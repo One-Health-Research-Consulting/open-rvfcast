@@ -36,11 +36,11 @@ jobs:
           libcurl4-openssl-dev \
           libssl-dev
           
-      - name: Decrypt repository using symmetric key
-        run: |
-          echo $GIT_CRYPT_KEY64 > git_crypt_key.key64 && base64 -di git_crypt_key.key64 > git_crypt_key.key && git-crypt unlock git_crypt_key.key
-          rm git_crypt_key.key git_crypt_key.key64
-      
+      - name: Unlock secrets
+        uses: sliteteam/github-action-git-crypt-unlock@1.2.0
+        env:
+          GIT_CRYPT_KEY64: ${{ secrets.GIT_CRYPT_KEY64 }} 
+          
       - name: Restore R packages
         run: |
           renv::restore()
