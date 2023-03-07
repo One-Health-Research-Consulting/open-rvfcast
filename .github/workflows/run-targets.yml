@@ -19,7 +19,7 @@ env:
   GIT_CRYPT_KEY: ${{ secrets.GIT_CRYPT_KEY64 }}
       
 jobs:
-  container-workflow-encrypted-tempalte:
+  run-targets:
     runs-on: ubuntu-latest                                # Run on GitHub Actions runner
     #runs-on: [self-hosted, linux, x64, onprem-aegypti]   # Run the workflow on EHA aegypti runner
     #runs-on: [self-hosted, linux, x64, onprem-prospero]  # Run the workflow on EHA prospero runner
