@@ -39,10 +39,11 @@ jobs:
       - name: Unlock secrets
         uses: sliteteam/github-action-git-crypt-unlock@1.2.0
 
-      - name: Restore R packages
-        run: |
-          renv::restore()
-        shell: Rscript {0}
+      - name: Install packages from renv.lock (with cache)
+        if: ${{ !env.ACT }}  ## Doesn't work locally with ACT
+        uses: r-lib/actions/setup-renv@v2
+        with:
+          cache-version: 2
     
       - name: Run targets workflow
         run: |
