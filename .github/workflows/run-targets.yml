@@ -16,7 +16,7 @@ on:
   #  - cron: "0 8 * * *"
 
 env:
-  GIT_CRYPT_KEY64: ${{ secrets.GIT_CRYPT_KEY64 }}
+  GIT_CRYPT_KEY: ${{ secrets.GIT_CRYPT_KEY64 }}
       
 jobs:
   container-workflow-encrypted-tempalte:
@@ -38,9 +38,7 @@ jobs:
           
       - name: Unlock secrets
         uses: sliteteam/github-action-git-crypt-unlock@1.2.0
-        env:
-          GIT_CRYPT_KEY64: ${{ secrets.GIT_CRYPT_KEY64 }} 
-          
+
       - name: Restore R packages
         run: |
           renv::restore()
