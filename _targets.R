@@ -12,9 +12,11 @@ tar_option_set(resources = tar_resources(
   format = "qs"
 )
 
+# Wahis download
 wahis <- tar_plan(
   tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()) # TODO: setup scheduled run to get new outbreaks (after last outbreak)
-)
+  #tar_target(wahis_rvf_outbreaks, clean_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw)) 
+  )
 
 # List targets -----------------------------------------------------------------
 
