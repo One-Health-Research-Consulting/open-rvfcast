@@ -2,8 +2,6 @@
 suppressPackageStartupMessages(source("packages.R"))
 for (f in list.files(here::here("R"), full.names = TRUE)) source (f)
 
-nproc <- 4
-
 # Targets options
 tar_option_set(resources = tar_resources(
   aws = tar_resources_aws(bucket = Sys.getenv("AWS_BUCKET_ID"), prefix = "open-rvfcast"),
@@ -12,14 +10,55 @@ tar_option_set(resources = tar_resources(
   format = "qs"
 )
 
-# Wahis download
+# How many parallel processes?
+nproc <- 4
+
+# Short term task tracking
+
+# TODO current
+# alternate weather data source
+# map out model and deploy
+
+# TODO priority 1
+# Plan how downloads will work on github actions, with caching and updates with new data
+# Figure out creds for ecmwf
+
+# TODO priority 2
+# encmwf: get spatial bound for all of Africa for ecmwf download
+# encmwf: fix sys 51 API call (currently failing)
+
+# Data Download -----------------------------------------------------------
 wahis <- tar_plan(
-  tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()) # TODO: setup scheduled run to get new outbreaks (after last outbreak)
-  #tar_target(wahis_rvf_outbreaks, clean_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw)) 
-  )
+  tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()),
+  tar_target(wahis_rvf_outbreaks, clean_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw)) 
+)
+ecmwf <- tar_plan(
+  tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter()), 
+  # !!! ecmwf_forecasts_downloaded currently returns directory without downloading !!!
+  tar_target(ecmwf_forecasts_download, download_ecmwf_forecasts(parameters = ecmwf_api_parameters, 
+                                                                user_id = "173186", 
+                                                                variable = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
+                                                                product_type = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
+                                                                leadtime_month = c("1", "2", "3", "4", "5", "6"),
+                                                                spatial_bound = c(-21, 15, -35, 37), # N, W, S, E 
+                                                                download_directory = here::here("data", "ecmwf_gribs"))),
+  tar_target(ecmwf_forecasts_preprocessed, 
+             preprocess_ecmwf_forecasts(ecmwf_forecasts_download,
+                                        output_filename =  here::here("data", "ecmwf_forecasts_preprocessed.csv")), 
+             format = "file"),
+  
+  # Note the tar_read. When using AWS this does not read
+  # into R but instead initiates a download of the file into
+  # the scratch folder for later processing.
+  # Format file here means if we delete or change the local cache it
+  # will force a re-download.
+  tar_target(ecmwf_forecasts_local, cache_aws_target(tar_read(ecmwf_forecasts_preprocessed)), repository = "local", format = "file"),
+  
+)
 
 # List targets -----------------------------------------------------------------
 
 list(
-  wahis
-  )
+  wahis,
+  ecmwf
+)
