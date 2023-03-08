@@ -83,6 +83,24 @@
       "Hash": "a45594a00f5dbb073d5ec9f48592a08a",
       "Requirements": []
     },
+    "arrow": {
+      "Package": "arrow",
+      "Version": "11.0.0.3",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "e861b81e0b87a2f133a688c985953508",
+      "Requirements": [
+        "R6",
+        "assertthat",
+        "bit64",
+        "cpp11",
+        "glue",
+        "purrr",
+        "rlang",
+        "tidyselect",
+        "vctrs"
+      ]
+    },
     "askpass": {
       "Package": "askpass",
       "Version": "1.1",

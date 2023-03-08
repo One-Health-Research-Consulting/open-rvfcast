@@ -7,11 +7,9 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-cache_aws_target <- function(tmp_path, cleanup = TRUE) {
-
-  ext <- tools::file_ext(tmp_path)
+cache_aws_target <- function(tmp_path, ext, cleanup = TRUE) {
   
-  local_path <- gsub(paste0('\\.', ext), paste0("_cache\\.", ext), tmp_path)
+  local_path <- gsub(ext, paste0("_cache", ext), tmp_path)
   file.copy(tmp_path, local_path, overwrite = TRUE)
   
   if(cleanup) {
