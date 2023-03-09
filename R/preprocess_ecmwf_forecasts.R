@@ -12,7 +12,7 @@ preprocess_ecmwf_forecasts <- function(ecmwf_forecasts_download,
                                        download_directory,
                                        preprocessed_directory) {
   
-  suppressWarnings(dir.create(preprocessed_directory, recursive = TRUE))
+  suppressWarnings(dir.create(here::here(preprocessed_directory), recursive = TRUE))
   existing_files <- list.files(preprocessed_directory)
   
   # filename for postprocessed file
@@ -22,7 +22,7 @@ preprocess_ecmwf_forecasts <- function(ecmwf_forecasts_download,
   # begin processing
   message(paste0("Processing ", ecmwf_forecasts_download))
   
-  file <- file.path(download_directory, ecmwf_forecasts_download)
+  file <- here::here(download_directory, ecmwf_forecasts_download)
   
   # read in with terra
   grib <- terra::rast(file)
@@ -42,8 +42,8 @@ preprocess_ecmwf_forecasts <- function(ecmwf_forecasts_download,
   dat <- as.data.frame(grib, xy = TRUE) |> 
     pivot_longer(-c("x", "y"), names_to = "id")
   
-  write_csv(dat, file.path(preprocessed_directory, filename))
+  write_csv(dat, here::here(preprocessed_directory, filename))
   
-  return(filename)
+  return(file.path(preprocessed_directory, filename))
   
 }

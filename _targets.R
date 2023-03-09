@@ -50,7 +50,7 @@ ecmwf <- tar_plan(
                                                                 product_type = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
                                                                 leadtime_month = c("1", "2", "3", "4", "5", "6"),
                                                                 spatial_bound = c(-21, 15, -35, 37), # N, W, S, E
-                                                                download_directory = here::here("data", "ecmwf_gribs")),
+                                                                download_directory = "data/ecmwf_gribs"),
              pattern = map(ecmwf_api_parameters), 
              iteration = "list"),
   
@@ -58,8 +58,8 @@ ecmwf <- tar_plan(
   # convert grib files to compressed csvs
   tar_target(ecmwf_forecasts_preprocessed,
              preprocess_ecmwf_forecasts(ecmwf_forecasts_download,
-                                        download_directory = here::here("data", "ecmwf_gribs"),
-                                        preprocessed_directory =  here::here("data", "ecmwf_csvs")),
+                                        download_directory = "data/ecmwf_gribs",
+                                        preprocessed_directory =  "data/ecmwf_csvs"),
              pattern = map(ecmwf_forecasts_download), 
              iteration = "list",
              format = "file" 
@@ -73,6 +73,7 @@ ecmwf <- tar_plan(
   # Format file here means if we delete or change the local cache it
   # will force a re-download.
   tar_target(ecmwf_forecasts_local, {
+    suppressWarnings(dir.create(here::here("data/ecmwf_csvs"), recursive = TRUE))
     cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
                               ext = ".csv.gz")
   },
