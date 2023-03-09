@@ -16,12 +16,13 @@ nproc <- 4
 # Short term task tracking
 
 # TODO current
-# alternate weather data source
 # map out model and deploy
+# alternate weather data source
 
 # TODO priority 1
 # Plan how downloads will work on github actions, with caching and updates with new data
 # Figure out creds for ecmwf
+# Server error - local cache transer is not working (https://unix.stackexchange.com/questions/79132/invalid-cross-device-link-while-hardlinking-in-the-same-file-system)
 
 # TODO priority 2
 # encmwf: get spatial bound for all of Africa for ecmwf download
@@ -72,14 +73,17 @@ ecmwf <- tar_plan(
   # the scratch folder for later processing.
   # Format file here means if we delete or change the local cache it
   # will force a re-download.
-  tar_target(ecmwf_forecasts_local, {
-    suppressWarnings(dir.create(here::here("data/ecmwf_csvs"), recursive = TRUE))
+  tar_target(ecmwf_forecasts_local, {suppressWarnings(dir.create(here::here("data/ecmwf_csvs"), recursive = TRUE))
     cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
-                              ext = ".csv.gz")
-  },
-  repository = "local", 
-  format = "file"
+                              ext = ".csv.gz")},
+    repository = "local", 
+    format = "file"
   ),
+  
+  # SERVER ERROR
+  # Warning messages:
+  #   1: In file.rename(from = scratch, to = stage) :
+  #   cannot rename file '/tmp/RtmpVdd2Fa/scratch/targets_aws_file_570ca545a66c0' to 'data/ecmwf_csvs/ecmwf_seasonal_forecast_4_2017_to_2017.csv.gz', reason 'Invalid cross-device link'
   
 )
 
