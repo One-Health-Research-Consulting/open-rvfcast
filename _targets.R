@@ -22,8 +22,7 @@ nproc <- 4
 # TODO priority 1
 # Plan how downloads will work on github actions, with caching and updates with new data
 # Figure out creds for ecmwf
-# Figure out dynamic branching with cacheing
-
+ 
 # TODO priority 2
 # encmwf: get spatial bound for all of Africa for ecmwf download
 # encmwf: fix sys 51 API call (currently failing)
@@ -65,23 +64,17 @@ ecmwf <- tar_plan(
              iteration = "list",
              format = "file" 
              ),
-
+  
   # Note the tar_read. When using AWS this does not read
   # into R but instead initiates a download of the file into
   # the scratch folder for later processing.
   # Format file here means if we delete or change the local cache it
   # will force a re-download.
   tar_target(ecmwf_forecasts_local, 
-             tar_read(ecmwf_forecasts_preprocessed), 
-             #TODO tar_read is not working with mapping, instead multiplies number of endpoints by number of branches
-             # maybe that means we can skip branching here, just use the list?
-             
-             # cache_aws_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
-             #                  ext = ".csv.gz"), 
-             pattern = map(ecmwf_forecasts_preprocessed)#, 
-             #iteration = "list",
-             #repository = "local", 
-             #format = "file"
+             cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
+                              ext = ".csv.gz"),
+             repository = "local", 
+             format = "file"
              ),
   
 )
