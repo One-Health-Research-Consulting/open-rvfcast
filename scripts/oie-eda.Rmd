@@ -1,0 +1,208 @@
+---
+title: "OIE RVF Outbreaks"
+output: html_document
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+h <- here::here
+library(targets)
+suppressPackageStartupMessages(
+  source(h("packages.R"))
+)
+library(httr)
+library(jsonlite)
+library(urltools)
+
+```
+
+
+```{r api, include=FALSE}
+# function to run query with variable offset
+create_oie_query <- function(offset){
+  
+  endpoint <- "https://www.dolthub.com/api/v1alpha1/ecohealthalliance/wahisdb/main"
+  query <- glue::glue(
+    "SELECT ts.*, ob.outbreak_thread_id, ob.country, ob.country_iso3c, ob.disease, ob.duration_in_days, ob.total_cases_per_outbreak 
+FROM outbreak_summary ob 
+JOIN outbreak_time_series ts 
+ON ob.outbreak_thread_id=ts.outbreak_thread_id 
+WHERE disease = 'rift valley fever'
+LIMIT 200
+OFFSET {offset}")
+  
+  url <- param_set(endpoint, key = "q", value = url_encode(query)) 
+  return(url)
+}
+
+# intialize parameters
+offset <- 0 
+limit <- 200
+oie <- tibble()
+
+# Repeat the query until all data is downloaded
+while(TRUE) {
+  
+  # Set the url call
+  url <- create_oie_query(offset)
+  
+  # Make the API request
+  res <- RETRY("POST", url, encode = "json", times = 3)
+  
+  # Check if the request was successful
+  if (res$status_code != 200) {
+    stop("API request failed with status code: ", res$status_code)
+  }
+  
+  # Parse the JSON response
+  dat <- fromJSON(content(res, as = "text"))
+  
+  # Add to the dataframe
+  oie <- bind_rows(oie, dat$rows)
+  
+  # Increment the offset
+  offset <- offset + limit
+  
+  Sys.sleep(1)
+  
+  # Check if all data has been downloaded
+  if (nrow(dat$rows) < limit) {
+    break
+  }
+}
+```
+
+```{r cleaning, include=FALSE}
+
+oie$continent <- countrycode::countrycode(oie$country_iso3c, origin = "iso3c", destination = "continent")
+oie <- oie |> filter(continent == "Africa") |> filter(cases_per_interval > 0)
+
+regions <- tribble( ~"country", ~"region",
+                    "Libya", "Northern",
+                    "Kenya", "Eastern",
+                    "South Africa", "Southern", 
+                    "Mauritania", "Western",
+                    "Niger", "Western",
+                    "Namibia", "Southern",
+                    "Madagascar", "Eastern",
+                    "Eswatini", "Southern",
+                    "Botswana" , "Southern",
+                    "Mayotte" , "Eastern",
+                    "Mali", "Western",
+                    "Tanzania", "Eastern",
+                    "Chad", "Central",
+                    "Sudan", "Northern",
+                    "Senegal","Western" )
+
+oie <- left_join(oie, regions)
+# n_distinct(oie$outbreak_thread_id) # 33 outbreaks
+# n_distinct(oie$country) # 15 countries
+```
+
+-   Built at: `r Sys.time()`
+-   Last git commit hash: `r gert::git_commit_id()`
+
+### OIE summary by country
+```{r oie-outbreak-summary}
+oie_summary <- oie |>
+  group_by(region, country_iso3c, country) |> 
+  summarize(n_outbreaks = n_distinct(outbreak_thread_id), 
+            n_cases = sum(cases_per_interval),
+            min_date = as_date(min(start_date)), 
+            max_date = as_date(max(start_date)),
+            avg_duration_days = round(mean(duration_in_days))) |> 
+  ungroup() |> 
+  arrange(-n_cases)
+oie_summary |> datatable()
+```
+
+
+### OIE cases by country and taxa
+```{r oie-outbreak-taxa-summary}
+oie_summary_by_taxa <- oie |>
+  group_by(region, country_iso3c, country, taxon) |> 
+  summarize(n_cases = sum(cases_per_interval)) |> 
+  ungroup()  |> 
+  arrange(-n_cases)
+
+oie_summary_by_taxa|> datatable()
+```
+
+```{r get-spatial-data}
+africa <- rnaturalearth::ne_countries(continent ="Africa", returnclass = "sf")
+africa_rvf <- left_join(africa, oie_summary, by = c("iso_a3" = "country_iso3c")) |> 
+  mutate(outbreak_label = ifelse(is.na(n_outbreaks), NA, paste(country, "\n", n_outbreaks))) |> 
+  mutate(cases_label = ifelse(is.na(n_cases), NA, paste(country, "\n", n_cases)))
+outbreak_points <- oie |> 
+  distinct(outbreak_thread_id, country, latitude, longitude, total_cases_per_outbreak) |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs =  st_crs(africa))
+```
+
+### OIE Cases Map
+```{r cases-map}
+ggplot() +
+  geom_sf(data = africa_rvf, aes(fill = n_outbreaks), color = "gray50", size = 0.1) +
+  geom_sf(data = outbreak_points, aes(size = total_cases_per_outbreak), color = "darkorange3") +    geom_sf_text(data = africa_rvf, aes(label = cases_label), size = 2.5) +
+  scale_size_continuous(breaks = c(10, 100, 1000, 10000, 30000)) +
+  # geom_sf_text(data = outbreak_points, aes(label = total_cases_per_outbreak), size = 2.5) +
+  # geom_text_repel(data = outbreak_points, aes(label = total_cases_per_outbreak, geometry = geometry),stat = "sf_coordinates",  min.segment.length = 0, size = 2.5) +
+  scale_fill_viridis_c(na.value = "gray80", alpha = 0.5) +
+  labs(title = "", fill = "Number of Outbreaks", size = "Cases per Outbreak") +
+  theme_map() +
+  theme(legend.position = "right")
+```
+
+### Outbreak Timing
+```{r time}
+oie_summary_ts <- oie |>
+  group_by(region, country_iso3c, country, outbreak_thread_id) |> 
+  summarize(n_cases = sum(cases_per_interval),
+            min_date = as_date(min(start_date)), 
+            max_date = as_date(max(end_date))) |> 
+  ungroup() |> 
+  arrange(-n_cases)
+
+ggplot(oie_summary_ts) +
+  geom_point(aes(x = min_date, y = n_cases, color = region)) +
+  #geom_segment( aes(x =  min_date, xend = max_date, y = n_cases, yend = n_cases, color = region)) +
+  labs(title = "",  y = "Cases", x = "", subtitle = "each point is an outbreak") +
+  scale_y_log10() +
+  scale_x_date(date_breaks = "2 years", labels=date_format("%Y")) + 
+  theme_bw()
+```
+
+### South Africa
+```{r rsa}
+rsa_oie <- oie |> 
+  filter(country == "South Africa") |> 
+  mutate(year = year(start_date)) |> 
+  mutate(year = as.factor(year)) |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs =  st_crs(africa))
+
+rsa_ews <- tar_read(outbreak_data_raw, store = h("_targets")) |>
+  filter(cases >0) |> 
+  filter(Year >= 2008) |> 
+  mutate(year = as.factor(Year)) |> 
+  sf::st_as_sf(coords = c("East", "South"), crs = '+proj=longlat +datum=WGS84') 
+
+
+sum(rsa_ews$cases)
+
+rsa <- africa |> filter(admin == "South Africa")
+
+ggplot() +
+  geom_sf(data = rsa, color = "gray50", size = 0.1) +
+  geom_sf(data = rsa_oie, aes(color = year)) +    
+  theme_map() +
+  labs(title = "OIE", subtitle = paste(sum(rsa_oie$cases_per_interval), "cases")) +
+  theme(legend.position = "right")
+
+ggplot() +
+  geom_sf(data = rsa, color = "gray50", size = 0.1) +
+  geom_sf(data = rsa_ews, aes(color = year)) +    
+  theme_map() +
+  labs(title = "EWS data", subtitle = paste(sum(rsa_ews$cases), "cases")) +
+  theme(legend.position = "right")
+
+```
