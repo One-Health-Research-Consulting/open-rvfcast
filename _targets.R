@@ -16,8 +16,7 @@ nproc <- 4
 # Short term task tracking
 
 # TODO current
-# map out model and deploy
-# alternate weather data source
+# alternate recorded weather data source
 
 # TODO priority 1
 # Plan how downloads will work on github actions, with caching and updates with new data
@@ -29,22 +28,21 @@ nproc <- 4
 # encmwf: fix sys 51 API call (currently failing)
 # wahis: refactor to download with dynamic branching
 
-# Data Download -----------------------------------------------------------
-wahis <- tar_plan(
-  tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()),
-  tar_target(wahis_rvf_outbreaks, clean_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw)) 
-)
-
-ecmwf <- tar_plan(
+# Data Source Download -----------------------------------------------------------
+source_targets <- tar_plan(
   
+  ## wahis
+  tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()),
+  tar_target(wahis_rvf_outbreaks_preprocessed, preprocess_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw)),
+
+  ## ecmwf
   tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter() |> 
-               filter(system != 51) |>  # NEED TO BUG FIX
-               slice(1:2) |>  # TMP
+               filter(system != 51) |> # temp until download bug is fixed
+               slice(1:2) |>  # temp for faster testing
                rowwise() |> 
                tar_group(),
              iteration = "group"), 
   
-  # use dynamic mapping to download, transform, and cache
   tar_target(ecmwf_forecasts_download, download_ecmwf_forecasts(parameters = ecmwf_api_parameters,
                                                                 user_id = "173186",
                                                                 variable = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
@@ -56,7 +54,6 @@ ecmwf <- tar_plan(
              iteration = "list"),
   
   
-  # convert grib files to compressed csvs
   tar_target(ecmwf_forecasts_preprocessed,
              preprocess_ecmwf_forecasts(ecmwf_forecasts_download,
                                         download_directory = "data/ecmwf_gribs",
@@ -67,13 +64,9 @@ ecmwf <- tar_plan(
   ),
   
   # cache locally
-  # ------
-  # Note the tar_read. When using AWS this does not read
-  # into R but instead initiates a download of the file into
-  # the scratch folder for later processing.
-  # Format file here means if we delete or change the local cache it
-  # will force a re-download.
-  tar_target(ecmwf_forecasts_local, {suppressWarnings(dir.create(here::here("data/ecmwf_csvs"), recursive = TRUE))
+  # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
+  # Format file here means if we delete or change the local cache it will force a re-download.
+  tar_target(ecmwf_forecasts_preprocessed_local, {suppressWarnings(dir.create(here::here("data/ecmwf_csvs"), recursive = TRUE))
     cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
                               ext = ".csv.gz")},
     repository = "local", 
@@ -87,9 +80,82 @@ ecmwf <- tar_plan(
   
 )
 
+# Data Processing -----------------------------------------------------------
+data_targets <- tar_plan(
+  
+  # Data cleaning - weather
+  # Assembly into time series
+  ## Each row is a pixel for a date (maybe on a weekly basis?, pixel based on coarser resolution of forecasts? or on finer resolution of recorded data)
+  ## trailing 90 days of recorded weather data (aggregated by month)
+  ## forecasted 90 days (weight based on time since last seasonal forecast)
+  
+  # Data cleaning - RVF
+  ## overlay with weather data 
+  ## add variable for spatial autocorrelation?
+  
+)
+
+# Model -----------------------------------------------------------
+model_targets <- tar_plan(
+  
+  # I like this workflow from rvf-ews1
+  
+  # model_data = prep_model_data(case_data, rast(static_stack)),
+  # spatial_grid = create_spatial_grid(model_data),
+  # blocked_data = create_blocked_model_data(model_data, spatial_grid),
+  # divided_data = divide_data(blocked_data),
+  # holdout_data = assessment(divided_data),
+  # training_data = analysis(divided_data),
+  # training_splits = create_training_splits(training_data),
+  # model_workflow = build_workflow(training_data),
+  # tuned_parameters = cv_tune_parameters(model_workflow, training_splits, grid_size = 10, n_cores = 4),
+  # tuned_model = fit_full_model(model_workflow, training_data, tuned_parameters),
+  # tar_file(tuned_model_file, {f <- "tuned_model_file.rds"; saveRDS(tuned_model, f, compress = "xz"); f}),
+  # holdout_data_predictions = predict_rvf(holdout_data, tuned_model),
+  # confusion_matrix = get_confusion_matrix(holdout_data_predictions),
+  # model_performance = summary(confusion_matrix),
+  # dalex_explainer = get_dalex_explainer(tuned_model)
+)
+
+# Deploy -----------------------------------------------------------
+deploy_targets <- tar_plan(
+  
+  # Regular updating of data - append to parquet file or duckdb
+  ## ecmwf forecast data = monthly (updated on the 13th)
+  ## recorded data = daily ?
+  
+  # Use fixed version of the model to generate new predictions
+  
+)
+
+# Plots -----------------------------------------------------------
+plot_targets <- tar_plan(
+  
+  # I like to pregenerate plots to feed into reports
+  
+)
+
+# Reports -----------------------------------------------------------
+report_targets <- tar_plan(
+  
+  # Data eval look at how past weather forecasts compare to historical recorded data
+  # Static model diagnostics and interpretation (test data performance, mcmc chains, VIP)
+  # Real time performance. How are our predictions compared to actual?
+  
+)
+
+# Testing -----------------------------------------------------------
+test_targets <- tar_plan(
+)
+
 # List targets -----------------------------------------------------------------
 
 list(
-  wahis,
-  ecmwf
+  source_targets,
+  data_targets,
+  model_targets,
+  deploy_targets,
+  plot_targets,
+  report_targets,
+  test_targets
 )

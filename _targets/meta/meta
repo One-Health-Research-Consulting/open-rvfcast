@@ -1,15 +1,17 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|62dd86602a9bbe51|||||||||||||||
+.Random.seed|object|2d0c17f9438414aa|||||||||||||||
 cache_aws_branched_target|function|aab501df44a18e06|||||||||||||||
 cache_aws_target|function|955ba0ca64e323a2|||||||||||||||
 clean_wahis_rvf_outbreaks|function|449e5937fba6f975|||||||||||||||
+data_targets|object|1eb1bc8d77111ded|||||||||||||||
+deploy_targets|object|1eb1bc8d77111ded|||||||||||||||
 download_ecmwf_forecasts|function|08c7677000300e78|||||||||||||||
 ecmwf|object|38c57dfe34fc7539|||||||||||||||
-ecmwf_api_parameters|stem|1b4ff16a6d18b844|ea29ae16fd98a1eb|578f0a8cd3eb2c7f|-877182628|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/ecmwf_api_parameters*endpoint=TlVMTA*version=pu1SQJeKBJXdtMBySDrzMpjr4v.xWhWn|t19424.8351378616s||247|qs|aws|group||ecmwf_api_parameters_7d3d550a*ecmwf_api_parameters_add9efc2|0.034||
+ecmwf_api_parameters|stem|1b4ff16a6d18b844|ea29ae16fd98a1eb|578f0a8cd3eb2c7f|-877182628|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/ecmwf_api_parameters*endpoint=TlVMTA*version=Dc5bgZoC2zMuV2GmzJBl4md57sEQGqex|t19425.6472192391s||247|qs|aws|group||ecmwf_api_parameters_7d3d550a*ecmwf_api_parameters_add9efc2|0.058||
 ecmwf_forecasts_download|pattern|e220dc1917b1fc56|3348a0746b97766a||-1391179141||||152|qs|aws|list||ecmwf_forecasts_download_a5618119*ecmwf_forecasts_download_d73ac62c|0.02||
 ecmwf_forecasts_download_08a880ea|branch|515191b7a98c48a1|3348a0746b97766a|abe659fcbef13ab8|824652975|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/ecmwf_forecasts_download_08a880ea*endpoint=TlVMTA*version=cQMVskcOICEC3ZVsAygxjBvGtmfdgVK_|t19424.8288369254s||76|qs|aws|list|ecmwf_forecasts_download||0.001||
 ecmwf_forecasts_download_16fdbebd|branch|fd4565a32753f9f8|3348a0746b97766a|f2f2363eeca63ee9|-283608266|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/ecmwf_forecasts_download_16fdbebd*endpoint=TlVMTA*version=jLX4ksiD0Y0hJHsHtBZutj45qaNM0Anf|t19424.8288396222s||76|qs|aws|list|ecmwf_forecasts_download||0||
-ecmwf_forecasts_download_3be9ef85|branch|2bb339e1379dddd2|1ad4f06ecc1c7aae|404815dc3e578fcd|1218553905|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/ecmwf_forecasts_download_3be9ef85*endpoint=TlVMTA*version=BTcRTxip.hj9Py3bB6VzqZ1HItibNcP_|t19424.7875267364s||30|qs|aws|vector|ecmwf_forecasts_download||0||
+ecmwf_forecasts_download_3be9ef85|branch|2bb339e1379dddd2|bb247708b987470f|5076c562b7891714|1218553905|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/ecmwf_forecasts_download_3be9ef85*endpoint=TlVMTA*version=BTcRTxip.hj9Py3bB6VzqZ1HItibNcP_|t19424.7875267364s||30|qs|aws|vector|ecmwf_forecasts_download||4.406||Data identifier seasonalmonthlysinglelevels is not found in Web API, CDS or ADS datasets.                 Or your login credentials do not match your request.
 ecmwf_forecasts_download_78ebfdc2|branch|e0815afb8dde8913|3348a0746b97766a|93930e4fcf116517|-1746781504|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/ecmwf_forecasts_download_78ebfdc2*endpoint=TlVMTA*version=mhfL3oLZesvnx9fOB6jdbZknxISXPuar|t19424.8288377235s||76|qs|aws|list|ecmwf_forecasts_download||0.001||
 ecmwf_forecasts_download_a5618119|branch|a0f60d4a094436fa|bb247708b987470f|7ce945c57dac09c2|1432196109|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/ecmwf_forecasts_download_a5618119*endpoint=TlVMTA*version=TxngJpxVQGGePHFUuqZko.FfUT3EYQXd|t19425.6331076249s||76|qs|aws|list|ecmwf_forecasts_download||0.009||
 ecmwf_forecasts_download_c6cee0c1|branch|a0f60d4a094436fa|3348a0746b97766a|605f4fe11fdec889|1488793567|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/ecmwf_forecasts_download_c6cee0c1*endpoint=TlVMTA*version=qHfr_oL4xHLtfFQ9zhwyE2FvH_FnPLV8|t19424.8288360711s||76|qs|aws|list|ecmwf_forecasts_download||0.008||
@@ -32,16 +34,24 @@ ecmwf_forecasts_preprocessed_a65ef772|branch|0e22462d7220f8c0|de7f0aee1dbda14f|3
 ecmwf_forecasts_preprocessed_aa984500|branch|515191b7a98c48a1|de7f0aee1dbda14f|e9ded2f4062433e5|-825852650|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/ecmwf_forecasts_preprocessed_aa984500*endpoint=TlVMTA*version=imRULf1srw7fPd4.jP7iJbXv2SajeO2Z|t19424.829722416s||76|qs|aws|list|ecmwf_forecasts_preprocessed||0.001||
 ecmwf_forecasts_preprocessed_d44fdb36|branch|eee2463428a0e2b1|fa38cda8883ca59b|ece8c1015708a18b|-2145576784|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/ecmwf_forecasts_preprocessed_d44fdb36*endpoint=TlVMTA*stage=data/ecmwf_csvs/ecmwf_seasonal_forecast_5_1993_to_1995.csv.gz*version=f2sYltb0rffpaKBM0rN038_b_4hY5oce|t19425.6339433771s|583c3df175107ac5|176332109|file|aws|list|ecmwf_forecasts_preprocessed||62.883||
 ecmwf_forecasts_preprocessed_ef7e337c|branch|32b820d10891add6|de7f0aee1dbda14f|a55543441e4b78fd|2024142137|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/ecmwf_forecasts_preprocessed_ef7e337c*endpoint=TlVMTA*version=oiL0IPuS8MUccRJH080oxeaKaDdpoayZ|t19424.8297248382s||76|qs|aws|list|ecmwf_forecasts_preprocessed||0.001||
+ecmwf_forecasts_preprocessed_local|stem|d835ff88697cbd31|edc650bd8cf00362|8c2e3d4244231f3b|-200737809|data/ecmwf_csvs/ecmwf_seasonal_forecast_4_2017_to_2017_cache.csv.gz*data/ecmwf_csvs/ecmwf_seasonal_forecast_5_1993_to_1995_cache.csv.gz|t19425.6633025001s|732c3212934f8d05|196518753|file|local|vector|||32.518||
 f|object|5e485be002c447a4|||||||||||||||
 files_bb8cab60|branch||f11a6bf1b1830f22|762f7baa35a7c9fd|2056725708|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/files_bb8cab60*endpoint=TlVMTA*stage=ecmwf_seasonal_forecast_4_2017_to_2017.csv.gz//Users/emmamendelsohn/projects/open-rvfcast/data/ecmwf_gribs|t19424.8975012828s||0|file|aws|vector|files||||_paths_ 31mmissing files ecmwf_seasonal_forecast_4_2017_to_2017.csv.gzUsersemmamendelsohnprojectsopenrvfcastdataecmwf_gribs39m
 get_wahis_rvf_outbreaks_raw|function|5f598f1bb5b718a6|||||||||||||||
+model_targets|object|1eb1bc8d77111ded|||||||||||||||
 nproc|object|4fd03901ce9470f4|||||||||||||||
+plot_targets|object|1eb1bc8d77111ded|||||||||||||||
 preprocess_ecmwf_forecasts|function|861f59080854da25|||||||||||||||
+preprocess_wahis_rvf_outbreaks|function|449e5937fba6f975|||||||||||||||
 process_ecmwf_forecasts|function|e4b6cdd333cb9180|||||||||||||||
+report_targets|object|1eb1bc8d77111ded|||||||||||||||
 set_ecmwf_api_parameter|function|eaef3649355aa9c7|||||||||||||||
+source_targets|object|aba803a5972e8474|||||||||||||||
 test|stem|7321d36b45e151a8|de45df0690f3bdc4|63723adc94e4e6f3|1064684737|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/test*endpoint=TlVMTA*version=Xb_Yq3W4B7cTeR8Pqnk2353HD7f8wEt9|t19425.5950726292s||186|qs|aws|vector|||0.001||
-user_rprof|object|9cd9b528328f544e|||||||||||||||
+test_targets|object|1eb1bc8d77111ded|||||||||||||||
+user_rprof|object|4feea962893b5729|||||||||||||||
 wahis|object|6a46063d8a926bbf|||||||||||||||
 wahis_rvf_outbreaks|stem|5d5f049d3c4b6a19|22818b1181882376|faa25ea92cf71fe4|1834537007|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/wahis_rvf_outbreaks*endpoint=TlVMTA*version=jp9XFsmoxJTbGgdG5gNuFsVq272j28wY|t19424.6141142455s||70574|qs|aws|vector|||0.103||
+wahis_rvf_outbreaks_preprocessed|stem|5d5f049d3c4b6a19|3ea98184b5887c93|0d0bc80b8c0c9db5|2127878318|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/wahis_rvf_outbreaks_preprocessed*endpoint=TlVMTA*version=KYstUqze7ql3tWk9gA0StbkZx0ylyFXA|t19425.6624870742s||70574|qs|aws|vector|||0.08||
 wahis_rvf_outbreaks_raw|stem|21ed8b89991782f4|b988ec4215d4213c|163bc1f7c5910584|1933416983|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/wahis_rvf_outbreaks_raw*endpoint=TlVMTA*version=jpUCyo4S941i.Z3ErG_EVDdTKQnaLijc|t19423.8958938137s||69672|qs|aws|vector|||27.615||
 wahis_rvf_query|function|b8bb534f6c6e8e4b|||||||||||||||
