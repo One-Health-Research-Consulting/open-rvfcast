@@ -12,7 +12,6 @@ preprocess_ecmwf_forecasts <- function(ecmwf_forecasts_download,
                                        download_directory,
                                        preprocessed_directory) {
   
-  # create directory for processed files if it doesnt exisit
   suppressWarnings(dir.create(preprocessed_directory, recursive = TRUE))
   existing_files <- list.files(preprocessed_directory)
   

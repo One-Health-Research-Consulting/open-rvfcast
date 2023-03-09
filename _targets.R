@@ -22,7 +22,7 @@ nproc <- 4
 # TODO priority 1
 # Plan how downloads will work on github actions, with caching and updates with new data
 # Figure out creds for ecmwf
- 
+
 # TODO priority 2
 # encmwf: get spatial bound for all of Africa for ecmwf download
 # encmwf: fix sys 51 API call (currently failing)
@@ -55,7 +55,7 @@ ecmwf <- tar_plan(
              iteration = "list"),
   
   
-  # convert grib files to parquet
+  # convert grib files to compressed csvs
   tar_target(ecmwf_forecasts_preprocessed,
              preprocess_ecmwf_forecasts(ecmwf_forecasts_download,
                                         download_directory = here::here("data", "ecmwf_gribs"),
@@ -63,19 +63,22 @@ ecmwf <- tar_plan(
              pattern = map(ecmwf_forecasts_download), 
              iteration = "list",
              format = "file" 
-             ),
+  ),
   
+  # cache locally
+  # ------
   # Note the tar_read. When using AWS this does not read
   # into R but instead initiates a download of the file into
   # the scratch folder for later processing.
   # Format file here means if we delete or change the local cache it
   # will force a re-download.
-  tar_target(ecmwf_forecasts_local, 
-             cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
-                              ext = ".csv.gz"),
-             repository = "local", 
-             format = "file"
-             ),
+  tar_target(ecmwf_forecasts_local, {
+    cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
+                              ext = ".csv.gz")
+  },
+  repository = "local", 
+  format = "file"
+  ),
   
 )
 

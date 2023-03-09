@@ -5,10 +5,11 @@
 .DS_Store
 _targets/objects
 _targets.yaml
+nohup.out
 outputs/
 !outputs/.gitkeep
 !outputs/example_report.html
-data/
-!data/.gitkeep
-nohup.out
+data/**/*.csv.gz
+data/**/*.grib
+
 
