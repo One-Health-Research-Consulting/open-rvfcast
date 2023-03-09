@@ -1,17 +1,17 @@
 name: run-targets
 
 on:
-  push:
-    branches:
-      - main
-      - master
-  pull_request:
-    branches:
-      - main
-      - master
-  workflow_dispatch:
-    branches:
-      - '*'
+  # push:
+  #   branches:
+  #     - main
+  #     - master
+  # pull_request:
+  #   branches:
+  #     - main
+  #     - master
+  # workflow_dispatch:
+  #   branches:
+  #     - '*'
   #schedule:
   #  - cron: "0 8 * * *"
 
