@@ -13,11 +13,6 @@ tar_option_set(resources = tar_resources(
 # How many parallel processes?
 nproc <- 4
 
-# Set these in .env
-# ECMWF_TOKEN=**** 
-# R_KEYRING_BACKEND=env # through keyring package - set backend to env
-# wf_set_key() in download function
-
 # Data Source Download -----------------------------------------------------------
 source_targets <- tar_plan(
   
@@ -36,11 +31,10 @@ source_targets <- tar_plan(
   
   tar_target(ecmwf_forecasts_download, 
              download_ecmwf_forecasts(parameters = ecmwf_api_parameters,
-                                      user_id = "173186",
+                                      spatial_bound = c(-21, 15, -35, 37), # N, W, S, E
                                       variable = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
                                       product_type = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
                                       leadtime_month = c("1", "2", "3", "4", "5", "6"),
-                                      spatial_bound = c(-21, 15, -35, 37), # N, W, S, E
                                       download_directory = "data/ecmwf_gribs"),
              pattern = map(ecmwf_api_parameters), 
              iteration = "list",

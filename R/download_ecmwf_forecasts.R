@@ -8,11 +8,10 @@
 #' @author Emma Mendelsohn
 #' @export
 download_ecmwf_forecasts <- function(parameters, 
-                                     user_id,
+                                     spatial_bound,
                                      variable = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
                                      product_type = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
                                      leadtime_month = c("1", "2", "3", "4", "5", "6"),
-                                     spatial_bound,
                                      download_directory){
   
   suppressWarnings(dir.create(download_directory, recursive = TRUE))
@@ -41,7 +40,9 @@ download_ecmwf_forecasts <- function(parameters,
     target = filename
   )
   
-  safely(wf_request(user = user_id, request = request, transfer = TRUE, path = download_directory))
+  wf_set_key(user = Sys.getenv("ECMWF_USERID"), key = Sys.getenv("ECMWF_TOKEN"), service = "cds")
+  
+  safely(wf_request(user = Sys.getenv("ECMWF_USERID"), request = request, transfer = TRUE, path = download_directory))
   
   
   return(filename)
