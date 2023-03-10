@@ -17,8 +17,15 @@ preprocess_ecmwf_forecasts <- function(ecmwf_forecasts_download,
   
   # filename for postprocessed file
   filename <- str_replace(basename(ecmwf_forecasts_download), "\\.grib", "\\.csv.gz")
-  if(filename %in% existing_files) return(file.path(preprocessed_directory, filename)) # skip if file exists
-
+  
+  # begin processing
+  message(paste0("Preprocessing ", ecmwf_forecasts_download))
+  
+  if(filename %in% existing_files){
+    message("file already exists, skipping preprocess")
+    return(file.path(preprocessed_directory, filename)) # skip if file exists
+  }
+  
   # begin processing
   message(paste0("Processing ", ecmwf_forecasts_download))
   

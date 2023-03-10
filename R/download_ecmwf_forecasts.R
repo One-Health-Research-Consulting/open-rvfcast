@@ -24,8 +24,13 @@ download_ecmwf_forecasts <- function(parameters,
   filename <- paste("ecmwf", "seasonal_forecast", system, min(year), "to", max(year), sep = "_")
   filename <- paste0(filename, ".grib")
 
-  if(filename %in% existing_files) return(filename) # skip if file exists
+  message(paste0("Downloading ", filename))
   
+  if(filename %in% existing_files) {
+    message("file already exists, skipping download")
+    return(filename)
+    #return(file.path(download_directory, filename)) # skip if file exists
+  }  
   request <- list(
     originating_centre = "ecmwf",
     system = system,

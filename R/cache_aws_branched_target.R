@@ -12,6 +12,7 @@ cache_aws_branched_target <- function(tmp_path, ext, cleanup = TRUE) {
   local_path <- map(tmp_path, ~gsub(ext, paste0("_cache", ext), .))
     
   walk2(tmp_path, local_path, function(tmp, local){
+    message(paste("caching", basename(tmp)))
     file.copy(tmp, local, overwrite = TRUE)
   })
   
