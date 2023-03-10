@@ -24,7 +24,7 @@ source_targets <- tar_plan(
   ## ecmwf
   tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter() |> 
                filter(system != 51) |> # temp until download bug is fixed
-               slice(1) |>  # temp for faster testing
+               slice(4) |>  # temp for faster testing
                rowwise() |> 
                tar_group(),
              iteration = "group"), 
@@ -38,7 +38,7 @@ source_targets <- tar_plan(
                                       download_directory = "data/ecmwf_gribs"),
              pattern = map(ecmwf_api_parameters), 
              iteration = "list",
-             cue = tar_cue("always")
+            # cue = tar_cue("always")
              # return relative path
   ),
   
