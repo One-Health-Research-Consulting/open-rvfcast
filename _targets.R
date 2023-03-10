@@ -23,7 +23,7 @@ source_targets <- tar_plan(
   
   ## ecmwf
   tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter() |> 
-               filter(system == 51) |>
+               slice(1:4) |>
                rowwise() |> 
                tar_group(),
              iteration = "group"), 

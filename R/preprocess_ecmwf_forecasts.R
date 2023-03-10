@@ -26,9 +26,6 @@ preprocess_ecmwf_forecasts <- function(ecmwf_forecasts_download,
     return(file.path(preprocessed_directory, filename)) # skip if file exists
   }
   
-  # begin processing
-  message(paste0("Processing ", ecmwf_forecasts_download))
-  
   file <- here::here(ecmwf_forecasts_download)
   
   # read in with terra
