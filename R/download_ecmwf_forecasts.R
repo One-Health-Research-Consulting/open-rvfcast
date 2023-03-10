@@ -28,8 +28,8 @@ download_ecmwf_forecasts <- function(parameters,
   
   if(filename %in% existing_files) {
     message("file already exists, skipping download")
-    return(filename)
-    #return(file.path(download_directory, filename)) # skip if file exists
+    # return(filename)
+    return(file.path(download_directory, filename)) # skip if file exists
   }  
   request <- list(
     originating_centre = "ecmwf",
@@ -50,5 +50,5 @@ download_ecmwf_forecasts <- function(parameters,
   safely(wf_request(user = Sys.getenv("ECMWF_USERID"), request = request, transfer = TRUE, path = download_directory))
   
   
-  return(filename)
+  return(file.path(download_directory, filename))
 }

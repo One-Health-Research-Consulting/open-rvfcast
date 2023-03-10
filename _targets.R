@@ -36,15 +36,13 @@ source_targets <- tar_plan(
                                       leadtime_month = c("1", "2", "3", "4", "5", "6"),
                                       download_directory = "data/ecmwf_gribs"),
              pattern = map(ecmwf_api_parameters), 
-             iteration = "list",
-            # cue = tar_cue("always")
-             # return relative path
+             iteration = "list"
   ),
   
   
   tar_target(ecmwf_forecasts_preprocessed,
              preprocess_ecmwf_forecasts(ecmwf_forecasts_download,
-                                        download_directory = "data/ecmwf_gribs",
+                                        #download_directory = "data/ecmwf_gribs",
                                         preprocessed_directory =  "data/ecmwf_csvs"),
              pattern = map(ecmwf_forecasts_download), 
              iteration = "list",
