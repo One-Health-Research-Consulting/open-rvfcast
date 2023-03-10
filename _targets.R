@@ -23,8 +23,7 @@ source_targets <- tar_plan(
   
   ## ecmwf
   tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter() |> 
-               filter(system != 51) |> # temp until download bug is fixed
-               slice(4) |>  # temp for faster testing
+               filter(system == 51) |>
                rowwise() |> 
                tar_group(),
              iteration = "group"), 

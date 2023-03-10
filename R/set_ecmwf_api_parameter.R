@@ -8,12 +8,16 @@
 #' @author Emma Mendelsohn
 #' @export
 set_ecmwf_api_parameter <- function() {
-
+  
   # System 4 covers just sept/oct 2017
   sys4 <- tibble(system = 4, year = list(2017), month = list(9:10))
   
   # System 51 covers nov 2022 through present
-  sys51_dates <- seq(ymd("2022-11-01"), Sys.Date(), by = "month")
+  # Setup to download just 2022 first (download fails when combining end of 2022 with beginning of 2023)
+  sys51_2022 <- tibble(system = 51, year = list(2022), month = list(11:12))
+  
+  # Now get 2023 onward
+  sys51_dates <- seq(ymd("2023-01-01"), Sys.Date(), by = "month")
   
   ## Real-time forecasts are released once per month on the 13th at 12UTC
   ## Check if new forecast has been released this month
@@ -32,7 +36,8 @@ set_ecmwf_api_parameter <- function() {
   }
   sys51 <- tibble(system = 51,
                   year = sys51_years,
-                  month = list(unique(month(sys51_dates))))
+                  month = list(unique(month(sys51_dates)))) |> 
+    bind_rows(sys51_2022)
   
   # System 5 covers everything else. 
   sys5_years <- 1993:2022
@@ -42,5 +47,5 @@ set_ecmwf_api_parameter <- function() {
   seasonal_forecast_parameters <- bind_rows(sys4, sys51, sys5)
   
   return(seasonal_forecast_parameters)
-
+  
 }
