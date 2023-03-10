@@ -23,7 +23,6 @@ source_targets <- tar_plan(
   
   ## ecmwf
   tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter() |> 
-               slice(1:4) |>
                rowwise() |> 
                tar_group(),
              iteration = "group"), 
@@ -55,7 +54,9 @@ source_targets <- tar_plan(
   # Format file here means if we delete or change the local cache it will force a re-download.
   tar_target(ecmwf_forecasts_preprocessed_local, {suppressWarnings(dir.create(here::here("data/ecmwf_csvs"), recursive = TRUE))
     cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
-                              ext = ".csv.gz")},
+                              ext = ".csv.gz",
+                              cleanup = FALSE) # setting cleanup to false doesn't work - targets will still remove the non-cache files
+    },
     repository = "local", 
     format = "file"
   ),

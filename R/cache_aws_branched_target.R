@@ -7,7 +7,7 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-cache_aws_branched_target <- function(tmp_path, ext, cleanup = TRUE) {
+cache_aws_branched_target <- function(tmp_path, ext, cleanup = FALSE) {
 
   local_path <- map(tmp_path, ~gsub(ext, paste0("_cache", ext), .))
     
