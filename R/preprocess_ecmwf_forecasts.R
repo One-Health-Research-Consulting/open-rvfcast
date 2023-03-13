@@ -15,7 +15,7 @@ preprocess_ecmwf_forecasts <- function(ecmwf_forecasts_download,
   existing_files <- list.files(preprocessed_directory)
   
   # filename for postprocessed file
-  filename <- str_replace(basename(ecmwf_forecasts_download), "\\.grib", "\\.csv.gz")
+  filename <- str_replace(basename(ecmwf_forecasts_download), "\\.grib", "\\.gz.parquet")
   
   # begin processing
   message(paste0("Preprocessing ", ecmwf_forecasts_download))
@@ -55,7 +55,7 @@ preprocess_ecmwf_forecasts <- function(ecmwf_forecasts_download,
     select(unique_id, data_date, short_name, data_type, step_range, x, y, model_iteration, everything()) |> 
     arrange(data_date, short_name, data_type, step_range, x, y, model_iteration)
   
-  write_csv(dat, here::here(preprocessed_directory, filename))
+  write_parquet(dat, here::here(preprocessed_directory, filename), compression = "gzip", compression_level = 5)
   
   return(file.path(preprocessed_directory, filename))
   

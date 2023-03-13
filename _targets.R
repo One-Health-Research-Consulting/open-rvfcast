@@ -33,7 +33,6 @@ source_targets <- tar_plan(
   
   tar_target(ecmwf_forecasts_download, 
              download_ecmwf_forecasts(parameters = ecmwf_api_parameters,
-                                      # spatial_bound = c(-21, 15, -35, 37), # N, W, S, E
                                       variable = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
                                       product_type = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
                                       leadtime_month = c("1", "2", "3", "4", "5", "6"),
@@ -45,7 +44,7 @@ source_targets <- tar_plan(
   
   tar_target(ecmwf_forecasts_preprocessed,
              preprocess_ecmwf_forecasts(ecmwf_forecasts_download,
-                                        preprocessed_directory =  "data/ecmwf_csvs"),
+                                        preprocessed_directory =  "data/ecmwf_parquets"),
              pattern = map(ecmwf_forecasts_download), 
              iteration = "list",
              format = "file" 
@@ -57,7 +56,7 @@ source_targets <- tar_plan(
   # Format file here means if we delete or change the local cache it will force a re-download.
   tar_target(ecmwf_forecasts_preprocessed_local, {suppressWarnings(dir.create(here::here("data/ecmwf_csvs"), recursive = TRUE))
     cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
-                              ext = ".csv.gz",
+                              ext = ".gz.parquet",
                               cleanup = FALSE) # setting cleanup to false doesn't work - targets will still remove the non-cache files
     },
     repository = "local", 
@@ -69,13 +68,10 @@ source_targets <- tar_plan(
 # Data Processing -----------------------------------------------------------
 data_targets <- tar_plan(
   
-  
 )
 
 # Model -----------------------------------------------------------
 model_targets <- tar_plan(
-  
-  # I like this workflow from rvf-ews1
   
   # model_data = prep_model_data(case_data, rast(static_stack)),
   # spatial_grid = create_spatial_grid(model_data),
@@ -97,18 +93,10 @@ model_targets <- tar_plan(
 # Deploy -----------------------------------------------------------
 deploy_targets <- tar_plan(
   
-  # Regular updating of data - append to parquet file or duckdb
-  ## ecmwf forecast data = monthly (updated on the 13th)
-  ## recorded data = daily ?
-  
-  # Use fixed version of the model to generate new predictions
-  
 )
 
 # Plots -----------------------------------------------------------
 plot_targets <- tar_plan(
-  
-  # I like to pregenerate plots to feed into reports
   
 )
 
@@ -119,6 +107,7 @@ report_targets <- tar_plan(
 
 # Testing -----------------------------------------------------------
 test_targets <- tar_plan(
+  
 )
 
 # List targets -----------------------------------------------------------------
