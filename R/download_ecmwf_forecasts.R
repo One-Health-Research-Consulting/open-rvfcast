@@ -8,7 +8,6 @@
 #' @author Emma Mendelsohn
 #' @export
 download_ecmwf_forecasts <- function(parameters, 
-                                     spatial_bound,
                                      variable = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
                                      product_type = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
                                      leadtime_month = c("1", "2", "3", "4", "5", "6"),
@@ -20,15 +19,16 @@ download_ecmwf_forecasts <- function(parameters,
   system <- unlist(parameters$system)
   year <- unlist(parameters$year)
   month <- unlist(parameters$month)
+  spatial_bounds <- unlist(parameters$spatial_bounds) |> round(1)
+  region <- parameters$region
   
-  filename <- paste("ecmwf", "seasonal_forecast", system, min(year), "to", max(year), sep = "_")
+  filename <- paste("ecmwf", "seasonal_forecast", region, paste0("sys", system), min(year), "to", max(year), sep = "_")
   filename <- paste0(filename, ".grib")
 
   message(paste0("Downloading ", filename))
   
   if(filename %in% existing_files) {
     message("file already exists, skipping download")
-    # return(filename)
     return(file.path(download_directory, filename)) # skip if file exists
   }  
   request <- list(
@@ -39,7 +39,7 @@ download_ecmwf_forecasts <- function(parameters,
     year = year,
     month = month,
     leadtime_month = leadtime_month,
-    area = spatial_bound,
+    area = spatial_bounds,
     format = "grib",
     dataset_short_name = "seasonal-monthly-single-levels",
     target = filename

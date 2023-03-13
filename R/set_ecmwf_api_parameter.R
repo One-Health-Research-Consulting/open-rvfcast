@@ -7,7 +7,7 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-set_ecmwf_api_parameter <- function() {
+set_ecmwf_api_parameter <- function(bounding_boxes) {
   
   # System 4 covers just sept/oct 2017
   sys4 <- tibble(system = 4, year = list(2017), month = list(9:10))
@@ -45,6 +45,14 @@ set_ecmwf_api_parameter <- function() {
   
   # Tibble to interate over rowwise for download
   seasonal_forecast_parameters <- bind_rows(sys4, sys51, sys5)
+  
+  # Setup spatial bounds
+  # N, W, S, E
+  spacial_bounds <- bounding_boxes |> 
+    rename(N = y_max, W = x_min, S = y_min, E = x_max) |> 
+    nest(spatial_bounds = c(N, W, S, E))
+  
+  seasonal_forecast_parameters <- crossing(seasonal_forecast_parameters, spacial_bounds)
   
   return(seasonal_forecast_parameters)
   

@@ -26,14 +26,14 @@ source_targets <- tar_plan(
              preprocess_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw, country_regions)),
   
   ## ecmwf
-  tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter() |> 
+  tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter(bounding_boxes) |> 
                rowwise() |> 
                tar_group(),
              iteration = "group"), 
   
   tar_target(ecmwf_forecasts_download, 
              download_ecmwf_forecasts(parameters = ecmwf_api_parameters,
-                                      spatial_bound = c(-21, 15, -35, 37), # N, W, S, E
+                                      # spatial_bound = c(-21, 15, -35, 37), # N, W, S, E
                                       variable = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
                                       product_type = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
                                       leadtime_month = c("1", "2", "3", "4", "5", "6"),
