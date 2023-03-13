@@ -14,9 +14,17 @@ define_bounding_boxes <- function(country_regions) {
   bounding_boxes <- left_join(country_regions, countries_bbox, by = c("iso2c" = "iso")) |> 
     group_by(region) |> 
     summarize(across(c(x_min, y_min), ~min(., na.rm = TRUE)),
-              across(c(x_max, y_max), ~max(., na.rm = TRUE)))
+              across(c(x_max, y_max), ~max(., na.rm = TRUE))) |> 
+    ungroup()
   
-
+  bounding_boxes_all <- bounding_boxes |> 
+    group_by(region = "africa") |> 
+    summarize(across(c(x_min, y_min), ~min(., na.rm = TRUE)),
+              across(c(x_max, y_max), ~max(., na.rm = TRUE))) |> 
+    ungroup()
+  
+  bounding_boxes <- bind_rows(bounding_boxes, bounding_boxes_all)
+  
   return(bounding_boxes)
   
 }
