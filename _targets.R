@@ -17,7 +17,7 @@ nproc <- 4
 source_targets <- tar_plan(
   
   tar_target(country_regions, define_country_regions()),
-  tar_target(bounding_boxes, define_bounding_boxes()),
+  tar_target(bounding_boxes, define_bounding_boxes(country_regions)),
   
   ## wahis
   # TODO can refactor to download with dynamic branching
