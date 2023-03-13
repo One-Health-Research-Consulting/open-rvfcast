@@ -11,5 +11,6 @@ outputs/
 !outputs/example_report.html
 data/**/*.csv.gz
 data/**/*.grib
+data/**/*.parquet
 
 
