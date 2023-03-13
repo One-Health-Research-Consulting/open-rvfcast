@@ -9,7 +9,6 @@
 #' @author Emma Mendelsohn
 #' @export
 preprocess_ecmwf_forecasts <- function(ecmwf_forecasts_download,
-                                       #download_directory,
                                        preprocessed_directory) {
   
   suppressWarnings(dir.create(here::here(preprocessed_directory), recursive = TRUE))

@@ -16,10 +16,14 @@ nproc <- 4
 # Data Source Download -----------------------------------------------------------
 source_targets <- tar_plan(
   
+  tar_target(country_regions, define_country_regions()),
+  tar_target(bounding_boxes, define_bounding_boxes()),
+  
   ## wahis
   # TODO can refactor to download with dynamic branching
   tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()),
-  tar_target(wahis_rvf_outbreaks_preprocessed, preprocess_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw)),
+  tar_target(wahis_rvf_outbreaks_preprocessed, 
+             preprocess_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw, country_regions)),
   
   ## ecmwf
   tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter() |> 
@@ -41,7 +45,6 @@ source_targets <- tar_plan(
   
   tar_target(ecmwf_forecasts_preprocessed,
              preprocess_ecmwf_forecasts(ecmwf_forecasts_download,
-                                        #download_directory = "data/ecmwf_gribs",
                                         preprocessed_directory =  "data/ecmwf_csvs"),
              pattern = map(ecmwf_forecasts_download), 
              iteration = "list",
