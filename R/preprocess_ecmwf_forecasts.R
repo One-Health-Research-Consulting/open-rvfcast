@@ -34,16 +34,26 @@ preprocess_ecmwf_forecasts <- function(ecmwf_forecasts_download,
   grib_meta <- system(paste("grib_ls", file), intern = TRUE)
   remove <- c(1, (length(grib_meta)-2):length(grib_meta)) 
   grib_meta <- grib_meta[-remove]
-  grib_meta <- read.table(text = grib_meta, header = TRUE)
   
-  # create IDs for columns headers (NOTE these are non unique because there are multiple models per outcome)
-  grib_meta <- as_tibble(grib_meta) |>
-    mutate(id = paste(dataDate, stepRange, dataType, shortName, sep = "_"))
-  names(grib) <- grib_meta$id
+  # processing metadata to join with actual data
+  meta <- read.table(text = grib_meta, header = TRUE) |>
+    as_tibble() |> 
+    janitor::clean_names() |> 
+    group_by(across(everything())) |> 
+    mutate(model_iteration = row_number()) |> 
+    ungroup() |> 
+    mutate(unique_id = glue::glue("{data_date}_step{step_range}_{data_type}_{short_name}_i{model_iteration}")) |> 
+    mutate(data_date = ymd(data_date)) 
+  
+  # create IDs for columns headers 
+   names(grib) <- meta$unique_id
   
   # covert SpatRaster to dataframe for storage
   dat <- as.data.frame(grib, xy = TRUE) |> 
-    pivot_longer(-c("x", "y"), names_to = "id")
+    pivot_longer(-c("x", "y"), names_to = "unique_id") |> 
+    left_join(meta, by = "unique_id") |> 
+    select(unique_id, data_date, short_name, data_type, step_range, x, y, model_iteration, everything()) |> 
+    arrange(data_date, short_name, data_type, step_range, x, y, model_iteration)
   
   write_csv(dat, here::here(preprocessed_directory, filename))
   
