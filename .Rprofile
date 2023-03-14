@@ -66,3 +66,6 @@ if(requireNamespace("conflicted", quietly = TRUE)) {
   conflicted::conflict_prefer("set_names", "magrittr", quiet = TRUE)
   conflicted::conflict_prefer("View", "utils", quiet = TRUE)
 }
+
+# Suppress summarize messages
+options(dplyr.summarise.inform = FALSE)
