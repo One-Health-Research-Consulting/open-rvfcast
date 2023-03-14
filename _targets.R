@@ -11,7 +11,7 @@ tar_option_set(resources = tar_resources(
 )
 
 # How many parallel processes?
-nproc <- 4
+n_workers <- 4
 
 # Data Source Download -----------------------------------------------------------
 source_targets <- tar_plan(
