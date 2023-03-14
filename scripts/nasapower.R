@@ -2,7 +2,7 @@ library("nasapower")
 daily_ag <- get_power(community = "ag",
                       lonlat = c(15, -35, 20, -30), # xmin (W), ymin (S), xmax (E), ymax (N)
                       pars = c("RH2M", "T2M", "PRECTOTCORR"),
-                      dates = c("1993-01-01", "1994-01-01"), #
+                      dates = c("1993-01-01", as.character(ymd(Sys.Date()))), #
                       temporal_api = "daily"
 )
 daily_ag

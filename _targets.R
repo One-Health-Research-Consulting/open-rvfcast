@@ -63,6 +63,12 @@ source_targets <- tar_plan(
     format = "file"
   ),
   
+  ## NASA Power
+  tar_target(nasa_api_parameters, set_nasa_api_parameter(bounding_boxes) |> 
+               rowwise() |> 
+               tar_group(),
+             iteration = "group"), 
+  
 )
 
 # Data Processing -----------------------------------------------------------

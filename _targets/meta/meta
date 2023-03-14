@@ -1,5 +1,5 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|694d10e2af3ce92b|||||||||||||||
+.Random.seed|object|9c80ee67b8b2f7a3|||||||||||||||
 bounding_boxes|stem|82e67eb5f1a684fe|73de702541f22007|722c17de8906f854|-188689526|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/bounding_boxes*endpoint=TlVMTA*version=TXTpMX6CtaTmGdRTHX8gYHBbIXBBROQ_|t19429.7607891532s||404|qs|aws|vector|||0.034||
 cache_aws_branched_target|function|6e2abfa4969de1bf|||||||||||||||
 cache_aws_target|function|955ba0ca64e323a2|||||||||||||||
@@ -74,21 +74,24 @@ ecmwf_forecasts_preprocessed_de0407e9|branch|a05f9b9f70c01512|fa44c2c8d7a88427|d
 ecmwf_forecasts_preprocessed_eaa18f40|branch|164eb0f9231cdbba|fa44c2c8d7a88427|31ff36e71ea6b80e|1870061320|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/ecmwf_forecasts_preprocessed_eaa18f40*endpoint=TlVMTA*stage=data/ecmwf_csvs/ecmwf_seasonal_forecast_5_2016_to_2020.csv.gz*version=ZLox7Zv6Y0pdSWJ.yNjUxSSFqkBBgVbp|t19426.7672483608s|6a27187f8c406ddd|525965739|file|aws|list|ecmwf_forecasts_preprocessed||0.002||
 ecmwf_forecasts_preprocessed_ef7e337c|branch|32b820d10891add6|de7f0aee1dbda14f|a55543441e4b78fd|2024142137|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/ecmwf_forecasts_preprocessed_ef7e337c*endpoint=TlVMTA*version=oiL0IPuS8MUccRJH080oxeaKaDdpoayZ|t19424.8297248382s||76|qs|aws|list|ecmwf_forecasts_preprocessed||0.001||
 ecmwf_forecasts_preprocessed_local|stem|3677e2a36ce9088c|a60399507f169f2a|752b5096b637c7be|-200737809|data/ecmwf_csvs/ecmwf_seasonal_forecast_4_2017_to_2017_cache.csv.gz*data/ecmwf_csvs/ecmwf_seasonal_forecast_51_2023_to_2023_cache.csv.gz*data/ecmwf_csvs/ecmwf_seasonal_forecast_51_2022_to_2022_cache.csv.gz*data/ecmwf_csvs/ecmwf_seasonal_forecast_5_1993_to_1995_cache.csv.gz*data/ecmwf_csvs/ecmwf_seasonal_forecast_5_1996_to_2000_cache.csv.gz*data/ecmwf_csvs/ecmwf_seasonal_forecast_5_2001_to_2005_cache.csv.gz*data/ecmwf_csvs/ecmwf_seasonal_forecast_5_2006_to_2010_cache.csv.gz*data/ecmwf_csvs/ecmwf_seasonal_forecast_5_2011_to_2015_cache.csv.gz*data/ecmwf_csvs/ecmwf_seasonal_forecast_5_2016_to_2020_cache.csv.gz*data/ecmwf_csvs/ecmwf_seasonal_forecast_5_2021_to_2022_cache.csv.gz|t19426.9369172046s|f83aac664811cd98|2152555808|file|local|vector|||124.52||
-f|object|38f6fa422df9f95e|||||||||||||||
+f|object|2bff2516e28a20e7|||||||||||||||
 files_bb8cab60|branch||f11a6bf1b1830f22|762f7baa35a7c9fd|2056725708|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/files_bb8cab60*endpoint=TlVMTA*stage=ecmwf_seasonal_forecast_4_2017_to_2017.csv.gz//Users/emmamendelsohn/projects/open-rvfcast/data/ecmwf_gribs|t19424.8975012828s||0|file|aws|vector|files||||_paths_ 31mmissing files ecmwf_seasonal_forecast_4_2017_to_2017.csv.gzUsersemmamendelsohnprojectsopenrvfcastdataecmwf_gribs39m
 get_wahis_rvf_outbreaks_raw|function|5f598f1bb5b718a6|||||||||||||||
 model_targets|object|1eb1bc8d77111ded|||||||||||||||
+nasa_api_parameters|stem|3fabc209ed210dcd|6a5f74cc70734890|c70c09b7b26ac72f|-1576512875|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/nasa_api_parameters*endpoint=TlVMTA*version=TrmW18ccL.Mfns_T2JwOcZLi9LCX0qrB|t19430.1255236746s||28542|qs|aws|group|||0.078||
 nproc|object|4fd03901ce9470f4|||||||||||||||
 plot_targets|object|1eb1bc8d77111ded|||||||||||||||
 preprocess_ecmwf_forecasts|function|cf71d4a1cc796a69|||||||||||||||
 preprocess_wahis_rvf_outbreaks|function|ad31e18b7b8e3e9d|||||||||||||||
 process_ecmwf_forecasts|function|e4b6cdd333cb9180|||||||||||||||
 report_targets|object|1eb1bc8d77111ded|||||||||||||||
+rolling_box|function|1195d491d98c697b|||||||||||||||
 set_ecmwf_api_parameter|function|38f0573ffc00bd19|||||||||||||||
-source_targets|object|e0879b9759d14a08|||||||||||||||
+set_nasa_api_parameter|function|b9734ce520cd9d64|||||||||||||||
+source_targets|object|eecdd54407a10536|||||||||||||||
 test|stem|7321d36b45e151a8|de45df0690f3bdc4|63723adc94e4e6f3|1064684737|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/test*endpoint=TlVMTA*version=Xb_Yq3W4B7cTeR8Pqnk2353HD7f8wEt9|t19425.5950726292s||186|qs|aws|vector|||0.001||
 test_targets|object|1eb1bc8d77111ded|||||||||||||||
-user_rprof|object|4b262787edb237ff|||||||||||||||
+user_rprof|object|17d27d603b23b3bd|||||||||||||||
 wahis|object|6a46063d8a926bbf|||||||||||||||
 wahis_rvf_outbreaks|stem|5d5f049d3c4b6a19|22818b1181882376|faa25ea92cf71fe4|1834537007|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/wahis_rvf_outbreaks*endpoint=TlVMTA*version=jp9XFsmoxJTbGgdG5gNuFsVq272j28wY|t19424.6141142455s||70574|qs|aws|vector|||0.103||
 wahis_rvf_outbreaks_preprocessed|stem|a8dd592f9bd8ad74|bc061a808838c7aa|3863b2d56287acd3|2127878318|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/wahis_rvf_outbreaks_preprocessed*endpoint=TlVMTA*version=aTboBwKMpX9LBfGD2F7HnA62cefK34I1|t19429.5830259459s||74464|qs|aws|vector|||0.071||
