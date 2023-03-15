@@ -54,13 +54,13 @@ source_targets <- tar_plan(
   # cache locally
   # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
   # Format file here means if we delete or change the local cache it will force a re-download.
-  tar_target(ecmwf_forecasts_preprocessed_local, {suppressWarnings(dir.create(here::here("data/ecmwf_csvs"), recursive = TRUE))
+  tar_target(ecmwf_forecasts_preprocessed_local, {suppressWarnings(dir.create(here::here("data/ecmwf_parquets"), recursive = TRUE))
     cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
                               ext = ".gz.parquet",
                               cleanup = FALSE) # setting cleanup to false doesn't work - targets will still remove the non-cache files
-    },
-    repository = "local", 
-    format = "file"
+  },
+  repository = "local", 
+  format = "file"
   ),
   
   ## NASA Power
@@ -68,6 +68,17 @@ source_targets <- tar_plan(
                rowwise() |> 
                tar_group(),
              iteration = "group"), 
+  
+  # here we save downloads as parquets - no preprocessing required
+  tar_target(nasa_recorded_download, 
+             download_nasa_recorded_weather(parameters = nasa_api_parameters,
+                                            variable  = c("RH2M", "T2M", "PRECTOTCORR"),
+                                            timestep = "daily",
+                                            download_directory = "data/nasa_parquets"),
+             pattern = map(nasa_api_parameters), 
+             iteration = "list",
+             format = "file" 
+  )
   
 )
 
