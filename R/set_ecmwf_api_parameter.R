@@ -56,6 +56,10 @@ set_ecmwf_api_parameter <- function(bounding_boxes) {
   
   seasonal_forecast_parameters <- crossing(seasonal_forecast_parameters, spacial_bounds)
   
+  # will be easier to split by year
+  seasonal_forecast_parameters <- seasonal_forecast_parameters |> 
+    unnest(year)
+  
   return(seasonal_forecast_parameters)
   
 }

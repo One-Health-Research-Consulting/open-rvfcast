@@ -7,11 +7,13 @@ tar_option_set(resources = tar_resources(
   aws = tar_resources_aws(bucket = Sys.getenv("AWS_BUCKET_ID"), prefix = "open-rvfcast"),
   qs = tar_resources_qs(preset = "fast")),
   repository = "aws",
-  format = "qs"
+  format = "qs",
+  error = "null"
 )
 
 # How many parallel processes?
-n_workers <- 4
+n_workers <- 5
+future::plan(future.callr::callr, workers = n_workers)
 
 # Data Source Download -----------------------------------------------------------
 source_targets <- tar_plan(
@@ -78,6 +80,18 @@ source_targets <- tar_plan(
              pattern = map(nasa_api_parameters), 
              iteration = "list",
              format = "file" 
+  ),
+  
+  # cache locally
+  # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
+  # Format file here means if we delete or change the local cache it will force a re-download.
+  tar_target(nasa_recorded_local, {suppressWarnings(dir.create(here::here("data/nasa_parquets"), recursive = TRUE))
+    cache_aws_branched_target(tmp_path = tar_read(nasa_recorded_download),
+                              ext = ".gz.parquet",
+                              cleanup = FALSE) # setting cleanup to false doesn't work - targets will still remove the non-cache files
+  },
+  repository = "local", 
+  format = "file"
   )
   
 )
