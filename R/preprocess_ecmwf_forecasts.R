@@ -9,7 +9,8 @@
 #' @author Emma Mendelsohn
 #' @export
 preprocess_ecmwf_forecasts <- function(ecmwf_forecasts_download,
-                                       preprocessed_directory) {
+                                       preprocessed_directory,
+                                       n_workers = NULL) {
   
   suppressWarnings(dir.create(here::here(preprocessed_directory), recursive = TRUE))
   existing_files <- list.files(preprocessed_directory)
@@ -70,13 +71,15 @@ preprocess_ecmwf_forecasts <- function(ecmwf_forecasts_download,
   # i.e., we're summarizing over model iterations
   dat_split <- dat_long |> 
     group_split(variable_id)
-    
+  
+  if(is.null(n_workers)) n_workers <- as.integer(Sys.getenv("N_PARALLEL_CORES"))
+  
   dat_sum <- bettermc::mclapply(dat_split,
-                       mc.silent = F,
-                       mc.progress = T,
-                       mc.allow.fatal = T,
-                       mc.preschedule = F, # mc.preschedule = F is dynamic scheduling
-                       mc.cores = getOption("mc.cores", n_workers), # n_workers is defined in targets file - not an argument because it would easily invalidate the target
+                       mc.silent = FALSE,
+                       mc.progress = TRUE,
+                       mc.allow.fatal = TRUE,
+                       mc.preschedule = FALSE, # mc.preschedule = F is dynamic scheduling
+                       mc.cores = n_workers, 
                        function(grp){
                          grp |> 
                            group_by(x, y, variable_id) |> 
