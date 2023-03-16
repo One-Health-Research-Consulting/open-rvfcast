@@ -41,7 +41,7 @@ set_nasa_api_parameter <- function(bounding_boxes) {
     group_by(year, region) |> 
     mutate(i = row_number()) |> 
     ungroup()
-  
+
   return(daily_recorded_parameters)
   
 }

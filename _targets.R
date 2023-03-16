@@ -8,11 +8,11 @@ tar_option_set(resources = tar_resources(
   qs = tar_resources_qs(preset = "fast")),
   repository = "aws",
   format = "qs",
-  error = "null"
+  # error = "null"
 )
 
 # How many parallel processes?
-n_workers <- 5
+n_workers <- 20
 future::plan(future.callr::callr, workers = n_workers)
 
 # Data Source Download -----------------------------------------------------------
@@ -64,15 +64,15 @@ source_targets <- tar_plan(
   repository = "local", 
   format = "file"
   ),
-  
+
   ## NASA Power
   tar_target(nasa_api_parameters, set_nasa_api_parameter(bounding_boxes) |> 
-               rowwise() |> 
+               group_by(year, region) |> 
                tar_group(),
              iteration = "group"), 
   
   # here we save downloads as parquets - no preprocessing required
-  tar_target(nasa_recorded_download, 
+  tar_target(nasa_recorded_weather_download, 
              download_nasa_recorded_weather(parameters = nasa_api_parameters,
                                             variable  = c("RH2M", "T2M", "PRECTOTCORR"),
                                             timestep = "daily",
@@ -85,8 +85,8 @@ source_targets <- tar_plan(
   # cache locally
   # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
   # Format file here means if we delete or change the local cache it will force a re-download.
-  tar_target(nasa_recorded_local, {suppressWarnings(dir.create(here::here("data/nasa_parquets"), recursive = TRUE))
-    cache_aws_branched_target(tmp_path = tar_read(nasa_recorded_download),
+  tar_target(nasa_recorded_weather_local, {suppressWarnings(dir.create(here::here("data/nasa_parquets"), recursive = TRUE))
+    cache_aws_branched_target(tmp_path = tar_read(nasa_recorded_weather_download),
                               ext = ".gz.parquet",
                               cleanup = FALSE) # setting cleanup to false doesn't work - targets will still remove the non-cache files
   },

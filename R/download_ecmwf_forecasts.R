@@ -16,12 +16,12 @@ download_ecmwf_forecasts <- function(parameters,
   suppressWarnings(dir.create(download_directory, recursive = TRUE))
   existing_files <- list.files(download_directory)
   
-  system <- unlist(parameters$system)
-  year <- unlist(parameters$year)
+  system <- parameters$system
+  year <- parameters$year
   month <- unlist(parameters$month)
   spatial_bounds <- unlist(parameters$spatial_bounds) |> round(1)
 
-  filename <- paste("ecmwf", "seasonal_forecast", paste0("sys", system), min(year), "to", max(year), sep = "_")
+  filename <- paste("ecmwf", "seasonal_forecast", paste0("sys", system), year, sep = "_")
   filename <- paste0(filename, ".grib")
 
   message(paste0("Downloading ", filename))
