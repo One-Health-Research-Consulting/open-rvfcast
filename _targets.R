@@ -12,7 +12,7 @@ tar_option_set(resources = tar_resources(
 )
 
 # How many parallel processes?
-n_workers <- 20
+n_workers <- 5
 future::plan(future.callr::callr, workers = n_workers)
 
 # Data Source Download -----------------------------------------------------------

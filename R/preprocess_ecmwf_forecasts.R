@@ -76,7 +76,7 @@ preprocess_ecmwf_forecasts <- function(ecmwf_forecasts_download,
                        mc.progress = T,
                        mc.allow.fatal = T,
                        mc.preschedule = F, # mc.preschedule = F is dynamic scheduling
-                       mc.cores = getOption("mc.cores", n_workers),
+                       mc.cores = getOption("mc.cores", n_workers), # n_workers is defined in targets file - not an argument because it would easily invalidate the target
                        function(grp){
                          grp |> 
                            group_by(x, y, variable_id) |> 
