@@ -87,8 +87,7 @@ source_targets <- tar_plan(
   # Format file here means if we delete or change the local cache it will force a re-download.
   tar_target(nasa_recorded_weather_local, {suppressWarnings(dir.create(here::here("data/nasa_parquets"), recursive = TRUE))
     cache_aws_branched_target(tmp_path = tar_read(nasa_recorded_weather_download),
-                              ext = ".gz.parquet",
-                              cleanup = FALSE) # setting cleanup to false doesn't work - targets will still remove the non-cache files
+                              ext = ".gz.parquet") 
   },
   repository = "local", 
   format = "file"
