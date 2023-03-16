@@ -8,12 +8,11 @@ tar_option_set(resources = tar_resources(
   qs = tar_resources_qs(preset = "fast")),
   repository = "aws",
   format = "qs",
-  # error = "null"
+  # error = "null" # uncomment if you want to allow branches to error during tar_make
 )
 
-# How many parallel processes?
-n_workers <- 5
-future::plan(future.callr::callr, workers = n_workers)
+# How many parallel processes for tar_make_future? (for within branch parallelization, set .env var N_PARALLEL_CORES)
+# future::plan(future.callr::callr, workers = 4)
 
 # Data Source Download -----------------------------------------------------------
 source_targets <- tar_plan(
