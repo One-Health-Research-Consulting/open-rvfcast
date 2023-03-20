@@ -24,6 +24,8 @@ source_targets <- tar_plan(
   # TODO do we need S3A and S3B satellites
   tar_target(ndvi_api_parameters, get_ndvi_parameters()),
   
+  # TODO target to download with refreshing token
+  
   ## wahis
   # TODO can refactor to download with dynamic branching
   tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()),

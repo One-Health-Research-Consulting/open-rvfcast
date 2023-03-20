@@ -3,6 +3,7 @@ library(jsonlite)
 library(xml2)
 library(tidyverse)
 
+
 # Can use this to identify full raster name - which can be downloaded with API key
 # should we get S3A AND S3B?
 url1 <- "https://catalogue.dataspace.copernicus.eu/resto/api/collections/Sentinel3/search.json?maxRecords=100&productType=SY_2_V10___&platform=S3A" 
@@ -11,6 +12,16 @@ out1 <- fromJSON(rawToChar(resp1$content))
 out1$features$properties$title
 out1$features$properties$services$download
 
+# this is the Africa file from above
+url <- "http://catalogue.dataspace.copernicus.eu/odata/v1/Products(a7b631b1-e6c4-549d-9beb-aa2b8244ba8c)/$value"
+filename <- "example_odata.zip"
+auth_header <- paste("Bearer", Sys.getenv("KEYCLOAK_TOKEN"), sep = " ")
+response <- GET(url, add_headers(Authorization = auth_header), write_disk(filename, overwrite = TRUE))
+
+url <- "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
+resp <- GET(url)
+out <- fromJSON(rawToChar(resp$content))
+out$value$Id
 
 # get token to downlaod products
 # https://documentation.dataspace.copernicus.eu/#/APIs/OData
@@ -44,4 +55,16 @@ url <- "https://catalogue.dataspace.copernicus.eu/resto/api/collections/Sentinel
 
 # from template above
 url <- "https://finder.creodias.eu/resto/api/collections/Sentinel3/search.json"
+
+# from open search
+url <- "https://catalogue.dataspace.copernicus.eu/resto/api/collections/Sentinel3/search.json?maxRecords=10&productType=SY_2_V10___&platform=S3A&box=13.4,7.46,24.0,23.4" 
+# should we get S3B as well?
+resp <- GET(url)
+out <- fromJSON(rawToChar(resp$content))
+gmlgeometry <- out$features$properties$title |> 
+  filter(title == "S3A_SY_2_V10____20180922T111721_20181002T111721_20181012T115623_AFRICA____________LN2_O_NT_002.SEN3") 
+
+
+
+
 
