@@ -22,10 +22,16 @@ source_targets <- tar_plan(
   tar_target(bounding_boxes, define_bounding_boxes(country_regions)),
   
   # TODO do we need S3A and S3B satellites
-  tar_target(ndvi_api_parameters, get_ndvi_parameters()),
-  
-  # TODO target to download with refreshing token
-  
+  tar_target(ndvi_api_parameters, get_ndvi_parameters() |> 
+               rowwise() |> 
+               tar_group(),
+             iteration = "group"), 
+  tar_target(ndvi_downloaded, download_ndvi(ndvi_api_parameters,
+                                            download_directory = "data/ndvi_rasters"),
+             pattern = map(ndvi_api_parameters), 
+             iteration = "list",
+             format = "file" ),
+
   ## wahis
   # TODO can refactor to download with dynamic branching
   tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()),
