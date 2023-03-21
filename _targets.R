@@ -29,9 +29,20 @@ source_targets <- tar_plan(
   
   tar_target(ndvi_downloaded, download_ndvi(ndvi_api_parameters,
                                             download_directory = "data/ndvi_rasters"),
-             pattern = map(ndvi_api_parameters), 
+             pattern = head(ndvi_api_parameters, 3), 
              iteration = "list",
              format = "file" ),
+  
+  # cache locally
+  # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
+  # Format file here means if we delete or change the local cache it will force a re-download.
+  tar_target(ndvi_local, {suppressWarnings(dir.create(here::here("data/ndvi_rasters"), recursive = TRUE))
+    cache_aws_branched_target(tmp_path = tar_read(ndvi_downloaded),
+                              ext = ".nc") 
+  },
+  repository = "local", 
+  format = "file"
+  ),
 
   ## wahis
   # TODO can refactor to download with dynamic branching
@@ -70,8 +81,7 @@ source_targets <- tar_plan(
   # Format file here means if we delete or change the local cache it will force a re-download.
   tar_target(ecmwf_forecasts_preprocessed_local, {suppressWarnings(dir.create(here::here("data/ecmwf_parquets"), recursive = TRUE))
     cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
-                              ext = ".gz.parquet",
-                              cleanup = FALSE) # setting cleanup to false doesn't work - targets will still remove the non-cache files
+                              ext = ".gz.parquet") # setting cleanup to false doesn't work - targets will still remove the non-cache files
   },
   repository = "local", 
   format = "file"

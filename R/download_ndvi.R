@@ -14,8 +14,8 @@ download_ndvi <- function(ndvi_api_parameters, download_directory) {
   
   id <- ndvi_api_parameters$id
   download_filename <- tools::file_path_sans_ext(ndvi_api_parameters$properties$title)
-  start_date <- str_extract(filename, "(\\d{8}T\\d{6})")
-  end_date <- str_extract(filename, "(?<=_)(\\d{8}T\\d{6})(?=_\\w{6}_)")
+  start_date <- str_extract(download_filename, "(\\d{8}T\\d{6})")
+  end_date <- str_extract(download_filename, "(?<=_)(\\d{8}T\\d{6})(?=_\\w{6}_)")
   save_filename <- paste0("NDVI_Africa_",start_date, "_to_", end_date, ".nc")
   
   message(paste0("Downloading ", download_filename))
