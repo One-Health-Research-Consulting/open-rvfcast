@@ -26,6 +26,7 @@ source_targets <- tar_plan(
                rowwise() |> 
                tar_group(),
              iteration = "group"), 
+  
   tar_target(ndvi_downloaded, download_ndvi(ndvi_api_parameters,
                                             download_directory = "data/ndvi_rasters"),
              pattern = map(ndvi_api_parameters), 

@@ -12,5 +12,5 @@ outputs/
 data/**/*.csv.gz
 data/**/*.grib
 data/**/*.parquet
-
-
+data/**/*.zip
+data/**/*.nc
