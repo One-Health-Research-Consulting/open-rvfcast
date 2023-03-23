@@ -8,7 +8,8 @@ tar_option_set(resources = tar_resources(
   qs = tar_resources_qs(preset = "fast")),
   repository = "aws",
   format = "qs",
-  # error = "null"
+  error = "null", # allow branches to error without stopping the pipeline
+  workspace_on_error = TRUE # allows interactive session for failed branches
 )
 
 # How many parallel processes?
@@ -29,7 +30,7 @@ source_targets <- tar_plan(
   
   tar_target(ndvi_downloaded, download_ndvi(ndvi_api_parameters,
                                             download_directory = "data/ndvi_rasters"),
-             pattern = head(ndvi_api_parameters, 3), 
+             pattern = head(ndvi_api_parameters, 100), 
              iteration = "list",
              format = "file" ),
   
@@ -43,7 +44,7 @@ source_targets <- tar_plan(
   repository = "local", 
   format = "file"
   ),
-
+  
   ## wahis
   # TODO can refactor to download with dynamic branching
   tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()),
@@ -86,7 +87,7 @@ source_targets <- tar_plan(
   repository = "local", 
   format = "file"
   ),
-
+  
   ## NASA Power
   tar_target(nasa_api_parameters, set_nasa_api_parameter(bounding_boxes) |> 
                group_by(year, region) |> 
