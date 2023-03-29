@@ -8,7 +8,8 @@ tar_option_set(resources = tar_resources(
   qs = tar_resources_qs(preset = "fast")),
   repository = "aws",
   format = "qs",
-  # error = "null" # uncomment if you want to allow branches to error during tar_make
+  error = "null", # allow branches to error without stopping the pipeline
+  workspace_on_error = TRUE # allows interactive session for failed branches
 )
 
 # How many parallel processes for tar_make_future? (for within branch parallelization, set .env var N_PARALLEL_CORES)
@@ -19,6 +20,29 @@ source_targets <- tar_plan(
   
   tar_target(country_regions, define_country_regions()),
   tar_target(bounding_boxes, define_bounding_boxes(country_regions)),
+  
+  # TODO do we need S3A and S3B satellites
+  tar_target(ndvi_api_parameters, get_ndvi_parameters() |> 
+               rowwise() |> 
+               tar_group(),
+             iteration = "group"), 
+  
+  tar_target(ndvi_downloaded, download_ndvi(ndvi_api_parameters,
+                                            download_directory = "data/ndvi_rasters"),
+             pattern = head(ndvi_api_parameters, 100), 
+             iteration = "list",
+             format = "file" ),
+  
+  # cache locally
+  # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
+  # Format file here means if we delete or change the local cache it will force a re-download.
+  tar_target(ndvi_local, {suppressWarnings(dir.create(here::here("data/ndvi_rasters"), recursive = TRUE))
+    cache_aws_branched_target(tmp_path = tar_read(ndvi_downloaded),
+                              ext = ".nc") 
+  },
+  repository = "local", 
+  format = "file"
+  ),
   
   ## wahis
   # TODO can refactor to download with dynamic branching
@@ -57,13 +81,12 @@ source_targets <- tar_plan(
   # Format file here means if we delete or change the local cache it will force a re-download.
   tar_target(ecmwf_forecasts_preprocessed_local, {suppressWarnings(dir.create(here::here("data/ecmwf_parquets"), recursive = TRUE))
     cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
-                              ext = ".gz.parquet",
-                              cleanup = FALSE) # setting cleanup to false doesn't work - targets will still remove the non-cache files
+                              ext = ".gz.parquet") # setting cleanup to false doesn't work - targets will still remove the non-cache files
   },
   repository = "local", 
   format = "file"
   ),
-
+  
   ## NASA Power
   tar_target(nasa_api_parameters, set_nasa_api_parameter(bounding_boxes) |> 
                group_by(year, region) |> 
@@ -97,6 +120,8 @@ source_targets <- tar_plan(
 # Data Processing -----------------------------------------------------------
 data_targets <- tar_plan(
   
+  # merge data together
+
 )
 
 # Model -----------------------------------------------------------
