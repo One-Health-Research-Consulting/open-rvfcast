@@ -3,20 +3,23 @@
 #' .. content for \details{} ..
 #'
 #' @title
-#' @param ndvi_api_parameters
+#' @param sentinel_ndvi_api_parameters
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-download_ndvi <- function(ndvi_api_parameters, download_directory) {
+download_sentinel_ndvi <- function(sentinel_ndvi_api_parameters, download_directory) {
   
   suppressWarnings(dir.create(download_directory, recursive = TRUE))
   existing_files <- list.files(download_directory)
   
-  id <- ndvi_api_parameters$id
-  download_filename <- tools::file_path_sans_ext(ndvi_api_parameters$properties$title)
+  id <- sentinel_ndvi_api_parameters$id
+  download_filename <- tools::file_path_sans_ext(sentinel_ndvi_api_parameters$properties$title)
+  
+  # extract info based on naming conventions 
+  # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-3-synergy/naming-conventions
   start_date <- str_extract(download_filename, "(\\d{8}T\\d{6})")
   end_date <- str_extract(download_filename, "(?<=_)(\\d{8}T\\d{6})(?=_\\w{6}_)")
-  save_filename <- paste0("NDVI_Africa_",start_date, "_to_", end_date, ".nc")
+  save_filename <- paste0("sentinel_ndvi_africa_",start_date, "_to_", end_date, ".nc")
   
   message(paste0("Downloading ", download_filename))
   
@@ -46,3 +49,4 @@ download_ndvi <- function(ndvi_api_parameters, download_directory) {
   file.remove(here::here(download_directory, paste0(download_filename, ".SEN3")))
   return(file.path(download_directory, save_filename))
 }
+
