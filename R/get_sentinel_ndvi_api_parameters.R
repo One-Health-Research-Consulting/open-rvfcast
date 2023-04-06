@@ -8,7 +8,7 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-get_sentinel_ndvi_parameters <- function() {
+get_sentinel_ndvi_api_parameters <- function() {
 
   # Query using our bounding box for Central Africa - returns list of full Africa files
   # 229 results as of 2023-03-20, so max records of 500 is safe

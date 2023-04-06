@@ -31,3 +31,5 @@ url <- paste0("/vsicurl/", it_obj$features[[37]]$assets$`250m_16_days_NDVI`$href
 
 data <- rast(url)
 plot(data)
+
+# breaks into small bounding boxes
