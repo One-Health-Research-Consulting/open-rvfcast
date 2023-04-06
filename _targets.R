@@ -15,6 +15,10 @@ tar_option_set(resources = tar_resources(
 # How many parallel processes for tar_make_future? (for within branch parallelization, set .env var N_PARALLEL_CORES)
 # future::plan(future.callr::callr, workers = 4)
 
+# Local caching documentation ---------------------------------------------------
+# Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
+# Format "file" means if we delete or change the local cache it will force a re-download.
+
 # Static Data Download ----------------------------------------------------
 static_targets <- tar_plan(
   
@@ -40,11 +44,14 @@ dynamic_targets <- tar_plan(
   # They are overlapping orbits, offset by 140 deg, which is useful for realtime images
   # but not necessary for our timestep 
   # pretty sure it's okay to select just one, but we can confirm with Assaf
+  
+  # get API parameters
   tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_parameters() |> 
                rowwise() |> 
                tar_group(),
              iteration = "group"), 
   
+  # download files
   tar_target(sentinel_ndvi_downloaded, download_sentinel_ndvi(sentinel_ndvi_api_parameters,
                                                               download_directory = "data/sentinel_ndvi_rasters"),
              pattern = sentinel_ndvi_api_parameters, 
@@ -52,8 +59,6 @@ dynamic_targets <- tar_plan(
              format = "file" ),
   
   # cache locally
-  # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
-  # Format file here means if we delete or change the local cache it will force a re-download.
   tar_target(sentinel_ndvi_local, {suppressWarnings(dir.create(here::here("data/sentinel_ndvi_rasters"), recursive = TRUE))
     cache_aws_branched_target(tmp_path = tar_read(sentinel_ndvi_downloaded),
                               ext = ".nc") 
@@ -62,50 +67,19 @@ dynamic_targets <- tar_plan(
   format = "file"
   ),
   
-  
-  ## ecmwf
-  tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter(bounding_boxes) |> 
-               rowwise() |> 
-               tar_group(),
-             iteration = "group"), 
-  
-  tar_target(ecmwf_forecasts_download, 
-             download_ecmwf_forecasts(parameters = ecmwf_api_parameters,
-                                      variable = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
-                                      product_type = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
-                                      leadtime_month = c("1", "2", "3", "4", "5", "6"),
-                                      download_directory = "data/ecmwf_gribs"),
-             pattern = map(ecmwf_api_parameters), 
-             iteration = "list"
-  ),
+  # MODIS NDVI -----------------------------------------------------------
   
   
-  tar_target(ecmwf_forecasts_preprocessed,
-             preprocess_ecmwf_forecasts(ecmwf_forecasts_download,
-                                        preprocessed_directory =  "data/ecmwf_parquets"),
-             pattern = map(ecmwf_forecasts_download), 
-             iteration = "list",
-             format = "file" 
-  ),
+  # NASA POWER recorded weather -----------------------------------------------------------
+  # TODO this needs to be refactored to pull terra data
   
-  
-  # cache locally
-  # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
-  # Format file here means if we delete or change the local cache it will force a re-download.
-  tar_target(ecmwf_forecasts_preprocessed_local, {suppressWarnings(dir.create(here::here("data/ecmwf_parquets"), recursive = TRUE))
-    cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
-                              ext = ".gz.parquet") # setting cleanup to false doesn't work - targets will still remove the non-cache files
-  },
-  repository = "local", 
-  format = "file"
-  ),
-  
-  ## NASA Power
+  # get API parameters
   tar_target(nasa_api_parameters, set_nasa_api_parameter(bounding_boxes) |> 
                group_by(year, region) |> 
                tar_group(),
              iteration = "group"), 
   
+  # download files
   # here we save downloads as parquets - no preprocessing required
   tar_target(nasa_recorded_weather_download, 
              download_nasa_recorded_weather(parameters = nasa_api_parameters,
@@ -118,15 +92,50 @@ dynamic_targets <- tar_plan(
   ),
   
   # cache locally
-  # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
-  # Format file here means if we delete or change the local cache it will force a re-download.
   tar_target(nasa_recorded_weather_local, {suppressWarnings(dir.create(here::here("data/nasa_parquets"), recursive = TRUE))
     cache_aws_branched_target(tmp_path = tar_read(nasa_recorded_weather_download),
                               ext = ".gz.parquet") 
   },
   repository = "local", 
   format = "file"
-  )
+  ),
+  
+  # # ECMWF Weather Forecast data -----------------------------------------------------------
+  # # TODO refactoring based on Noam's PR
+  # tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter(bounding_boxes) |> 
+  #              rowwise() |> 
+  #              tar_group(),
+  #            iteration = "group"), 
+  # 
+  # tar_target(ecmwf_forecasts_download, 
+  #            download_ecmwf_forecasts(parameters = ecmwf_api_parameters,
+  #                                     variable = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
+  #                                     product_type = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
+  #                                     leadtime_month = c("1", "2", "3", "4", "5", "6"),
+  #                                     download_directory = "data/ecmwf_gribs"),
+  #            pattern = map(ecmwf_api_parameters), 
+  #            iteration = "list"
+  # ),
+  # 
+  # 
+  # tar_target(ecmwf_forecasts_preprocessed,
+  #            preprocess_ecmwf_forecasts(ecmwf_forecasts_download,
+  #                                       preprocessed_directory =  "data/ecmwf_parquets"),
+  #            pattern = map(ecmwf_forecasts_download), 
+  #            iteration = "list",
+  #            format = "file" 
+  # ),
+  # 
+  # 
+  # # cache locally
+  # tar_target(ecmwf_forecasts_preprocessed_local, {suppressWarnings(dir.create(here::here("data/ecmwf_parquets"), recursive = TRUE))
+  #   cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
+  #                             ext = ".gz.parquet") # setting cleanup to false doesn't work - targets will still remove the non-cache files
+  # },
+  # repository = "local", 
+  # format = "file"
+  # ),
+  
   
 )
 
