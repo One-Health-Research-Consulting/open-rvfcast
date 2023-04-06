@@ -54,7 +54,7 @@ dynamic_targets <- tar_plan(
   # download files
   tar_target(sentinel_ndvi_downloaded, download_sentinel_ndvi(sentinel_ndvi_api_parameters,
                                                               download_directory = "data/sentinel_ndvi_rasters"),
-             pattern = sentinel_ndvi_api_parameters, 
+             pattern = head(sentinel_ndvi_api_parameters, 3), 
              iteration = "list",
              format = "file" ),
   
@@ -71,15 +71,9 @@ dynamic_targets <- tar_plan(
   # pull 2005-present
   # this satellite will be retired soon, so we should use sentinel for present dates 
   
-  # get API parameters
-  tar_target(modis_ndvi_api_parameters, get_modis_ndvi_api_parameters(bounding_boxes) |> 
-               rowwise() |> 
-               tar_group(),
-             iteration = "group"), 
-  
   # download files
-  tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_api_parameters,
-                                                              download_directory = "data/modis_ndvi_rasters"),
+  tar_target(modis_ndvi_downloaded, download_modis_ndvi(start_year = 2005, end_year = 2023,
+                                                        download_directory = "data/modis_ndvi_rasters"),
              pattern = modis_ndvi_api_parameters, 
              iteration = "list",
              format = "file" ),

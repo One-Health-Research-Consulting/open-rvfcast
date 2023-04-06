@@ -19,7 +19,8 @@ download_sentinel_ndvi <- function(sentinel_ndvi_api_parameters, download_direct
   # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-3-synergy/naming-conventions
   start_date <- str_extract(download_filename, "(\\d{8}T\\d{6})")
   end_date <- str_extract(download_filename, "(?<=_)(\\d{8}T\\d{6})(?=_\\w{6}_)")
-  save_filename <- paste0("sentinel_ndvi_africa_",start_date, "_to_", end_date, ".nc")
+ 
+  save_filename <- paste0(download_filename, ".nc")
   
   message(paste0("Downloading ", download_filename))
   
