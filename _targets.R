@@ -54,7 +54,7 @@ dynamic_targets <- tar_plan(
   # download files
   tar_target(sentinel_ndvi_downloaded, download_sentinel_ndvi(sentinel_ndvi_api_parameters,
                                                               download_directory = "data/sentinel_ndvi_rasters"),
-             pattern = head(sentinel_ndvi_api_parameters, 3), 
+             pattern = sentinel_ndvi_api_parameters, 
              iteration = "list",
              format = "file" ),
   
@@ -68,11 +68,25 @@ dynamic_targets <- tar_plan(
   ),
   
   # MODIS NDVI -----------------------------------------------------------
-  # pull 2005-present
+  # 2005-present
   # this satellite will be retired soon, so we should use sentinel for present dates 
   
+  # get API parameters
+  # TODO WIP 
+  # results in 52 tiles per date for all of africa, and slightly less if we do by regions
+  # 52 tiles * 48 years * 19 observations per year = 47424 files
+  # let's discuss best approach for managing this
+  # for now just run on one year
+  
+  tar_target(modis_ndvi_api_parameters, get_modis_ndvi_api_parameters(bounding_boxes, 
+                                                                      start_year = 2005, 
+                                                                      end_year = 2005) |> 
+               rowwise() |> 
+               tar_group(),
+             iteration = "group"), 
+  
   # download files
-  tar_target(modis_ndvi_downloaded, download_modis_ndvi(start_year = 2005, end_year = 2023,
+  tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_api_parameters,
                                                         download_directory = "data/modis_ndvi_rasters"),
              pattern = modis_ndvi_api_parameters, 
              iteration = "list",
