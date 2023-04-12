@@ -1708,6 +1708,19 @@
         "yaml"
       ]
     },
+    "rnaturalearth": {
+      "Package": "rnaturalearth",
+      "Version": "0.3.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "c97d05220a4112f461eb940f2633d091",
+      "Requirements": [
+        "httr",
+        "jsonlite",
+        "sf",
+        "sp"
+      ]
+    },
     "rprojroot": {
       "Package": "rprojroot",
       "Version": "2.0.3",
@@ -1715,6 +1728,20 @@
       "Repository": "CRAN",
       "Hash": "1de7ab598047a87bba48434ba35d497d",
       "Requirements": []
+    },
+    "rstac": {
+      "Package": "rstac",
+      "Version": "0.9.2-2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "3593eb433ef8af73d2559ca646f777c4",
+      "Requirements": [
+        "crayon",
+        "httr",
+        "jsonlite",
+        "lifecycle",
+        "magrittr"
+      ]
     },
     "rstudioapi": {
       "Package": "rstudioapi",

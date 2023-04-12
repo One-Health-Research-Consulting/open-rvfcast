@@ -29,6 +29,7 @@ download_modis_ndvi <- function(modis_ndvi_api_parameters, download_directory =
   data <- rast(url)
   
   # save here - best approach?
+  # aggregate tiles by region and date
   
   return(file.path(download_directory, save_filename))
   

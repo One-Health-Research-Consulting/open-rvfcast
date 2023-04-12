@@ -11,8 +11,6 @@
 #' @author Emma Mendelsohn
 #' @export
 download_nasa_recorded_weather <- function(parameters = nasa_api_parameters, 
-                                           variable = c("RH2M", "T2M", "PRECTOTCORR"),
-                                           timestep = "daily", 
                                            download_directory = "data/nasa_parquets") {
   
   suppressWarnings(dir.create(download_directory, recursive = TRUE))
@@ -20,6 +18,7 @@ download_nasa_recorded_weather <- function(parameters = nasa_api_parameters,
   
   year <- unique(parameters$year)
   region <- unique(parameters$region)
+  variables <-  unlist(unique(parameters$variables))
   #i <- parameters$i
   
   filename <- paste("nasa", "recorded_weather", region, year, sep = "_")
@@ -43,7 +42,7 @@ download_nasa_recorded_weather <- function(parameters = nasa_api_parameters,
       
       nasapower::get_power(community = "ag",
                                   lonlat = c(x[1], y[1], x[2], y[2]), # xmin (W), ymin (S), xmax (E), ymax (N)
-                                  pars = variable,
+                                  pars = variables,
                                   dates = dates,
                                   temporal_api = "daily")
     })

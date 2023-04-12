@@ -22,18 +22,22 @@ tar_option_set(resources = tar_resources(
 # Static Data Download ----------------------------------------------------
 static_targets <- tar_plan(
   
-  # Define country regions and bounding boxes ----------------------------------------------------
-  # TODO edit bounding boxes to include countries with historical outbreaks
-  tar_target(country_regions, define_country_regions()),
-  tar_target(bounding_boxes, define_bounding_boxes(country_regions)),
-  
+  # Define country bounding boxes and years to set up download ----------------------------------------------------
+  tar_target(country_polygons, create_country_polygons(countries =  c("Libya", "Kenya", "South Africa",
+                                                                      "Mauritania", "Niger", "Namibia",
+                                                                      "Madagascar", "Eswatini", "Botswana" ,
+                                                                      "Mali", "United Republic of Tanzania", 
+                                                                      "Chad","Sudan", "Senegal"),
+                                                       states = tibble(state = "Mayotte", country = "France"))),
+  tar_target(country_bounding_boxes, get_country_bounding_boxes(country_polygons)),
+  tar_target(country_bounding_boxes_years, expand_grid(country_bounding_boxes, year = 2005:2023))
 )
 
 # Dynamic Data Download -----------------------------------------------------------
 dynamic_targets <- tar_plan(
   
   # WAHIS -----------------------------------------------------------
-  # TODO can refactor to download with dynamic branching
+  # TODO refactor with flatfiles
   tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()),
   tar_target(wahis_rvf_outbreaks_preprocessed, 
              preprocess_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw, country_regions)),
@@ -46,6 +50,7 @@ dynamic_targets <- tar_plan(
   # pretty sure it's okay to select just one, but we can confirm with Assaf
   
   # get API parameters
+  # files are for full Africa
   tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters() |> 
                rowwise() |> 
                tar_group(),
@@ -71,19 +76,18 @@ dynamic_targets <- tar_plan(
   # 2005-present
   # this satellite will be retired soon, so we should use sentinel for present dates 
   
-  # get API parameters
-  # TODO WIP 
-  # results in 52 tiles per date for all of africa, and slightly less if we do by regions
-  # 52 tiles * 48 years * 19 observations per year = 47424 files
-  # let's discuss best approach for managing this
-  # for now just run on one year
-  
-  tar_target(modis_ndvi_api_parameters, get_modis_ndvi_api_parameters(bounding_boxes, 
-                                                                      start_year = 2005, 
-                                                                      end_year = 2005) |> 
+  # set country/year branching for modis
+  tar_target(modis_country_bounding_boxes_years, country_bounding_boxes_years |> 
+               filter(year <= 2018) |> 
                rowwise() |> 
                tar_group(),
              iteration = "group"), 
+  
+  # get API parameters
+  # TODO figure out MYD13Q1 vs MOD13Q1
+  tar_target(modis_ndvi_api_parameters, get_modis_ndvi_api_parameters(modis_country_bounding_boxes_years), 
+             pattern = tail(modis_country_bounding_boxes_years, 4)
+  ), 
   
   # download files
   tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_api_parameters,
@@ -105,7 +109,10 @@ dynamic_targets <- tar_plan(
   # TODO this needs to be refactored to pull terra data
   
   # get API parameters
-  tar_target(nasa_api_parameters, set_nasa_api_parameter(bounding_boxes, start_year = 2005) |> 
+  tar_target(nasa_api_parameters, 
+             set_nasa_api_parameter(bounding_boxes, 
+                                    start_year = 2005,
+                                    variables  = c("RH2M", "T2M", "PRECTOTCORR")) |> 
                group_by(year, region) |> 
                tar_group(),
              iteration = "group"), 
@@ -114,8 +121,6 @@ dynamic_targets <- tar_plan(
   # here we save downloads as parquets - no preprocessing required
   tar_target(nasa_recorded_weather_download, 
              download_nasa_recorded_weather(parameters = nasa_api_parameters,
-                                            variable  = c("RH2M", "T2M", "PRECTOTCORR"),
-                                            timestep = "daily",
                                             download_directory = "data/nasa_parquets"),
              pattern = map(nasa_api_parameters), 
              iteration = "list",

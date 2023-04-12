@@ -7,7 +7,9 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-set_nasa_api_parameter <- function(bounding_boxes, start_year) {
+set_nasa_api_parameter <- function(bounding_boxes, 
+                                   start_year,
+                                   variables  = c("RH2M", "T2M", "PRECTOTCORR")) {
   
   xy <- bounding_boxes |> 
     mutate(across(x_min:y_max, ~round(., 1))) |> 
@@ -38,6 +40,7 @@ set_nasa_api_parameter <- function(bounding_boxes, start_year) {
     select(-start, -end)
   
   daily_recorded_parameters <- crossing(dates, xy) |> 
+    mutate(variables = list(variables)) |> 
     group_by(year, region) |> 
     mutate(i = row_number()) |> 
     ungroup()

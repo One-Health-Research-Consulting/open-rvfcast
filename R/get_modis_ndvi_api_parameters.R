@@ -7,16 +7,16 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-get_modis_ndvi_api_parameters <- function(bounding_boxes, start_year, end_year) {
+get_modis_ndvi_api_parameters <- function(modis_country_bounding_boxes_years) {
   
-  bbox <- bounding_boxes |> filter(region == "southern") 
-  bbox_coords <- as.numeric(bbox[1,-1])
+  bbox_coords <- unlist(modis_country_bounding_boxes_years$bounding_box)
+  country_name <- modis_country_bounding_boxes_years$country
+  year <- modis_country_bounding_boxes_years$year
   
   planetary_query <- stac("https://planetarycomputer.microsoft.com/api/stac/v1/")
   
   collection <- "modis-13Q1-061" # this is 250m (modis-13A1-061 is 500m)
   
-  out <- map_dfr(start_year:end_year, function(year){
     ndvi_query <- planetary_query |> 
       stac_search(collections = collection,
                   limit = 1000,
@@ -25,10 +25,11 @@ get_modis_ndvi_api_parameters <- function(bounding_boxes, start_year, end_year) 
       get_request() |> 
       items_sign(sign_fn = sign_planetary_computer())
     
-    tibble(url = map_vec(ndvi_query$features, ~.$assets$`250m_16_days_NDVI`$href),
+    out <- tibble(country_name = country_name,
+           year = year,
+           url = map_vec(ndvi_query$features, ~.$assets$`250m_16_days_NDVI`$href),
            id = (map_vec(ndvi_query$features, ~.$id)))
-  }) 
   
-  return(out)
   
+
 }
