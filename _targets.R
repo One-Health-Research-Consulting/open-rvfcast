@@ -113,7 +113,29 @@ source_targets <- tar_plan(
   },
   repository = "local", 
   format = "file"
-  )
+  ),
+  
+  ## GLW
+
+  tar_target(glw_cattle, get_glw()),
+  tar_target(glw_sheep, get_glw()),
+  tar_target(glw_goats, get_glw()),
+  tar_target(glw_cattle_preprocessed, preprocess_glw(glw_cattle, bounding_boxes)),
+  #need to cache
+  
+  ## ELEVATION
+  
+  tar_target(elevation_layer_raw, get_elevation()),
+  tar_target(elevation_layer_processed, 
+             process_elevation(elevation_layer_processed, bounding_boxes)),
+  #need to cache
+  
+  ## GRAZING CAPACITY
+  
+  tar_target(grazingcap_raw, get_grazingcap()),
+  tar_target(grazingcap_processed, 
+             process_grazingcap(grazingcap_layer_processed, bounding_boxes)),
+  #need to cache
   
 )
 
