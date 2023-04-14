@@ -30,6 +30,26 @@ get_modis_ndvi_api_parameters <- function(modis_country_bounding_boxes_years) {
            url = map_vec(ndvi_query$features, ~.$assets$`250m_16_days_NDVI`$href),
            id = (map_vec(ndvi_query$features, ~.$id)))
   
+    # Sys.sleep(30)
+    
+    suppressWarnings(dir.create(download_directory, recursive = TRUE))
+    existing_files <- list.files(download_directory)
+    
+    download_filename <- out$id[1]
+    
+    message(paste0("Downloading ", download_filename))
+    
+    if(save_filename %in% existing_files) {
+      message("file already exists, skipping download")
+      return(file.path(download_directory, save_filename)) # skip if file exists
+    }  
+    
+    
+    url <- paste0("/vsicurl/", out$url[1])
+    
+    data <- rast(url)
+    #compile tiles here, then save
+    
   
-
+    terra::writeRaster(data, filename = paste(out$id[1], ".tif"))
 }

@@ -14,3 +14,4 @@ data/**/*.grib
 data/**/*.parquet
 data/**/*.zip
 data/**/*.nc
+data/**/*.tif

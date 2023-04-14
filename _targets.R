@@ -15,10 +15,6 @@ tar_option_set(resources = tar_resources(
 # How many parallel processes for tar_make_future? (for within branch parallelization, set .env var N_PARALLEL_CORES)
 # future::plan(future.callr::callr, workers = 4)
 
-# Local caching documentation ---------------------------------------------------
-# Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
-# Format "file" means if we delete or change the local cache it will force a re-download.
-
 # Static Data Download ----------------------------------------------------
 static_targets <- tar_plan(
   
@@ -44,33 +40,21 @@ dynamic_targets <- tar_plan(
   
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
-  # TODO do we need S3A and S3B satellites?
+  # S3A and S3B satellites?
   # They are overlapping orbits, offset by 140 deg, which is useful for realtime images
   # but not necessary for our timestep 
   # pretty sure it's okay to select just one, but we can confirm with Assaf
   
   # get API parameters
   # files are for full Africa
-  tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters() |> 
-               rowwise() |> 
-               tar_group(),
-             iteration = "group"), 
+  tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters()), 
   
   # download files
   tar_target(sentinel_ndvi_downloaded, download_sentinel_ndvi(sentinel_ndvi_api_parameters,
                                                               download_directory = "data/sentinel_ndvi_rasters"),
              pattern = sentinel_ndvi_api_parameters, 
-             iteration = "list",
-             format = "file" ),
-  
-  # cache locally
-  tar_target(sentinel_ndvi_local, {suppressWarnings(dir.create(here::here("data/sentinel_ndvi_rasters"), recursive = TRUE))
-    cache_aws_branched_target(tmp_path = tar_read(sentinel_ndvi_downloaded),
-                              ext = ".nc") 
-  },
-  repository = "local", 
-  format = "file"
-  ),
+             format = "file", 
+             repository = "local"),
   
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
@@ -78,32 +62,14 @@ dynamic_targets <- tar_plan(
   
   # set country/year branching for modis
   tar_target(modis_country_bounding_boxes_years, country_bounding_boxes_years |> 
-               filter(year <= 2018) |> 
-               rowwise() |> 
-               tar_group(),
-             iteration = "group"), 
-  
-  # get API parameters
-  # TODO figure out MYD13Q1 vs MOD13Q1
-  tar_target(modis_ndvi_api_parameters, get_modis_ndvi_api_parameters(modis_country_bounding_boxes_years), 
-             pattern = tail(modis_country_bounding_boxes_years, 4)
-  ), 
+               filter(year <= 2018)), 
   
   # download files
-  tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_api_parameters,
+  tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_country_bounding_boxes_years,
                                                         download_directory = "data/modis_ndvi_rasters"),
-             pattern = modis_ndvi_api_parameters, 
-             iteration = "list",
-             format = "file" ),
-  
-  # cache locally
-  tar_target(modis_ndvi_local, {suppressWarnings(dir.create(here::here("data/modis_ndvi_rasters"), recursive = TRUE))
-    cache_aws_branched_target(tmp_path = tar_read(modis_ndvi_downloaded),
-                              ext = ".nc") 
-  },
-  repository = "local", 
-  format = "file"
-  ),
+             pattern = tail(modis_country_bounding_boxes_years, 1), 
+             format = "file" , 
+             repository = "local"),
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # TODO this needs to be refactored to pull terra data
@@ -179,6 +145,8 @@ dynamic_targets <- tar_plan(
 
 # Data Processing -----------------------------------------------------------
 data_targets <- tar_plan(
+  
+  # resampling
   
   # merge data together
   
