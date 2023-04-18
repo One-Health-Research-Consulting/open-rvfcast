@@ -13,6 +13,7 @@ download_modis_ndvi <- function(modis_country_bounding_boxes_years, download_dir
   
   
   suppressWarnings(dir.create(download_directory, recursive = TRUE))
+  existing_files <- list.files(download_directory)
   
   bbox_coords <- unlist(modis_country_bounding_boxes_years$bounding_box)
   country_name <- modis_country_bounding_boxes_years$country
@@ -35,12 +36,14 @@ download_modis_ndvi <- function(modis_country_bounding_boxes_years, download_dir
   
   # Save the parameters from the query
   ndvi_params <- tibble(
-    url = map_vec(ndvi_query$features, ~.$assets$`250m_16_days_NDVI`$href),
+    url = map_vec(ndvi_query$features, ~.$assets$`500m_16_days_NDVI`$href),
     id = map_vec(ndvi_query$features, ~.$id),
     start_date = map_vec(ndvi_query$features, ~.$properties$start_datetime), 
     end_date = map_vec(ndvi_query$features, ~.$properties$end_datetime),
+    platform = map_vec(ndvi_query$features, ~.$properties$platform),
     bbox = list(map(ndvi_query$features, ~.$bbox))
-  )
+  ) |> 
+    filter(platform == "terra")
   
   # Plan to download by start date - each file will be a mosaic of the tiles for each NDVI day
   ndvi_params_split <- ndvi_params |> 
@@ -54,7 +57,12 @@ download_modis_ndvi <- function(modis_country_bounding_boxes_years, download_dir
   
   # read in and mosaic the tiles 
   filenames <- map_vec(ndvi_params_split, function(params){
-    message(paste("downloading",  unique(params$filename)))
+    filename <-  unique(params$filename)
+    message(paste("downloading", filename))
+    if(filename %in% existing_files){
+      message("file already exists, skipping download")
+      return(filename)
+    }
     urls <- paste0("/vsicurl/", params$url)
     tiles <- map(urls, rast) 
     if(length(tiles)>1){
@@ -63,7 +71,7 @@ download_modis_ndvi <- function(modis_country_bounding_boxes_years, download_dir
       rast_downloaded <- tiles[[1]]
     }
     terra::writeRaster(rast_downloaded, here::here(download_directory, unique(params$filename)), overwrite = T)
-    return(unique(params$filename))
+    return(filename)
   })
   
   return(file.path(download_directory, filenames))
