@@ -4,7 +4,7 @@ for (f in list.files(here::here("R"), full.names = TRUE)) source (f)
 
 # Targets options
 tar_option_set(resources = tar_resources(
-  aws = tar_resources_aws(bucket = Sys.getenv("AWS_BUCKET_ID"), prefix = "open-rvfcast"),
+  aws = tar_resources_aws(bucket = Sys.getenv("AWS_BUCKET_ID"), prefix = "open-rvfcast/_targets"),
   qs = tar_resources_qs(preset = "fast")),
   repository = "aws",
   format = "qs",
@@ -64,7 +64,8 @@ dynamic_targets <- tar_plan(
   # get API parameters (branched, because rate limited)
   tar_target(modis_ndvi_parameters, get_modis_ndvi_api_parameters(continent_bounding_box,
                                                                   modis_ndvi_years),
-             pattern = modis_ndvi_years),
+             pattern = modis_ndvi_years,
+             iteration = "list"),
 
   # download files
   tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_parameters,
