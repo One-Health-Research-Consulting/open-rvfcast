@@ -26,7 +26,10 @@ static_targets <- tar_plan(
                                                                       "Chad","Sudan", "Senegal"),
                                                        states = tibble(state = "Mayotte", country = "France"))),
   tar_target(country_bounding_boxes, get_country_bounding_boxes(country_polygons)),
-  tar_target(country_bounding_boxes_years, expand_grid(country_bounding_boxes, year = 2005:2023))
+
+  tar_target(continent_polygon, create_africa_polygon()),
+  tar_target(continent_bounding_box, sf::st_bbox(continent_polygon))
+  
 )
 
 # Dynamic Data Download -----------------------------------------------------------
@@ -40,13 +43,8 @@ dynamic_targets <- tar_plan(
   
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
-  # S3A and S3B satellites?
-  # They are overlapping orbits, offset by 140 deg, which is useful for realtime images
-  # but not necessary for our timestep 
-  # pretty sure it's okay to select just one, but we can confirm with Assaf
   
   # get API parameters
-  # files are for full Africa
   tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters()), 
   
   # download files
@@ -60,14 +58,18 @@ dynamic_targets <- tar_plan(
   # 2005-present
   # this satellite will be retired soon, so we should use sentinel for present dates 
   
-  # set country/year branching for modis
-  tar_target(modis_country_bounding_boxes_years, country_bounding_boxes_years |> 
-               filter(year <= 2018)), 
+  # set branching for modis
+  tar_target(modis_ndvi_years, 2005:2018),
   
+  # get API parameters (branched, because rate limited)
+  tar_target(modis_ndvi_parameters, get_modis_ndvi_api_parameters(continent_bounding_box,
+                                                                  modis_ndvi_years),
+             pattern = modis_ndvi_years),
+
   # download files
-  tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_country_bounding_boxes_years,
+  tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_parameters,
                                                         download_directory = "data/modis_ndvi_rasters"),
-             pattern = tail(modis_country_bounding_boxes_years, 1), 
+             pattern = modis_ndvi_parameters, 
              format = "file" , 
              repository = "local"),
   
@@ -91,16 +93,8 @@ dynamic_targets <- tar_plan(
              pattern = map(nasa_api_parameters), 
              iteration = "list",
              format = "file" 
-  ),
+),
   
-  # cache locally
-  tar_target(nasa_recorded_weather_local, {suppressWarnings(dir.create(here::here("data/nasa_parquets"), recursive = TRUE))
-    cache_aws_branched_target(tmp_path = tar_read(nasa_recorded_weather_download),
-                              ext = ".gz.parquet") 
-  },
-  repository = "local", 
-  format = "file"
-  ),
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   # TODO refactoring based on Noam's PR
