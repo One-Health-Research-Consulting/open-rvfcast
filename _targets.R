@@ -4,7 +4,7 @@ for (f in list.files(here::here("R"), full.names = TRUE)) source (f)
 
 # Targets options
 tar_option_set(resources = tar_resources(
-  aws = tar_resources_aws(bucket = Sys.getenv("AWS_BUCKET_ID"), prefix = "open-rvfcast/_targets"),
+  aws = tar_resources_aws(bucket = "project-dtra-ml-main" , prefix = "open-rvfcast/_targets"),
   qs = tar_resources_qs(preset = "fast")),
   repository = "aws",
   format = "qs",
@@ -26,7 +26,7 @@ static_targets <- tar_plan(
                                                                       "Chad","Sudan", "Senegal"),
                                                        states = tibble(state = "Mayotte", country = "France"))),
   tar_target(country_bounding_boxes, get_country_bounding_boxes(country_polygons)),
-
+  
   tar_target(continent_polygon, create_africa_polygon()),
   tar_target(continent_bounding_box, sf::st_bbox(continent_polygon))
   
@@ -47,12 +47,25 @@ dynamic_targets <- tar_plan(
   # get API parameters
   tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters()), 
   
-  # download files
+  # download files (locally)
   tar_target(sentinel_ndvi_downloaded, download_sentinel_ndvi(sentinel_ndvi_api_parameters,
                                                               download_directory = "data/sentinel_ndvi_rasters"),
              pattern = sentinel_ndvi_api_parameters, 
              format = "file", 
              repository = "local"),
+  
+  # save to AWS bucket
+  # CHANGE CUE IF UPLOAD IS NEEDED
+  tar_target(sentinel_ndvi_upload_aws_s3, aws_s3_upload(path = "data/sentinel_ndvi_rasters/",
+                                                        bucket =  "project-dtra-ml-main" ,
+                                                        key = "data/sentinel_ndvi_rasters/", 
+                                                        prefix = "open-rvfcast/",
+                                                        check = TRUE), 
+             cue = tar_cue("never")), 
+  
+  # user can download from AWS
+  # CHANGE CUE IF DOWNLOAD IS NEEDED
+  tar_target(sentinel_ndvi_download_aws_s3, aws_s3_download()), #TODO
   
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
@@ -66,7 +79,7 @@ dynamic_targets <- tar_plan(
                                                                   modis_ndvi_years),
              pattern = modis_ndvi_years,
              iteration = "list"),
-
+  
   # download files
   tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_parameters,
                                                         download_directory = "data/modis_ndvi_rasters"),
@@ -94,7 +107,7 @@ dynamic_targets <- tar_plan(
              pattern = map(nasa_api_parameters), 
              iteration = "list",
              format = "file" 
-),
+  ),
   
   
   # ECMWF Weather Forecast data -----------------------------------------------------------

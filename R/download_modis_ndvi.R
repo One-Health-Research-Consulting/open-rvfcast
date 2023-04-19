@@ -44,7 +44,7 @@ download_modis_ndvi <- function(modis_ndvi_parameters,
       mutate(url = paste0("/vsicurl/", url)) |> 
       group_by(id) |> 
       group_split() |> 
-      sample(size = 5) 
+      sample(size = 3) 
   }) |> reduce(c)
   assertthat::assert_that(all(imap_lgl(dupe_tiles_to_test, function(dup, i){
     print(i)
