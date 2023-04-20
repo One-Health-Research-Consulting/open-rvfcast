@@ -7,7 +7,11 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-set_ecmwf_api_parameter <- function(bounding_boxes) {
+set_ecmwf_api_parameter <- function(years = 2005:2018,
+                                    bbox_coords = continent_bounding_box,
+                                    variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
+                                    product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
+                                    leadtime_months = c("1", "2", "3", "4", "5", "6")) {
   
   # System 4 covers just sept/oct 2017
   sys4 <- tibble(system = 4, year = list(2017), month = list(9:10))
@@ -40,7 +44,7 @@ set_ecmwf_api_parameter <- function(bounding_boxes) {
     bind_rows(sys51_2022)
   
   # System 5 covers everything else. 
-  sys5_years <- 1993:2022
+  sys5_years <- 2005:2022
   sys5 <- tibble(system = 5, year = split(sys5_years, ceiling(sys5_years/ 5)), month = list(1:12))
   
   # Tibble to interate over rowwise for download
@@ -48,13 +52,18 @@ set_ecmwf_api_parameter <- function(bounding_boxes) {
   
   # Setup spatial bounds
   # N, W, S, E
-  spacial_bounds <- bounding_boxes |>
-    filter(region == "africa") |> 
-    rename(N = y_max, W = x_min, S = y_min, E = x_max) |>
-    nest(spatial_bounds = c(N, W, S, E)) |> 
-    select(-region)
+  spatial_bounds <- c("N" = unname(bbox_coords["ymax"]),
+                      "W" = unname(bbox_coords["xmin"]),
+                      "S" = unname(bbox_coords["ymin"]),
+                      "E" = unname(bbox_coords["xmax"]))
   
-  seasonal_forecast_parameters <- crossing(seasonal_forecast_parameters, spacial_bounds)
+  # Add all other params
+  seasonal_forecast_parameters <- seasonal_forecast_parameters |> 
+    mutate(spatial_bounds = list(spatial_bounds)) |> 
+    mutate(variables = list(variables)) |> 
+    mutate(product_types = list(product_types)) |> 
+    mutate(leadtime_months = list(leadtime_months))
+  
   
   # will be easier to split by year
   seasonal_forecast_parameters <- seasonal_forecast_parameters |> 

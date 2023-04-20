@@ -74,16 +74,12 @@ dynamic_targets <- tar_plan(
   # set branching for modis
   tar_target(modis_ndvi_years, 2005:2018),
   
-  # get API parameters (branched, because rate limited)
-  tar_target(modis_ndvi_parameters, get_modis_ndvi_api_parameters(continent_bounding_box,
-                                                                  modis_ndvi_years),
-             pattern = modis_ndvi_years,
-             iteration = "list"),
-  
+
   # download files
-  tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_parameters,
+  tar_target(modis_ndvi_downloaded, download_modis_ndvi(continent_bounding_box,
+                                                        modis_ndvi_years,
                                                         download_directory = "data/modis_ndvi_rasters"),
-             pattern = modis_ndvi_parameters, 
+             pattern = modis_ndvi_years, 
              format = "file" , 
              repository = "local"),
   
@@ -111,19 +107,17 @@ dynamic_targets <- tar_plan(
   
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
-  # TODO refactoring based on Noam's PR
-  # TODO download from 2005-present
   
-  # tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter(bounding_boxes) |> 
-  #              rowwise() |> 
-  #              tar_group(),
-  #            iteration = "group"), 
-  # 
+  # set branching for ecmwf
+  tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter(years = 2005:2018,
+                                                           bbox_coords = continent_bounding_box,
+                                                           variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
+                                                           product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
+                                                           leadtime_months = c("1", "2", "3", "4", "5", "6"))),
+  
+  
   # tar_target(ecmwf_forecasts_download, 
-  #            download_ecmwf_forecasts(parameters = ecmwf_api_parameters,
-  #                                     variable = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
-  #                                     product_type = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
-  #                                     leadtime_month = c("1", "2", "3", "4", "5", "6"),
+  #            download_ecmwf_forecasts(ecmwf_api_parameters,
   #                                     download_directory = "data/ecmwf_gribs"),
   #            pattern = map(ecmwf_api_parameters), 
   #            iteration = "list"
