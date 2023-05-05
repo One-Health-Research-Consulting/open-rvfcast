@@ -4,7 +4,7 @@ for (f in list.files(here::here("R"), full.names = TRUE)) source (f)
 
 # Targets options
 tar_option_set(resources = tar_resources(
-  aws = tar_resources_aws(bucket = Sys.getenv("AWS_BUCKET_ID"), prefix = "open-rvfcast"),
+  aws = tar_resources_aws(bucket = "project-dtra-ml-main" , prefix = "open-rvfcast/_targets"),
   qs = tar_resources_qs(preset = "fast")),
   repository = "aws",
   format = "qs",
@@ -15,113 +15,150 @@ tar_option_set(resources = tar_resources(
 # How many parallel processes for tar_make_future? (for within branch parallelization, set .env var N_PARALLEL_CORES)
 # future::plan(future.callr::callr, workers = 4)
 
-# Data Source Download -----------------------------------------------------------
-source_targets <- tar_plan(
+# Static Data Download ----------------------------------------------------
+static_targets <- tar_plan(
   
-  tar_target(country_regions, define_country_regions()),
-  tar_target(bounding_boxes, define_bounding_boxes(country_regions)),
+  # Define country bounding boxes and years to set up download ----------------------------------------------------
+  tar_target(country_polygons, create_country_polygons(countries =  c("Libya", "Kenya", "South Africa",
+                                                                      "Mauritania", "Niger", "Namibia",
+                                                                      "Madagascar", "Eswatini", "Botswana" ,
+                                                                      "Mali", "United Republic of Tanzania", 
+                                                                      "Chad","Sudan", "Senegal"),
+                                                       states = tibble(state = "Mayotte", country = "France"))),
+  tar_target(country_bounding_boxes, get_country_bounding_boxes(country_polygons)),
   
-  # TODO do we need S3A and S3B satellites
-  tar_target(ndvi_api_parameters, get_ndvi_parameters() |> 
-               rowwise() |> 
-               tar_group(),
-             iteration = "group"), 
+  tar_target(continent_polygon, create_africa_polygon()),
+  tar_target(continent_bounding_box, sf::st_bbox(continent_polygon))
   
-  tar_target(ndvi_downloaded, download_ndvi(ndvi_api_parameters,
-                                            download_directory = "data/ndvi_rasters"),
-             pattern = head(ndvi_api_parameters, 100), 
-             iteration = "list",
-             format = "file" ),
+)
+
+# Dynamic Data Download -----------------------------------------------------------
+dynamic_targets <- tar_plan(
   
-  # cache locally
-  # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
-  # Format file here means if we delete or change the local cache it will force a re-download.
-  tar_target(ndvi_local, {suppressWarnings(dir.create(here::here("data/ndvi_rasters"), recursive = TRUE))
-    cache_aws_branched_target(tmp_path = tar_read(ndvi_downloaded),
-                              ext = ".nc") 
-  },
-  repository = "local", 
-  format = "file"
-  ),
-  
-  ## wahis
-  # TODO can refactor to download with dynamic branching
+  # WAHIS -----------------------------------------------------------
+  # TODO refactor with flatfiles
   tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()),
   tar_target(wahis_rvf_outbreaks_preprocessed, 
              preprocess_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw, country_regions)),
   
-  ## ecmwf
-  tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter(bounding_boxes) |> 
-               rowwise() |> 
-               tar_group(),
-             iteration = "group"), 
+  # SENTINEL NDVI -----------------------------------------------------------
+  # 2018-present
   
-  tar_target(ecmwf_forecasts_download, 
-             download_ecmwf_forecasts(parameters = ecmwf_api_parameters,
-                                      variable = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
-                                      product_type = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
-                                      leadtime_month = c("1", "2", "3", "4", "5", "6"),
-                                      download_directory = "data/ecmwf_gribs"),
-             pattern = map(ecmwf_api_parameters), 
-             iteration = "list"
-  ),
+  # get API parameters
+  tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters()), 
+  
+  # download files (locally)
+  tar_target(sentinel_ndvi_downloaded, download_sentinel_ndvi(sentinel_ndvi_api_parameters,
+                                                              download_directory = "data/sentinel_ndvi_rasters"),
+             pattern = sentinel_ndvi_api_parameters, 
+             format = "file", 
+             repository = "local"),
+  
+  # save to AWS bucket
+  tar_target(sentinel_ndvi_upload_aws_s3, aws_s3_upload(path = unique(dirname(sentinel_ndvi_downloaded)),
+                                                        bucket =  "project-dtra-ml-main" ,
+                                                        key = unique(dirname(sentinel_ndvi_downloaded)), 
+                                                        prefix = "open-rvfcast/",
+                                                        check = TRUE), 
+             cue = tar_cue("thorough")), 
+  
+  # user can download from AWS
+  tar_target(sentinel_ndvi_download_aws_s3, aws_s3_download()), #TODO
+  
+  # MODIS NDVI -----------------------------------------------------------
+  # 2005-present
+  # this satellite will be retired soon, so we should use sentinel for present dates 
+  
+  # set branching for modis
+  tar_target(modis_ndvi_years, 2005:2018),
   
   
-  tar_target(ecmwf_forecasts_preprocessed,
-             preprocess_ecmwf_forecasts(ecmwf_forecasts_download,
-                                        preprocessed_directory =  "data/ecmwf_parquets"),
-             pattern = map(ecmwf_forecasts_download), 
-             iteration = "list",
-             format = "file" 
-  ),
+  # download files
+  tar_target(modis_ndvi_downloaded, download_modis_ndvi(continent_bounding_box,
+                                                        modis_ndvi_years,
+                                                        download_directory = "data/modis_ndvi_rasters"),
+             pattern = modis_ndvi_years, 
+             format = "file" , 
+             repository = "local"),
+  
+  # save to AWS bucket
+  tar_target(modis_ndvi_upload_aws_s3, aws_s3_upload(path = unique(dirname(modis_ndvi_downloaded)),
+                                                     bucket =  "project-dtra-ml-main" ,
+                                                     key = unique(dirname(modis_ndvi_downloaded)), 
+                                                     prefix = "open-rvfcast/",
+                                                     check = TRUE), 
+             cue = tar_cue("thorough")), 
   
   
-  # cache locally
-  # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
-  # Format file here means if we delete or change the local cache it will force a re-download.
-  tar_target(ecmwf_forecasts_preprocessed_local, {suppressWarnings(dir.create(here::here("data/ecmwf_parquets"), recursive = TRUE))
-    cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
-                              ext = ".gz.parquet") # setting cleanup to false doesn't work - targets will still remove the non-cache files
-  },
-  repository = "local", 
-  format = "file"
-  ),
+  # NASA POWER recorded weather -----------------------------------------------------------
+  # TODO this needs to be refactored to pull terra data
   
-  ## NASA Power
-  tar_target(nasa_api_parameters, set_nasa_api_parameter(bounding_boxes) |> 
+  # get API parameters
+  tar_target(nasa_api_parameters, 
+             set_nasa_api_parameter(bounding_boxes, 
+                                    start_year = 2005,
+                                    variables  = c("RH2M", "T2M", "PRECTOTCORR")) |> 
                group_by(year, region) |> 
                tar_group(),
              iteration = "group"), 
   
+  # download files
   # here we save downloads as parquets - no preprocessing required
   tar_target(nasa_recorded_weather_download, 
              download_nasa_recorded_weather(parameters = nasa_api_parameters,
-                                            variable  = c("RH2M", "T2M", "PRECTOTCORR"),
-                                            timestep = "daily",
                                             download_directory = "data/nasa_parquets"),
              pattern = map(nasa_api_parameters), 
              iteration = "list",
              format = "file" 
   ),
   
-  # cache locally
-  # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
-  # Format file here means if we delete or change the local cache it will force a re-download.
-  tar_target(nasa_recorded_weather_local, {suppressWarnings(dir.create(here::here("data/nasa_parquets"), recursive = TRUE))
-    cache_aws_branched_target(tmp_path = tar_read(nasa_recorded_weather_download),
-                              ext = ".gz.parquet") 
-  },
-  repository = "local", 
-  format = "file"
-  )
+  
+  # ECMWF Weather Forecast data -----------------------------------------------------------
+  
+  # set branching for ecmwf
+  tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter(years = 2005:2018,
+                                                           bbox_coords = continent_bounding_box,
+                                                           variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
+                                                           product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
+                                                           leadtime_months = c("1", "2", "3", "4", "5", "6"))),
+  
+  
+  # tar_target(ecmwf_forecasts_download, 
+  #            download_ecmwf_forecasts(ecmwf_api_parameters,
+  #                                     download_directory = "data/ecmwf_gribs"),
+  #            pattern = map(ecmwf_api_parameters), 
+  #            iteration = "list"
+  # ),
+  # 
+  # 
+  # tar_target(ecmwf_forecasts_preprocessed,
+  #            preprocess_ecmwf_forecasts(ecmwf_forecasts_download,
+  #                                       preprocessed_directory =  "data/ecmwf_parquets"),
+  #            pattern = map(ecmwf_forecasts_download), 
+  #            iteration = "list",
+  #            format = "file" 
+  # ),
+  # 
+  # 
+  # # cache locally
+  # tar_target(ecmwf_forecasts_preprocessed_local, {suppressWarnings(dir.create(here::here("data/ecmwf_parquets"), recursive = TRUE))
+  #   cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
+  #                             ext = ".gz.parquet") # setting cleanup to false doesn't work - targets will still remove the non-cache files
+  # },
+  # repository = "local", 
+  # format = "file"
+  # ),
+  
   
 )
 
 # Data Processing -----------------------------------------------------------
 data_targets <- tar_plan(
   
+  # resampling
+  
   # merge data together
-
+  
 )
 
 # Model -----------------------------------------------------------
@@ -167,7 +204,8 @@ test_targets <- tar_plan(
 # List targets -----------------------------------------------------------------
 
 list(
-  source_targets,
+  static_targets,
+  dynamic_targets,
   data_targets,
   model_targets,
   deploy_targets,

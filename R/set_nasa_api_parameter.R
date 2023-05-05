@@ -7,7 +7,9 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-set_nasa_api_parameter <- function(bounding_boxes) {
+set_nasa_api_parameter <- function(bounding_boxes, 
+                                   start_year,
+                                   variables  = c("RH2M", "T2M", "PRECTOTCORR")) {
   
   xy <- bounding_boxes |> 
     mutate(across(x_min:y_max, ~round(., 1))) |> 
@@ -29,7 +31,7 @@ set_nasa_api_parameter <- function(bounding_boxes) {
     
   # start and end dates
   current_time <- Sys.Date()
-  dates <- tibble(year = 1993:year(current_time)) |> 
+  dates <- tibble(year = start_year:year(current_time)) |> 
     mutate(start = paste0(year, "-01-01"), end = paste0(year, "-12-31")) |> 
     mutate(end = if_else(year == year(current_time), as.character(current_time), end)) |> 
     rowwise() |> 
@@ -38,6 +40,7 @@ set_nasa_api_parameter <- function(bounding_boxes) {
     select(-start, -end)
   
   daily_recorded_parameters <- crossing(dates, xy) |> 
+    mutate(variables = list(variables)) |> 
     group_by(year, region) |> 
     mutate(i = row_number()) |> 
     ungroup()
