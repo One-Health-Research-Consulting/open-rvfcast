@@ -55,16 +55,14 @@ dynamic_targets <- tar_plan(
              repository = "local"),
   
   # save to AWS bucket
-  # CHANGE CUE IF UPLOAD IS NEEDED
-  tar_target(sentinel_ndvi_upload_aws_s3, aws_s3_upload(path = "data/sentinel_ndvi_rasters/",
+  tar_target(sentinel_ndvi_upload_aws_s3, aws_s3_upload(path = unique(dirname(sentinel_ndvi_downloaded)),
                                                         bucket =  "project-dtra-ml-main" ,
-                                                        key = "data/sentinel_ndvi_rasters/", 
+                                                        key = unique(dirname(sentinel_ndvi_downloaded)), 
                                                         prefix = "open-rvfcast/",
                                                         check = TRUE), 
-             cue = tar_cue("never")), 
+             cue = tar_cue("thorough")), 
   
   # user can download from AWS
-  # CHANGE CUE IF DOWNLOAD IS NEEDED
   tar_target(sentinel_ndvi_download_aws_s3, aws_s3_download()), #TODO
   
   # MODIS NDVI -----------------------------------------------------------
@@ -74,7 +72,7 @@ dynamic_targets <- tar_plan(
   # set branching for modis
   tar_target(modis_ndvi_years, 2005:2018),
   
-
+  
   # download files
   tar_target(modis_ndvi_downloaded, download_modis_ndvi(continent_bounding_box,
                                                         modis_ndvi_years,
@@ -82,6 +80,15 @@ dynamic_targets <- tar_plan(
              pattern = modis_ndvi_years, 
              format = "file" , 
              repository = "local"),
+  
+  # save to AWS bucket
+  tar_target(modis_ndvi_upload_aws_s3, aws_s3_upload(path = unique(dirname(modis_ndvi_downloaded)),
+                                                     bucket =  "project-dtra-ml-main" ,
+                                                     key = unique(dirname(modis_ndvi_downloaded)), 
+                                                     prefix = "open-rvfcast/",
+                                                     check = TRUE), 
+             cue = tar_cue("thorough")), 
+  
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # TODO this needs to be refactored to pull terra data
