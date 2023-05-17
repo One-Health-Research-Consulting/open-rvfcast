@@ -2,18 +2,17 @@
 suppressPackageStartupMessages(source("packages.R"))
 for (f in list.files(here::here("R"), full.names = TRUE)) source (f)
 
+aws_bucket = Sys.getenv("AWS_BUCKET_ID")
+
 # Targets options
 tar_option_set(resources = tar_resources(
-  aws = tar_resources_aws(bucket = "project-dtra-ml-main" , prefix = "open-rvfcast/_targets"),
+  aws = tar_resources_aws(bucket = aws_bucket, prefix = "open-rvfcast/_targets"),
   qs = tar_resources_qs(preset = "fast")),
   repository = "aws",
   format = "qs",
   error = "null", # allow branches to error without stopping the pipeline
   workspace_on_error = TRUE # allows interactive session for failed branches
 )
-
-# How many parallel processes for tar_make_future? (for within branch parallelization, set .env var N_PARALLEL_CORES)
-# future::plan(future.callr::callr, workers = 4)
 
 # Static Data Download ----------------------------------------------------
 static_targets <- tar_plan(
@@ -44,74 +43,106 @@ dynamic_targets <- tar_plan(
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
   
-  # get API parameters
-  tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters()), 
+  tar_target(sentinel_ndvi_directory, "data/sentinel_ndvi_rasters"),
   
-  # download files (locally)
+  # get API parameters
+  tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters(), cue = tar_cue("thorough")), 
+  
+  # download files from source (locally)
   tar_target(sentinel_ndvi_downloaded, download_sentinel_ndvi(sentinel_ndvi_api_parameters,
-                                                              download_directory = "data/sentinel_ndvi_rasters"),
+                                                              download_directory = sentinel_ndvi_directory),
              pattern = sentinel_ndvi_api_parameters, 
              format = "file", 
-             repository = "local"),
+             repository = "local",
+             cue = tar_cue("thorough")),
   
   # save to AWS bucket
-  tar_target(sentinel_ndvi_upload_aws_s3, aws_s3_upload(path = unique(dirname(sentinel_ndvi_downloaded)),
-                                                        bucket =  "project-dtra-ml-main" ,
-                                                        key = unique(dirname(sentinel_ndvi_downloaded)), 
-                                                        prefix = "open-rvfcast/",
-                                                        check = TRUE), 
-             cue = tar_cue("thorough")), 
+  tar_target(sentinel_ndvi_upload_aws_s3, {sentinel_ndvi_downloaded; # enforce dependency
+    aws_s3_upload(path = sentinel_ndvi_directory,
+                  bucket =  aws_bucket ,
+                  key = sentinel_ndvi_directory, 
+                  prefix = "open-rvfcast/",
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")), 
   
-  # user can download from AWS
-  tar_target(sentinel_ndvi_download_aws_s3, aws_s3_download()), #TODO
+  # user can download from AWS (instead of going through the source)
+  # tar_target(sentinel_ndvi_download_aws_s3, aws_s3_download(path = sentinel_ndvi_directory,
+  #                                                           bucket = aws_bucket ,
+  #                                                           key = paste0("open-rvfcast/", sentinel_ndvi_directory), 
+  #                                                           check = TRUE),
+  #            cue = tar_cue("never")), 
   
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
   # this satellite will be retired soon, so we should use sentinel for present dates 
   
+  tar_target(modis_ndvi_directory, "data/modis_ndvi_rasters"),
+  
   # set branching for modis
   tar_target(modis_ndvi_years, 2005:2018),
-  
   
   # download files
   tar_target(modis_ndvi_downloaded, download_modis_ndvi(continent_bounding_box,
                                                         modis_ndvi_years,
-                                                        download_directory = "data/modis_ndvi_rasters"),
+                                                        download_directory = modis_ndvi_directory),
              pattern = modis_ndvi_years, 
              format = "file" , 
-             repository = "local"),
+             repository = "local",
+             cue = tar_cue("thorough")),
   
   # save to AWS bucket
-  tar_target(modis_ndvi_upload_aws_s3, aws_s3_upload(path = unique(dirname(modis_ndvi_downloaded)),
-                                                     bucket =  "project-dtra-ml-main" ,
-                                                     key = unique(dirname(modis_ndvi_downloaded)), 
-                                                     prefix = "open-rvfcast/",
-                                                     check = TRUE), 
-             cue = tar_cue("thorough")), 
+  tar_target(modis_ndvi_upload_aws_s3, {modis_ndvi_downloaded; # enforce dependency
+    aws_s3_upload(path = modis_ndvi_directory,
+                  bucket = aws_bucket ,
+                  key = modis_ndvi_directory, 
+                  prefix = "open-rvfcast/",
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")), 
+  
+  # user can download from AWS (instead of going through the source)
+  # tar_target(modis_ndvi_download_aws_s3, aws_s3_download(path = modis_ndvi_directory,
+  #                                                        bucket = aws_bucket ,
+  #                                                        key = paste0("open-rvfcast/", modis_ndvi_directory), 
+  #                                                        check = TRUE),
+  #            cue = tar_cue("never")), 
   
   
   # NASA POWER recorded weather -----------------------------------------------------------
-  # TODO this needs to be refactored to pull terra data
   
-  # get API parameters
-  tar_target(nasa_api_parameters, 
-             set_nasa_api_parameter(bounding_boxes, 
-                                    start_year = 2005,
-                                    variables  = c("RH2M", "T2M", "PRECTOTCORR")) |> 
-               group_by(year, region) |> 
-               tar_group(),
-             iteration = "group"), 
+  tar_target(nasa_weather_directory, "data/nasa_weather_parquets"),
   
-  # download files
-  # here we save downloads as parquets - no preprocessing required
-  tar_target(nasa_recorded_weather_download, 
-             download_nasa_recorded_weather(parameters = nasa_api_parameters,
-                                            download_directory = "data/nasa_parquets"),
-             pattern = map(nasa_api_parameters), 
-             iteration = "list",
-             format = "file" 
+  # set branching for nasa
+  tar_target(nasa_weather_years, 2005:2023),
+  tar_target(nasa_weather_variables, c("RH2M", "T2M", "PRECTOTCORR")),
+  tar_target(nasa_weather_coordinates, get_nasa_weather_coordinates(country_bounding_boxes)),
+  
+  #  download files
+  tar_target(nasa_weather_downloaded,
+             download_nasa_weather(nasa_weather_coordinates,
+                                   nasa_weather_years,
+                                   nasa_weather_variables,
+                                   download_directory = nasa_weather_directory),
+             pattern = crossing(nasa_weather_years, nasa_weather_coordinates),
+             format = "file",
+             repository = "local",
+             cue = tar_cue("thorough")
   ),
   
+  # save to AWS bucket
+  tar_target(nasa_weather_upload_aws_s3,  {nasa_weather_downloaded; # enforce dependency
+    aws_s3_upload(path = nasa_weather_directory,
+                  bucket =  aws_bucket ,
+                  key = nasa_weather_directory, 
+                  prefix = "open-rvfcast/",
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")), 
+  
+  # user can download from AWS (instead of going through the source)
+  # tar_target(nasa_weather_download_aws_s3, aws_s3_download(path = nasa_weather_directory,
+  #                                                           bucket = aws_bucket ,
+  #                                                           key = paste0("open-rvfcast/", nasa_weather_directory), 
+  #                                                           check = TRUE),
+  #            cue = tar_cue("never")), 
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   
