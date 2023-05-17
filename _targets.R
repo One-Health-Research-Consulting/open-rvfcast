@@ -57,12 +57,13 @@ dynamic_targets <- tar_plan(
              cue = tar_cue("thorough")),
   
   # save to AWS bucket
-  tar_target(sentinel_ndvi_upload_aws_s3, aws_s3_upload(path = sentinel_ndvi_directory,
-                                                        bucket =  aws_bucket ,
-                                                        key = sentinel_ndvi_directory, 
-                                                        prefix = "open-rvfcast/",
-                                                        check = TRUE), 
-             cue = tar_cue("thorough")), 
+  tar_target(sentinel_ndvi_upload_aws_s3, {sentinel_ndvi_downloaded; # enforce dependency
+    aws_s3_upload(path = sentinel_ndvi_directory,
+                  bucket =  aws_bucket ,
+                  key = sentinel_ndvi_directory, 
+                  prefix = "open-rvfcast/",
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")), 
   
   # user can download from AWS (instead of going through the source)
   # tar_target(sentinel_ndvi_download_aws_s3, aws_s3_download(path = sentinel_ndvi_directory,
@@ -90,12 +91,13 @@ dynamic_targets <- tar_plan(
              cue = tar_cue("thorough")),
   
   # save to AWS bucket
-  tar_target(modis_ndvi_upload_aws_s3, aws_s3_upload(path = modis_ndvi_directory,
-                                                     bucket = aws_bucket ,
-                                                     key = modis_ndvi_directory, 
-                                                     prefix = "open-rvfcast/",
-                                                     check = TRUE), 
-             cue = tar_cue("thorough")), 
+  tar_target(modis_ndvi_upload_aws_s3, {modis_ndvi_downloaded; # enforce dependency
+    aws_s3_upload(path = modis_ndvi_directory,
+                  bucket = aws_bucket ,
+                  key = modis_ndvi_directory, 
+                  prefix = "open-rvfcast/",
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")), 
   
   # user can download from AWS (instead of going through the source)
   # tar_target(modis_ndvi_download_aws_s3, aws_s3_download(path = modis_ndvi_directory,
@@ -125,14 +127,15 @@ dynamic_targets <- tar_plan(
              repository = "local",
              cue = tar_cue("thorough")
   ),
-
+  
   # save to AWS bucket
-  tar_target(nasa_weather_upload_aws_s3, aws_s3_upload(path = nasa_weather_directory,
-                                                        bucket =  aws_bucket ,
-                                                        key = nasa_weather_directory, 
-                                                        prefix = "open-rvfcast/",
-                                                        check = TRUE), 
-             cue = tar_cue("thorough")), 
+  tar_target(nasa_weather_upload_aws_s3,  {nasa_weather_downloaded; # enforce dependency
+    aws_s3_upload(path = nasa_weather_directory,
+                  bucket =  aws_bucket ,
+                  key = nasa_weather_directory, 
+                  prefix = "open-rvfcast/",
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")), 
   
   # user can download from AWS (instead of going through the source)
   # tar_target(nasa_weather_download_aws_s3, aws_s3_download(path = nasa_weather_directory,
