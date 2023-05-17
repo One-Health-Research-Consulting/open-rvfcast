@@ -9,6 +9,7 @@ nohup.out
 outputs/
 !outputs/.gitkeep
 !outputs/example_report.html
+data/archive
 data/**/*.csv.gz
 data/**/*.grib
 data/**/*.parquet

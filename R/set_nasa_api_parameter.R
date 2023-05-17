@@ -7,26 +7,9 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-set_nasa_api_parameter <- function(bounding_boxes, 
+set_nasa_api_parameter <- function(nasa_weather_coordinates,
                                    start_year,
                                    variables  = c("RH2M", "T2M", "PRECTOTCORR")) {
-  
-  xy <- bounding_boxes |> 
-    mutate(across(x_min:y_max, ~round(., 1))) |> 
-    filter(region != "africa") |> 
-    group_split(region) |> 
-    map_dfr(function(reg){
-      x <- c(seq(reg$x_min, reg$x_max, by = 4)) # by 4 instead of 5 to be able to handle adding 2 to the range below
-      if(reg$x_max > x[length(x)]) x <- c(x, reg$x_max)
-      if(x[length(x)] - x[length(x)-1] < 2) x[length(x)] <- x[length(x)-1] + 2 # API requires at least 2 degree range
-      
-      y <- c(seq(reg$y_min, reg$y_max, by = 4))
-      if(reg$y_max > y[length(y)]) y <- c(y, reg$y_max)
-      if(y[length(y)] - y[length(y)-1] < 2) y[length(y)] <- y[length(y)-1] + 2 # API requires at least 2 degree range
-      
-      out <- crossing(x = rolling_box(x), y = rolling_box(y))  |> 
-        mutate(region = reg$region)
-    })
   
     
   # start and end dates
@@ -39,11 +22,9 @@ set_nasa_api_parameter <- function(bounding_boxes,
     ungroup() |> 
     select(-start, -end)
   
-  daily_recorded_parameters <- crossing(dates, xy) |> 
+  daily_recorded_parameters <- dates |> 
     mutate(variables = list(variables)) |> 
-    group_by(year, region) |> 
-    mutate(i = row_number()) |> 
-    ungroup()
+    mutate(coordinates = list(nasa_weather_coordinates))
 
   return(daily_recorded_parameters)
   
