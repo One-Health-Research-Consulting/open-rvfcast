@@ -20,8 +20,10 @@ get_wahis_rvf_outbreaks_raw <- function() {
     # Set the url call
     url <- wahis_rvf_query(offset)
     
+    headers <- add_headers("authorization" = glue::glue("token {Sys.getenv('DOLTHUB_API_KEY')}"))
+    
     # Make the API request
-    res <- RETRY("POST", url, encode = "json", times = 3)
+    res <- RETRY("POST", url = url, headers = headers, encode = "json", times = 3)
     
     # Check if the request was successful
     if (res$status_code != 200) {
@@ -54,11 +56,12 @@ wahis_rvf_query <- function(offset){
   
   endpoint <- "https://www.dolthub.com/api/v1alpha1/ecohealthalliance/wahisdb/main"
   query <- glue::glue(
-    "SELECT ts.*, ob.outbreak_thread_id, ob.country, ob.country_iso3c, ob.disease, ob.duration_in_days, ob.total_cases_per_outbreak 
-FROM outbreak_summary ob 
-JOIN outbreak_time_series ts 
-ON ob.outbreak_thread_id=ts.outbreak_thread_id 
-WHERE disease = 'rift valley fever'
+    "SELECT we.*, wo.*
+FROM wahis_epi_events we
+JOIN wahis_outbreaks wo 
+ON wo.epi_event_id_unique = we.epi_event_id_unique 
+WHERE we.standardized_disease_name = 'rift valley fever'
+ORDER BY we.epi_event_id_unique
 LIMIT 200
 OFFSET {offset}")
   
