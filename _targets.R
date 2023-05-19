@@ -18,11 +18,13 @@ tar_option_set(resources = tar_resources(
 static_targets <- tar_plan(
   
   # Define country bounding boxes and years to set up download ----------------------------------------------------
+  #TODO these will need to be updated from WAHIS
   tar_target(country_polygons, create_country_polygons(countries =  c("Libya", "Kenya", "South Africa",
                                                                       "Mauritania", "Niger", "Namibia",
                                                                       "Madagascar", "Eswatini", "Botswana" ,
                                                                       "Mali", "United Republic of Tanzania", 
-                                                                      "Chad","Sudan", "Senegal"),
+                                                                      "Chad","Sudan", "Senegal",
+                                                                      "Uganda", "South Sudan", "Burundi"),
                                                        states = tibble(state = "Mayotte", country = "France"))),
   tar_target(country_bounding_boxes, get_country_bounding_boxes(country_polygons)),
   
@@ -35,10 +37,9 @@ static_targets <- tar_plan(
 dynamic_targets <- tar_plan(
   
   # WAHIS -----------------------------------------------------------
-  # TODO refactor with flatfiles
   tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()),
   tar_target(wahis_rvf_outbreaks_preprocessed, 
-             preprocess_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw, country_regions)),
+             preprocess_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw)),
   
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
