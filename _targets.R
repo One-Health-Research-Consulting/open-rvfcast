@@ -65,12 +65,6 @@ dynamic_targets <- tar_plan(
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
-  # user can download from AWS (instead of going through the source)
-  # tar_target(sentinel_ndvi_download_aws_s3, aws_s3_download(path = sentinel_ndvi_directory,
-  #                                                           bucket = aws_bucket ,
-  #                                                           key = paste0("open-rvfcast/", sentinel_ndvi_directory), 
-  #                                                           check = TRUE),
-  #            cue = tar_cue("never")), 
   
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
@@ -98,14 +92,7 @@ dynamic_targets <- tar_plan(
                   prefix = "open-rvfcast/",
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
-  
-  # user can download from AWS (instead of going through the source)
-  # tar_target(modis_ndvi_download_aws_s3, aws_s3_download(path = modis_ndvi_directory,
-  #                                                        bucket = aws_bucket ,
-  #                                                        key = paste0("open-rvfcast/", modis_ndvi_directory), 
-  #                                                        check = TRUE),
-  #            cue = tar_cue("never")), 
-  
+
   
   # NASA POWER recorded weather -----------------------------------------------------------
   
@@ -137,12 +124,6 @@ dynamic_targets <- tar_plan(
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
-  # user can download from AWS (instead of going through the source)
-  # tar_target(nasa_weather_download_aws_s3, aws_s3_download(path = nasa_weather_directory,
-  #                                                           bucket = aws_bucket ,
-  #                                                           key = paste0("open-rvfcast/", nasa_weather_directory), 
-  #                                                           check = TRUE),
-  #            cue = tar_cue("never")), 
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   

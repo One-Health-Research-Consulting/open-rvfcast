@@ -188,16 +188,6 @@
         "backports"
       ]
     },
-    "bettermc": {
-      "Package": "bettermc",
-      "Version": "1.1.2",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "b2b7d8f90d753f720585f124cde6eb9f",
-      "Requirements": [
-        "checkmate"
-      ]
-    },
     "bit": {
       "Package": "bit",
       "Version": "4.0.5",
@@ -323,16 +313,6 @@
         "tibble"
       ]
     },
-    "checkmate": {
-      "Package": "checkmate",
-      "Version": "2.1.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "147e4db6909d8814bb30f671b49d7e06",
-      "Requirements": [
-        "backports"
-      ]
-    },
     "class": {
       "Package": "class",
       "Version": "7.3-20",
@@ -414,9 +394,9 @@
       "RemoteHost": "api.github.com",
       "RemoteUsername": "ecohealthalliance",
       "RemoteRepo": "containerTemplateUtils",
-      "RemoteRef": "feature/aws_s3_download",
-      "RemoteSha": "6f857934c932d2cb541ccc2ff538e923e9222a03",
-      "Hash": "22d7ab735eaee52b050c3ffe1c9bb626",
+      "RemoteRef": "main",
+      "RemoteSha": "c661a6aeb33cda54f399e37cd3b95a9a5fff68ec",
+      "Hash": "0eea61507c46ddab935bfe2e25ae8067",
       "Requirements": [
         "blastula",
         "cli",
