@@ -7,19 +7,15 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-download_ecmwf_forecasts <- function(parameters, 
-                                     variable = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
-                                     product_type = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
-                                     leadtime_month = c("1", "2", "3", "4", "5", "6"),
+download_ecmwf_forecasts <- function(ecmwf_api_parameters,
                                      download_directory){
   
   suppressWarnings(dir.create(download_directory, recursive = TRUE))
   existing_files <- list.files(download_directory)
   
-  system <- parameters$system
-  year <- parameters$year
-  month <- unlist(parameters$month)
-  spatial_bounds <- unlist(parameters$spatial_bounds) |> round(1)
+  system <- ecmwf_api_parameters$system
+  year <- ecmwf_api_parameters$year
+  month <- unlist(ecmwf_api_parameters$month)
 
   filename <- paste("ecmwf", "seasonal_forecast", paste0("sys", system), year, sep = "_")
   filename <- paste0(filename, ".grib")
@@ -33,12 +29,12 @@ download_ecmwf_forecasts <- function(parameters,
   request <- list(
     originating_centre = "ecmwf",
     system = system,
-    variable = variable,
-    product_type = product_type,
+    variable = unlist(ecmwf_api_parameters$variables),
+    product_type = unlist(ecmwf_api_parameters$product_types),
     year = year,
     month = month,
-    leadtime_month = leadtime_month,
-    area = spatial_bounds,
+    leadtime_month = unlist(ecmwf_api_parameters$leadtime_months),
+    area = round(unlist(ecmwf_api_parameters$spatial_bounds), 1),
     format = "grib",
     dataset_short_name = "seasonal-monthly-single-levels",
     target = filename
@@ -47,7 +43,6 @@ download_ecmwf_forecasts <- function(parameters,
   wf_set_key(user = Sys.getenv("ECMWF_USERID"), key = Sys.getenv("ECMWF_TOKEN"), service = "cds")
   
   safely(wf_request(user = Sys.getenv("ECMWF_USERID"), request = request, transfer = TRUE, path = download_directory))
-  
   
   return(file.path(download_directory, filename))
 }

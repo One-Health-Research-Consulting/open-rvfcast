@@ -18,7 +18,6 @@ tar_option_set(resources = tar_resources(
 static_targets <- tar_plan(
   
   # Define country bounding boxes and years to set up download ----------------------------------------------------
-  #TODO these will need to be updated from WAHIS
   tar_target(country_polygons, create_country_polygons(countries =  c("Libya", "Kenya", "South Africa",
                                                                       "Mauritania", "Niger", "Namibia",
                                                                       "Madagascar", "Eswatini", "Botswana" ,
@@ -147,22 +146,44 @@ dynamic_targets <- tar_plan(
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   
+  tar_target(ecmwf_forecasts_directory, "data/ecmwf_forecasts_gribs"),
+  
   # set branching for ecmwf
-  tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter(years = 2005:2018,
+  tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter(years = 2005:2023,
                                                            bbox_coords = continent_bounding_box,
                                                            variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
                                                            product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
                                                            leadtime_months = c("1", "2", "3", "4", "5", "6"))),
   
+  #  download files
+  tar_target(ecmwf_forecasts_downloaded,
+             download_ecmwf_forecasts(ecmwf_api_parameters,
+                                      download_directory = ecmwf_forecasts_directory),
+             pattern = ecmwf_api_parameters,
+             format = "file",
+             repository = "local",
+             cue = tar_cue("thorough")
+  ),
   
-  # tar_target(ecmwf_forecasts_download, 
-  #            download_ecmwf_forecasts(ecmwf_api_parameters,
-  #                                     download_directory = "data/ecmwf_gribs"),
-  #            pattern = map(ecmwf_api_parameters), 
-  #            iteration = "list"
-  # ),
-  # 
-  # 
+  # save to AWS bucket
+  tar_target(ecmwf_forecasts_upload_aws_s3,  {ecmwf_forecasts_downloaded; # enforce dependency
+    aws_s3_upload(path = ecmwf_forecasts_directory,
+                  bucket =  aws_bucket ,
+                  key = ecmwf_forecasts_directory, 
+                  prefix = "open-rvfcast/",
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")), 
+  
+)
+
+# Data Processing -----------------------------------------------------------
+data_targets <- tar_plan(
+  
+  # convert ecmwf to raster
+  
+  # convert terra power to raster
+  
+  
   # tar_target(ecmwf_forecasts_preprocessed,
   #            preprocess_ecmwf_forecasts(ecmwf_forecasts_download,
   #                                       preprocessed_directory =  "data/ecmwf_parquets"),
@@ -170,22 +191,7 @@ dynamic_targets <- tar_plan(
   #            iteration = "list",
   #            format = "file" 
   # ),
-  # 
-  # 
-  # # cache locally
-  # tar_target(ecmwf_forecasts_preprocessed_local, {suppressWarnings(dir.create(here::here("data/ecmwf_parquets"), recursive = TRUE))
-  #   cache_aws_branched_target(tmp_path = tar_read(ecmwf_forecasts_preprocessed),
-  #                             ext = ".gz.parquet") # setting cleanup to false doesn't work - targets will still remove the non-cache files
-  # },
-  # repository = "local", 
-  # format = "file"
-  # ),
   
-  
-)
-
-# Data Processing -----------------------------------------------------------
-data_targets <- tar_plan(
   
   # resampling
   
@@ -196,21 +202,6 @@ data_targets <- tar_plan(
 # Model -----------------------------------------------------------
 model_targets <- tar_plan(
   
-  # model_data = prep_model_data(case_data, rast(static_stack)),
-  # spatial_grid = create_spatial_grid(model_data),
-  # blocked_data = create_blocked_model_data(model_data, spatial_grid),
-  # divided_data = divide_data(blocked_data),
-  # holdout_data = assessment(divided_data),
-  # training_data = analysis(divided_data),
-  # training_splits = create_training_splits(training_data),
-  # model_workflow = build_workflow(training_data),
-  # tuned_parameters = cv_tune_parameters(model_workflow, training_splits, grid_size = 10, n_cores = 4),
-  # tuned_model = fit_full_model(model_workflow, training_data, tuned_parameters),
-  # tar_file(tuned_model_file, {f <- "tuned_model_file.rds"; saveRDS(tuned_model, f, compress = "xz"); f}),
-  # holdout_data_predictions = predict_rvf(holdout_data, tuned_model),
-  # confusion_matrix = get_confusion_matrix(holdout_data_predictions),
-  # model_performance = summary(confusion_matrix),
-  # dalex_explainer = get_dalex_explainer(tuned_model)
 )
 
 # Deploy -----------------------------------------------------------
