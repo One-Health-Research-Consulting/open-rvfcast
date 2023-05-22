@@ -1,13 +1,16 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|9c460d3a02d725a6|||||||||||||||
+.Random.seed|object|7e11c1f2fedce10a|||||||||||||||
 aws_bucket|object|6470e0eaaf45ae31|||||||||||||||
 cache_aws_branched_target|function|6e2abfa4969de1bf|||||||||||||||
 continent_bounding_box|stem|a230f74991f51c94|bc00ded6218f3e10|925b4e563663efb6|-1551480776|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/continent_bounding_box*endpoint=TlVMTA*version=m.iaiEzHVJJVInR0pdCyLMGUe_gTyAZm|t19466.75048577s||1912|qs|aws|vector|||0.001||
 continent_polygon|stem|e5b755d1bb0cf1f5|8fdc308f6950b209|8fda1350e825d6f0|-1018833134|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/continent_polygon*endpoint=TlVMTA*version=qgDYPhMxQt0qolfxJLDNBIqezEEd5LnP|t19466.7501340025s||41587|qs|aws|vector|||0.032||
+continent_raster_template|stem|f7447f449dab6127|59215772b6da1296|8f9ba5bdcebfbf68|435814239|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/continent_raster_template*endpoint=TlVMTA*version=lW7Xdfy1uTa85fhfoRvHHmZWtAJ9SKHk|t19499.8566794849s||17991|qs|aws|vector|||0.012|readValues raster has no values|
+continent_raster_template_plot|stem|2bb339e1379dddd2|49ecb64805b051b3|4d0f5a05e879b51a|-1126088679|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/continent_raster_template_plot*endpoint=TlVMTA*version=xrkORydp2RKg6r0nm.lkpvJxA4dS4JIu|t19499.8613628116s||30|qs|aws|vector|||0.264|ignoring all but the first attribute|
 country_bounding_boxes|stem|61cf4bcf627ad9fa|30fec9e0e3d1a974|78cecc089aa427ea|1038934427|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/country_bounding_boxes*endpoint=TlVMTA*version=Lu0z3owT03AnkJ5d4YTqqMsNXM0z4te7|t19496.5805091469s||4459|qs|aws|vector|||0.024||
 country_polygons|stem|8d2fd766bbf4371c|cb7eceb109efaff7|a2cdedccfeb044ec|1321015204|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/country_polygons*endpoint=TlVMTA*version=ByQX8VexDY1GyPmGbMEa19luF2RbaV_I|t19496.5799316641s||18590|qs|aws|vector|||0.808||
 create_africa_polygon|function|fb2ce70982e38cd3|||||||||||||||
 create_country_polygons|function|9917ababa5b4b8f4|||||||||||||||
+create_raster_template_plot|function|db738156a3247831|||||||||||||||
 data_targets|object|1eb1bc8d77111ded|||||||||||||||
 define_bounding_boxes|function|e614caacc0592e73|||||||||||||||
 define_country_regions|function|54808365a1bb460e|||||||||||||||
@@ -914,9 +917,9 @@ sentinel_ndvi_downloaded_fe98ad93|branch|8ffb5af1537998f1|2902c89437b339e8|39f5e
 sentinel_ndvi_upload_aws_s3|stem|d255ab8d3c5e7565|11c93155ffa225df|b56330db65b68647|-1245746504|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/sentinel_ndvi_upload_aws_s3*endpoint=TlVMTA*version=jTE_QSiBWIo8vu8pxuZq7ahX2MYt0yHV|t19494.6237017094s||20786|qs|aws|vector|||16.311||
 set_ecmwf_api_parameter|function|e3e4962883690ed5|||||||||||||||
 set_nasa_api_parameter|function|ac1cc420c9c9242c|||||||||||||||
-static_targets|object|d11b20fb91a7e72d|||||||||||||||
+static_targets|object|a6765bfc98a846fc|||||||||||||||
 test_targets|object|1eb1bc8d77111ded|||||||||||||||
-user_rprof|object|7b516752d69e2eab|||||||||||||||
+user_rprof|object|f830e9c767f14736|||||||||||||||
 wahis_rvf_outbreaks_preprocessed|stem|30ccd988b415d773|3ea98184b5887c93|275a59d310ff2a63|2127878318|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/wahis_rvf_outbreaks_preprocessed*endpoint=TlVMTA*version=B59R2UfXvSyjXvghth4wnQ.bd4E35nmr|t19496.5774266348s||172965|qs|aws|vector|||0.049||
 wahis_rvf_outbreaks_raw|stem|6fc7e6c7238977b3|b988ec4215d4213c|5ed4661ae3efb1aa|1933416983|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/wahis_rvf_outbreaks_raw*endpoint=TlVMTA*version=xNQzoRkYrmDsU37GWg0gWosoI7.s6nIq|t19496.5530035559s||173410|qs|aws|vector|||29.11||
 wahis_rvf_query|function|9836433f6f1061fb|||||||||||||||

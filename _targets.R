@@ -28,7 +28,10 @@ static_targets <- tar_plan(
   tar_target(country_bounding_boxes, get_country_bounding_boxes(country_polygons)),
   
   tar_target(continent_polygon, create_africa_polygon()),
-  tar_target(continent_bounding_box, sf::st_bbox(continent_polygon))
+  tar_target(continent_bounding_box, sf::st_bbox(continent_polygon)),
+  tar_target(continent_raster_template,
+            wrap(terra::rast(ext(continent_polygon), resolution = 0.1))),
+  tar_target(continent_raster_template_plot, create_raster_template_plot(rast(continent_raster_template), continent_polygon))
   
 )
 
@@ -160,9 +163,12 @@ dynamic_targets <- tar_plan(
 # Data Processing -----------------------------------------------------------
 data_targets <- tar_plan(
   
+  # resample ndvi to raster template
+  
   # convert ecmwf to raster
   
   # convert terra power to raster
+  
   
   
   # tar_target(ecmwf_forecasts_preprocessed,
@@ -173,9 +179,7 @@ data_targets <- tar_plan(
   #            format = "file" 
   # ),
   
-  
-  # resampling
-  
+
   # merge data together
   
 )
