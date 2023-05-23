@@ -167,16 +167,28 @@ data_targets <- tar_plan(
   
   # Transform Sentinel NDVI
   # save locally as files
-  #TODO diff between template and raster crs
+  # TODO diff between template and raster crs
   tar_target(sentinel_ndvi_rasters_transformed, 
              save_transform_raster(raster_file = sentinel_ndvi_downloaded, 
                                    template = continent_raster_template,
                                    transform_directory = paste0(sentinel_ndvi_directory, "_transformed"),
                                    verbose = TRUE),
-             pattern = head(sentinel_ndvi_downloaded, 3), 
+             pattern = head(sentinel_ndvi_downloaded, 4), 
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
+  
+  # TODO what are the units (differs between sentinel and modis)
+  # TODO this needs to handle the batching from modis
+  tar_target(modis_ndvi_rasters_transformed, 
+             save_transform_raster(raster_file = modis_ndvi_downloaded, 
+                                   template = continent_raster_template,
+                                   transform_directory = paste0(modis_ndvi_directory, "_transformed"),
+                                   verbose = TRUE),
+             pattern = head(modis_ndvi_downloaded, 4), 
+             format = "file", 
+             repository = "local",
+             cue = tar_cue("thorough")), 
   
   # convert ecmwf to raster
   

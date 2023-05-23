@@ -19,7 +19,12 @@ save_transform_raster <- function(raster_file, template, transform_directory, ve
      !identical(res(raw_raster), res(template))) {
     raw_raster <- terra::resample(raw_raster, template, method = "cubicspline")
   } 
-  terra::writeCDF(raw_raster, here::here(transform_directory, filename), overwrite = T)
+  
+  save_function <- switch(tools::file_ext(filename), 
+                          "tif" = terra::writeRaster,
+                          "nc" = terra::writeCDF)
+  
+  save_function(raw_raster, here::here(transform_directory, filename), overwrite = T)
   return(file.path(transform_directory, filename))
   
 }
