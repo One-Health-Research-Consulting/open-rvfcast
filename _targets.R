@@ -30,7 +30,9 @@ static_targets <- tar_plan(
   tar_target(continent_polygon, create_africa_polygon()),
   tar_target(continent_bounding_box, sf::st_bbox(continent_polygon)),
   tar_target(continent_raster_template,
-            wrap(terra::rast(ext(continent_polygon), resolution = 0.1))),
+            wrap(terra::rast(ext(continent_polygon), 
+                             #crs = "+proj=aea +lat_0=0 +lon_0=24 +lat_1=-24 +lat_2=-33 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs",
+                             resolution = 0.1))),
   tar_target(continent_raster_template_plot, create_raster_template_plot(rast(continent_raster_template), continent_polygon))
   
 )
@@ -163,13 +165,22 @@ dynamic_targets <- tar_plan(
 # Data Processing -----------------------------------------------------------
 data_targets <- tar_plan(
   
-  # resample ndvi to raster template
+  # Transform Sentinel NDVI
+  # save locally as files
+  #TODO diff between template and raster crs
+  tar_target(sentinel_ndvi_rasters_transformed, 
+             save_transform_raster(raster_file = sentinel_ndvi_downloaded, 
+                                   template = continent_raster_template,
+                                   transform_directory = paste0(sentinel_ndvi_directory, "_transformed"),
+                                   verbose = TRUE),
+             pattern = head(sentinel_ndvi_downloaded, 3), 
+             format = "file", 
+             repository = "local",
+             cue = tar_cue("thorough")),  
   
   # convert ecmwf to raster
   
   # convert terra power to raster
-  
-  
   
   # tar_target(ecmwf_forecasts_preprocessed,
   #            preprocess_ecmwf_forecasts(ecmwf_forecasts_download,

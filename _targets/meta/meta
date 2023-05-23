@@ -1,17 +1,17 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|7e11c1f2fedce10a|||||||||||||||
+.Random.seed|object|00bdbcfdbdc9cc2e|||||||||||||||
 aws_bucket|object|6470e0eaaf45ae31|||||||||||||||
 cache_aws_branched_target|function|6e2abfa4969de1bf|||||||||||||||
 continent_bounding_box|stem|a230f74991f51c94|bc00ded6218f3e10|925b4e563663efb6|-1551480776|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/continent_bounding_box*endpoint=TlVMTA*version=m.iaiEzHVJJVInR0pdCyLMGUe_gTyAZm|t19466.75048577s||1912|qs|aws|vector|||0.001||
 continent_polygon|stem|e5b755d1bb0cf1f5|8fdc308f6950b209|8fda1350e825d6f0|-1018833134|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/continent_polygon*endpoint=TlVMTA*version=qgDYPhMxQt0qolfxJLDNBIqezEEd5LnP|t19466.7501340025s||41587|qs|aws|vector|||0.032||
-continent_raster_template|stem|f7447f449dab6127|59215772b6da1296|8f9ba5bdcebfbf68|435814239|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/continent_raster_template*endpoint=TlVMTA*version=lW7Xdfy1uTa85fhfoRvHHmZWtAJ9SKHk|t19499.8566794849s||17991|qs|aws|vector|||0.012|readValues raster has no values|
+continent_raster_template|stem|f7447f449dab6127|59215772b6da1296|8f9ba5bdcebfbf68|435814239|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/continent_raster_template*endpoint=TlVMTA*version=hXzbAtnvJDRkkR6cqcT5xHVulOmG2Xkl|t19500.6432723297s||17991|qs|aws|vector|||0.015|readValues raster has no values|
 continent_raster_template_plot|stem|2bb339e1379dddd2|49ecb64805b051b3|4d0f5a05e879b51a|-1126088679|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/continent_raster_template_plot*endpoint=TlVMTA*version=xrkORydp2RKg6r0nm.lkpvJxA4dS4JIu|t19499.8613628116s||30|qs|aws|vector|||0.264|ignoring all but the first attribute|
 country_bounding_boxes|stem|61cf4bcf627ad9fa|30fec9e0e3d1a974|78cecc089aa427ea|1038934427|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/country_bounding_boxes*endpoint=TlVMTA*version=Lu0z3owT03AnkJ5d4YTqqMsNXM0z4te7|t19496.5805091469s||4459|qs|aws|vector|||0.024||
 country_polygons|stem|8d2fd766bbf4371c|cb7eceb109efaff7|a2cdedccfeb044ec|1321015204|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/country_polygons*endpoint=TlVMTA*version=ByQX8VexDY1GyPmGbMEa19luF2RbaV_I|t19496.5799316641s||18590|qs|aws|vector|||0.808||
 create_africa_polygon|function|fb2ce70982e38cd3|||||||||||||||
 create_country_polygons|function|9917ababa5b4b8f4|||||||||||||||
 create_raster_template_plot|function|db738156a3247831|||||||||||||||
-data_targets|object|1eb1bc8d77111ded|||||||||||||||
+data_targets|object|77b5e4f7191cd8c1|||||||||||||||
 define_bounding_boxes|function|e614caacc0592e73|||||||||||||||
 define_country_regions|function|54808365a1bb460e|||||||||||||||
 deploy_targets|object|1eb1bc8d77111ded|||||||||||||||
@@ -746,8 +746,10 @@ nasa_weather_years|stem|d0f995f82cf9a4e1|8d8352b40762c255|787f005495551c49|-6807
 plot_targets|object|1eb1bc8d77111ded|||||||||||||||
 preprocess_ecmwf_forecasts|function|033bd8a3c45b4d46|||||||||||||||
 preprocess_wahis_rvf_outbreaks|function|1739270cf02b72d6|||||||||||||||
+read_transform_raster|function|f7518264efa394ed|||||||||||||||
 report_targets|object|1eb1bc8d77111ded|||||||||||||||
 rolling_box|function|1195d491d98c697b|||||||||||||||
+save_transform_raster|function|18b50d15df41cf18|||||||||||||||
 sentinel_ndvi_api_parameters|stem|e32ba045fbe8a72d|c6ae8aff809f6603|412f9d3fd52784a7|492793368|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/sentinel_ndvi_api_parameters*endpoint=TlVMTA*version=ayW.4fGmrzh00JfrBDahLsxQNoELbX9P|t19466.7510960649s||203073|qs|aws|vector|||35.409||
 sentinel_ndvi_directory|stem|a55e5b31d1640cff|267d3b375867a113|ef46db3751d8e999|700574979|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/sentinel_ndvi_directory*endpoint=TlVMTA*version=KlD9_ftLoSTF4MHtzAJ7lDswcMVj_XKf|t19493.7807251114s||58|qs|aws|vector|||0||
 sentinel_ndvi_download_aws_s3|stem|error|a45993114d65d6d0|e1f924b6fc90289e|1760411890|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/sentinel_ndvi_download_aws_s3*endpoint=TlVMTA*version=5yeSPBvXJBocmi5Y1sk.qHysG2w21ixB|t19493.5978104486s||30|qs|aws|vector|||0.003||argument key is missing, with no default
@@ -914,12 +916,20 @@ sentinel_ndvi_downloaded_fa565642|branch|2e91bca2faaca9c6|2902c89437b339e8|864ef
 sentinel_ndvi_downloaded_fc344e8c|branch|6f7175204b4dc34b|2902c89437b339e8|962f13a512169cd0|-358300942|data/sentinel_ndvi_rasters/S3A_SY_2_V10____20220901T000000_20220910T235959_20220912T231003_AFRICA____________PS1_O_NT_002.nc|t19464.7565837055s|0c94bc3eed3e622a|24342287|file|local|vector|sentinel_ndvi_downloaded||0.001||
 sentinel_ndvi_downloaded_fc3ff937|branch|144fba2df453a05f|2902c89437b339e8|58ff3612b81f6d11|-430409680|data/sentinel_ndvi_rasters/S3A_SY_2_V10____20210921T000000_20210930T235959_20211008T134318_AFRICA____________LN2_O_NT_002.nc|t19464.7574874723s|a79e9fa3d160141a|24800196|file|local|vector|sentinel_ndvi_downloaded||0.001||
 sentinel_ndvi_downloaded_fe98ad93|branch|8ffb5af1537998f1|2902c89437b339e8|39f5e7cc667f8115|-1987494490|data/sentinel_ndvi_rasters/S3A_SY_2_V10____20191216T110000_20191226T110000_20200105T113727_AFRICA____________LN2_O_NT_002.nc|t19453.7774763245s|164ba5331f2df0c4|24617037|file|local|vector|sentinel_ndvi_downloaded||0.001||
+sentinel_ndvi_rasters|pattern|6ed9f782d77c0248|d3825d9f578072fb||-1069424546||||7013009|qs|local|vector||sentinel_ndvi_rasters_320c45ea*sentinel_ndvi_rasters_7fa2126b*sentinel_ndvi_rasters_34213e20|2.776||
+sentinel_ndvi_rasters_320c45ea|branch|4db9a82efba89b45|d3825d9f578072fb|56f7c4eb4ac29fdc|689123027||t19500.6507883354s|0ca2dff761e77966|2331934|qs|local|vector|sentinel_ndvi_rasters||0.925||
+sentinel_ndvi_rasters_34213e20|branch|951c33f091d6a7da|d3825d9f578072fb|51baea235c46b55e|410977340||t19500.6508099706s|f571865cbb19911d|2339493|qs|local|vector|sentinel_ndvi_rasters||0.896||
+sentinel_ndvi_rasters_7fa2126b|branch|1468eea079bc19e7|d3825d9f578072fb|b1e31051decd3a88|234591437||t19500.6507995051s|80e4f56780e1c628|2341582|qs|local|vector|sentinel_ndvi_rasters||0.955||
+sentinel_ndvi_rasters_transformed|pattern|915acc37c4310143|7490e5717bc38d7a||673466713||||6019653|file|local|vector||sentinel_ndvi_rasters_transformed_320c45ea*sentinel_ndvi_rasters_transformed_7fa2126b*sentinel_ndvi_rasters_transformed_34213e20|0.091||
+sentinel_ndvi_rasters_transformed_320c45ea|branch|03447f15e112cec3|7490e5717bc38d7a|192e22cb8d31ebfb|-1144521711|data/sentinel_ndvi_rasters_transformed/transformed_S3A_SY_2_V10____20200115T110000_20200125T110000_20200204T113742_AFRICA____________LN2_O_NT_002.nc|t19500.8816916904s|8a1e3dc78dbcdf55|2006551|file|local|vector|sentinel_ndvi_rasters_transformed||0.032||
+sentinel_ndvi_rasters_transformed_34213e20|branch|a526ee5335584f6c|7490e5717bc38d7a|d21fa6ece36ca20d|90236746|data/sentinel_ndvi_rasters_transformed/transformed_S3A_SY_2_V10____20211111T000000_20211120T235959_20211128T113640_AFRICA____________LN2_O_NT_002.nc|t19500.8819234125s|8a1e3dc78dbcdf55|2006551|file|local|vector|sentinel_ndvi_rasters_transformed||0.009||
+sentinel_ndvi_rasters_transformed_7fa2126b|branch|619ba492726209b9|7490e5717bc38d7a|ec1e2eccc455302d|738059638|data/sentinel_ndvi_rasters_transformed/transformed_S3A_SY_2_V10____20211101T000000_20211110T235959_20211118T174145_AFRICA____________LN2_O_NT_002.nc|t19500.8819125312s|8a1e3dc78dbcdf55|2006551|file|local|vector|sentinel_ndvi_rasters_transformed||0.05||
 sentinel_ndvi_upload_aws_s3|stem|d255ab8d3c5e7565|11c93155ffa225df|b56330db65b68647|-1245746504|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/sentinel_ndvi_upload_aws_s3*endpoint=TlVMTA*version=jTE_QSiBWIo8vu8pxuZq7ahX2MYt0yHV|t19494.6237017094s||20786|qs|aws|vector|||16.311||
 set_ecmwf_api_parameter|function|e3e4962883690ed5|||||||||||||||
 set_nasa_api_parameter|function|ac1cc420c9c9242c|||||||||||||||
 static_targets|object|a6765bfc98a846fc|||||||||||||||
 test_targets|object|1eb1bc8d77111ded|||||||||||||||
-user_rprof|object|f830e9c767f14736|||||||||||||||
+user_rprof|object|266c2feb85f838b3|||||||||||||||
 wahis_rvf_outbreaks_preprocessed|stem|30ccd988b415d773|3ea98184b5887c93|275a59d310ff2a63|2127878318|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/wahis_rvf_outbreaks_preprocessed*endpoint=TlVMTA*version=B59R2UfXvSyjXvghth4wnQ.bd4E35nmr|t19496.5774266348s||172965|qs|aws|vector|||0.049||
 wahis_rvf_outbreaks_raw|stem|6fc7e6c7238977b3|b988ec4215d4213c|5ed4661ae3efb1aa|1933416983|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/wahis_rvf_outbreaks_raw*endpoint=TlVMTA*version=xNQzoRkYrmDsU37GWg0gWosoI7.s6nIq|t19496.5530035559s||173410|qs|aws|vector|||29.11||
 wahis_rvf_query|function|9836433f6f1061fb|||||||||||||||
