@@ -30,9 +30,8 @@ static_targets <- tar_plan(
   tar_target(continent_polygon, create_africa_polygon()),
   tar_target(continent_bounding_box, sf::st_bbox(continent_polygon)),
   tar_target(continent_raster_template,
-            wrap(terra::rast(ext(continent_polygon), 
-                             #crs = "+proj=aea +lat_0=0 +lon_0=24 +lat_1=-24 +lat_2=-33 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs",
-                             resolution = 0.1))),
+             wrap(terra::rast(ext(continent_polygon), 
+                              resolution = 0.1))),
   tar_target(continent_raster_template_plot, create_raster_template_plot(rast(continent_raster_template), continent_polygon))
   
 )
@@ -97,7 +96,7 @@ dynamic_targets <- tar_plan(
                   prefix = "open-rvfcast/",
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
-
+  
   
   # NASA POWER recorded weather -----------------------------------------------------------
   
@@ -166,43 +165,47 @@ dynamic_targets <- tar_plan(
 data_targets <- tar_plan(
   
   # Transform Sentinel NDVI
-  # save locally as files
-  # TODO diff between template and raster crs
-  tar_target(sentinel_ndvi_rasters_transformed, 
+  tar_target(sentinel_ndvi_transformed_rasters, 
              save_transform_raster(raster_file = sentinel_ndvi_downloaded, 
                                    template = continent_raster_template,
                                    transform_directory = paste0(sentinel_ndvi_directory, "_transformed"),
                                    verbose = TRUE),
-             pattern = head(sentinel_ndvi_downloaded, 4), 
+             pattern = sentinel_ndvi_downloaded, 
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
   
   # TODO what are the units (differs between sentinel and modis)
-  # TODO this needs to handle the batching from modis
-  tar_target(modis_ndvi_rasters_transformed, 
-             save_transform_raster(raster_file = modis_ndvi_downloaded, 
-                                   template = continent_raster_template,
-                                   transform_directory = paste0(modis_ndvi_directory, "_transformed"),
-                                   verbose = TRUE),
-             pattern = head(modis_ndvi_downloaded, 4), 
+  # TODO this needs to handle the internal batching from modis (tar_rep?)
+  # tar_target(modis_ndvi_transformed_rasters,
+  #            save_transform_raster(raster_file = modis_ndvi_downloaded, 
+  #                                  template = continent_raster_template,
+  #                                  transform_directory = paste0(modis_ndvi_directory, "_transformed"),
+  #                                  verbose = TRUE),
+  #            pattern = head(modis_ndvi_downloaded, 4), 
+  #            format = "file", 
+  #            repository = "local",
+  #            cue = tar_cue("thorough")), 
+  
+  # Transform ECMWF
+  tar_target(ecmwf_forecasts_flat_transformed,
+             save_transform_ecmwf_grib(ecmwf_forecasts_downloaded,
+                                       transform_directory = paste0(str_replace(ecmwf_forecasts_directory, "gribs", "flat"), "_transformed"),
+                                       verbose = TRUE),
+             pattern = map(ecmwf_forecasts_downloaded),
+             iteration = "list",
              format = "file", 
              repository = "local",
-             cue = tar_cue("thorough")), 
-  
-  # convert ecmwf to raster
-  
-  # convert terra power to raster
-  
-  # tar_target(ecmwf_forecasts_preprocessed,
-  #            preprocess_ecmwf_forecasts(ecmwf_forecasts_download,
-  #                                       preprocessed_directory =  "data/ecmwf_parquets"),
-  #            pattern = map(ecmwf_forecasts_download), 
-  #            iteration = "list",
-  #            format = "file" 
-  # ),
+             cue = tar_cue("thorough")),  
   
 
+
+  
+
+  #  terra power 
+  
+  
+  
   # merge data together
   
 )
