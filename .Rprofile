@@ -7,15 +7,11 @@ if (file.exists(".env")) {
 # Put the project library *outside* the project
 #Sys.setenv(RENV_PATHS_LIBRARY_ROOT = file.path(normalizePath("~/.renv-project-libraries", mustWork = FALSE)))
 
-if (!Sys.getenv("USE_CAPSULE") != "") {
-  if (file.exists("renv/activate.R")) {
-    source("renv/activate.R")
-  } else {
-    message("No renv/activate.R")
-  }
+if (file.exists("renv/activate.R")) {
+  source("renv/activate.R")
 } else {
-  message("Skipping renv load. Use {capsule} commands.")
-}
+  message("No renv/activate.R")
+} 
 
 # Use the local user's .Rprofile when interactive.
 # Good for keeping local preferences, but not always reproducible.
