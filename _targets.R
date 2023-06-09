@@ -5,8 +5,9 @@ for (f in list.files(here::here("R"), full.names = TRUE)) source (f)
 aws_bucket = Sys.getenv("AWS_BUCKET_ID")
 
 # Targets options
+
 tar_option_set(resources = tar_resources(
-  aws = tar_resources_aws(bucket = aws_bucket, prefix = "open-rvfcast/_targets"),
+  aws = tar_resources_aws(bucket = Sys.getenv("AWS_BUCKET_ID"), prefix = "_targets"),
   qs = tar_resources_qs(preset = "fast")),
   repository = "aws",
   format = "qs",
@@ -65,7 +66,6 @@ dynamic_targets <- tar_plan(
     aws_s3_upload(path = sentinel_ndvi_directory,
                   bucket =  aws_bucket ,
                   key = sentinel_ndvi_directory, 
-                  prefix = "open-rvfcast/",
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
@@ -80,22 +80,22 @@ dynamic_targets <- tar_plan(
   tar_target(modis_ndvi_years, 2005:2018),
   
   # download files
-  tar_target(modis_ndvi_downloaded, download_modis_ndvi(continent_bounding_box,
-                                                        modis_ndvi_years,
-                                                        download_directory = modis_ndvi_directory),
-             pattern = modis_ndvi_years, 
-             format = "file" , 
-             repository = "local",
-             cue = tar_cue("thorough")),
+  # TODO refactor so that it can skip files without calling the stec api
+  # tar_target(modis_ndvi_downloaded, download_modis_ndvi(continent_bounding_box,
+  #                                                       modis_ndvi_years,
+  #                                                       download_directory = modis_ndvi_directory),
+  #            pattern = modis_ndvi_years, 
+  #            format = "file" , 
+  #            repository = "local",
+  #            cue = tar_cue("thorough")),
   
   # save to AWS bucket
-  tar_target(modis_ndvi_upload_aws_s3, {modis_ndvi_downloaded; # enforce dependency
-    aws_s3_upload(path = modis_ndvi_directory,
-                  bucket = aws_bucket ,
-                  key = modis_ndvi_directory, 
-                  prefix = "open-rvfcast/",
-                  check = TRUE)}, 
-    cue = tar_cue("thorough")), 
+  # tar_target(modis_ndvi_upload_aws_s3, {modis_ndvi_downloaded; # enforce dependency
+  #   aws_s3_upload(path = modis_ndvi_directory,
+  #                 bucket = aws_bucket ,
+  #                 key = modis_ndvi_directory, 
+  #                 check = TRUE)}, 
+  #   cue = tar_cue("thorough")), 
   
   
   # NASA POWER recorded weather -----------------------------------------------------------
@@ -124,7 +124,6 @@ dynamic_targets <- tar_plan(
     aws_s3_upload(path = nasa_weather_directory,
                   bucket =  aws_bucket ,
                   key = nasa_weather_directory, 
-                  prefix = "open-rvfcast/",
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
@@ -155,7 +154,6 @@ dynamic_targets <- tar_plan(
     aws_s3_upload(path = ecmwf_forecasts_directory,
                   bucket =  aws_bucket ,
                   key = ecmwf_forecasts_directory, 
-                  prefix = "open-rvfcast/",
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
