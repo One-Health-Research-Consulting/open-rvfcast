@@ -20,14 +20,15 @@ CC-BY-4.0](https://img.shields.io/badge/License%20(for%20text)-CC_BY_4.0-blue.sv
 
 ### OpenRVFcast
 
-EcoHealth Alliance’s ongoing OpenRVFcast project is developing an
-open-source modeling framework for predicting Rift Valley Fever (RVF)
-outbreaks in Africa. The project is funded by the Wellcome Trust’s
-climate-sensitive infectious disease modeling
+EcoHealth Alliance’s ongoing OpenRVFcast project is developing a
+generalizable, open-source modeling framework for predicting Rift Valley
+Fever (RVF) outbreaks in Africa. The project is funded by the Wellcome
+Trust’s climate-sensitive infectious disease modeling
 [initiative](https://wellcome.org/news/digital-tools-climate-sensitive-infectious-disease)
 and aims to integrate open data sets of climatic and vegetation data
-with internationally-reported outbreak data to build a pipeline for
-model fitting, testing, and deployment.
+with internationally-reported outbreak data to build an adaptable
+modeling pipeline that can be applied to varying local local conditions
+in RVF-prone regions across the continent.
 
 ### Repository Structure and Reproducibility
 
