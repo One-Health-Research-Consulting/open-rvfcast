@@ -10,8 +10,7 @@ has not yet been a stable, usable release suitable for the
 public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
 [![Lifecycle:
 experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
-[![run-targets](https://github.com/ecohealthalliance/open-rvfcast/actions/workflows/run-targets.yml/badge.svg)](https://github.com/ecohealthalliance/open-rvfcast/actions/workflows/run-targets.yml)
-<!-- badges: end -->
+
 
 This repository is based on EHA's [template repository](https://github.com/ecohealthalliance/container-template) of a containerised R workflow built on the
 `targets` framework, made portable using `renv`, and ran manually or
