@@ -37,6 +37,12 @@ model fitting, testing, and deployment.
 - `reports/` contains literate code for R Markdown reports generated in
   the analysis
 - `outputs/` contains compiled reports and figures.
+- This project uses the [{renv}](https://rstudio.github.io/renv/)
+  framework to record R package dependencies and versions. Packages and
+  versions used are recorded in `renv.lock` and code used to manage
+  dependencies is in `renv/` and other files in the root project
+  directory. On starting an R session in the working directory, run
+  `renv::restore()` to install R package dependencies.
 - This project uses the
   [{targets}](https://wlandau.github.io/targets-manual/) framework to
   organize build steps for analysis pipeline. The schematic figure below
@@ -83,15 +89,6 @@ subgraph Project Workflow
   end
 linkStyle 0 stroke-width:0px;
 ```
-
-This is a template repository of a containerised R workflow built on the
-`targets` framework, made portable using `renv`, and ran manually or
-automatically using `GitHub Actions`.
-
-Packages and versions used are recorded in `renv.lock` and code used to
-manage dependencies is in `renv/` and other files in the root project
-directory. On starting an R session in the working directory, run
-`renv::restore()`to install R package dependencies.
 
 To run the pipeline, the user will need to adapt the `_targets.R` file
 to use their own object storage repository (we use AWS) and will need to

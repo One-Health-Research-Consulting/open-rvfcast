@@ -31,10 +31,10 @@ EcoHealth Alliance's ongoing OpenRVFcast project is developing an open-source mo
 -   `R/` contains functions used in this analysis. 
 -   `reports/` contains literate code for  R Markdown reports generated in the analysis
 -   `outputs/` contains compiled reports and figures.
+-   This project uses the [{renv}](https://rstudio.github.io/renv/) framework to 
+    record R package dependencies and versions. Packages and versions used are recorded in `renv.lock` and code used to manage dependencies is in `renv/` and other files in the root project directory.  On starting an R session in the working directory, run `renv::restore()` to install R package dependencies.
 -   This project uses the [{targets}](https://wlandau.github.io/targets-manual/) 
-    framework to organize build steps for analysis pipeline. The schematic figure below summarizes the steps. (The figure is generated using
-    `mermaid.js` syntax and should display as a graph on GitHub.  It can also
-    be viewed by pasting the code into <https://mermaid.live>.)
+    framework to organize build steps for analysis pipeline. The schematic figure below summarizes the steps. (The figure is generated using `mermaid.js` syntax and should display as a graph on GitHub.  It can also be viewed by pasting the code into <https://mermaid.live>.)
     
     
 ```{r, echo=FALSE, message = FALSE, results='asis'}
@@ -52,10 +52,6 @@ cat(
   sep = "\n"
 )
 ```
-
-This is a template repository of a containerised R workflow built on the `targets` framework, made portable using `renv`, and ran manually or automatically using `GitHub Actions`. 
-
-Packages and versions used are recorded in `renv.lock` and code used to manage dependencies is in `renv/` and other files in the root project directory.  On starting an R session in the working directory, run `renv::restore()`to install R package dependencies.
 
 To run the pipeline, the user will need to adapt the `_targets.R` file to use their own object storage repository (we use AWS) and will need to supply keys in an `.env` file. 
 
