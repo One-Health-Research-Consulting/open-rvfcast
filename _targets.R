@@ -110,6 +110,9 @@ dynamic_targets <- tar_plan(
 
   
   # NASA POWER recorded weather -----------------------------------------------------------
+  # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
+  # T2M             MERRA-2 Temperature at 2 Meters (C) ;
+  # PRECTOTCORR     MERRA-2 Precipitation Corrected (mm/day)  
   
   tar_target(nasa_weather_directory_raw, 
              create_data_directory(directory_path = "data/nasa_weather_raw")),
@@ -117,9 +120,6 @@ dynamic_targets <- tar_plan(
              create_data_directory(directory_path = "data/nasa_weather_dataset")),
   
   # set branching for nasa
-  #  RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
-  #  T2M             MERRA-2 Temperature at 2 Meters (C) ;
-  #  PRECTOTCORR     MERRA-2 Precipitation Corrected (mm/day)  
   tar_target(nasa_weather_years, 2005:2023),
   tar_target(nasa_weather_variables, c("RH2M", "T2M", "PRECTOTCORR")),
   tar_target(nasa_weather_coordinates, get_nasa_weather_coordinates(country_bounding_boxes)),
@@ -137,8 +137,8 @@ dynamic_targets <- tar_plan(
              cue = tar_cue("thorough")
   ),
   
-  # save to AWS bucket
-  tar_target(nasa_weather_upload_aws_s3,  {nasa_weather_downloaded; # enforce dependency
+  # save raw to AWS bucket
+  tar_target(nasa_weather_raw_upload_aws_s3,  {nasa_weather_downloaded; # enforce dependency
     aws_s3_upload(path = nasa_weather_directory_raw,
                   bucket =  aws_bucket ,
                   key = nasa_weather_directory_raw, 
@@ -155,6 +155,15 @@ dynamic_targets <- tar_plan(
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
+  
+  # save transformed to AWS bucket
+  tar_target(nasa_weather_transformed_upload_aws_s3,  {nasa_weather_transformed; # enforce dependency
+    aws_s3_upload(path = nasa_weather_directory_dataset,
+                  bucket =  aws_bucket,
+                  key = nasa_weather_directory_dataset, 
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")), 
+  
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   
@@ -203,7 +212,7 @@ dynamic_targets <- tar_plan(
 # Data Processing -----------------------------------------------------------
 data_targets <- tar_plan(
   
-  tar_target(weather_data, process_weather_data(sentinel_ndvi_transformed, nasa_weather_transformed))
+  tar_target(weather_data, process_weather_data(nasa_weather_directory_dataset, nasa_weather_transformed))
 )
 
 # Model -----------------------------------------------------------
