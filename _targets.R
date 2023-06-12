@@ -48,34 +48,50 @@ dynamic_targets <- tar_plan(
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
   
-  tar_target(sentinel_ndvi_directory, "data/sentinel_ndvi_rasters"),
+  tar_target(sentinel_ndvi_directory_raw, 
+             create_data_directory(directory_path = "data/sentinel_ndvi_raw")),
+  tar_target(sentinel_ndvi_directory_dataset, 
+             create_data_directory(directory_path = "data/sentinel_ndvi_dataset")),
   
   # get API parameters
   tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters(), cue = tar_cue("thorough")), 
   
   # download files from source (locally)
   tar_target(sentinel_ndvi_downloaded, download_sentinel_ndvi(sentinel_ndvi_api_parameters,
-                                                              download_directory = sentinel_ndvi_directory),
+                                                              download_directory = sentinel_ndvi_directory_raw,
+                                                              overwrite = FALSE),
              pattern = sentinel_ndvi_api_parameters, 
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),
   
-  # save to AWS bucket
-  tar_target(sentinel_ndvi_upload_aws_s3, {sentinel_ndvi_downloaded; # enforce dependency
-    aws_s3_upload(path = sentinel_ndvi_directory,
+  # save raw to AWS bucket
+  tar_target(sentinel_ndvi_raw_upload_aws_s3, {sentinel_ndvi_downloaded; # enforce dependency
+    aws_s3_upload(path = sentinel_ndvi_directory_raw,
                   bucket =  aws_bucket ,
-                  key = sentinel_ndvi_directory, 
+                  key = sentinel_ndvi_directory_raw, 
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
-  # project to the template and transform into single flat file
+  #TODO start here - set up to save as parquets (see https://github.com/ecohealthalliance/open-rvfcast/commit/45be4c8077c84917db31f85bdf88f0c9a4abbde9)
+  # project to the template and save as parquets (these can now be queried for analysis)
   tar_target(sentinel_ndvi_transformed, 
              transform_sentinel_ndvi(sentinel_ndvi_downloaded, 
-                                     continent_raster_template),
-             pattern = sentinel_ndvi_downloaded, 
-             iteration = "vector",
+                                    continent_raster_template,
+                                    sentinel_directory_dataset,
+                                    overwrite = FALSE),
+             pattern = sentinel_ndvi_downloaded,
+             format = "file", 
+             repository = "local",
              cue = tar_cue("thorough")), 
+  
+  # save transformed to AWS bucket
+  tar_target(sentinel_ndvi_transformed_upload_aws_s3,  {sentinel_ndvi_transformed; # enforce dependency
+    aws_s3_upload(path = sentinel_ndvi_directory_dataset,
+                  bucket =  aws_bucket,
+                  key = sentinel_ndvi_directory_dataset, 
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")), 
   
   
   # MODIS NDVI -----------------------------------------------------------
