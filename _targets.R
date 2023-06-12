@@ -163,12 +163,11 @@ dynamic_targets <- tar_plan(
 data_targets <- tar_plan(
   
   # Transform Sentinel NDVI
-  tar_target(sentinel_ndvi_transformed_rasters, 
-             save_transform_raster(raster_file = sentinel_ndvi_downloaded, 
-                                   template = continent_raster_template,
-                                   transform_directory = paste0(sentinel_ndvi_directory, "_transformed"),
-                                   verbose = TRUE),
-             pattern = sentinel_ndvi_downloaded, 
+  tar_target(sentinel_ndvi_transformed, 
+             transform_sentinel_ndvi(sentinel_ndvi_downloaded, 
+                                     continent_raster_template,
+                                     transform_directory = "data/sentinel_ndvi_transformed"),
+             pattern = head(sentinel_ndvi_downloaded, 5), 
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
@@ -186,26 +185,36 @@ data_targets <- tar_plan(
   #            cue = tar_cue("thorough")), 
   
   # Transform ECMWF
-  tar_target(ecmwf_forecasts_flat_transformed,
-             save_transform_ecmwf_grib(ecmwf_forecasts_downloaded,
-                                       transform_directory = paste0(str_replace(ecmwf_forecasts_directory, "gribs", "flat"), "_transformed"),
-                                       verbose = TRUE),
-             pattern = map(ecmwf_forecasts_downloaded),
-             iteration = "list",
-             format = "file", 
-             repository = "local",
-             cue = tar_cue("thorough")),  
+  # make raster stacks of all the data, transform, convert back to parquets
+  # tar_target(ecmwf_forecasts_flat_transformed,
+  #            save_transform_ecmwf_grib(ecmwf_forecasts_downloaded,
+  #                                      transform_directory = paste0(str_replace(ecmwf_forecasts_directory, "gribs", "flat"), "_transformed"),
+  #                                      verbose = TRUE),
+  #            pattern = map(ecmwf_forecasts_downloaded),
+  #            iteration = "list",
+  #            format = "file", 
+  #            repository = "local",
+  #            cue = tar_cue("thorough")),  
   
-
-
+  # Transform TERRA POW
+  # make raster stacks of all the data, transform, convert back to parquets
+  # tar_target(nasa_weather_flat_transformed,
+  #            save_transform_nasa_weather(nasa_weather_downloaded,
+  #                                        transform_directory = paste0(nasa_weather_directory,"_transformed"),
+  #                                        verbose = TRUE),
+  #            pattern = map(nasa_weather_downloaded),
+  #            iteration = "list",
+  #            format = "file", 
+  #            repository = "local",
+  #            cue = tar_cue("thorough")),  
   
-
-  #  terra power 
+  
+  # terra power 
+  # any transforming?
   
   
   
   # merge data together
-  
 )
 
 # Model -----------------------------------------------------------
