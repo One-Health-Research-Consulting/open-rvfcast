@@ -69,6 +69,16 @@ dynamic_targets <- tar_plan(
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
+  # transform
+  tar_target(sentinel_ndvi_transformed, 
+             transform_sentinel_ndvi(sentinel_ndvi_downloaded, 
+                                     continent_raster_template,
+                                     transform_directory = "data/sentinel_ndvi_transformed"),
+             pattern = sentinel_ndvi_downloaded,
+             format = "file", 
+             repository = "local",
+             cue = tar_cue("thorough")), 
+  
   
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
@@ -97,6 +107,9 @@ dynamic_targets <- tar_plan(
   #                 check = TRUE)}, 
   #   cue = tar_cue("thorough")), 
   
+  # TODO what are the units (differs between sentinel and modis)
+  # TODO transform needs to handle the internal batching from modis (tar_rep?)
+
   
   # NASA POWER recorded weather -----------------------------------------------------------
   
@@ -130,6 +143,15 @@ dynamic_targets <- tar_plan(
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
+  # transform
+  tar_target(nasa_weather_transformed, 
+             transform_nasa_weather(nasa_weather_downloaded, 
+                                    continent_raster_template,
+                                    transform_directory = "data/nasa_weather_transformed"),
+             pattern = nasa_weather_downloaded,
+             format = "file", 
+             repository = "local",
+             cue = tar_cue("thorough")),  
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   
@@ -160,34 +182,7 @@ dynamic_targets <- tar_plan(
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
-)
-
-# Data Processing -----------------------------------------------------------
-data_targets <- tar_plan(
-  
-  # Transform Sentinel NDVI
-  tar_target(sentinel_ndvi_transformed, 
-             transform_sentinel_ndvi(sentinel_ndvi_downloaded, 
-                                     continent_raster_template,
-                                     transform_directory = "data/sentinel_ndvi_transformed"),
-             pattern = sentinel_ndvi_downloaded,
-             format = "file", 
-             repository = "local",
-             cue = tar_cue("thorough")),  
-  
-  # TODO what are the units (differs between sentinel and modis)
-  # TODO this needs to handle the internal batching from modis (tar_rep?)
-  # tar_target(modis_ndvi_transformed_rasters,
-  #            save_transform_raster(raster_file = modis_ndvi_downloaded, 
-  #                                  template = continent_raster_template,
-  #                                  transform_directory = paste0(modis_ndvi_directory, "_transformed"),
-  #                                  verbose = TRUE),
-  #            pattern = head(modis_ndvi_downloaded, 4), 
-  #            format = "file", 
-  #            repository = "local",
-  #            cue = tar_cue("thorough")), 
-  
-  # Transform ECMWF
+  # transform
   # make raster stacks of all the data, transform, convert back to parquets
   # tar_target(ecmwf_forecasts_flat_transformed,
   #            save_transform_ecmwf_grib(ecmwf_forecasts_downloaded,
@@ -200,15 +195,12 @@ data_targets <- tar_plan(
   #            cue = tar_cue("thorough")),  
   
 
-  # Transform NASA Power weather
-  tar_target(nasa_weather_transformed, 
-             transform_nasa_weather(nasa_weather_downloaded, 
-                                    continent_raster_template,
-                                    transform_directory = "data/nasa_weather_transformed"),
-             pattern = nasa_weather_downloaded,
-             format = "file", 
-             repository = "local",
-             cue = tar_cue("thorough")),  
+)
+
+# Data Processing -----------------------------------------------------------
+data_targets <- tar_plan(
+  
+  tar_target(model_data, make_model_data(sentinel_ndvi_transformed, nasa_weather_transformed))
 )
 
 # Model -----------------------------------------------------------
