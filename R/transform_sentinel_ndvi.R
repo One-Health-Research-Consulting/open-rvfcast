@@ -26,7 +26,7 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_downloaded,
   
   if(save_filename %in% existing_files){
     message("file already exists, skipping transform")
-    return(file.path(transform_directory, filename))
+    return(file.path(transform_directory, save_filename))
   }
   
   transformed_raster <- transform_raster(raster_file = sentinel_ndvi_downloaded,

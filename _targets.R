@@ -167,7 +167,7 @@ data_targets <- tar_plan(
              transform_sentinel_ndvi(sentinel_ndvi_downloaded, 
                                      continent_raster_template,
                                      transform_directory = "data/sentinel_ndvi_transformed"),
-             pattern = head(sentinel_ndvi_downloaded, 5), 
+             pattern = sentinel_ndvi_downloaded,
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
