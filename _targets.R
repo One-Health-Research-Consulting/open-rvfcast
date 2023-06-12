@@ -32,7 +32,7 @@ static_targets <- tar_plan(
   tar_target(continent_bounding_box, sf::st_bbox(continent_polygon)),
   tar_target(continent_raster_template,
              wrap(terra::rast(ext(continent_polygon), 
-                              resolution = 0.5))),
+                              resolution = 0.5))), # this is the resolution of nasa power
   tar_target(continent_raster_template_plot, create_raster_template_plot(rast(continent_raster_template), continent_polygon))
   
 )
@@ -73,13 +73,12 @@ dynamic_targets <- tar_plan(
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
-  #TODO start here - set up to save as parquets (see https://github.com/ecohealthalliance/open-rvfcast/commit/45be4c8077c84917db31f85bdf88f0c9a4abbde9)
   # project to the template and save as parquets (these can now be queried for analysis)
   tar_target(sentinel_ndvi_transformed, 
              transform_sentinel_ndvi(sentinel_ndvi_downloaded, 
-                                    continent_raster_template,
-                                    sentinel_directory_dataset,
-                                    overwrite = FALSE),
+                                     continent_raster_template,
+                                     sentinel_ndvi_directory_dataset,
+                                     overwrite = FALSE),
              pattern = sentinel_ndvi_downloaded,
              format = "file", 
              repository = "local",
@@ -92,7 +91,6 @@ dynamic_targets <- tar_plan(
                   key = sentinel_ndvi_directory_dataset, 
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
-  
   
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
@@ -229,6 +227,8 @@ dynamic_targets <- tar_plan(
 data_targets <- tar_plan(
   
   tar_target(weather_data, process_weather_data(nasa_weather_directory_dataset, nasa_weather_transformed))
+  tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_dataset, sentinel_ndvi_transformed))
+  
 )
 
 # Model -----------------------------------------------------------
