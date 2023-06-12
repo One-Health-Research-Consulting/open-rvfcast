@@ -32,7 +32,7 @@ static_targets <- tar_plan(
   tar_target(continent_bounding_box, sf::st_bbox(continent_polygon)),
   tar_target(continent_raster_template,
              wrap(terra::rast(ext(continent_polygon), 
-                              resolution = 0.1))),
+                              resolution = 0.5))),
   tar_target(continent_raster_template_plot, create_raster_template_plot(rast(continent_raster_template), continent_polygon))
   
 )
@@ -69,14 +69,12 @@ dynamic_targets <- tar_plan(
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
-  # transform
+  # project to the template and transform into single flat file
   tar_target(sentinel_ndvi_transformed, 
              transform_sentinel_ndvi(sentinel_ndvi_downloaded, 
-                                     continent_raster_template,
-                                     transform_directory = "data/sentinel_ndvi_transformed"),
-             pattern = sentinel_ndvi_downloaded,
-             format = "file", 
-             repository = "local",
+                                     continent_raster_template),
+             pattern = sentinel_ndvi_downloaded, 
+             iteration = "vector",
              cue = tar_cue("thorough")), 
   
   
@@ -113,7 +111,10 @@ dynamic_targets <- tar_plan(
   
   # NASA POWER recorded weather -----------------------------------------------------------
   
-  tar_target(nasa_weather_directory, "data/nasa_weather_parquets"),
+  tar_target(nasa_weather_directory_raw, 
+             create_data_directory(directory_path = "data/nasa_weather_raw")),
+  tar_target(nasa_weather_directory_dataset, 
+             create_data_directory(directory_path = "data/nasa_weather_dataset")),
   
   # set branching for nasa
   #  RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
@@ -123,12 +124,13 @@ dynamic_targets <- tar_plan(
   tar_target(nasa_weather_variables, c("RH2M", "T2M", "PRECTOTCORR")),
   tar_target(nasa_weather_coordinates, get_nasa_weather_coordinates(country_bounding_boxes)),
   
-  #  download files
+  #  download raw files
   tar_target(nasa_weather_downloaded,
              download_nasa_weather(nasa_weather_coordinates,
                                    nasa_weather_years,
                                    nasa_weather_variables,
-                                   download_directory = nasa_weather_directory),
+                                   download_directory = nasa_weather_directory_raw,
+                                   overwrite = FALSE),
              pattern = crossing(nasa_weather_years, nasa_weather_coordinates),
              format = "file",
              repository = "local",
@@ -137,17 +139,18 @@ dynamic_targets <- tar_plan(
   
   # save to AWS bucket
   tar_target(nasa_weather_upload_aws_s3,  {nasa_weather_downloaded; # enforce dependency
-    aws_s3_upload(path = nasa_weather_directory,
+    aws_s3_upload(path = nasa_weather_directory_raw,
                   bucket =  aws_bucket ,
-                  key = nasa_weather_directory, 
+                  key = nasa_weather_directory_raw, 
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
-  # transform
+  # project to the template and save again as parquets (these can now be queried for analysis)
   tar_target(nasa_weather_transformed, 
              transform_nasa_weather(nasa_weather_downloaded, 
                                     continent_raster_template,
-                                    transform_directory = "data/nasa_weather_transformed"),
+                                    nasa_weather_directory_dataset,
+                                    overwrite = FALSE),
              pattern = nasa_weather_downloaded,
              format = "file", 
              repository = "local",
@@ -200,7 +203,7 @@ dynamic_targets <- tar_plan(
 # Data Processing -----------------------------------------------------------
 data_targets <- tar_plan(
   
-  tar_target(model_data, make_model_data(sentinel_ndvi_transformed, nasa_weather_transformed))
+  tar_target(weather_data, process_weather_data(sentinel_ndvi_transformed, nasa_weather_transformed))
 )
 
 # Model -----------------------------------------------------------
