@@ -1,8 +1,6 @@
-transform_raster <- function(raster_file, template, verbose = FALSE) {
+transform_raster <- function(raw_raster, template) {
   
-  if(verbose) cat(raster_file, "\n")
   template <- rast(template)
-  raw_raster <- terra::rast(raster_file)
 
   if(!identical(crs(raw_raster), crs(template))) {
     raw_raster <- terra::project(raw_raster, template)

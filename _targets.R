@@ -103,6 +103,9 @@ dynamic_targets <- tar_plan(
   tar_target(nasa_weather_directory, "data/nasa_weather_parquets"),
   
   # set branching for nasa
+  #  RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
+  #  T2M             MERRA-2 Temperature at 2 Meters (C) ;
+  #  PRECTOTCORR     MERRA-2 Precipitation Corrected (mm/day)  
   tar_target(nasa_weather_years, 2005:2023),
   tar_target(nasa_weather_variables, c("RH2M", "T2M", "PRECTOTCORR")),
   tar_target(nasa_weather_coordinates, get_nasa_weather_coordinates(country_bounding_boxes)),
@@ -196,25 +199,16 @@ data_targets <- tar_plan(
   #            repository = "local",
   #            cue = tar_cue("thorough")),  
   
-  # Transform TERRA POW
-  # make raster stacks of all the data, transform, convert back to parquets
-  # tar_target(nasa_weather_flat_transformed,
-  #            save_transform_nasa_weather(nasa_weather_downloaded,
-  #                                        transform_directory = paste0(nasa_weather_directory,"_transformed"),
-  #                                        verbose = TRUE),
-  #            pattern = map(nasa_weather_downloaded),
-  #            iteration = "list",
-  #            format = "file", 
-  #            repository = "local",
-  #            cue = tar_cue("thorough")),  
-  
-  
-  # terra power 
-  # any transforming?
-  
-  
-  
-  # merge data together
+
+  # Transform NASA Power weather
+  tar_target(nasa_weather_transformed, 
+             transform_nasa_weather(nasa_weather_downloaded, 
+                                    continent_raster_template,
+                                    transform_directory = "data/nasa_weather_transformed"),
+             pattern = nasa_weather_downloaded,
+             format = "file", 
+             repository = "local",
+             cue = tar_cue("thorough")),  
 )
 
 # Model -----------------------------------------------------------

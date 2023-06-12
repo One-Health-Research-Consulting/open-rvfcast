@@ -3,21 +3,19 @@
 #' .. content for \details{} ..
 #'
 #' @title
-#' @param raster_file
-#' @param template
+#' @param nasa_weather_downloaded
+#' @param continent_raster_template
 #' @param transform_directory
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-transform_sentinel_ndvi <- function(sentinel_ndvi_downloaded,
-                                    continent_raster_template,
-                                    transform_directory =
-                                      "data/sentinel_ndvi_transformed") {
-  
-  filename <- basename(sentinel_ndvi_downloaded)
-  start_date <- as.Date(str_extract(filename, "(\\d{8}T\\d{6})"), format = "%Y%m%dT%H%M%S")
-  end_date <- as.Date(str_extract(filename, "(?<=_)(\\d{8}T\\d{6})(?=_\\w{6}_)"), format = "%Y%m%dT%H%M%S")
-  save_filename <- glue::glue("transformed_NDVI_{start_date}_to_{end_date}.gz.parquet")
+transform_nasa_weather <- function(nasa_weather_downloaded,
+                                   continent_raster_template,
+                                   transform_directory =
+                                   "data/nasa_weather_transformed") {
+
+  filename <- basename(nasa_weather_downloaded)
+  save_filename <- glue::glue("transformed_{filename}")
   
   suppressWarnings(dir.create(transform_directory, recursive = TRUE))
   existing_files <- list.files(transform_directory)
@@ -29,20 +27,26 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_downloaded,
     return(file.path(transform_directory, save_filename))
   }
   
-  transformed_raster <- transform_raster(raw_raster = rast(sentinel_ndvi_downloaded),
+  raw_flat <- arrow::read_parquet(nasa_weather_downloaded)
+  raw_flat <- as_tibble(raw_flat) |> 
+    select(LON, LAT, everything(), -YYYYMMDD)  # terra::rast - the first with x (or longitude) and the second with y (or latitude) coordinates 
+  raw_raster <- terra::rast(raw_flat) 
+  crs(raw_raster) <-  crs(rast()) 
+
+  transformed_raster <- transform_raster(raw_raster = raw_raster,
                                          template = rast(continent_raster_template))
   
   # Convert to dataframe
   dat_out <- as.data.frame(transformed_raster, xy = TRUE) |> 
     as_tibble() |> 
-    rename(ndvi = NDVI) |> 
-    mutate(start_date = start_date,
-           end_date = end_date)
-  
+    janitor::clean_names() |> 
+    rename(relative_humidity = rh2m, temperature = t2m, precipitation= prectotcorr)
+
   # Save as parquet 
   write_parquet(dat_out, here::here(transform_directory, save_filename), compression = "gzip", compression_level = 5)
   
   return(file.path(transform_directory, save_filename))
   
   
+
 }
