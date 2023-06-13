@@ -10,9 +10,11 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-preprocess_nasa_weather <- function(nasa_weather_directory_raw,
-                                    nasa_weather_downloaded,
+preprocess_nasa_weather <- function(nasa_weather_downloaded,
                                     nasa_weather_directory_dataset){
+  
+  
+  nasa_weather_directory_raw <- unique(dirname(nasa_weather_downloaded))
   
   open_dataset(nasa_weather_directory_raw) |> 
     distinct() |> 

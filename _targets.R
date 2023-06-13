@@ -121,7 +121,7 @@ dynamic_targets <- tar_plan(
   
   # TODO what are the units (differs between sentinel and modis)
   # TODO transform needs to handle the internal batching from modis (tar_rep?)
-
+  
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
@@ -146,6 +146,7 @@ dynamic_targets <- tar_plan(
                                    download_directory = nasa_weather_directory_raw,
                                    overwrite = FALSE),
              pattern = crossing(nasa_weather_years, nasa_weather_coordinates),
+             iteration = "vector",
              format = "file",
              repository = "local",
              cue = tar_cue("thorough")
@@ -161,24 +162,28 @@ dynamic_targets <- tar_plan(
   
   # remove dupes due to having overlapping country bounding boxes
   # resave as arrow dataset, grouped by year
-  tar_target(nasa_weather_preprocess, preprocess_nasa_weather(nasa_weather_directory_raw, 
-                                                              nasa_weather_downloaded,
+  tar_target(nasa_weather_preprocess, preprocess_nasa_weather(nasa_weather_downloaded,
                                                               nasa_weather_directory_dataset)),
   
   tar_target(nasa_weather_preprocess_files, list.files(nasa_weather_preprocess, full.names = TRUE, recursive = TRUE)),
   
   # project to the template and resave
-  tar_target(nasa_weather_transformed_files, 
+  tar_target(nasa_weather_transformed, 
              transform_nasa_weather(nasa_weather_preprocess_files, 
                                     continent_raster_template),
-             pattern = head(nasa_weather_preprocess_files, 4),
+             pattern = nasa_weather_preprocess_files,
              iteration = "vector",
-             # format = "file", # for now dont track as files because these may be updated later
-             # repository = "local",
+             format = "file", 
+             repository = "local",
              cue = tar_cue("thorough")),  
   
-  # Duckdb - has implementation of windows function
-  # toduckdb - changes the underlying engine
+  # save transformed to AWS bucket
+  tar_target(nasa_weather_transformed_upload_aws_s3,  {nasa_weather_transformed; # enforce dependency
+    aws_s3_upload(path = nasa_weather_directory_dataset,
+                  bucket =  aws_bucket,
+                  key = nasa_weather_directory_dataset, 
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")),    
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   
@@ -221,7 +226,7 @@ dynamic_targets <- tar_plan(
   #            repository = "local",
   #            cue = tar_cue("thorough")),  
   
-
+  
 )
 
 # Data Processing -----------------------------------------------------------
@@ -229,8 +234,8 @@ data_targets <- tar_plan(
   
   tar_target(model_dates_random_select, random_select_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, seed = 212)),
   
-  # TODO take nasa_weather_transformed_files and do full lag calcs in this function (change back to get_weather_data) collect into memory
-  tar_target(weather_anomalies, get_weather_anomalies(nasa_weather_directory_dataset, nasa_weather_transformed_files)),
+  # TODO take nasa_weather_directory_dataset and do full lag calcs in this function using duckdb, then collect into memory
+  tar_target(weather_data, process_weather_data(nasa_weather_directory_dataset, nasa_weather_transformed)),
   tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_dataset, sentinel_ndvi_transformed, model_dates_random_select))
   
 )

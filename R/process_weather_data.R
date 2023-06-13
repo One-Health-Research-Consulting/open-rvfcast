@@ -8,7 +8,7 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-get_weather_anomalies <- function(nasa_weather_directory_dataset, nasa_weather_transformed) {
+process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_transformed) {
   
   # connect to transformed data
   weather_conn <- open_dataset(nasa_weather_directory_dataset) 
@@ -32,7 +32,6 @@ get_weather_anomalies <- function(nasa_weather_directory_dataset, nasa_weather_t
     write_dataset(nasa_weather_directory_dataset)
   
   return(nasa_weather_directory_dataset)
-  
   
   # ok read into memory to do lags 😬
  #  weather_dat <- weather_means |> 

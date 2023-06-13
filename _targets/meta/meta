@@ -1,5 +1,5 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|37e62e593cf8d9af|||||||||||||||
+.Random.seed|object|ce2979ded3864efd|||||||||||||||
 aws_bucket|object|d9cf2c5ff7cc1be4|||||||||||||||
 cache_aws_branched_target|function|6e2abfa4969de1bf|||||||||||||||
 continent_bounding_box|stem|cd4a4ddaa46d634a|bc00ded6218f3e10|d25ebcbef292030f|-1551480776|bucket=open-rvfcast-data*region=NULL*key=_targets/continent_bounding_box*endpoint=TlVMTA*version=|t19517.6854396s||650|qs|aws|vector|||0.001||
@@ -13,7 +13,7 @@ create_country_polygons|function|9917ababa5b4b8f4|||||||||||||||
 create_data_directory|function|5781405b45264703|||||||||||||||
 create_example_target|function|df4f421d40047080|||||||||||||||
 create_raster_template_plot|function|db738156a3247831|||||||||||||||
-data_targets|object|18326b068c55d2e5|||||||||||||||
+data_targets|object|c8e9352da0630ee0|||||||||||||||
 define_bounding_boxes|function|e614caacc0592e73|||||||||||||||
 define_country_regions|function|54808365a1bb460e|||||||||||||||
 deploy_targets|object|1eb1bc8d77111ded|||||||||||||||
@@ -22,7 +22,7 @@ download_modis_ndvi|function|ff443130c1d2c60e|||||||||||||||
 download_nasa_recorded_weather|function|6a773d3a570df8e3|||||||||||||||
 download_nasa_weather|function|44ffecc296978e5e|||||||||||||||
 download_sentinel_ndvi|function|03e5942d01ac5cc7|||||||||||||||
-dynamic_targets|object|ec0dfaf3112f568e|||||||||||||||
+dynamic_targets|object|805c8de4e422aa88|||||||||||||||
 ecmwf_api_parameters|stem|d546e620a5cfb7be|0bdeb27065a5c91c|37ee5a84ea2c3af5|-877182628|bucket=open-rvfcast-data*region=NULL*key=_targets/ecmwf_api_parameters*endpoint=TlVMTA*version=|t19517.6854418785s||4597|qs|aws|vector||ecmwf_api_parameters_eba30102*ecmwf_api_parameters_67b07257*ecmwf_api_parameters_1c23802c*ecmwf_api_parameters_3a35088b*ecmwf_api_parameters_c9becb2d*ecmwf_api_parameters_789e2f8f*ecmwf_api_parameters_7476140e*ecmwf_api_parameters_9f10cd0e*ecmwf_api_parameters_cd1d812f*ecmwf_api_parameters_bdca56aa*ecmwf_api_parameters_0e93238e*ecmwf_api_parameters_aaa47fbd*ecmwf_api_parameters_b2651b02*ecmwf_api_parameters_f77b0c67*ecmwf_api_parameters_a433d8c0*ecmwf_api_parameters_c9f117bd*ecmwf_api_parameters_35ebf6ea*ecmwf_api_parameters_30a898ee*ecmwf_api_parameters_faba2bbc*ecmwf_api_parameters_9bae9d60*ecmwf_api_parameters_dff68b0f|0.061||
 ecmwf_forecasts_directory|stem|4c505630c8888177|e176bd247a667427|ef46db3751d8e999|116739348|bucket=open-rvfcast-data*region=NULL*key=_targets/ecmwf_forecasts_directory*endpoint=TlVMTA*version=|t19517.6854336679s||58|qs|aws|vector|||0.001||
 ecmwf_forecasts_download|pattern|5174978914512006|38cb62f29a552f9b||-1391179141||||88|qs|aws|list||ecmwf_forecasts_download_a558f87b|0.011||
@@ -119,6 +119,7 @@ get_nasa_weather_coordinates|function|2c23f9e4d93cd8ca|||||||||||||||
 get_sentinel_ndvi_api_parameters|function|ec6ebe60c7637311|||||||||||||||
 get_wahis_rvf_outbreaks_raw|function|a8564ce9127c9c1d|||||||||||||||
 get_weather_anomalies|function|1956aa290dc4fc5d|||||||||||||||
+get_weather_data|function|1956aa290dc4fc5d|||||||||||||||
 make_model_data|function|df0e5631ac6d7b53|||||||||||||||
 model_dates_random_select|stem|3276f32c43338e02|9d974731006fc420|4ea98346634ca2b4|-368262049|bucket=open-rvfcast-data*region=NULL*key=_targets/model_dates_random_select*endpoint=TlVMTA*version=|t19521.5689224347s||6694|qs|aws|vector|||0.037||
 model_targets|object|1eb1bc8d77111ded|||||||||||||||
@@ -814,10 +815,10 @@ nasa_weather_downloaded_fe977403|branch|f4116c020875fb11|cda60b2b95ec34df|df9e16
 nasa_weather_downloaded_ff76efe8|branch|eaa64ed3182cf9ac|cda60b2b95ec34df|1b6c4297ecda9621|984810167|data/nasa_weather_raw/nasa_recorded_weather_MLI_2007.gz.parquet|t19494.5418937214s|9d12bc29dd6d59f5|1498881|file|local|vector|nasa_weather_downloaded||0.001||
 nasa_weather_downloaded_ff890006|branch|2a0bceaaec3f8934|cda60b2b95ec34df|da2539695d7fc20e|-460227418|data/nasa_weather_raw/nasa_recorded_weather_KEN_2017.gz.parquet|t19493.8714579655s|4e26a4940c96e641|520492|file|local|vector|nasa_weather_downloaded||0.001||
 nasa_weather_downloaded_ffd53e46|branch|7c7079ae62226076|cda60b2b95ec34df|33ca42c46f025fef|784513070|data/nasa_weather_raw/nasa_recorded_weather_TCD_2018.gz.parquet|t19494.5475309282s|f10102e31f25f5ff|942512|file|local|vector|nasa_weather_downloaded||0.002||
-nasa_weather_preprocess|stem|863c69e82eeb8250|c1d6ba70bf85e239|bbe835338107e26b|-595530275|bucket=open-rvfcast-data*region=NULL*key=_targets/nasa_weather_preprocess*endpoint=TlVMTA*version=|t19521.7905457679s||57|qs|aws|vector|||14.059||
+nasa_weather_preprocess|stem|863c69e82eeb8250|2e3e50daa4f00a2f|5034b7edb652aab4|-595530275|bucket=open-rvfcast-data*region=NULL*key=_targets/nasa_weather_preprocess*endpoint=TlVMTA*version=|t19521.8920514511s||57|qs|aws|vector|||17.305||
 nasa_weather_preprocess_files|stem|f41a19854f3c79cc|f47a2f68e8ab9b33|2ad361ddc67b0cd1|1739894916|bucket=open-rvfcast-data*region=NULL*key=_targets/nasa_weather_preprocess_files*endpoint=TlVMTA*version=|t19521.6990639949s||1022|qs|aws|vector|||0.002||
 nasa_weather_raw_upload_aws_s3|stem|56ed36a5d19b0f00|5fbdf70412d0d976|d4569a69851ef960|33266095|bucket=open-rvfcast-data*region=NULL*key=_targets/nasa_weather_raw_upload_aws_s3*endpoint=TlVMTA*version=|t19520.8678037404s||19108|qs|aws|vector|||267.734||
-nasa_weather_transformed|pattern|21caf2aa22373a25|37df5eb8a378c150||-65046342||||604351757|file|local|vector||nasa_weather_transformed_f8801ab9*nasa_weather_transformed_9db11862*nasa_weather_transformed_b4390c82*nasa_weather_transformed_e1f0c77a*nasa_weather_transformed_56150e5c*nasa_weather_transformed_e2558414*nasa_weather_transformed_9d9a537d*nasa_weather_transformed_84ebde81*nasa_weather_transformed_9e5aba02*nasa_weather_transformed_5d54839b*nasa_weather_transformed_63011bc7*nasa_weather_transformed_2bd69b3b*nasa_weather_transformed_e73cfbc3*nasa_weather_transformed_87e41d9f*nasa_weather_transformed_25942d44*nasa_weather_transformed_c8e97830*nasa_weather_transformed_94796cf4*nasa_weather_transformed_d987bae9*nasa_weather_transformed_1f69543d|0.09||
+nasa_weather_transformed|pattern|a3bcda4aa5d80884|37df5eb8a378c150||-65046342||||117926819|file|local|vector||nasa_weather_transformed_f8801ab9*nasa_weather_transformed_9db11862*nasa_weather_transformed_b4390c82*nasa_weather_transformed_e1f0c77a|49.6||
 nasa_weather_transformed_00acbcf6|branch|3ea259c9b28adb3a|fb8d988b46f32918|71b2154d9ffb97d2|614851819|data/nasa_weather_dataset/transformed_nasa_recorded_weather_SDN_2008.gz.parquet|t19520.870322359s|0f4c86b7a18d3b91|4471385|file|local|vector|nasa_weather_transformed||7.284||
 nasa_weather_transformed_00b4e232|branch|80fd434b90ebcc8d|fb8d988b46f32918|1d7f9b5aa5eae889|28232328|data/nasa_weather_dataset/transformed_nasa_recorded_weather_SDS_2023.gz.parquet|t19520.8656095051s|b1b9da7553e895e1|889751|file|local|vector|nasa_weather_transformed||2.42||
 nasa_weather_transformed_00eaa038|branch|0bc57a3b1fb71cfc|fb8d988b46f32918|4273b772d9222b29|-1254982107|data/nasa_weather_dataset/transformed_nasa_recorded_weather_MLI_2009.gz.parquet|t19520.8382797439s|15d428ffa0bd17c1|4732539|file|local|vector|nasa_weather_transformed||7.005||
@@ -1034,7 +1035,7 @@ nasa_weather_transformed_9bb938e3|branch|459dfd6de6d12602|fb8d988b46f32918|16f88
 nasa_weather_transformed_9bf8cf46|branch|9bb888a645b0d438|fb8d988b46f32918|826c9be823cdadc3|-1532449106|data/nasa_weather_dataset/transformed_nasa_recorded_weather_UGA_2015.gz.parquet|t19520.8784728397s|ae6fd8fbea46404b|873798|file|local|vector|nasa_weather_transformed||6.999||
 nasa_weather_transformed_9d53b2f8|branch|cfa7df89eb978873|fb8d988b46f32918|2370da07cebc1e77|455979440|data/nasa_weather_dataset/transformed_nasa_recorded_weather_SEN_2020.gz.parquet|t19520.8638872432s|a1d0d52ba027fd8f|743247|file|local|vector|nasa_weather_transformed||5.714||
 nasa_weather_transformed_9d9a537d|branch|error|37df5eb8a378c150|2eb7b4d37a124d2c|236424167||t0s|f4066a65ff755f48|0|file|local|vector|nasa_weather_transformed||0.002||IOError Failed to open local file datanasa_weather_datasetyear2011part0.parquet. Detail errno 2 No such file or directory
-nasa_weather_transformed_9db11862|branch|error|37df5eb8a378c150|5b02662aa706539b|991149746||t0s|f4066a65ff755f48|0|file|local|vector|nasa_weather_transformed||0.002||IOError Failed to open local file datanasa_weather_datasetyear2006part0.parquet. Detail errno 2 No such file or directory
+nasa_weather_transformed_9db11862|branch|103f03f61fa06ed2|37df5eb8a378c150|5b02662aa706539b|991149746|data/nasa_weather_dataset/year=2006/part-0.parquet|t19521.892671091s|b1b9abf238e23637|29563839|file|local|vector|nasa_weather_transformed||12.095||
 nasa_weather_transformed_9e571eb8|branch|0f5d5b64616e18ca|fb8d988b46f32918|5ef214420da98b1a|272461132|data/nasa_weather_dataset/transformed_nasa_recorded_weather_MLI_2007.gz.parquet|t19520.8761664379s|faeac512485244b9|4623325|file|local|vector|nasa_weather_transformed||6.922||
 nasa_weather_transformed_9e5aba02|branch|error|37df5eb8a378c150|79dbb87e6f535314|-576431321||t0s|f4066a65ff755f48|0|file|local|vector|nasa_weather_transformed||0.002||IOError Failed to open local file datanasa_weather_datasetyear2013part0.parquet. Detail errno 2 No such file or directory
 nasa_weather_transformed_9f031f42|branch|05361e7cf55861d9|fb8d988b46f32918|887fd625a0b4d330|363034388|data/nasa_weather_dataset/transformed_nasa_recorded_weather_TCD_2022.gz.parquet|t19520.8665035643s|968a4cc7e7e9b2ce|2948296|file|local|vector|nasa_weather_transformed||6.51||
@@ -1063,7 +1064,7 @@ nasa_weather_transformed_b19c86a8|branch|b2a0161eb2d88db2|fb8d988b46f32918|44edf
 nasa_weather_transformed_b2521994|branch|0f2d68634dd88835|fb8d988b46f32918|e948981733cbb37b|-1790301327|data/nasa_weather_dataset/transformed_nasa_recorded_weather_MLI_2012.gz.parquet|t19520.8817978786s|db04e0306cd22240|4768212|file|local|vector|nasa_weather_transformed||7.132||
 nasa_weather_transformed_b30cad47|branch|70faf399647ace74|fb8d988b46f32918|c534430fbc707f3d|6721632|data/nasa_weather_dataset/transformed_nasa_recorded_weather_MDG_2014.gz.parquet|t19520.8716428914s|ecf88c90b70b9a1e|2514154|file|local|vector|nasa_weather_transformed||6.208||
 nasa_weather_transformed_b405aedc|branch|b919d3608b2d00e2|fb8d988b46f32918|fea6852fb97f1e96|515575773|data/nasa_weather_dataset/transformed_nasa_recorded_weather_FR1_2022.gz.parquet|t19520.8669367341s|8a88f97e1e8bf7a0|102112|file|local|vector|nasa_weather_transformed||5.577||
-nasa_weather_transformed_b4390c82|branch|error|37df5eb8a378c150|141a1b04dc4c4a7a|463093877||t0s|f4066a65ff755f48|0|file|local|vector|nasa_weather_transformed||0.002||IOError Failed to open local file datanasa_weather_datasetyear2007part0.parquet. Detail errno 2 No such file or directory
+nasa_weather_transformed_b4390c82|branch|4d6d47dd437ec404|37df5eb8a378c150|141a1b04dc4c4a7a|463093877|data/nasa_weather_dataset/year=2007/part-0.parquet|t19521.8928139939s|65958301d89be438|29470452|file|local|vector|nasa_weather_transformed||12.334||
 nasa_weather_transformed_b47d47a0|branch|03238714a9f09124|fb8d988b46f32918|4db6977643a51c4b|-921720773|data/nasa_weather_dataset/transformed_nasa_recorded_weather_SWZ_2015.gz.parquet|t19520.8793430393s|a2db4c9ff65fa42c|102145|file|local|vector|nasa_weather_transformed||5.887||
 nasa_weather_transformed_b47dd460|branch|0ad4f4dba369fd8e|fb8d988b46f32918|c7f12c5ad23b820d|567102240|data/nasa_weather_dataset/transformed_nasa_recorded_weather_KEN_2008.gz.parquet|t19520.8703919039s|a2e814196908ce00|2091484|file|local|vector|nasa_weather_transformed||6.003||
 nasa_weather_transformed_b4d040b2|branch|dc79ed3862e5af39|fb8d988b46f32918|e978ea404ff998a8|1604771408|data/nasa_weather_dataset/transformed_nasa_recorded_weather_SWZ_2008.gz.parquet|t19520.8708610791s|d7f805418a2e7e7c|101342|file|local|vector|nasa_weather_transformed||6.88||
@@ -1133,7 +1134,7 @@ nasa_weather_transformed_df6cc109|branch|7d7325212589f027|fb8d988b46f32918|2263c
 nasa_weather_transformed_e04f3ce5|branch|3dccc88e8e558fbc|fb8d988b46f32918|b8d198df6e1e5e6b|1330185463|data/nasa_weather_dataset/transformed_nasa_recorded_weather_ZAF_2020.gz.parquet|t19520.8638210372s|97748bc187bc8cd4|4972045|file|local|vector|nasa_weather_transformed||6.895||
 nasa_weather_transformed_e1a677e9|branch|0e07ff5e4db6750a|fb8d988b46f32918|58b9b02057e93182|1182103230|data/nasa_weather_dataset/transformed_nasa_recorded_weather_ZAF_2014.gz.parquet|t19520.8726671945s|2725490a0eb0590d|4952481|file|local|vector|nasa_weather_transformed||7.541||
 nasa_weather_transformed_e1e2271c|branch|3dce31186e358ea6|fb8d988b46f32918|e4190ffb9a2c72cf|-1012348706|data/nasa_weather_dataset/transformed_nasa_recorded_weather_UGA_2011.gz.parquet|t19520.86864099s|3684fd7f0307354f|881118|file|local|vector|nasa_weather_transformed||6.925||
-nasa_weather_transformed_e1f0c77a|branch|error|37df5eb8a378c150|41de2d2668c9d172|-2026535380||t0s|f4066a65ff755f48|0|file|local|vector|nasa_weather_transformed||0.002||IOError Failed to open local file datanasa_weather_datasetyear2008part0.parquet. Detail errno 2 No such file or directory
+nasa_weather_transformed_e1f0c77a|branch|c3f83b61764c2173|37df5eb8a378c150|41de2d2668c9d172|-2026535380|data/nasa_weather_dataset/year=2008/part-0.parquet|t19521.8929565227s|1b25efb72ea539d2|29503829|file|local|vector|nasa_weather_transformed||12.302||
 nasa_weather_transformed_e2558414|branch|error|37df5eb8a378c150|4c53d4b96394c498|1254885247||t0s|f4066a65ff755f48|0|file|local|vector|nasa_weather_transformed||0.002||IOError Failed to open local file datanasa_weather_datasetyear2010part0.parquet. Detail errno 2 No such file or directory
 nasa_weather_transformed_e2db6bcd|branch|f6b1d0ffa1c62df4|fb8d988b46f32918|c144af4611a21ada|1192043266|data/nasa_weather_dataset/transformed_nasa_recorded_weather_MDG_2010.gz.parquet|t19520.8674882936s|a3a6019ef5bbe240|2508908|file|local|vector|nasa_weather_transformed||6.365||
 nasa_weather_transformed_e3a932eb|branch|11deac1438a421e3|fb8d988b46f32918|cc74873be39c311d|1853581803|data/nasa_weather_dataset/transformed_nasa_recorded_weather_BWA_2011.gz.parquet|t19520.8695443444s|63d0bebfb9ff131d|2237031|file|local|vector|nasa_weather_transformed||6.115||
@@ -1169,7 +1170,7 @@ nasa_weather_transformed_f6824018|branch|7d5abefb4b0e16ec|fb8d988b46f32918|ba446
 nasa_weather_transformed_f719949a|branch|f44f0f02f8b04404|fb8d988b46f32918|a3bf751005617aad|1511058537|data/nasa_weather_dataset/transformed_nasa_recorded_weather_TCD_2005.gz.parquet|t19520.8618568521s|d613a6a119f0e4ef|2962815|file|local|vector|nasa_weather_transformed||6.412||
 nasa_weather_transformed_f74b3bda|branch|dbf7a6bc87a9827d|fb8d988b46f32918|1906879813b3a8d7|1440154516|data/nasa_weather_dataset/transformed_nasa_recorded_weather_MRT_2021.gz.parquet|t19520.8349172896s|d8121b9dedb15fd4|3412954|file|local|vector|nasa_weather_transformed||6.663||
 nasa_weather_transformed_f75397d2|branch|5b1b1278b06f3116|fb8d988b46f32918|103b3e56b8a1831a|1505462082|data/nasa_weather_dataset/transformed_nasa_recorded_weather_UGA_2009.gz.parquet|t19520.8377540524s|b4f995861d5ef1b5|892056|file|local|vector|nasa_weather_transformed||6.02||
-nasa_weather_transformed_f8801ab9|branch|error|37df5eb8a378c150|8b70623b618fd36a|-114187315||t0s|f4066a65ff755f48|0|file|local|vector|nasa_weather_transformed||0.011||IOError Failed to open local file datanasa_weather_datasetyear2005part0.parquet. Detail errno 2 No such file or directory
+nasa_weather_transformed_f8801ab9|branch|bbac6fc4a026cca8|37df5eb8a378c150|8b70623b618fd36a|-114187315|data/nasa_weather_dataset/year=2005/part-0.parquet|t19521.8925309237s|50dd5e769aa91fde|29388699|file|local|vector|nasa_weather_transformed||12.869||
 nasa_weather_transformed_f90053c9|branch|87cd1c341d73a829|fb8d988b46f32918|4852cc7a26ef9f15|-1762660114|data/nasa_weather_dataset/transformed_nasa_recorded_weather_SWZ_2023.gz.parquet|t19520.8656392945s|7124c10c476ea2f9|41015|file|local|vector|nasa_weather_transformed||2.571||
 nasa_weather_transformed_f9763d2f|branch|5fcdf818b4ed5edb|fb8d988b46f32918|a97b6c360ed3e197|-1790017353|data/nasa_weather_dataset/transformed_nasa_recorded_weather_SDN_2010.gz.parquet|t19520.867572643s|e0c4ca4d2262c9a1|4522709|file|local|vector|nasa_weather_transformed||7.284||
 nasa_weather_transformed_fb4dd879|branch|a0f1f8d0293f80cb|fb8d988b46f32918|0615000443d34b41|1632490172|data/nasa_weather_dataset/transformed_nasa_recorded_weather_NER_2017.gz.parquet|t19520.8649840804s|79c424c9bf274f10|3073266|file|local|vector|nasa_weather_transformed||7.096||
@@ -1190,10 +1191,10 @@ nasa_weather_variables|stem|10d0d4fc164d0f68|b536a47bb9897be7|a3dad144c40657ed|1
 nasa_weather_years|stem|d0f995f82cf9a4e1|8d8352b40762c255|787f005495551c49|-680794831|bucket=open-rvfcast-data*region=NULL*key=_targets/nasa_weather_years*endpoint=TlVMTA*version=|t19517.694854974s||107|qs|aws|vector||nasa_weather_years_3507997e*nasa_weather_years_246233d0*nasa_weather_years_e21705ac*nasa_weather_years_a704d29f*nasa_weather_years_34dbac61*nasa_weather_years_840b5acb*nasa_weather_years_a147c765*nasa_weather_years_fe25e234*nasa_weather_years_c7d0bddf*nasa_weather_years_b6b0e781*nasa_weather_years_f1acad11*nasa_weather_years_f90769be*nasa_weather_years_6549f23e*nasa_weather_years_ead54fb0*nasa_weather_years_c3c42a21*nasa_weather_years_42c0dfe9*nasa_weather_years_14a7fccb*nasa_weather_years_71778769*nasa_weather_years_69cc6f61|0.001||
 plot_targets|object|1eb1bc8d77111ded|||||||||||||||
 preprocess_ecmwf_forecasts|function|033bd8a3c45b4d46|||||||||||||||
-preprocess_nasa_weather|function|534f777a16275fc5|||||||||||||||
+preprocess_nasa_weather|function|f5c92fafb420500d|||||||||||||||
 preprocess_wahis_rvf_outbreaks|function|1739270cf02b72d6|||||||||||||||
 process_ndvi_data|function|8a56ce9bd504bbec|||||||||||||||
-process_weather_data|function|39e342a99c9868df|||||||||||||||
+process_weather_data|function|1956aa290dc4fc5d|||||||||||||||
 random_select_model_dates|function|9ff4c8b11c4c6a0f|||||||||||||||
 read_transform_raster|function|f7518264efa394ed|||||||||||||||
 report_targets|object|1eb1bc8d77111ded|||||||||||||||
@@ -2054,8 +2055,46 @@ test_targets|object|1eb1bc8d77111ded|||||||||||||||
 transform_nasa_weather|function|244bc99990ee0c7c|||||||||||||||
 transform_raster|function|8af124ae46aeffc8|||||||||||||||
 transform_sentinel_ndvi|function|92a19330c7f2bff2|||||||||||||||
-user_rprof|object|92eac146f6c5c0c0|||||||||||||||
+user_rprof|object|04e1609a60e795cb|||||||||||||||
 wahis_rvf_outbreaks_preprocessed|stem|30ccd988b415d773|3ea98184b5887c93|275a59d310ff2a63|2127878318|bucket=open-rvfcast-data*region=NULL*key=_targets/wahis_rvf_outbreaks_preprocessed*endpoint=TlVMTA*version=|t19517.6952212142s||172965|qs|aws|vector|||0.043||
 wahis_rvf_outbreaks_raw|stem|6fc7e6c7238977b3|b988ec4215d4213c|5ed4661ae3efb1aa|1933416983|bucket=open-rvfcast-data*region=NULL*key=_targets/wahis_rvf_outbreaks_raw*endpoint=TlVMTA*version=|t19517.6952047733s||173410|qs|aws|vector|||29.629||
 wahis_rvf_query|function|9836433f6f1061fb|||||||||||||||
 weather_data|stem|error|a5b7c71ecc8a6031|3160e0777a812aed|655573160|bucket=open-rvfcast-data*region=NULL*key=_targets/weather_data*endpoint=TlVMTA*version=|t19521.765027018s||30|qs|aws|vector|||0.003||unused argument model_dates_random_select
+transform_raster|function|8af124ae46aeffc8
+download_ecmwf_forecasts|function|d480f006e498f31a
+wahis_rvf_query|function|9836433f6f1061fb
+.Random.seed|object|49e38d4a2d92d174
+rolling_box|function|1195d491d98c697b
+preprocess_nasa_weather|function|f5c92fafb420500d
+aws_bucket|object|d9cf2c5ff7cc1be4
+deploy_targets|object|1eb1bc8d77111ded
+get_country_bounding_boxes|function|82b21d03b36ce8fe
+save_transform_ecmwf_grib|function|6a76f13bf2e8bad9
+process_ndvi_data|function|8a56ce9bd504bbec
+process_weather_data|function|1956aa290dc4fc5d
+plot_targets|object|1eb1bc8d77111ded
+create_africa_polygon|function|fb2ce70982e38cd3
+dynamic_targets|object|805c8de4e422aa88
+model_targets|object|1eb1bc8d77111ded
+preprocess_wahis_rvf_outbreaks|function|1739270cf02b72d6
+create_country_polygons|function|9917ababa5b4b8f4
+create_raster_template_plot|function|db738156a3247831
+data_targets|object|c8e9352da0630ee0
+create_data_directory|function|5781405b45264703
+report_targets|object|1eb1bc8d77111ded
+user_rprof|object|c952b8ad08ff0f4a
+static_targets|object|1a11c1eec372ef8b
+download_nasa_weather|function|44ffecc296978e5e
+set_ecmwf_api_parameter|function|e3e4962883690ed5
+random_select_model_dates|function|9ff4c8b11c4c6a0f
+f|object|8958b19a2a0d79bf
+test_targets|object|1eb1bc8d77111ded
+download_modis_ndvi|function|ff443130c1d2c60e
+download_sentinel_ndvi|function|03e5942d01ac5cc7
+get_sentinel_ndvi_api_parameters|function|ec6ebe60c7637311
+transform_sentinel_ndvi|function|92a19330c7f2bff2
+transform_nasa_weather|function|244bc99990ee0c7c
+get_wahis_rvf_outbreaks_raw|function|a8564ce9127c9c1d
+get_nasa_weather_coordinates|function|2c23f9e4d93cd8ca
+nasa_weather_transformed_56150e5c|branch|e7a62192fdd40968|37df5eb8a378c150|d0276e848e9ef034|647546425|data/nasa_weather_dataset/year=2009/part-0.parquet|t19521.896525914s|8f9ad2bbe2ea4981|29647716|file|local|vector|nasa_weather_transformed||12.862||
+nasa_weather_transformed_e2558414|branch|e5b3548ac8784270|37df5eb8a378c150|4c53d4b96394c498|1254885247|data/nasa_weather_dataset/year=2010/part-0.parquet|t19521.8966653424s|283e0cc79d8b6982|29600212|file|local|vector|nasa_weather_transformed||12.037||
