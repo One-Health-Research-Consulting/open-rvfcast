@@ -168,22 +168,17 @@ dynamic_targets <- tar_plan(
   tar_target(nasa_weather_preprocess_files, list.files(nasa_weather_preprocess, full.names = TRUE, recursive = TRUE)),
   
   # project to the template and resave
-  tar_target(nasa_weather_transformed, 
+  tar_target(nasa_weather_transformed_files, 
              transform_nasa_weather(nasa_weather_preprocess_files, 
                                     continent_raster_template),
-             pattern = nasa_weather_preprocess_files,
-             format = "file", 
-             repository = "local",
+             pattern = head(nasa_weather_preprocess_files, 4),
+             iteration = "vector",
+             # format = "file", # for now dont track as files because these may be updated later
+             # repository = "local",
              cue = tar_cue("thorough")),  
   
-  # save transformed to AWS bucket
-  tar_target(nasa_weather_transformed_upload_aws_s3,  {nasa_weather_transformed; # enforce dependency
-    aws_s3_upload(path = nasa_weather_directory_dataset,
-                  bucket =  aws_bucket,
-                  key = nasa_weather_directory_dataset, 
-                  check = TRUE)}, 
-    cue = tar_cue("thorough")), 
-  
+  # Duckdb - has implementation of windows function
+  # toduckdb - changes the underlying engine
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   
@@ -234,7 +229,8 @@ data_targets <- tar_plan(
   
   tar_target(model_dates_random_select, random_select_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, seed = 212)),
   
-  tar_target(weather_data, process_weather_data(nasa_weather_directory_dataset, nasa_weather_transformed, model_dates_random_select)),
+  # TODO take nasa_weather_transformed_files and do full lag calcs in this function (change back to get_weather_data) collect into memory
+  tar_target(weather_anomalies, get_weather_anomalies(nasa_weather_directory_dataset, nasa_weather_transformed_files)),
   tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_dataset, sentinel_ndvi_transformed, model_dates_random_select))
   
 )

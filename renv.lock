@@ -2389,6 +2389,16 @@
       "Repository": "CRAN",
       "Hash": "d98c94dacb7e0efcf83b0a133a705504",
       "Requirements": []
+    },
+    "zoo": {
+      "Package": "zoo",
+      "Version": "1.8-12",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "5c715954112b45499fb1dadc6ee6ee3e",
+      "Requirements": [
+        "lattice"
+      ]
     }
   }
 }

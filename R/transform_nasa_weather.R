@@ -28,10 +28,10 @@ transform_nasa_weather <- function(nasa_weather_preprocess_files,
       crs(raw_raster) <-  crs(rast()) 
       transformed_raster <- transform_raster(raw_raster = raw_raster,
                                              template = rast(continent_raster_template))
-     test= as.data.frame(transformed_raster, xy = TRUE) 
+     as.data.frame(transformed_raster, xy = TRUE) 
     })
   
-  # Save as parquet 
+  # Save as parquets 
   write_parquet(dat_out, nasa_weather_preprocess_files, compression = "gzip", compression_level = 5)
   
   return(nasa_weather_preprocess_files)
