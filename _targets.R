@@ -159,13 +159,19 @@ dynamic_targets <- tar_plan(
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
-  # project to the template and save again as parquets (these can now be queried for analysis)
+  # remove dupes due to having overlapping country bounding boxes
+  # resave as arrow dataset, grouped by year
+  tar_target(nasa_weather_preprocess, preprocess_nasa_weather(nasa_weather_directory_raw, 
+                                                              nasa_weather_downloaded,
+                                                              nasa_weather_directory_dataset)),
+  
+  tar_target(nasa_weather_preprocess_files, list.files(nasa_weather_preprocess, full.names = TRUE, recursive = TRUE)),
+  
+  # project to the template and resave
   tar_target(nasa_weather_transformed, 
-             transform_nasa_weather(nasa_weather_downloaded, 
-                                    continent_raster_template,
-                                    nasa_weather_directory_dataset,
-                                    overwrite = FALSE),
-             pattern = nasa_weather_downloaded,
+             transform_nasa_weather(nasa_weather_preprocess_files, 
+                                    continent_raster_template),
+             pattern = nasa_weather_preprocess_files,
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
@@ -226,8 +232,10 @@ dynamic_targets <- tar_plan(
 # Data Processing -----------------------------------------------------------
 data_targets <- tar_plan(
   
-  tar_target(weather_data, process_weather_data(nasa_weather_directory_dataset, nasa_weather_transformed))
-  tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_dataset, sentinel_ndvi_transformed))
+  tar_target(model_dates_random_select, random_select_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, seed = 212)),
+  
+  tar_target(weather_data, process_weather_data(nasa_weather_directory_dataset, nasa_weather_transformed, model_dates_random_select)),
+  tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_dataset, sentinel_ndvi_transformed, model_dates_random_select))
   
 )
 
