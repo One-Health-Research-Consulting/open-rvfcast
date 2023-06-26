@@ -161,24 +161,17 @@ dynamic_targets <- tar_plan(
     cue = tar_cue("thorough")), 
   
   # remove dupes due to having overlapping country bounding boxes
-  # resave as arrow dataset, grouped by year
-  tar_target(nasa_weather_preprocess, preprocess_nasa_weather(nasa_weather_downloaded,
-                                                              nasa_weather_directory_dataset)),
-  
-  tar_target(nasa_weather_preprocess_files, list.files(nasa_weather_preprocess, full.names = TRUE, recursive = TRUE)),
-  
-  # project to the template and resave
-  tar_target(nasa_weather_transformed, 
-             transform_nasa_weather(nasa_weather_preprocess_files, 
-                                    continent_raster_template),
-             pattern = nasa_weather_preprocess_files,
-             iteration = "vector",
+  # project to the template and save as arrow dataset
+  tar_target(nasa_weather_dataset, 
+             create_nasa_weather_dataset(nasa_weather_downloaded,
+                                         nasa_weather_directory_dataset, 
+                                         continent_raster_template),
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
   
-  # save transformed to AWS bucket
-  tar_target(nasa_weather_transformed_upload_aws_s3,  {nasa_weather_transformed; # enforce dependency
+  # save dataset to AWS bucket
+  tar_target(nasa_weather_dataset_upload_aws_s3,  {nasa_weather_dataset; # enforce dependency
     aws_s3_upload(path = nasa_weather_directory_dataset,
                   bucket =  aws_bucket,
                   key = nasa_weather_directory_dataset, 
@@ -235,7 +228,7 @@ data_targets <- tar_plan(
   tar_target(model_dates_random_select, random_select_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, seed = 212)),
   
   # TODO take nasa_weather_directory_dataset and do full lag calcs in this function using duckdb, then collect into memory
-  tar_target(weather_data, process_weather_data(nasa_weather_directory_dataset, nasa_weather_transformed)),
+  tar_target(weather_data, process_weather_data(nasa_weather_directory_dataset, nasa_weather_dataset)),
   tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_dataset, sentinel_ndvi_transformed, model_dates_random_select))
   
 )

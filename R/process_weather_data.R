@@ -8,10 +8,10 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_transformed) {
+process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_dataset) {
   
-  # connect to transformed data
-  weather_conn <- open_dataset(nasa_weather_directory_dataset) 
+  # connect to transformed data, use duckdb to apply SQL
+  weather_conn <- open_dataset(nasa_weather_directory_dataset) |> to_duckdb()
   # or keep on aws: s3_bucket(nasa_weather_directory_dataset)
   
   # calculate monthly averages by pixel
@@ -27,22 +27,35 @@ process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_tr
     left_join(weather_means, by = c("x", "y", "month")) |> 
     mutate(anomaly_relative_humidity = relative_humidity - mean_relative_humidity,
            anomaly_temperature = temperature - mean_temperature,
-           anomaly_precipitation = precipitation - mean_precipitation) |> 
-    group_by(year) |> 
-    write_dataset(nasa_weather_directory_dataset)
+           anomaly_precipitation = precipitation - mean_precipitation)  |> 
+    arrange(x, y, year, month, day)
   
-  return(nasa_weather_directory_dataset)
+  # figure out how to calculate moving average with base, or send a sql query with dplyr?
+  test <- weather_means |> 
+   # group_by(x, y) |> 
+    mutate(anomaly_relative_humidity_lag = zoo::rollmean(anomaly_relative_humidity, 2))
+  
+  ahh <- test |> filter(year == 2005) |> collect()
+  
+  
+  
+  query <- "SELECT * FROM weather_means"
+  results <- DBI::dbGetQuery(weather_means, query)
+  
+  mutate(anomaly_temperature_30d_mean = slider::slide_dbl(anomaly_temperature, .before = 30, .after = 0, .f = mean, .complete  = TRUE))
+  
+  
   
   # ok read into memory to do lags 😬
- #  weather_dat <- weather_means |> 
- #    collect()
- #  
- #  weather_lag_groups <- weather_dat |> 
- #    group_split(x, y)
- #  
- # test <- weather_lag_groups[[1]] |> 
- #    arrange(year, month, day) |> 
- #    mutate(anomaly_temperature_30d_mean = slider::slide_dbl(anomaly_temperature, .before = 30, .after = 0, .f = mean, .complete  = TRUE))
+  #  weather_dat <- weather_means |> 
+  #    collect()
+  #  
+  #  weather_lag_groups <- weather_dat |> 
+  #    group_split(x, y)
+  #  
+  # test <- weather_lag_groups[[1]] |> 
+  #    arrange(year, month, day) |> 
+  #    mutate(anomaly_temperature_30d_mean = slider::slide_dbl(anomaly_temperature, .before = 30, .after = 0, .f = mean, .complete  = TRUE))
   
   # out = test2 |> 
   #   select(doy, temperature, precipitation) |> 
