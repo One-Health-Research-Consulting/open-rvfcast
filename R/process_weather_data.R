@@ -10,63 +10,31 @@
 #' @export
 process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_dataset) {
   
-  # connect to transformed data, use duckdb to apply SQL
-  weather_conn <- open_dataset(nasa_weather_directory_dataset) |> to_duckdb()
-  # or keep on aws: s3_bucket(nasa_weather_directory_dataset)
+  weather_dataset <- open_dataset(nasa_weather_directory_dataset) |> to_duckdb(table_name = "weather")
   
   # calculate monthly averages by pixel
-  weather_means <- weather_conn |> 
-    group_by(x, y, month) |> 
-    summarize(mean_relative_humidity = mean(relative_humidity),
-              mean_temperature = mean(temperature),
-              mean_precipitation = mean(precipitation)) |> 
-    ungroup()  
-  
   # calculate anomalies for each day relative to monthly average
-  weather_means <- weather_conn |> 
-    left_join(weather_means, by = c("x", "y", "month")) |> 
+  weather_anomalies <- weather_dataset |> 
+    group_by(x, y, month) |> 
+    mutate(mean_relative_humidity = mean(relative_humidity),
+           mean_temperature = mean(temperature),
+           mean_precipitation = mean(precipitation)) |> 
+    ungroup()  |> 
     mutate(anomaly_relative_humidity = relative_humidity - mean_relative_humidity,
            anomaly_temperature = temperature - mean_temperature,
-           anomaly_precipitation = precipitation - mean_precipitation)  |> 
-    arrange(x, y, year, month, day)
+           anomaly_precipitation = precipitation - mean_precipitation)  
   
-  # figure out how to calculate moving average with base, or send a sql query with dplyr?
-  test <- weather_means |> 
-   # group_by(x, y) |> 
-    mutate(anomaly_relative_humidity_lag = zoo::rollmean(anomaly_relative_humidity, 2))
+  # get rolling avg for each x,y
+  # throws memory error - PRAGMA temp_directory='/path/to/tmp.tmp'
+  weather_lags <- weather_anomalies |> 
+    group_by(x, y) |> 
+    window_frame(-30, -1) |> 
+    window_order(day_of_year) |> 
+    mutate(anomaly_relative_humidity_roll30 = mean(anomaly_relative_humidity))  |> 
+    ungroup()
   
-  ahh <- test |> filter(year == 2005) |> collect()
-  
-  
-  
-  query <- "SELECT * FROM weather_means"
-  results <- DBI::dbGetQuery(weather_means, query)
-  
-  mutate(anomaly_temperature_30d_mean = slider::slide_dbl(anomaly_temperature, .before = 30, .after = 0, .f = mean, .complete  = TRUE))
-  
-  
-  
-  # ok read into memory to do lags 😬
-  #  weather_dat <- weather_means |> 
-  #    collect()
-  #  
-  #  weather_lag_groups <- weather_dat |> 
-  #    group_split(x, y)
-  #  
-  # test <- weather_lag_groups[[1]] |> 
-  #    arrange(year, month, day) |> 
-  #    mutate(anomaly_temperature_30d_mean = slider::slide_dbl(anomaly_temperature, .before = 30, .after = 0, .f = mean, .complete  = TRUE))
-  
-  # out = test2 |> 
-  #   select(doy, temperature, precipitation) |> 
-  #    mutate(temp_30_day_avg = slide_dbl(temperature, .before = 29, .after = 0, .f = mean, na.rm = FALSE),
-  #           precip_30_day_avg = slide_dbl(precipitation, .before = 29, .after = 0, .f = mean, na.rm = TRUE)) 
-  #  
-  # out= zoo::rollmean(test2$temperature, k = 30, fill = NA, align = "right")
-  #! day 30 includes the temp on day 30, so we need to offset by one
-  
-  
-  # collect
-  #return(NULL)
+    "AVG(anomaly_precipitation) OVER (
+     ORDER BY day_of_year
+     ROWS BETWEEN 30 PRECEDING AND 1 PRECEDING)"
   
 }
