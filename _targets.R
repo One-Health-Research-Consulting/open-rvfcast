@@ -32,8 +32,9 @@ static_targets <- tar_plan(
   tar_target(continent_bounding_box, sf::st_bbox(continent_polygon)),
   tar_target(continent_raster_template,
              wrap(terra::rast(ext(continent_polygon), 
-                              resolution = 0.5))), # this is the resolution of nasa power
-  tar_target(continent_raster_template_plot, create_raster_template_plot(rast(continent_raster_template), continent_polygon))
+                              resolution = 0.5))), #TODO change to 0.1 (might cause error in transform, leaving at 0.5 for now)
+  # nasa power resolution = 0.5; enmwf = ; ndvi = 
+  # tar_target(continent_raster_template_plot, create_raster_template_plot(rast(continent_raster_template), continent_polygon))
   
 )
 
@@ -74,18 +75,18 @@ dynamic_targets <- tar_plan(
     cue = tar_cue("thorough")), 
   
   # project to the template and save as parquets (these can now be queried for analysis)
-  tar_target(sentinel_ndvi_transformed, 
-             transform_sentinel_ndvi(sentinel_ndvi_downloaded, 
-                                     continent_raster_template,
-                                     sentinel_ndvi_directory_dataset,
-                                     overwrite = FALSE),
+  tar_target(sentinel_ndvi_dataset, 
+             create_sentinel_ndvi_dataset(sentinel_ndvi_downloaded, 
+                                          continent_raster_template,
+                                          sentinel_ndvi_directory_dataset,
+                                          overwrite = FALSE),
              pattern = sentinel_ndvi_downloaded,
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")), 
   
   # save transformed to AWS bucket
-  tar_target(sentinel_ndvi_transformed_upload_aws_s3,  {sentinel_ndvi_transformed; # enforce dependency
+  tar_target(sentinel_ndvi_dataset_upload_aws_s3,  {sentinel_ndvi_dataset; # enforce dependency
     aws_s3_upload(path = sentinel_ndvi_directory_dataset,
                   bucket =  aws_bucket,
                   key = sentinel_ndvi_directory_dataset, 
@@ -96,10 +97,10 @@ dynamic_targets <- tar_plan(
   # 2005-present
   # this satellite will be retired soon, so we should use sentinel for present dates 
   
-  tar_target(modis_ndvi_directory, "data/modis_ndvi_rasters"),
+  # tar_target(modis_ndvi_directory, "data/modis_ndvi_rasters"),
   
   # set branching for modis
-  tar_target(modis_ndvi_years, 2005:2018),
+  # tar_target(modis_ndvi_years, 2005:2018),
   
   # download files
   # TODO refactor so that it can skip files without calling the stec api
@@ -165,7 +166,8 @@ dynamic_targets <- tar_plan(
   tar_target(nasa_weather_dataset, 
              create_nasa_weather_dataset(nasa_weather_downloaded,
                                          nasa_weather_directory_dataset, 
-                                         continent_raster_template),
+                                         continent_raster_template,
+                                         overwrite = FALSE),
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
@@ -180,32 +182,32 @@ dynamic_targets <- tar_plan(
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   
-  tar_target(ecmwf_forecasts_directory, "data/ecmwf_forecasts_gribs"),
-  
-  # set branching for ecmwf
-  tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter(years = 2005:2023,
-                                                           bbox_coords = continent_bounding_box,
-                                                           variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
-                                                           product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
-                                                           leadtime_months = c("1", "2", "3", "4", "5", "6"))),
-  
-  #  download files
-  tar_target(ecmwf_forecasts_downloaded,
-             download_ecmwf_forecasts(ecmwf_api_parameters,
-                                      download_directory = ecmwf_forecasts_directory),
-             pattern = ecmwf_api_parameters,
-             format = "file",
-             repository = "local",
-             cue = tar_cue("thorough")
-  ),
-  
-  # save to AWS bucket
-  tar_target(ecmwf_forecasts_upload_aws_s3,  {ecmwf_forecasts_downloaded; # enforce dependency
-    aws_s3_upload(path = ecmwf_forecasts_directory,
-                  bucket =  aws_bucket ,
-                  key = ecmwf_forecasts_directory, 
-                  check = TRUE)}, 
-    cue = tar_cue("thorough")), 
+  # tar_target(ecmwf_forecasts_directory, "data/ecmwf_forecasts_gribs"),
+  # 
+  # # set branching for ecmwf
+  # tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter(years = 2005:2023,
+  #                                                          bbox_coords = continent_bounding_box,
+  #                                                          variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
+  #                                                          product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
+  #                                                          leadtime_months = c("1", "2", "3", "4", "5", "6"))),
+  # 
+  # #  download files
+  # tar_target(ecmwf_forecasts_downloaded,
+  #            download_ecmwf_forecasts(ecmwf_api_parameters,
+  #                                     download_directory = ecmwf_forecasts_directory),
+  #            pattern = ecmwf_api_parameters,
+  #            format = "file",
+  #            repository = "local",
+  #            cue = tar_cue("thorough")
+  # ),
+  # 
+  # # save to AWS bucket
+  # tar_target(ecmwf_forecasts_upload_aws_s3,  {ecmwf_forecasts_downloaded; # enforce dependency
+  #   aws_s3_upload(path = ecmwf_forecasts_directory,
+  #                 bucket =  aws_bucket ,
+  #                 key = ecmwf_forecasts_directory, 
+  #                 check = TRUE)}, 
+  #   cue = tar_cue("thorough")), 
   
   # transform
   # make raster stacks of all the data, transform, convert back to parquets
@@ -225,11 +227,11 @@ dynamic_targets <- tar_plan(
 # Data Processing -----------------------------------------------------------
 data_targets <- tar_plan(
   
-  tar_target(model_dates_random_select, random_select_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, seed = 212)),
+  # tar_target(model_dates_random_select, random_select_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, seed = 212)),
   
   # TODO take nasa_weather_directory_dataset and do full lag calcs in this function using duckdb, then collect into memory
-  tar_target(weather_data, process_weather_data(nasa_weather_directory_dataset, nasa_weather_dataset)),
-  tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_dataset, sentinel_ndvi_transformed, model_dates_random_select))
+  # tar_target(weather_data, process_weather_data(nasa_weather_directory_dataset, nasa_weather_dataset)),
+  # tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_dataset, sentinel_ndvi_dataset, model_dates_random_select))
   
 )
 

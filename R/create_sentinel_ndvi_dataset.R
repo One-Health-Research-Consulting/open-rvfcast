@@ -9,7 +9,7 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-transform_sentinel_ndvi <- function(sentinel_ndvi_downloaded,
+create_sentinel_ndvi_dataset <- function(sentinel_ndvi_downloaded,
                                     continent_raster_template,
                                     sentinel_ndvi_directory_dataset,
                                     overwrite = FALSE) {
@@ -23,7 +23,7 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_downloaded,
   
   message(paste0("Transforming ", save_filename))
   
-  if(save_filename %in% existing_files){
+  if(save_filename %in% existing_files & !overwrite){
     message("file already exists, skipping transform")
     return(file.path(sentinel_ndvi_directory_dataset, save_filename))
   }

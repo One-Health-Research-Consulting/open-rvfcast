@@ -9,7 +9,7 @@
 #' @author Emma Mendelsohn
 #' @export
 process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_dataset) {
-  
+  library(dbplyr)
   weather_dataset <- open_dataset(nasa_weather_directory_dataset) |> to_duckdb(table_name = "weather")
   
   # calculate monthly averages by pixel
@@ -32,6 +32,9 @@ process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_da
     window_order(day_of_year) |> 
     mutate(anomaly_relative_humidity_roll30 = mean(anomaly_relative_humidity))  |> 
     ungroup()
+  
+  # check this worked
+  test = weather_lags |> filter(x == min(x), y == max(y), day_of_year < 50) |> collect()
   
   # ^ get rolling avg for 1 month, 2 month, 3 month ahead for each var
   

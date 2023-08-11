@@ -11,11 +11,21 @@
 #' @export
 create_nasa_weather_dataset <- function(nasa_weather_downloaded,
                                         nasa_weather_directory_dataset, 
-                                        continent_raster_template) {
-  
+                                        continent_raster_template,
+                                        overwrite = FALSE) {
   
   nasa_weather_directory_raw <- unique(dirname(nasa_weather_downloaded))
   
+  # Lazy/imperfect way of checking whether to overwrite or not
+  current_year <- year(Sys.Date())
+  file_names <- paste0("year=", 2005:current_year)
+  existing_files <- list.files(nasa_weather_directory_dataset)
+  if(all(file_names %in% existing_files) & !overwrite){
+    message("files already exist, skipping transform")
+    nasa_weather_preprocess_files <- list.files(nasa_weather_directory_dataset, full.names = TRUE, recursive = TRUE)
+    return(nasa_weather_preprocess_files)
+  }
+
   # remove dupes due to having overlapping country bounding boxes
   # resave as arrow dataset, grouped by year
   open_dataset(nasa_weather_directory_raw) |> 
