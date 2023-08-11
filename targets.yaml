@@ -1,0 +1,6 @@
+main:
+  store: _targets
+  script: _targets.R
+sandbox:
+  store: _targets_sandbox
+  script: _targets_sandbox.R
