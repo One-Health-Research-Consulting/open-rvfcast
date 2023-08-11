@@ -32,8 +32,9 @@ static_targets <- tar_plan(
   tar_target(continent_bounding_box, sf::st_bbox(continent_polygon)),
   tar_target(continent_raster_template,
              wrap(terra::rast(ext(continent_polygon), 
-                              resolution = 0.1))),
-  tar_target(continent_raster_template_plot, create_raster_template_plot(rast(continent_raster_template), continent_polygon))
+                              resolution = 0.5))), #TODO change to 0.1 (might cause error in transform, leaving at 0.5 for now)
+  # nasa power resolution = 0.5; enmwf = ; ndvi = 
+  # tar_target(continent_raster_template_plot, create_raster_template_plot(rast(continent_raster_template), continent_polygon))
   
 )
 
@@ -48,36 +49,58 @@ dynamic_targets <- tar_plan(
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
   
-  tar_target(sentinel_ndvi_directory, "data/sentinel_ndvi_rasters"),
+  tar_target(sentinel_ndvi_directory_raw, 
+             create_data_directory(directory_path = "data/sentinel_ndvi_raw")),
+  tar_target(sentinel_ndvi_directory_dataset, 
+             create_data_directory(directory_path = "data/sentinel_ndvi_dataset")),
   
   # get API parameters
   tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters(), cue = tar_cue("thorough")), 
   
   # download files from source (locally)
   tar_target(sentinel_ndvi_downloaded, download_sentinel_ndvi(sentinel_ndvi_api_parameters,
-                                                              download_directory = sentinel_ndvi_directory),
+                                                              download_directory = sentinel_ndvi_directory_raw,
+                                                              overwrite = FALSE),
              pattern = sentinel_ndvi_api_parameters, 
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),
   
-  # save to AWS bucket
-  tar_target(sentinel_ndvi_upload_aws_s3, {sentinel_ndvi_downloaded; # enforce dependency
-    aws_s3_upload(path = sentinel_ndvi_directory,
+  # save raw to AWS bucket
+  tar_target(sentinel_ndvi_raw_upload_aws_s3, {sentinel_ndvi_downloaded; # enforce dependency
+    aws_s3_upload(path = sentinel_ndvi_directory_raw,
                   bucket =  aws_bucket ,
-                  key = sentinel_ndvi_directory, 
+                  key = sentinel_ndvi_directory_raw, 
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
+  # project to the template and save as parquets (these can now be queried for analysis)
+  tar_target(sentinel_ndvi_dataset, 
+             create_sentinel_ndvi_dataset(sentinel_ndvi_downloaded, 
+                                          continent_raster_template,
+                                          sentinel_ndvi_directory_dataset,
+                                          overwrite = FALSE),
+             pattern = sentinel_ndvi_downloaded,
+             format = "file", 
+             repository = "local",
+             cue = tar_cue("thorough")), 
+  
+  # save transformed to AWS bucket
+  tar_target(sentinel_ndvi_dataset_upload_aws_s3,  {sentinel_ndvi_dataset; # enforce dependency
+    aws_s3_upload(path = sentinel_ndvi_directory_dataset,
+                  bucket =  aws_bucket,
+                  key = sentinel_ndvi_directory_dataset, 
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")), 
   
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
   # this satellite will be retired soon, so we should use sentinel for present dates 
   
-  tar_target(modis_ndvi_directory, "data/modis_ndvi_rasters"),
+  # tar_target(modis_ndvi_directory, "data/modis_ndvi_rasters"),
   
   # set branching for modis
-  tar_target(modis_ndvi_years, 2005:2018),
+  # tar_target(modis_ndvi_years, 2005:2018),
   
   # download files
   # TODO refactor so that it can skip files without calling the stec api
@@ -97,114 +120,118 @@ dynamic_targets <- tar_plan(
   #                 check = TRUE)}, 
   #   cue = tar_cue("thorough")), 
   
+  # TODO what are the units (differs between sentinel and modis)
+  # TODO transform needs to handle the internal batching from modis (tar_rep?)
+  
   
   # NASA POWER recorded weather -----------------------------------------------------------
+  # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
+  # T2M             MERRA-2 Temperature at 2 Meters (C) ;
+  # PRECTOTCORR     MERRA-2 Precipitation Corrected (mm/day)  
   
-  tar_target(nasa_weather_directory, "data/nasa_weather_parquets"),
+  tar_target(nasa_weather_directory_raw, 
+             create_data_directory(directory_path = "data/nasa_weather_raw")),
+  tar_target(nasa_weather_directory_dataset, 
+             create_data_directory(directory_path = "data/nasa_weather_dataset")),
   
   # set branching for nasa
   tar_target(nasa_weather_years, 2005:2023),
   tar_target(nasa_weather_variables, c("RH2M", "T2M", "PRECTOTCORR")),
   tar_target(nasa_weather_coordinates, get_nasa_weather_coordinates(country_bounding_boxes)),
   
-  #  download files
+  #  download raw files
   tar_target(nasa_weather_downloaded,
              download_nasa_weather(nasa_weather_coordinates,
                                    nasa_weather_years,
                                    nasa_weather_variables,
-                                   download_directory = nasa_weather_directory),
+                                   download_directory = nasa_weather_directory_raw,
+                                   overwrite = FALSE),
              pattern = crossing(nasa_weather_years, nasa_weather_coordinates),
+             iteration = "vector",
              format = "file",
              repository = "local",
              cue = tar_cue("thorough")
   ),
   
-  # save to AWS bucket
-  tar_target(nasa_weather_upload_aws_s3,  {nasa_weather_downloaded; # enforce dependency
-    aws_s3_upload(path = nasa_weather_directory,
+  # save raw to AWS bucket
+  tar_target(nasa_weather_raw_upload_aws_s3,  {nasa_weather_downloaded; # enforce dependency
+    aws_s3_upload(path = nasa_weather_directory_raw,
                   bucket =  aws_bucket ,
-                  key = nasa_weather_directory, 
+                  key = nasa_weather_directory_raw, 
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
+  # remove dupes due to having overlapping country bounding boxes
+  # project to the template and save as arrow dataset
+  tar_target(nasa_weather_dataset, 
+             create_nasa_weather_dataset(nasa_weather_downloaded,
+                                         nasa_weather_directory_dataset, 
+                                         continent_raster_template,
+                                         overwrite = FALSE),
+             format = "file", 
+             repository = "local",
+             cue = tar_cue("thorough")),  
+  
+  # save dataset to AWS bucket
+  tar_target(nasa_weather_dataset_upload_aws_s3,  {nasa_weather_dataset; # enforce dependency
+    aws_s3_upload(path = nasa_weather_directory_dataset,
+                  bucket =  aws_bucket,
+                  key = nasa_weather_directory_dataset, 
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")),    
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   
-  tar_target(ecmwf_forecasts_directory, "data/ecmwf_forecasts_gribs"),
+  # tar_target(ecmwf_forecasts_directory, "data/ecmwf_forecasts_gribs"),
+  # 
+  # # set branching for ecmwf
+  # tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter(years = 2005:2023,
+  #                                                          bbox_coords = continent_bounding_box,
+  #                                                          variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
+  #                                                          product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
+  #                                                          leadtime_months = c("1", "2", "3", "4", "5", "6"))),
+  # 
+  # #  download files
+  # tar_target(ecmwf_forecasts_downloaded,
+  #            download_ecmwf_forecasts(ecmwf_api_parameters,
+  #                                     download_directory = ecmwf_forecasts_directory),
+  #            pattern = ecmwf_api_parameters,
+  #            format = "file",
+  #            repository = "local",
+  #            cue = tar_cue("thorough")
+  # ),
+  # 
+  # # save to AWS bucket
+  # tar_target(ecmwf_forecasts_upload_aws_s3,  {ecmwf_forecasts_downloaded; # enforce dependency
+  #   aws_s3_upload(path = ecmwf_forecasts_directory,
+  #                 bucket =  aws_bucket ,
+  #                 key = ecmwf_forecasts_directory, 
+  #                 check = TRUE)}, 
+  #   cue = tar_cue("thorough")), 
   
-  # set branching for ecmwf
-  tar_target(ecmwf_api_parameters, set_ecmwf_api_parameter(years = 2005:2023,
-                                                           bbox_coords = continent_bounding_box,
-                                                           variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
-                                                           product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
-                                                           leadtime_months = c("1", "2", "3", "4", "5", "6"))),
+  # transform
+  # make raster stacks of all the data, transform, convert back to parquets
+  # tar_target(ecmwf_forecasts_flat_transformed,
+  #            save_transform_ecmwf_grib(ecmwf_forecasts_downloaded,
+  #                                      transform_directory = paste0(str_replace(ecmwf_forecasts_directory, "gribs", "flat"), "_transformed"),
+  #                                      verbose = TRUE),
+  #            pattern = map(ecmwf_forecasts_downloaded),
+  #            iteration = "list",
+  #            format = "file", 
+  #            repository = "local",
+  #            cue = tar_cue("thorough")),  
   
-  #  download files
-  tar_target(ecmwf_forecasts_downloaded,
-             download_ecmwf_forecasts(ecmwf_api_parameters,
-                                      download_directory = ecmwf_forecasts_directory),
-             pattern = ecmwf_api_parameters,
-             format = "file",
-             repository = "local",
-             cue = tar_cue("thorough")
-  ),
-  
-  # save to AWS bucket
-  tar_target(ecmwf_forecasts_upload_aws_s3,  {ecmwf_forecasts_downloaded; # enforce dependency
-    aws_s3_upload(path = ecmwf_forecasts_directory,
-                  bucket =  aws_bucket ,
-                  key = ecmwf_forecasts_directory, 
-                  check = TRUE)}, 
-    cue = tar_cue("thorough")), 
   
 )
 
 # Data Processing -----------------------------------------------------------
 data_targets <- tar_plan(
   
-  # Transform Sentinel NDVI
-  tar_target(sentinel_ndvi_transformed_rasters, 
-             save_transform_raster(raster_file = sentinel_ndvi_downloaded, 
-                                   template = continent_raster_template,
-                                   transform_directory = paste0(sentinel_ndvi_directory, "_transformed"),
-                                   verbose = TRUE),
-             pattern = sentinel_ndvi_downloaded, 
-             format = "file", 
-             repository = "local",
-             cue = tar_cue("thorough")),  
+  # tar_target(model_dates_random_select, random_select_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, seed = 212)),
   
-  # TODO what are the units (differs between sentinel and modis)
-  # TODO this needs to handle the internal batching from modis (tar_rep?)
-  # tar_target(modis_ndvi_transformed_rasters,
-  #            save_transform_raster(raster_file = modis_ndvi_downloaded, 
-  #                                  template = continent_raster_template,
-  #                                  transform_directory = paste0(modis_ndvi_directory, "_transformed"),
-  #                                  verbose = TRUE),
-  #            pattern = head(modis_ndvi_downloaded, 4), 
-  #            format = "file", 
-  #            repository = "local",
-  #            cue = tar_cue("thorough")), 
-  
-  # Transform ECMWF
-  tar_target(ecmwf_forecasts_flat_transformed,
-             save_transform_ecmwf_grib(ecmwf_forecasts_downloaded,
-                                       transform_directory = paste0(str_replace(ecmwf_forecasts_directory, "gribs", "flat"), "_transformed"),
-                                       verbose = TRUE),
-             pattern = map(ecmwf_forecasts_downloaded),
-             iteration = "list",
-             format = "file", 
-             repository = "local",
-             cue = tar_cue("thorough")),  
-  
-
-
-  
-
-  #  terra power 
-  
-  
-  
-  # merge data together
+  # TODO take nasa_weather_directory_dataset and do full lag calcs in this function using duckdb, then collect into memory
+  # tar_target(weather_data, process_weather_data(nasa_weather_directory_dataset, nasa_weather_dataset)),
+  # tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_dataset, sentinel_ndvi_dataset, model_dates_random_select))
   
 )
 

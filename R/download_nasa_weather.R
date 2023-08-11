@@ -13,9 +13,9 @@
 download_nasa_weather <- function(nasa_weather_coordinates,
                                   nasa_weather_years,
                                   nasa_weather_variables, 
-                                  download_directory) {
+                                  download_directory,
+                                  overwrite = FALSE) {
   
-  suppressWarnings(dir.create(download_directory, recursive = TRUE))
   existing_files <- list.files(download_directory)
   
   start <- paste0(nasa_weather_years, "-01-01")
@@ -28,7 +28,7 @@ download_nasa_weather <- function(nasa_weather_coordinates,
   message(paste0("Downloading ", filename))
   filename <- paste0(filename, ".gz.parquet") 
   
-  if(filename %in% existing_files) {
+  if(filename %in% existing_files & !overwrite) {
     message("file already exists, skipping download")
     return(file.path(download_directory, filename)) # skip if file exists
   }  

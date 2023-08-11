@@ -7,9 +7,8 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-download_sentinel_ndvi <- function(sentinel_ndvi_api_parameters, download_directory) {
+download_sentinel_ndvi <- function(sentinel_ndvi_api_parameters, download_directory,  overwrite = FALSE) {
   
-  suppressWarnings(dir.create(download_directory, recursive = TRUE))
   existing_files <- list.files(download_directory)
   
   id <- sentinel_ndvi_api_parameters$id
@@ -24,7 +23,7 @@ download_sentinel_ndvi <- function(sentinel_ndvi_api_parameters, download_direct
   
   message(paste0("Downloading ", download_filename))
   
-  if(save_filename %in% existing_files) {
+  if(save_filename %in% existing_files & !overwrite) {
     message("file already exists, skipping download")
     return(file.path(download_directory, save_filename)) # skip if file exists
   }  
