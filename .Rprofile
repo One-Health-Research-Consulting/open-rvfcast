@@ -1,17 +1,24 @@
-if (file.exists(".env")) {
-  try(readRenviron(".env"))
-} else {
-  message("No .env file")
+for (env_file in list.files(all.files = TRUE, pattern = "^\\.env.*")) {
+  try(readRenviron(env_file), silent = TRUE)
 }
+
 
 # Put the project library *outside* the project
 #Sys.setenv(RENV_PATHS_LIBRARY_ROOT = file.path(normalizePath("~/.renv-project-libraries", mustWork = FALSE)))
 
-if (file.exists("renv/activate.R")) {
-  source("renv/activate.R")
+if(Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true")) {
+  if (interactive() && file.exists("renv.lock")) {
+    message("renv library not loaded (found env var USE_CAPSULE=", Sys.getenv("USE_CAPSULE"), "). Use `capsule` functions (see https://github.com/MilesMcBain/capsule)")
+    if(require(capsule, quietly = TRUE)) {
+    capsule::whinge()
+    } else {
+      message('Install {capsule} with install.packages("capsule", repos = c(mm = "https://milesmcbain.r-universe.dev", getOption("repos")))')
+    }
+  }
 } else {
-  message("No renv/activate.R")
-} 
+  source("renv/activate.R")
+}
+
 
 # Use the local user's .Rprofile when interactive.
 # Good for keeping local preferences, but not always reproducible.
