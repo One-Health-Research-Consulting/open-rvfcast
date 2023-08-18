@@ -8,11 +8,19 @@
 #' @author Whitney Bagge
 #' @export
 get_glw <- function() {
+  
+  taxa <- c("url_cattle","url_sheep","url_goats")
+  
+  for(i in 1:length(taxa)) {                                    
+  
+  url_out <- switch(taxa[i], "url_cattle" = "https://dataverse.harvard.edu/api/access/datafile/6769710", 
+                            "url_sheep" = "https://dataverse.harvard.edu/api/access/datafile/6769629",
+                            "url_goats" = "https://dataverse.harvard.edu/api/access/datafile/6769692"
+                  )
 
-  url_cattle <- "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/LHBICE#"
-  #taxa cattle sheep goat have three urls here switch function (like if_else); have the three targets 
-  url_cattle_out <- GET(url_cattle)
-  unzipped_glw_cattle <- unzip(url_cattle_out)
-  Aw_layer <- if_else(str_detect(names(unzipped_glw_cattle), "Aw")==TRUE, )
+  url_taxa_out<-download.file(url_out, destfile = paste("data/",taxa[i],sep="",".tif"))
+
+  }
+  
   
 }

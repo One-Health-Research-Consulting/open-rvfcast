@@ -115,28 +115,25 @@ source_targets <- tar_plan(
   format = "file"
   ),
   
+  ## SOIL
+  
+  
   ## GLW
 
-  tar_target(glw_cattle, get_glw()),
-  tar_target(glw_sheep, get_glw()),
-  tar_target(glw_goats, get_glw()),
-  tar_target(glw_cattle_preprocessed, preprocess_glw(glw_cattle, bounding_boxes)),
-  #need to cache
-  
+  #tar_target(glw_cattle, get_glw(url_cattle)),
+  #tar_target(glw_sheep, get_glw(url_sheep)),
+  #tar_target(glw_goats, get_glw(url_goats)),
+  #tar_target(glw_cattle_preprocessed, preprocess_glw(glw_cattle, bounding_boxes, download_directory = "data/glw")),
+  #tar_target(glw_sheep_preprocessed, preprocess_glw(glw_sheep, bounding_boxes, download_directory = "data/glw")),
+  #tar_target(glw_goats_preprocessed, preprocess_glw(glw_goats, bounding_boxes, download_directory = "data/glw")),
+
   ## ELEVATION
   
-  tar_target(elevation_layer_raw, get_elevation()),
-  tar_target(elevation_layer_processed, 
-             process_elevation(elevation_layer_processed, bounding_boxes)),
-  #need to cache
-  
-  ## GRAZING CAPACITY
-  
-  tar_target(grazingcap_raw, get_grazingcap()),
-  tar_target(grazingcap_processed, 
-             process_grazingcap(grazingcap_layer_processed, bounding_boxes)),
-  #need to cache
-  
+  #tar_target(elevation_layer_raw, get_elevation()),
+  #tar_target(elevation_layer_processed, 
+  #          process_elevation(elevation_layer_processed, bounding_boxes)),
+
+
 )
 
 # Data Processing -----------------------------------------------------------
