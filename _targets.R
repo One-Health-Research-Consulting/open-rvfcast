@@ -227,7 +227,40 @@ dynamic_targets <- tar_plan(
   #            repository = "local",
   #            cue = tar_cue("thorough")),  
   
+
+  # cache locally
+  # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
+  # Format file here means if we delete or change the local cache it will force a re-download.
+  tar_target(nasa_recorded_weather_local, {suppressWarnings(dir.create(here::here("data/nasa_parquets"), recursive = TRUE))
+    cache_aws_branched_target(tmp_path = tar_read(nasa_recorded_weather_download),
+                              ext = ".gz.parquet") 
+  },
+  repository = "local", 
+  format = "file"
+  ),
   
+  ## GLW
+
+  tar_target(glw_cattle, get_glw()),
+  tar_target(glw_sheep, get_glw()),
+  tar_target(glw_goats, get_glw()),
+  tar_target(glw_cattle_preprocessed, preprocess_glw(glw_cattle, bounding_boxes)),
+  #need to cache
+  
+  ## ELEVATION
+  
+  tar_target(elevation_layer_raw, get_elevation()),
+  tar_target(elevation_layer_processed, 
+             process_elevation(elevation_layer_processed, bounding_boxes)),
+  #need to cache
+  
+  ## GRAZING CAPACITY
+  
+  tar_target(grazingcap_raw, get_grazingcap()),
+  tar_target(grazingcap_processed, 
+             process_grazingcap(grazingcap_layer_processed, bounding_boxes)),
+  #need to cache
+
 )
 
 # Data Processing -----------------------------------------------------------
