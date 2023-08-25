@@ -114,7 +114,8 @@ dynamic_targets <- tar_plan(
   tar_target(nasa_weather_directory_raw, 
              create_data_directory(directory_path = "data/nasa_weather_raw")),
   tar_target(nasa_weather_directory_dataset, 
-save_trans  
+             create_data_directory(directory_path = "data/nasa_weather_dataset")),
+  
   # set branching for nasa
   tar_target(nasa_weather_years, 2005:2023),
   tar_target(nasa_weather_variables, c("RH2M", "T2M", "PRECTOTCORR")),
@@ -213,7 +214,7 @@ save_trans
                   key = ecmwf_forecasts_directory_dataset, 
                   check = TRUE)}, 
     cue = tar_cue("thorough")),   
-
+  
 )
 
 # Data Processing -----------------------------------------------------------
