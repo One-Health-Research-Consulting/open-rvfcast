@@ -4,37 +4,37 @@
 #'
 #' @title
 #' @param ecmwf_forecasts_downloaded
-#' @param transform_directory
-#' @param verbose
+#' @param necmwf_forecasts_directory_dataset
+#' @param continent_raster_template
+#' @param overwrite
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-save_transform_ecmwf_grib <- function(ecmwf_forecasts_downloaded,
-                                      transform_directory =
-                                      paste0(str_replace(ecmwf_forecasts_directory,
-                                      "gribs", "flat"), "_transformed"),
-                                      verbose = TRUE) {
+create_ecmwf_forecasts_dataset <- function(ecmwf_forecasts_downloaded,
+                                           ecmwf_forecasts_directory_dataset,
+                                           continent_raster_template, 
+                                           overwrite = FALSE) {
+
+  filename <- tools::file_path_sans_ext(basename(ecmwf_forecasts_downloaded))
+  save_filename <- glue::glue("{filename}.gz.parquet")
   
-  if(verbose) cat(ecmwf_forecasts_downloaded, "\n")
+  existing_files <- list.files(ecmwf_forecasts_directory_dataset)
   
-  suppressWarnings(dir.create(here::here(transform_directory), recursive = TRUE))
-  existing_files <- list.files(transform_directory)
+  message(paste0("Transforming ", save_filename))
   
-  # filename for postprocessed file
-   filename <- str_replace(basename(ecmwf_forecasts_downloaded), "\\.grib", "\\.gz.parquet")
-  
-  if(filename %in% existing_files){
-    message("file already exists, skipping preprocess")
-    return(file.path(transform_directory, filename)) # skip if file exists
+  if(save_filename %in% existing_files & !overwrite){
+    message("file already exists, skipping transform")
+    return(file.path(ecmwf_forecasts_directory_dataset, save_filename))
   }
   
-  file <- here::here(ecmwf_forecasts_downloaded)
-  
   # read in with terra
-  grib <- terra::rast(file)
+  grib <- rast(ecmwf_forecasts_downloaded)
+
+  # get template
+  continent_raster_template <- rast(continent_raster_template)
   
-  # get associated metadata and remove non-df rows
-  grib_meta <- system(paste("grib_ls", file), intern = TRUE)
+  # get associated metadata and remove non-df rowsz
+  grib_meta <- system(paste("grib_ls", ecmwf_forecasts_downloaded), intern = TRUE)
   remove <- c(1, (length(grib_meta)-2):length(grib_meta)) 
   grib_meta <- grib_meta[-remove]
   
@@ -47,13 +47,16 @@ save_transform_ecmwf_grib <- function(ecmwf_forecasts_downloaded,
     select(-grid_type, -packing_type, -level, -type_of_level, -centre, -edition)
   
   # Calculate per-pixel mean and std for each unique combination, across all models
+  # transform to template
   grib_index <- as.integer(factor(meta$variable_id, levels = unique(meta$variable_id)))
   grib_means <- terra::tapp(grib, grib_index, "mean", cores = n_workers) |> 
     setNames(unique(meta$variable_id)) |> 
+    transform_raster(template = continent_raster_template) |> 
     as.data.frame(xy = TRUE) |> 
     reshape2::melt(id.vars = c("x", "y"), variable.name = "variable_id", value.name = "mean") 
   grib_sds <- terra::tapp(grib, grib_index, "sd", cores = n_workers) |> 
     setNames(unique(meta$variable_id)) |> 
+    transform_raster(template = continent_raster_template) |> 
     as.data.frame(xy = TRUE) |> 
     reshape2::melt(id.vars = c("x", "y"), variable.name = "variable_id", value.name = "std") |> 
     pull(std)
@@ -64,10 +67,10 @@ save_transform_ecmwf_grib <- function(ecmwf_forecasts_downloaded,
     left_join(distinct(meta), by = "variable_id") |> 
     arrange(variable_id, x, y) |> 
     select(x,y, mean, std, data_date, step_range, data_type, short_name)
+  # Save as parquet 
+  write_parquet(dat_out, here::here(ecmwf_forecasts_directory_dataset, save_filename), compression = "gzip", compression_level = 5)
   
-  write_parquet(dat_out, here::here(transform_directory, filename), compression = "gzip", compression_level = 5)
+  return(file.path(ecmwf_forecasts_directory_dataset, save_filename))
   
-  return(file.path(transform_directory, filename))
-
-
+  
 }
