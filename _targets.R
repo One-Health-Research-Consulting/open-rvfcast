@@ -104,7 +104,23 @@ dynamic_targets <- tar_plan(
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
   # this satellite will be retired soon, so we should use sentinel for present dates 
+  tar_target(modis_ndvi_directory_raw, 
+             create_data_directory(directory_path = "data/modis_ndvi_raw")),
+  tar_target(modis_ndvi_directory_dataset, 
+             create_data_directory(directory_path = "data/modis_ndvi_dataset")),
   
+  # get authorization token
+  # this expires after 48 hours
+  tar_target(modis_ndvi_token, get_modis_ndvi_token()),
+  
+  # set modis ndvi dates
+  tar_target(modis_ndvi_start_year, 2005),
+  tar_target(modis_ndvi_end_year, 2023),
+  
+  # set parameters and submit request
+  tar_target(modis_ndvi_request, submit_modis_ndvi_request(modis_ndvi_start_year, modis_ndvi_end_year, continent_bounding_box, get_modis_ndvi_token)),
+  
+  # download from AWS as bundle
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
