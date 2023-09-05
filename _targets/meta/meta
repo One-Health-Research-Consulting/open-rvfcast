@@ -1,5 +1,5 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|5a277fd5004811ef|||||||||||||||
+.Random.seed|object|eba287fca583dd28|||||||||||||||
 all_targets|function|2dda5afbd1f92385|||||||||||||||
 aws_bucket|object|d9cf2c5ff7cc1be4|||||||||||||||
 cache_aws_branched_target|function|6e2abfa4969de1bf|||||||||||||||
@@ -22,11 +22,11 @@ define_bounding_boxes|function|e614caacc0592e73|||||||||||||||
 define_country_regions|function|54808365a1bb460e|||||||||||||||
 deploy_targets|object|1eb1bc8d77111ded|||||||||||||||
 download_ecmwf_forecasts|function|f0ec062fa450f802|||||||||||||||
-download_modis_ndvi|function|ff443130c1d2c60e|||||||||||||||
+download_modis_ndvi|function|7a3a7512622b7492|||||||||||||||
 download_nasa_recorded_weather|function|6a773d3a570df8e3|||||||||||||||
 download_nasa_weather|function|44ffecc296978e5e|||||||||||||||
 download_sentinel_ndvi|function|03e5942d01ac5cc7|||||||||||||||
-dynamic_targets|object|40502e0071fcecb2|||||||||||||||
+dynamic_targets|object|0acd2d9e65822219|||||||||||||||
 ecmwf_api_parameters|stem|d546e620a5cfb7be|0bdeb27065a5c91c|37ee5a84ea2c3af5|-877182628|bucket=open-rvfcast-data*region=NULL*key=_targets/ecmwf_api_parameters*endpoint=TlVMTA*version=|t19517.6854418785s||4597|qs|aws|vector||ecmwf_api_parameters_eba30102*ecmwf_api_parameters_67b07257*ecmwf_api_parameters_1c23802c*ecmwf_api_parameters_3a35088b*ecmwf_api_parameters_c9becb2d*ecmwf_api_parameters_789e2f8f*ecmwf_api_parameters_7476140e*ecmwf_api_parameters_9f10cd0e*ecmwf_api_parameters_cd1d812f*ecmwf_api_parameters_bdca56aa*ecmwf_api_parameters_0e93238e*ecmwf_api_parameters_aaa47fbd*ecmwf_api_parameters_b2651b02*ecmwf_api_parameters_f77b0c67*ecmwf_api_parameters_a433d8c0*ecmwf_api_parameters_c9f117bd*ecmwf_api_parameters_35ebf6ea*ecmwf_api_parameters_30a898ee*ecmwf_api_parameters_faba2bbc*ecmwf_api_parameters_9bae9d60*ecmwf_api_parameters_dff68b0f|0.061||
 ecmwf_forecasts_api_parameters|stem|e2f32218fa634195|0bdeb27065a5c91c|37ee5a84ea2c3af5|2047345647|bucket=open-rvfcast-data*region=NULL*key=_targets/ecmwf_forecasts_api_parameters*endpoint=TlVMTA*version=|t19594.5957909587s||4621|qs|aws|vector|||0.035||
 ecmwf_forecasts_dataset|pattern|5c5cf7c101a9c15f|2333af598516cc8c||212957380||||2364721472|file|local|vector||ecmwf_forecasts_dataset_fb2e2cb3*ecmwf_forecasts_dataset_b83b0240*ecmwf_forecasts_dataset_ceabaab2*ecmwf_forecasts_dataset_5eecb6fb*ecmwf_forecasts_dataset_7cc72b5a*ecmwf_forecasts_dataset_e844c013*ecmwf_forecasts_dataset_92c68ce1*ecmwf_forecasts_dataset_21e1e1ae*ecmwf_forecasts_dataset_3bfe61d7*ecmwf_forecasts_dataset_64b22312*ecmwf_forecasts_dataset_f0668173*ecmwf_forecasts_dataset_39321319*ecmwf_forecasts_dataset_870de1f8*ecmwf_forecasts_dataset_0740e529*ecmwf_forecasts_dataset_a6fabcd1*ecmwf_forecasts_dataset_b31413c1*ecmwf_forecasts_dataset_529de76b*ecmwf_forecasts_dataset_b0dcd067*ecmwf_forecasts_dataset_7fdcacd2*ecmwf_forecasts_dataset_1a28f6da*ecmwf_forecasts_dataset_7c1a9767|1161.758||
@@ -168,6 +168,8 @@ env_file|object|4bace54ec4cfdef1|||||||||||||||
 f|object|a03aededb6577b02|||||||||||||||
 get_country_bounding_boxes|function|82b21d03b36ce8fe|||||||||||||||
 get_modis_ndvi_api_parameters|function|c30ed04e0978b176|||||||||||||||
+get_modis_ndvi_bundle|function|1f38d28bad794ce7|||||||||||||||
+get_modis_ndvi_bundle_request|function|1f38d28bad794ce7|||||||||||||||
 get_modis_ndvi_token|function|f7872f64690bfba2|||||||||||||||
 get_nasa_weather_coordinates|function|2c23f9e4d93cd8ca|||||||||||||||
 get_sentinel_ndvi_api_parameters|function|ec6ebe60c7637311|||||||||||||||
@@ -178,7 +180,10 @@ make_model_data|function|df0e5631ac6d7b53|||||||||||||||
 model_dates_random_select|stem|3276f32c43338e02|9d974731006fc420|4ea98346634ca2b4|-368262049|bucket=open-rvfcast-data*region=NULL*key=_targets/model_dates_random_select*endpoint=TlVMTA*version=|t19521.5689224347s||6694|qs|aws|vector|||0.037||
 model_targets|object|1eb1bc8d77111ded|||||||||||||||
 modis_directory|stem|0404b408f5e5efef|c985137dd9b95cd4|ef46db3751d8e999|-671711443|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/modis_directory*endpoint=TlVMTA*version=qdLdze87LwJZuMPusz2ovPXxe2rabGWb|t19493.6071375984s||55|qs|aws|vector|||0.001||
+modis_ndvi_bundle|stem|error|a6c770fab6751fac|9d56e94e8363274f|-1456098296|bucket=open-rvfcast-data*region=NULL*key=_targets/modis_ndvi_bundle*endpoint=TlVMTA*version=|t19605.5645307177s||30|qs|aws|vector|||0.33||object task_id not found
+modis_ndvi_bundle_request|stem|error|6009b8cc7fe2791f|a1635fd35773fa76|1393723928|bucket=open-rvfcast-data*region=NULL*key=_targets/modis_ndvi_bundle_request*endpoint=TlVMTA*version=|t19605.5929636343s||30|qs|aws|vector|||566.722||object task_id not found
 modis_ndvi_directory|stem|0404b408f5e5efef|c985137dd9b95cd4|ef46db3751d8e999|-1633693002|bucket=open-rvfcast-data*region=NULL*key=_targets/modis_ndvi_directory*endpoint=TlVMTA*version=|t19517.6952143223s||55|qs|aws|vector|||0||
+modis_ndvi_directory_raw|stem|b0a2018c8ffbbc93|283d123be8b05735|3d3d9feae01275db|-197863525|bucket=open-rvfcast-data*region=NULL*key=_targets/modis_ndvi_directory_raw*endpoint=TlVMTA*version=|t19605.5431705481s||51|qs|aws|vector|||0||
 modis_ndvi_downloaded|pattern|ca02dcc89dd5b0dc|68905d66d9caa0ed||-1554374742||||14034309832|file|local|vector||modis_ndvi_downloaded_fc705166*modis_ndvi_downloaded_fc3ca5af*modis_ndvi_downloaded_3ca22d47*modis_ndvi_downloaded_73a81b7e*modis_ndvi_downloaded_6e62dde3*modis_ndvi_downloaded_01178ed7*modis_ndvi_downloaded_1766971a*modis_ndvi_downloaded_42ff529b*modis_ndvi_downloaded_7e2b57c6*modis_ndvi_downloaded_d69d2bbf*modis_ndvi_downloaded_f7ef1a5c*modis_ndvi_downloaded_be2a27e3*modis_ndvi_downloaded_fe9bbe7e*modis_ndvi_downloaded_dd08b98c|30.521||
 modis_ndvi_downloaded_01178ed7|branch|1be231c42dd0df3c|68905d66d9caa0ed|2701a595d8e82658|-1436620014|data/modis_ndvi_rasters/MOD13A1.A2009353_africa_20091219T000000Z_20100103T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010001_africa_20100101T000000Z_20100116T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010017_africa_20100117T000000Z_20100201T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010033_africa_20100202T000000Z_20100217T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010049_africa_20100218T000000Z_20100305T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010065_africa_20100306T000000Z_20100321T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010081_africa_20100322T000000Z_20100406T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010097_africa_20100407T000000Z_20100422T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010113_africa_20100423T000000Z_20100508T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010129_africa_20100509T000000Z_20100524T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010145_africa_20100525T000000Z_20100609T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010161_africa_20100610T000000Z_20100625T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010177_africa_20100626T000000Z_20100711T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010193_africa_20100712T000000Z_20100727T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010209_africa_20100728T000000Z_20100812T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010225_africa_20100813T000000Z_20100828T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010241_africa_20100829T000000Z_20100913T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010257_africa_20100914T000000Z_20100929T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010273_africa_20100930T000000Z_20101015T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010289_africa_20101016T000000Z_20101031T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010305_africa_20101101T000000Z_20101116T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010321_africa_20101117T000000Z_20101202T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010337_africa_20101203T000000Z_20101218T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2010353_africa_20101219T000000Z_20110103T235959Z.tif|t19474.6145068634s|df03680ad6b0eb50|14024689424|file|local|vector|modis_ndvi_downloaded||31.789||
 modis_ndvi_downloaded_1766971a|branch|ae6b2ffcf3138c37|68905d66d9caa0ed|24593d02148de0dc|-16430369|data/modis_ndvi_rasters/MOD13A1.A2010353_africa_20101219T000000Z_20110103T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011001_africa_20110101T000000Z_20110116T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011017_africa_20110117T000000Z_20110201T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011033_africa_20110202T000000Z_20110217T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011049_africa_20110218T000000Z_20110305T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011065_africa_20110306T000000Z_20110321T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011081_africa_20110322T000000Z_20110406T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011097_africa_20110407T000000Z_20110422T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011113_africa_20110423T000000Z_20110508T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011129_africa_20110509T000000Z_20110524T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011145_africa_20110525T000000Z_20110609T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011161_africa_20110610T000000Z_20110625T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011177_africa_20110626T000000Z_20110711T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011193_africa_20110712T000000Z_20110727T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011209_africa_20110728T000000Z_20110812T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011225_africa_20110813T000000Z_20110828T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011241_africa_20110829T000000Z_20110913T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011257_africa_20110914T000000Z_20110929T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011273_africa_20110930T000000Z_20111015T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011289_africa_20111016T000000Z_20111031T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011305_africa_20111101T000000Z_20111116T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011321_africa_20111117T000000Z_20111202T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011337_africa_20111203T000000Z_20111218T235959Z.tif*data/modis_ndvi_rasters/MOD13A1.A2011353_africa_20111219T000000Z_20120103T235959Z.tif|t19474.6239670971s|0d9a144501c57584|14018196998|file|local|vector|modis_ndvi_downloaded||30.533||
@@ -229,8 +234,10 @@ modis_ndvi_rasters_transformed_aaa33fdb|branch|error|94e705d1d2d27afa|9b3b4a82bc
 modis_ndvi_rasters_transformed_c2e637b9|branch|error|94e705d1d2d27afa|496713d83db8194a|-361825417||t0s|f4066a65ff755f48|0|file|local|vector|modis_ndvi_rasters_transformed||0.077||the condition has length  1
 modis_ndvi_rasters_transformed_c8e36d63|branch|error|94e705d1d2d27afa|4a96b2aaec4bff26|1995684095||t0s|f4066a65ff755f48|0|file|local|vector|modis_ndvi_rasters_transformed||0.06||the condition has length  1
 modis_ndvi_rasters_transformed_db855d80|branch|error|94e705d1d2d27afa|c0cfdd44c60993ea|-695501519||t0s|f4066a65ff755f48|0|file|local|vector|modis_ndvi_rasters_transformed||0.036||the condition has length  1
+modis_ndvi_request|stem|d3e3bf7ec99ff344|34b6c77907020b46|fd0cbe52cf1fee5f|1303035786|bucket=open-rvfcast-data*region=NULL*key=_targets/modis_ndvi_request*endpoint=TlVMTA*version=|t19605.5020607735s||129|qs|aws|vector|||0.645||
 modis_ndvi_start_year|stem|da8fec383f496e23|bec7e2026c4ff786|ef46db3751d8e999|343410587|bucket=open-rvfcast-data*region=NULL*key=_targets/modis_ndvi_start_year*endpoint=TlVMTA*version=|t19598.7038441828s||38|qs|aws|vector|||0||
-modis_ndvi_token|stem|d48db4b9db47bf21|c67e2eef8bb2934f|e04e388fd1304865|-1399624378|bucket=open-rvfcast-data*region=NULL*key=_targets/modis_ndvi_token*endpoint=TlVMTA*version=|t19598.7709311977s||126|qs|aws|vector|||1.027||
+modis_ndvi_task_request|stem|6d2ebb8929e7e69f|19fc38b345db7047|7f8064aaedef8f11|372241109|bucket=open-rvfcast-data*region=NULL*key=_targets/modis_ndvi_task_request*endpoint=TlVMTA*version=|t19605.5720480667s||129|qs|aws|vector|||0.905||
+modis_ndvi_token|stem|19e26aa3db6c5c79|c67e2eef8bb2934f|e04e388fd1304865|-1399624378|bucket=open-rvfcast-data*region=NULL*key=_targets/modis_ndvi_token*endpoint=TlVMTA*version=|t19605.4919878481s||126|qs|aws|vector|||2.117||
 modis_ndvi_upload_aws_s3|stem|88ec97fd0404e3df|d84fbea879f23708|456a8bd4c1d0827a|888617487|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/modis_ndvi_upload_aws_s3*endpoint=TlVMTA*version=c4LtLauvFRDwFruFWzrN4Kfmr_B9AyAP|t19494.6287409904s||45307|qs|aws|vector|||418.65||
 modis_ndvi_years|stem|587a3ab81a088e29|18e70a9546d917c3|787f005495551c49|-1347432446|bucket=open-rvfcast-data*region=NULL*key=_targets/modis_ndvi_years*endpoint=TlVMTA*version=|t19517.6948596944s||87|qs|aws|vector|||0.001||
 nasa_api_parameters|stem|error|c5d442f86f80bfe1|c5389639654d89a9|-1576512875|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/nasa_api_parameters*endpoint=TlVMTA*version=CwWHqIPj1skmtMOuFWjhfC1ZTXmmurvf|t19482.775543246s||30|qs|aws|group|||0.028||object bounding_boxes not found
@@ -2280,13 +2287,54 @@ sentinel_ndvi_upload_aws_s3|stem|1a358ba66cfb3375|b9c6a884566d5476|826f421e76bc5
 set_ecmwf_api_parameter|function|e3e4962883690ed5|||||||||||||||
 set_nasa_api_parameter|function|ac1cc420c9c9242c|||||||||||||||
 static_targets|object|406ef9c30e410352|||||||||||||||
-submit_modis_ndvi_request|function|5dada08b3561be3d|||||||||||||||
+submit_modis_ndvi_bundle_request|function|15b2e002ec65de7f|||||||||||||||
+submit_modis_ndvi_request|function|e6d950c0c17bd8cd|||||||||||||||
+submit_modis_ndvi_task_request|function|e6d950c0c17bd8cd|||||||||||||||
 test_targets|object|1eb1bc8d77111ded|||||||||||||||
 transform_nasa_weather|function|e80c244fb32ef2bd|||||||||||||||
 transform_raster|function|47f20ba2b9ef9722|||||||||||||||
 transform_sentinel_ndvi|function|92a19330c7f2bff2|||||||||||||||
-user_rprof|object|9d37e4e29d09b622|||||||||||||||
+user_rprof|object|50ea7f8ae7c76f5f|||||||||||||||
 wahis_rvf_outbreaks_preprocessed|stem|30ccd988b415d773|3ea98184b5887c93|275a59d310ff2a63|2127878318|bucket=open-rvfcast-data*region=NULL*key=_targets/wahis_rvf_outbreaks_preprocessed*endpoint=TlVMTA*version=|t19517.6952212142s||172965|qs|aws|vector|||0.043||
 wahis_rvf_outbreaks_raw|stem|6fc7e6c7238977b3|b988ec4215d4213c|5ed4661ae3efb1aa|1933416983|bucket=open-rvfcast-data*region=NULL*key=_targets/wahis_rvf_outbreaks_raw*endpoint=TlVMTA*version=|t19517.6952047733s||173410|qs|aws|vector|||29.629||
 wahis_rvf_query|function|9836433f6f1061fb|||||||||||||||
 weather_data|stem|error|a5b7c71ecc8a6031|3160e0777a812aed|655573160|bucket=open-rvfcast-data*region=NULL*key=_targets/weather_data*endpoint=TlVMTA*version=|t19521.765027018s||30|qs|aws|vector|||0.003||unused argument model_dates_random_select
+download_sentinel_ndvi|function|03e5942d01ac5cc7
+create_data_directory|function|5781405b45264703
+submit_modis_ndvi_task_request|function|e6d950c0c17bd8cd
+create_country_polygons|function|9917ababa5b4b8f4
+.Random.seed|object|11595eeb820ac28a
+submit_modis_ndvi_bundle_request|function|0b6efb8db7ca0a91
+wahis_rvf_query|function|9836433f6f1061fb
+transform_raster|function|47f20ba2b9ef9722
+rolling_box|function|1195d491d98c697b
+get_modis_ndvi_token|function|f7872f64690bfba2
+report_targets|object|1eb1bc8d77111ded
+model_targets|object|1eb1bc8d77111ded
+process_ndvi_data|function|8a56ce9bd504bbec
+env_file|object|4bace54ec4cfdef1
+test_targets|object|1eb1bc8d77111ded
+get_country_bounding_boxes|function|82b21d03b36ce8fe
+f|object|a03aededb6577b02
+plot_targets|object|1eb1bc8d77111ded
+create_raster_template_plot|function|db738156a3247831
+process_weather_data|function|be824c5810b2ee3e
+aws_bucket|object|d9cf2c5ff7cc1be4
+get_sentinel_ndvi_api_parameters|function|ec6ebe60c7637311
+download_ecmwf_forecasts|function|f0ec062fa450f802
+deploy_targets|object|1eb1bc8d77111ded
+create_africa_polygon|function|fb2ce70982e38cd3
+set_ecmwf_api_parameter|function|e3e4962883690ed5
+download_nasa_weather|function|44ffecc296978e5e
+static_targets|object|406ef9c30e410352
+random_select_model_dates|function|9ff4c8b11c4c6a0f
+preprocess_wahis_rvf_outbreaks|function|1739270cf02b72d6
+all_targets|function|2dda5afbd1f92385
+data_targets|object|1eb1bc8d77111ded
+dynamic_targets|object|7485ed585853f4bf
+user_rprof|object|752adac596cada7d
+get_wahis_rvf_outbreaks_raw|function|a8564ce9127c9c1d
+create_nasa_weather_dataset|function|c12b134b7be25c25
+create_sentinel_ndvi_dataset|function|c1b1ff37d18fe7d1
+create_ecmwf_forecasts_dataset|function|557bbbb473a2eb1c
+get_nasa_weather_coordinates|function|2c23f9e4d93cd8ca

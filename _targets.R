@@ -118,9 +118,21 @@ dynamic_targets <- tar_plan(
   tar_target(modis_ndvi_end_year, 2023),
   
   # set parameters and submit request
-  tar_target(modis_ndvi_request, submit_modis_ndvi_request(modis_ndvi_start_year, modis_ndvi_end_year, continent_bounding_box, get_modis_ndvi_token)),
+  tar_target(modis_ndvi_task_request, submit_modis_ndvi_task_request(modis_ndvi_start_year, modis_ndvi_end_year, continent_bounding_box, modis_ndvi_token)),
   
-  # download from AWS as bundle
+  # check if the request is posted, then get bundle
+  # this uses a while loop to check every 30 seconds if the request is complete - it takes about 10 minutes
+  # this function could be refactored to check time of modis_ndvi_task_request and pause for some time before submitting bundle request
+  tar_target(modis_ndvi_bundle_request, submit_modis_ndvi_bundle_request(modis_ndvi_token, modis_ndvi_task_request, timeout = 1500)),
+  
+  # download files from source (locally)
+  tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_bundle_request,
+                                                              download_directory = modis_ndvi_directory_raw,
+                                                              overwrite = FALSE),
+             pattern = modis_ndvi_bundle_request, 
+             format = "file", 
+             repository = "local",
+             cue = tar_cue("thorough")),
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
