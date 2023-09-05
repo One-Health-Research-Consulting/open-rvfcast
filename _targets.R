@@ -126,10 +126,12 @@ dynamic_targets <- tar_plan(
   tar_target(modis_ndvi_bundle_request, submit_modis_ndvi_bundle_request(modis_ndvi_token, modis_ndvi_task_request, timeout = 1500)),
   
   # download files from source (locally)
-  tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_bundle_request,
-                                                              download_directory = modis_ndvi_directory_raw,
-                                                              overwrite = FALSE),
-             pattern = modis_ndvi_bundle_request, 
+  tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_token,
+                                                        modis_ndvi_task_request,
+                                                        file = modis_ndvi_bundle_request$files,
+                                                        download_directory = modis_ndvi_directory_raw,
+                                                        overwrite = FALSE),
+             pattern =  modis_ndvi_bundle_request$files, 
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),

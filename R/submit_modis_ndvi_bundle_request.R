@@ -47,17 +47,9 @@ submit_modis_ndvi_bundle_request <- function(modis_ndvi_token, modis_ndvi_task_r
     }
   }
   
-  bundle_response <- GET(paste("https://appeears.earthdatacloud.nasa.gov/api/bundle/", task_id, sep = ""), add_headers(Authorization = modis_ndvi_token))
+  bundle_response <- GET(paste("https://appeears.earthdatacloud.nasa.gov/api/bundle/", modis_ndvi_request_task_id, sep = ""), add_headers(Authorization = modis_ndvi_token))
   bundle_response <- fromJSON(toJSON(content(bundle_response))) 
   
   return(bundle_response)
-  # file_id <- bundle_response$files$file_id
-  # file_id <- file_id[[1]]
-  # 
-  # filepath <- paste(modis_ndvi_directory_raw, file_id, sep = '/')
-  # # write the file to disk using the destination directory and file name 
-  # response <- GET(paste("https://appeears.earthdatacloud.nasa.gov/api/bundle/", task_id, '/', file_id, sep = ""),
-  #                 write_disk(filepath, overwrite = TRUE), progress(), add_headers(Authorization = token))
-  # 
   
 }
