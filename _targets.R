@@ -126,13 +126,6 @@ dynamic_targets <- tar_plan(
   ),
   tar_target(modis_ndvi_task_id_list, map_dfr(modis_ndvi_task_id, as_tibble) |> select(-status)), # this extra step could have been avoided if we set iteration = "list" above, which would allow for continued branching
   
-  # tanzania ID
-  # tar_target(modis_ndvi_task_id,  "29541500-ed4c-4020-a60c-5d2f74fbc25b"), 
-  # full download ID
-  # tar_target(modis_ndvi_task_id, "c05ae10b-4170-4192-8cd8-45bbe57a930a"), 
-  # test download ID
-  # tar_target(modis_ndvi_task_id, "63af3cad-80a1-4322-977c-73d093e678de"), 
-  
   # check if the request is posted, then get bundle
   # this uses a while loop to check every 30 seconds if the request is complete - it takes about 10 minutes
   # this function could be refactored to check time of modis_ndvi_task_request and pause for some time before submitting bundle request
@@ -142,18 +135,24 @@ dynamic_targets <- tar_plan(
              pattern = modis_ndvi_task_id_list,
              iteration = "list"),
   
-  #TODO why is TCD failing
-  
   # download files from source (locally)
-  # TODO this is failing now
   tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_token,
                                                         modis_ndvi_bundle_request,
                                                         download_directory = modis_ndvi_directory_raw,
                                                         overwrite = FALSE),
-             pattern =  head(modis_ndvi_bundle_request, 2), 
+             pattern = modis_ndvi_bundle_request, 
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),
+  
+  # save raw to AWS bucket
+  tar_target(modis_ndvi_raw_upload_aws_s3, {modis_ndvi_downloaded; # enforce dependency
+    aws_s3_upload(path = modis_ndvi_directory_raw,
+                  bucket =  aws_bucket ,
+                  key = modis_ndvi_directory_raw, 
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")), 
+  
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
