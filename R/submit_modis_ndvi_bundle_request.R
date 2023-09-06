@@ -8,13 +8,10 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-submit_modis_ndvi_bundle_request <- function(modis_ndvi_token, modis_ndvi_task_id_list, timeout = 1000) {
+submit_modis_ndvi_bundle_request <- function(modis_ndvi_token, modis_ndvi_task_id_continent, timeout = 1000) {
   
-  task_id <- modis_ndvi_task_id_list$task_id
-  country_iso3c <- modis_ndvi_task_id_list$country_iso3c
-  
-  message(country_iso3c)
-  
+  task_id <- modis_ndvi_task_id_continent$task_id
+
   # Get sys time for the loop timeout
   sys_start_time <- Sys.time()
 
@@ -57,7 +54,6 @@ submit_modis_ndvi_bundle_request <- function(modis_ndvi_token, modis_ndvi_task_i
     mutate(file_name = unlist(file_name)) |>
     mutate(file_id = unlist(file_id)) |>
     filter(file_type == "tif") |>
-    mutate(country_iso3c = country_iso3c) |> 
     mutate(task_id = task_id)
 
   return(bundle_response_files)

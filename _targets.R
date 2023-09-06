@@ -117,23 +117,19 @@ dynamic_targets <- tar_plan(
   tar_target(modis_ndvi_start_year, 2005),
   tar_target(modis_ndvi_end_year, 2023),
   
-  # set parameters and submit request
-  tar_target(modis_ndvi_task_id, submit_modis_ndvi_task_request(modis_ndvi_start_year,
-                                                                modis_ndvi_end_year,
-                                                                modis_ndvi_token,
-                                                                country_bounding_boxes),
-             pattern =  country_bounding_boxes
-  ),
-  tar_target(modis_ndvi_task_id_list, map_dfr(modis_ndvi_task_id, as_tibble) |> select(-status)), # this extra step could have been avoided if we set iteration = "list" above, which would allow for continued branching
-  
+  # set parameters and submit request for full continent
+  tar_target(modis_ndvi_task_id_continent, submit_modis_ndvi_task_request_continent(modis_ndvi_start_year,
+                                                                                    modis_ndvi_end_year,
+                                                                                    modis_ndvi_token,
+                                                                                    bbox_coords = continent_bounding_box)),
   # check if the request is posted, then get bundle
   # this uses a while loop to check every 30 seconds if the request is complete - it takes about 10 minutes
   # this function could be refactored to check time of modis_ndvi_task_request and pause for some time before submitting bundle request
   tar_target(modis_ndvi_bundle_request, submit_modis_ndvi_bundle_request(modis_ndvi_token, 
-                                                                         modis_ndvi_task_id_list, 
-                                                                         timeout = 1500),
-             pattern = modis_ndvi_task_id_list,
-             iteration = "list"),
+                                                                         modis_ndvi_task_id_continent, 
+                                                                         timeout = 1500) |> rowwise() |> tar_group(),
+             iteration = "group"
+  ),
   
   # download files from source (locally)
   tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_token,

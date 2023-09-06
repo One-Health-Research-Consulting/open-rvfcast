@@ -14,28 +14,25 @@ download_modis_ndvi <- function(modis_ndvi_token,
                                 download_directory,
                                 overwrite = FALSE) {
   
+
   existing_files <- list.files(download_directory)
+
   task_id <- unique(modis_ndvi_bundle_request$task_id)
-  country_iso3c <- unique(modis_ndvi_bundle_request$country_iso3c)
-  modis_ndvi_bundle_request$filenames <- paste0(country_iso3c, "_", basename(modis_ndvi_bundle_request$file_name))
+  file_id <- modis_ndvi_bundle_request$file_id
+  filename <- basename(modis_ndvi_bundle_request$file_name)
+  
+  message(paste0("Downloading ", filename))
 
-  for(i in 1:nrow(modis_ndvi_bundle_request)){
-
-    file_id <- modis_ndvi_bundle_request$file_id[i]
-    filename <- modis_ndvi_bundle_request$filenames[i]
-
-    message(paste0("Downloading ", filename))
-
-    if(filename %in% existing_files & !overwrite) {
-      message("file already exists, skipping download")
-      next()
-    }
-
-    # Write the file to disk
-    response <- GET(paste("https://appeears.earthdatacloud.nasa.gov/api/bundle/", task_id, '/', file_id, sep = ""),
-                    write_disk(file.path(download_directory, filename), overwrite = TRUE), progress(), add_headers(Authorization = modis_ndvi_token))
+  if(filename %in% existing_files & !overwrite) {
+    message("file already exists, skipping download")
+    return(file.path(download_directory, filename))
   }
 
-  return(file.path(download_directory, modis_ndvi_bundle_request$filenames))
+  # Write the file to disk
+  response <- GET(paste("https://appeears.earthdatacloud.nasa.gov/api/bundle/", task_id, '/', file_id, sep = ""),
+                  write_disk(file.path(download_directory, filename), overwrite = TRUE), progress(), add_headers(Authorization = modis_ndvi_token))
+
+
+  return(file.path(download_directory, filename))
   
 }
