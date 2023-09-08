@@ -38,10 +38,11 @@ static_targets <- tar_plan(
   tar_target(continent_bounding_box, sf::st_bbox(continent_polygon)),
   tar_target(continent_raster_template,
              wrap(terra::rast(ext(continent_polygon), 
-                              resolution = 0.5))), #TODO change to 0.1 (might cause error in transform, leaving at 0.5 for now)
+                              resolution = 0.1))), #TODO change to 0.1 (might cause error in transform, leaving at 0.5 for now)
   # nasa power resolution = 0.5; 
   # ecmwf = 1; 
   # sentinel ndvi = 0.01
+  # modis ndvi = 0.01
   
 )
 
@@ -142,6 +143,7 @@ dynamic_targets <- tar_plan(
              cue = tar_cue("thorough")),
   
   # save raw to AWS bucket
+  # maybe switch to rsync or minio
   tar_target(modis_ndvi_raw_upload_aws_s3, {modis_ndvi_downloaded; # enforce dependency
     aws_s3_upload(path = modis_ndvi_directory_raw,
                   bucket =  aws_bucket ,
@@ -149,6 +151,17 @@ dynamic_targets <- tar_plan(
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
+  # project to the template and save as parquets (these can now be queried for analysis)
+  # this maintains the branches, saves separate files split by date
+  tar_target(modis_ndvi_dataset, 
+             create_modis_ndvi_dataset(modis_ndvi_downloaded, 
+                                       continent_raster_template,
+                                       modis_ndvi_directory_dataset,
+                                       overwrite = FALSE),
+             pattern = modis_ndvi_downloaded,
+             format = "file", 
+             repository = "local",
+             cue = tar_cue("thorough")), 
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
@@ -193,7 +206,7 @@ dynamic_targets <- tar_plan(
              create_nasa_weather_dataset(nasa_weather_downloaded,
                                          nasa_weather_directory_dataset, 
                                          continent_raster_template,
-                                         overwrite = FALSE),
+                                         overwrite = TRUE),
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
@@ -244,7 +257,7 @@ dynamic_targets <- tar_plan(
              create_ecmwf_forecasts_dataset(ecmwf_forecasts_downloaded,
                                             ecmwf_forecasts_directory_dataset, 
                                             continent_raster_template,
-                                            overwrite = FALSE),
+                                            overwrite = TRUE),
              pattern = ecmwf_forecasts_downloaded,
              format = "file", 
              repository = "local",
