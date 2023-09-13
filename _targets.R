@@ -56,6 +56,7 @@ dynamic_targets <- tar_plan(
   
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
+  # 10 day period
   
   tar_target(sentinel_ndvi_directory_raw, 
              create_data_directory(directory_path = "data/sentinel_ndvi_raw")),
@@ -105,6 +106,7 @@ dynamic_targets <- tar_plan(
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
   # this satellite will be retired soon, so we should use sentinel for present dates 
+  # 16 day period
   tar_target(modis_ndvi_directory_raw, 
              create_data_directory(directory_path = "data/modis_ndvi_raw")),
   tar_target(modis_ndvi_directory_dataset, 
@@ -199,14 +201,14 @@ dynamic_targets <- tar_plan(
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
-  # remove dupes due to having overlapping country bounding boxes
   # project to the template and save as arrow dataset
   # this combines all the branches because they are already saved as parquets and can be accessed as a dataset
+  # this also removes dupes due to having overlapping country bounding boxes
   tar_target(nasa_weather_dataset, 
              create_nasa_weather_dataset(nasa_weather_downloaded,
                                          nasa_weather_directory_dataset, 
                                          continent_raster_template,
-                                         overwrite = TRUE),
+                                         overwrite = FALSE),
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
