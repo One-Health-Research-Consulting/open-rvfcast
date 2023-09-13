@@ -165,6 +165,14 @@ dynamic_targets <- tar_plan(
              repository = "local",
              cue = tar_cue("thorough")), 
   
+  # save transformed to AWS bucket
+  tar_target(modis_ndvi_dataset_upload_aws_s3,  {modis_ndvi_dataset; # enforce dependency
+    aws_s3_upload(path = modis_ndvi_directory_dataset,
+                  bucket =  aws_bucket,
+                  key = modis_ndvi_directory_dataset, 
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")), 
+  
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
   # T2M             MERRA-2 Temperature at 2 Meters (C) ;
