@@ -38,10 +38,11 @@ static_targets <- tar_plan(
   tar_target(continent_bounding_box, sf::st_bbox(continent_polygon)),
   tar_target(continent_raster_template,
              wrap(terra::rast(ext(continent_polygon), 
-                              resolution = 0.5))), #TODO change to 0.1 (might cause error in transform, leaving at 0.5 for now)
+                              resolution = 0.1))), #TODO change to 0.1 (might cause error in transform, leaving at 0.5 for now)
   # nasa power resolution = 0.5; 
   # ecmwf = 1; 
   # sentinel ndvi = 0.01
+  # modis ndvi = 0.01
   
 )
 
@@ -55,6 +56,7 @@ dynamic_targets <- tar_plan(
   
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
+  # 10 day period
   
   tar_target(sentinel_ndvi_directory_raw, 
              create_data_directory(directory_path = "data/sentinel_ndvi_raw")),
@@ -104,7 +106,72 @@ dynamic_targets <- tar_plan(
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
   # this satellite will be retired soon, so we should use sentinel for present dates 
+  # 16 day period
+  tar_target(modis_ndvi_directory_raw, 
+             create_data_directory(directory_path = "data/modis_ndvi_raw")),
+  tar_target(modis_ndvi_directory_dataset, 
+             create_data_directory(directory_path = "data/modis_ndvi_dataset")),
   
+  # get authorization token
+  # this expires after 48 hours
+  tar_target(modis_ndvi_token, get_modis_ndvi_token()),
+  
+  # set modis ndvi dates
+  tar_target(modis_ndvi_start_year, 2005),
+  tar_target(modis_ndvi_end_year, 2023),
+  
+  # set parameters and submit request for full continent
+  tar_target(modis_ndvi_task_id_continent, submit_modis_ndvi_task_request_continent(modis_ndvi_start_year,
+                                                                                    modis_ndvi_end_year,
+                                                                                    modis_ndvi_token,
+                                                                                    bbox_coords = continent_bounding_box)),
+  # check if the request is posted, then get bundle
+  # this uses a while loop to check every 30 seconds if the request is complete - it takes about 10 minutes
+  # this function could be refactored to check time of modis_ndvi_task_request and pause for some time before submitting bundle request
+  tar_target(modis_ndvi_bundle_request, submit_modis_ndvi_bundle_request(modis_ndvi_token, 
+                                                                         modis_ndvi_task_id_continent, 
+                                                                         timeout = 1500) |> rowwise() |> tar_group(),
+             iteration = "group"
+  ),
+  
+  # download files from source (locally)
+  tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_token,
+                                                        modis_ndvi_bundle_request,
+                                                        download_directory = modis_ndvi_directory_raw,
+                                                        overwrite = FALSE),
+             pattern = modis_ndvi_bundle_request, 
+             format = "file", 
+             repository = "local",
+             cue = tar_cue("thorough")),
+  
+  # save raw to AWS bucket
+  # maybe switch to rsync or minio
+  tar_target(modis_ndvi_raw_upload_aws_s3, {modis_ndvi_downloaded; # enforce dependency
+    aws_s3_upload(path = modis_ndvi_directory_raw,
+                  bucket =  aws_bucket ,
+                  key = modis_ndvi_directory_raw, 
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")), 
+  
+  # project to the template and save as parquets (these can now be queried for analysis)
+  # this maintains the branches, saves separate files split by date
+  tar_target(modis_ndvi_dataset, 
+             create_modis_ndvi_dataset(modis_ndvi_downloaded, 
+                                       continent_raster_template,
+                                       modis_ndvi_directory_dataset,
+                                       overwrite = FALSE),
+             pattern = modis_ndvi_downloaded,
+             format = "file", 
+             repository = "local",
+             cue = tar_cue("thorough")), 
+  
+  # save transformed to AWS bucket
+  tar_target(modis_ndvi_dataset_upload_aws_s3,  {modis_ndvi_dataset; # enforce dependency
+    aws_s3_upload(path = modis_ndvi_directory_dataset,
+                  bucket =  aws_bucket,
+                  key = modis_ndvi_directory_dataset, 
+                  check = TRUE)}, 
+    cue = tar_cue("thorough")), 
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
@@ -129,7 +196,6 @@ dynamic_targets <- tar_plan(
                                    download_directory = nasa_weather_directory_raw,
                                    overwrite = FALSE),
              pattern = crossing(nasa_weather_years, nasa_weather_coordinates),
-             iteration = "vector",
              format = "file",
              repository = "local",
              cue = tar_cue("thorough")
@@ -143,9 +209,9 @@ dynamic_targets <- tar_plan(
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
-  # remove dupes due to having overlapping country bounding boxes
   # project to the template and save as arrow dataset
   # this combines all the branches because they are already saved as parquets and can be accessed as a dataset
+  # this also removes dupes due to having overlapping country bounding boxes
   tar_target(nasa_weather_dataset, 
              create_nasa_weather_dataset(nasa_weather_downloaded,
                                          nasa_weather_directory_dataset, 
@@ -201,7 +267,7 @@ dynamic_targets <- tar_plan(
              create_ecmwf_forecasts_dataset(ecmwf_forecasts_downloaded,
                                             ecmwf_forecasts_directory_dataset, 
                                             continent_raster_template,
-                                            overwrite = FALSE),
+                                            overwrite = TRUE),
              pattern = ecmwf_forecasts_downloaded,
              format = "file", 
              repository = "local",

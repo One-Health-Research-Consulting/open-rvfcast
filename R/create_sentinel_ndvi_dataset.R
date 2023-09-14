@@ -15,9 +15,10 @@ create_sentinel_ndvi_dataset <- function(sentinel_ndvi_downloaded,
                                     overwrite = FALSE) {
   
   filename <- basename(sentinel_ndvi_downloaded)
-  start_date <- as.Date(str_extract(filename, "(\\d{8}T\\d{6})"), format = "%Y%m%dT%H%M%S")
-  end_date <- as.Date(str_extract(filename, "(?<=_)(\\d{8}T\\d{6})(?=_\\w{6}_)"), format = "%Y%m%dT%H%M%S")
-  save_filename <- glue::glue("transformed_NDVI_{start_date}_to_{end_date}.gz.parquet")
+  assertthat::are_equal(nchar(filename), 97)
+  start_date <- as.Date(str_sub(filename, 17, 24), format = "%Y%m%d")
+  end_date <- as.Date(str_sub(filename, 33, 40), format = "%Y%m%d")
+  save_filename <- glue::glue("transformed_sentinel_NDVI_{start_date}_to_{end_date}.gz.parquet")
   
   existing_files <- list.files(sentinel_ndvi_directory_dataset)
   
