@@ -9,20 +9,62 @@
 #' @author Emma Mendelsohn
 #' @export
 process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_dataset) {
+  
   library(dbplyr)
   weather_dataset <- open_dataset(nasa_weather_directory_dataset) |> to_duckdb(table_name = "weather")
   
+  weather_dataset <- weather_dataset |> 
+    mutate(across(c("month", "day", "day_of_year"), ~as.integer(.))) |> 
+    mutate(year_doy = paste(year, day_of_year, sep = "_"))
+  
   # calculate monthly averages by pixel
-  # calculate anomalies for each day relative to monthly average
-  weather_anomalies <- weather_dataset |> 
+  weather_means <- weather_dataset |> 
     group_by(x, y, month) |> 
-    mutate(mean_relative_humidity = mean(relative_humidity),
-           mean_temperature = mean(temperature),
-           mean_precipitation = mean(precipitation)) |> 
-    ungroup()  |> 
-    mutate(anomaly_relative_humidity = relative_humidity - mean_relative_humidity,
-           anomaly_temperature = temperature - mean_temperature,
-           anomaly_precipitation = precipitation - mean_precipitation)  
+    summarize(mean_relative_humidity = mean(relative_humidity),
+              mean_temperature = mean(temperature),
+              mean_precipitation = mean(precipitation)) |> 
+    ungroup()  
+  
+  # weather_means_check <- collect(weather_means)
+  
+  # get 30 day lags for selected dates
+  for(i in 1:nrow(model_dates_random_select)){
+    date_select <- model_dates_random_select[i,]$date
+    previous_30_days <- seq(date_select - 30, date_select - 1, by = "day")
+    previous_30_days_tib <- tibble(year = year(previous_30_days), day_of_year = yday(previous_30_days))
+    
+    #TODO filter for year_doy for these 30 days
+    
+    lag <- weather_dataset |> 
+      inner_join(previous_30_days_tib)
+      group_by(x, y) |> 
+      window_frame(-30, -1) |> 
+      window_order(day_of_year) |> 
+      mutate(anomaly_relative_humidity_roll30 = mean(anomaly_relative_humidity))  |> 
+      ungroup()
+  }
+  
+  
+  
+  # calculate anomalies between lags and weighted monthly averages
+  
+  
+  
+  
+  
+  
+  
+  # # calculate monthly averages by pixel
+  # # calculate anomalies for each day relative to monthly average
+  # weather_anomalies <- weather_dataset |> 
+  #   group_by(x, y, month) |> 
+  #   mutate(mean_relative_humidity = mean(relative_humidity),
+  #          mean_temperature = mean(temperature),
+  #          mean_precipitation = mean(precipitation)) |> 
+  #   ungroup()  |> 
+  #   mutate(anomaly_relative_humidity = relative_humidity - mean_relative_humidity,
+  #          anomaly_temperature = temperature - mean_temperature,
+  #          anomaly_precipitation = precipitation - mean_precipitation)  
   
   # get rolling avg for each x,y
   # throws memory error - PRAGMA temp_directory='/path/to/tmp.tmp'
@@ -45,9 +87,9 @@ process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_da
   
   ### testing notes
   # SQL rolling avg
-    # "AVG(anomaly_precipitation) OVER (
-    #  ORDER BY day_of_year
-    #  ROWS BETWEEN 30 PRECEDING AND 1 PRECEDING)"
+  # "AVG(anomaly_precipitation) OVER (
+  #  ORDER BY day_of_year
+  #  ROWS BETWEEN 30 PRECEDING AND 1 PRECEDING)"
   
   # sanity checks
   # mf <- memdb_frame(x = 1:100, y = 1:100)
