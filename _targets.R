@@ -286,12 +286,13 @@ dynamic_targets <- tar_plan(
 # Data Processing -----------------------------------------------------------
 data_targets <- tar_plan(
   
-  tar_target(model_dates_random_select, random_select_model_dates(start_year = 2006, end_year = 2022, n_per_month = 2, seed = 212)),
+  tar_target(lag_intervals, c(30, 60, 90)), 
+  tar_target(model_dates, set_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, lag_intervals, seed = 212)),
   
   # TODO take nasa_weather_directory_dataset and do full lag calcs in this function using duckdb, then collect into memory
   tar_target(weather_data, process_weather_data(nasa_weather_directory_dataset, 
                                                 nasa_weather_dataset, # enforce dependency
-                                                model_dates_random_select)),
+                                                model_dates)),
   # tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_dataset, sentinel_ndvi_dataset, model_dates_random_select))
   
 )
