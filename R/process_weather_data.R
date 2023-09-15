@@ -30,8 +30,7 @@ process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_da
       summarize(lag_relative_humidity = mean(relative_humidity),
                 lag_temperature = mean(temperature),
                 lag_precipitation = mean(precipitation)) |> 
-      ungroup() |> 
-      mutate(year_day_of_year = date_selected)
+      ungroup() 
     
     # overall: calculate mean across the full dataset for the days of the year covered by the lag period
     # note when 366 is included, we'll have less overall data going into the mean. This is okay since it's one of 30 values
@@ -43,7 +42,9 @@ process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_da
       summarize(overall_relative_humidity = mean(relative_humidity),
                 overall_temperature = mean(temperature),
                 overall_precipitation = mean(precipitation)) |> 
-      ungroup() |> 
+      ungroup() 
+    
+    anomolies <- full_join(lagged_means, overall_means, by = c("x", "y")) |> 
       mutate(year_day_of_year = date_selected)
     
     
