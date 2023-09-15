@@ -34,6 +34,9 @@ process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_da
       mutate(year_day_of_year = date_selected)
     
     # overall: calculate mean across the full dataset for the days of the year covered by the lag period
+    # note when 366 is included, we'll have less overall data going into the mean. This is okay since it's one of 30 values
+    # the same this would happen if we did this by date (we'd have sparse data for feb-29)
+    # it would be avoided if we did weighted monthly means
     overall_means <- weather_dataset |> 
       filter(day_of_year %in% !!lag_dates$day_of_year ) |> 
       group_by(x, y) |> 
