@@ -288,15 +288,24 @@ data_targets <- tar_plan(
   
   tar_target(lag_intervals, c(30, 60, 90)), 
   tar_target(model_dates, set_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, lag_intervals, seed = 212)),
+  tar_target(model_dates_selected, model_dates |> filter(select_date) |> pull(date)),
   
-  tar_target(nasa_weather_anomalies_directory, 
-             create_data_directory(directory_path = "data/nasa_weather_anomalies")),
-  
+  tar_target(nasa_weather_anomalies_directory_dataset, 
+             create_data_directory(directory_path = "data/nasa_weather_anomalies_dataset")),
   
   # TODO take nasa_weather_directory_dataset and do full lag calcs in this function using duckdb, then collect into memory
-  tar_target(weather_data, process_weather_data(nasa_weather_directory_dataset, 
-                                                nasa_weather_dataset, # enforce dependency
-                                                model_dates)),
+  tar_target(weather_data, process_weather_data(nasa_weather_dataset, # enforce dependency
+                                                nasa_weather_directory_dataset,
+                                                nasa_weather_anomalies_directory_dataset,
+                                                model_dates,
+                                                model_dates_selected,
+                                                lag_intervals,
+                                                overwrite = FALSE),
+             pattern = head(model_dates_selected, 2),
+             format = "file", 
+             repository = "local",
+             cue = tar_cue("thorough")),  
+
   # tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_dataset, sentinel_ndvi_dataset, model_dates_random_select))
   
 )
