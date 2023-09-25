@@ -14,7 +14,9 @@ process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_da
   
   weather_dataset <- weather_dataset |> 
     mutate(across(c(year, month, day, day_of_year), as.integer)) |> 
-    mutate(year_day_of_year = paste(year, day_of_year, sep = "_"))  
+    mutate(year_day_of_year = paste(year, day_of_year, sep = "_"))  |> 
+    mutate(date = lubridate::make_date(year, month, day)) |> 
+    select(x, y, date, year, month, day, day_of_year, year_day_of_year, relative_humidity, temperature, precipitation)
   
   # generate the weather dataset - get the lagged anomolies for selected dates
   # TODO: do this for each lag internal
@@ -25,7 +27,7 @@ process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_da
     
     # lag: calculate mean by pixel for the preceeding 30 days
     lagged_means <- weather_dataset |> 
-      filter(year_day_of_year %in% !!lag_dates$year_day_of_year) |> 
+      filter(date %in% !!lag_dates$date) |> 
       group_by(x, y) |> 
       summarize(lag_relative_humidity = mean(relative_humidity),
                 lag_temperature = mean(temperature),
@@ -44,13 +46,18 @@ process_weather_data <- function(nasa_weather_directory_dataset, nasa_weather_da
                 overall_precipitation = mean(precipitation)) |> 
       ungroup() 
     
+    # anomaly
     anomolies <- full_join(lagged_means, overall_means, by = c("x", "y")) |> 
-      mutate(year_day_of_year = date_selected)
+      mutate(anomaly_relative_humidity = lag_relative_humidity - overall_relative_humidity,
+             anomaly_temperature = lag_temperature - overall_temperature,
+             anomaly_precipitation = lag_precipitation - overall_precipitation)
     
+    # get selected day info and pull in all calculated data
+    select_day_data <- weather_dataset |> 
+      filter(date == !!date_selected) |> 
+      full_join(anomolies,  by = c("x", "y"))
     
-    #TODO  
-    # join the lagged mean with the historical mean and calculate anomoly
-    # join with the data from the actual day, one row for each x, y, selected date
+    return(select_day_data)
     
   })
   

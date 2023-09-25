@@ -1,5 +1,5 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|adfbe9c01236ca30|||||||||||||||
+.Random.seed|object|81bdf40acce9cae3|||||||||||||||
 all_targets|function|2dda5afbd1f92385|||||||||||||||
 aws_bucket|object|d9cf2c5ff7cc1be4|||||||||||||||
 cache_aws_branched_target|function|6e2abfa4969de1bf|||||||||||||||
@@ -18,7 +18,7 @@ create_modis_ndvi_dataset|function|bb9bcd506ae906bd|||||||||||||||
 create_nasa_weather_dataset|function|c12b134b7be25c25|||||||||||||||
 create_raster_template_plot|function|db738156a3247831|||||||||||||||
 create_sentinel_ndvi_dataset|function|201d4eaf8c87d0c3|||||||||||||||
-data_targets|object|20a3ace986c6d250|||||||||||||||
+data_targets|object|1cebfd4c6eddf2cb|||||||||||||||
 define_bounding_boxes|function|e614caacc0592e73|||||||||||||||
 define_country_regions|function|54808365a1bb460e|||||||||||||||
 deploy_targets|object|1eb1bc8d77111ded|||||||||||||||
@@ -2922,6 +2922,8 @@ modis_ndvi_token|stem|19e26aa3db6c5c79|c67e2eef8bb2934f|e04e388fd1304865|-139962
 modis_ndvi_upload_aws_s3|stem|88ec97fd0404e3df|d84fbea879f23708|456a8bd4c1d0827a|888617487|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/modis_ndvi_upload_aws_s3*endpoint=TlVMTA*version=c4LtLauvFRDwFruFWzrN4Kfmr_B9AyAP|t19494.6287409904s||45307|qs|aws|vector|||418.65||
 modis_ndvi_years|stem|587a3ab81a088e29|18e70a9546d917c3|787f005495551c49|-1347432446|bucket=open-rvfcast-data*region=NULL*key=_targets/modis_ndvi_years*endpoint=TlVMTA*version=|t19517.6948596944s||87|qs|aws|vector|||0.001||
 nasa_api_parameters|stem|error|c5d442f86f80bfe1|c5389639654d89a9|-1576512875|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/nasa_api_parameters*endpoint=TlVMTA*version=CwWHqIPj1skmtMOuFWjhfC1ZTXmmurvf|t19482.775543246s||30|qs|aws|group|||0.028||object bounding_boxes not found
+nasa_weather_anomalies_directory|stem|ebb92f394fc7d2e1|57b10a3331bbbaf4|3d3d9feae01275db|1367256300|bucket=open-rvfcast-data*region=NULL*key=_targets/nasa_weather_anomalies_directory*endpoint=TlVMTA*version=|t19625.7717171847s||59|qs|aws|vector|||0||
+nasa_weather_anomalies_directory_dataset|stem|8855ed9154ae5a8d|efe122292e8aeecc|3d3d9feae01275db|-1442692814|bucket=open-rvfcast-data*region=NULL*key=_targets/nasa_weather_anomalies_directory_dataset*endpoint=TlVMTA*version=|t19625.7709027432s||68|qs|aws|vector|||0||
 nasa_weather_api_parameters|stem|3309104d31f77f99|7307c746845681ff|2e6e0eec16e79d96|484656159|bucket=project-dtra-ml-main*region=NULL*key=open-rvfcast/_targets/nasa_weather_api_parameters*endpoint=TlVMTA*version=tfJfYk82H1Efh3BlkwlxsY1V8EKZ.Egg|t19493.6389345323s||86290|qs|aws|group|||0.019||
 nasa_weather_coordinates|stem|4fcf6b80995fe6e5|c1c382f98286ac1e|068b05312dfaadbe|-882330736|bucket=open-rvfcast-data*region=NULL*key=_targets/nasa_weather_coordinates*endpoint=TlVMTA*version=|t19517.6952565017s||9682|qs|aws|vector||nasa_weather_coordinates_403fecee*nasa_weather_coordinates_37c2f757*nasa_weather_coordinates_2491b6a8*nasa_weather_coordinates_6b33b179*nasa_weather_coordinates_c0e52d6a*nasa_weather_coordinates_7f93044d*nasa_weather_coordinates_13da281a*nasa_weather_coordinates_f98d4f81*nasa_weather_coordinates_5a176215*nasa_weather_coordinates_103a8457*nasa_weather_coordinates_94057e4b*nasa_weather_coordinates_765e48d4*nasa_weather_coordinates_6b6e81ab*nasa_weather_coordinates_1600a5fb*nasa_weather_coordinates_be5fa17a*nasa_weather_coordinates_0d3abc14*nasa_weather_coordinates_6ef40a93*nasa_weather_coordinates_9df40608|0.092||
 nasa_weather_dataset|stem|a7abd561227083e6|785d6222b8029938|d033ef1133ad02de|138539170|data/nasa_weather_dataset/year=2005/part-0.parquet*data/nasa_weather_dataset/year=2006/part-0.parquet*data/nasa_weather_dataset/year=2007/part-0.parquet*data/nasa_weather_dataset/year=2008/part-0.parquet*data/nasa_weather_dataset/year=2009/part-0.parquet*data/nasa_weather_dataset/year=2010/part-0.parquet*data/nasa_weather_dataset/year=2011/part-0.parquet*data/nasa_weather_dataset/year=2012/part-0.parquet*data/nasa_weather_dataset/year=2013/part-0.parquet*data/nasa_weather_dataset/year=2014/part-0.parquet*data/nasa_weather_dataset/year=2015/part-0.parquet*data/nasa_weather_dataset/year=2016/part-0.parquet*data/nasa_weather_dataset/year=2017/part-0.parquet*data/nasa_weather_dataset/year=2018/part-0.parquet*data/nasa_weather_dataset/year=2019/part-0.parquet*data/nasa_weather_dataset/year=2020/part-0.parquet*data/nasa_weather_dataset/year=2021/part-0.parquet*data/nasa_weather_dataset/year=2022/part-0.parquet*data/nasa_weather_dataset/year=2023/part-0.parquet|t19613.9763186455s|9d3f73d7f82f52dc|12053943511|file|local|vector|||0.02||
@@ -3942,7 +3944,7 @@ preprocess_ecmwf_forecasts|function|033bd8a3c45b4d46|||||||||||||||
 preprocess_nasa_weather|function|f5c92fafb420500d|||||||||||||||
 preprocess_wahis_rvf_outbreaks|function|1739270cf02b72d6|||||||||||||||
 process_ndvi_data|function|8a56ce9bd504bbec|||||||||||||||
-process_weather_data|function|6dbc7677081a102e|||||||||||||||
+process_weather_data|function|4742d21165b14ee6|||||||||||||||
 random_select_model_dates|function|75d79de28b5c2e87|||||||||||||||
 read_transform_raster|function|f7518264efa394ed|||||||||||||||
 report_targets|object|1eb1bc8d77111ded|||||||||||||||
@@ -4977,7 +4979,7 @@ test_targets|object|1eb1bc8d77111ded|||||||||||||||
 transform_nasa_weather|function|e80c244fb32ef2bd|||||||||||||||
 transform_raster|function|47f20ba2b9ef9722|||||||||||||||
 transform_sentinel_ndvi|function|92a19330c7f2bff2|||||||||||||||
-user_rprof|object|2a027f145a5a1891|||||||||||||||
+user_rprof|object|7e34b2a2c6cda37d|||||||||||||||
 wahis_rvf_outbreaks_preprocessed|stem|30ccd988b415d773|3ea98184b5887c93|275a59d310ff2a63|2127878318|bucket=open-rvfcast-data*region=NULL*key=_targets/wahis_rvf_outbreaks_preprocessed*endpoint=TlVMTA*version=|t19517.6952212142s||172965|qs|aws|vector|||0.043||
 wahis_rvf_outbreaks_raw|stem|6fc7e6c7238977b3|b988ec4215d4213c|5ed4661ae3efb1aa|1933416983|bucket=open-rvfcast-data*region=NULL*key=_targets/wahis_rvf_outbreaks_raw*endpoint=TlVMTA*version=|t19517.6952047733s||173410|qs|aws|vector|||29.629||
 wahis_rvf_query|function|9836433f6f1061fb|||||||||||||||

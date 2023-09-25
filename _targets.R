@@ -289,6 +289,10 @@ data_targets <- tar_plan(
   tar_target(lag_intervals, c(30, 60, 90)), 
   tar_target(model_dates, set_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, lag_intervals, seed = 212)),
   
+  tar_target(nasa_weather_anomalies_directory, 
+             create_data_directory(directory_path = "data/nasa_weather_anomalies")),
+  
+  
   # TODO take nasa_weather_directory_dataset and do full lag calcs in this function using duckdb, then collect into memory
   tar_target(weather_data, process_weather_data(nasa_weather_directory_dataset, 
                                                 nasa_weather_dataset, # enforce dependency
