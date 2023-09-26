@@ -33,9 +33,8 @@ process_weather_data <- function(nasa_weather_dataset, # enforce dependency
   # TODO this could go into create_nasa_weather_dataset() to avoid repeating it on each branch
   weather_dataset <- weather_dataset |> 
     mutate(across(c(year, month, day, day_of_year), as.integer)) |> 
-    mutate(year_day_of_year = paste(year, day_of_year, sep = "_"))  |> 
     mutate(date = lubridate::make_date(year, month, day)) |> 
-    select(x, y, date, year, month, day, day_of_year, year_day_of_year, relative_humidity, temperature, precipitation)
+    select(x, y, date, day_of_year, relative_humidity, temperature, precipitation)
   
   # generate the weather dataset - get the lagged anomolies for selected dates
   # map over the lag intervals
@@ -51,9 +50,9 @@ process_weather_data <- function(nasa_weather_dataset, # enforce dependency
     lagged_means <- weather_dataset |> 
       filter(date %in% !!lag_dates$date) |> 
       group_by(x, y) |> 
-      summarize(!!paste0("lag_relative_humidity_", end) := mean(relative_humidity),
-                !!paste0("lag_temperature_", end) := mean(temperature),
-                !!paste0("lag_precipitation_", end) := mean(precipitation)) |> 
+      summarize(lag_relative_humidity = mean(relative_humidity),
+                lag_temperature = mean(temperature),
+                lag_precipitation = mean(precipitation)) |> 
       ungroup() 
     
     # historical: calculate mean across the full dataset for the days of the year covered by the lag period
@@ -63,26 +62,24 @@ process_weather_data <- function(nasa_weather_dataset, # enforce dependency
     historical_means <- weather_dataset |> 
       filter(day_of_year %in% !!lag_dates$day_of_year ) |> 
       group_by(x, y) |> 
-      summarize(!!paste0("historical_relative_humidity_", end) := mean(relative_humidity),
-                !!paste0("historical_temperature_", end) := mean(temperature),
-                !!paste0("historical_precipitation_", end) := mean(precipitation)) |> 
+      summarize(historical_relative_humidity = mean(relative_humidity),
+                historical_temperature = mean(temperature),
+                historical_precipitation = mean(precipitation)) |> 
       ungroup() 
     
     # anomaly
     full_join(lagged_means, historical_means, by = c("x", "y")) |> 
-      mutate(!!paste0("anomaly_relative_humidity_", end) := !!sym(paste0("lag_relative_humidity_", end))  - !!sym(paste0("historical_relative_humidity_", end)),
-             !!paste0("anomaly_temperature_", end) := !!sym(paste0("lag_temperature_", end))  -  !!sym(paste0("historical_temperature_", end)),
-             !!paste0("anomaly_precipitation_", end) := !!sym(paste0("lag_precipitation_", end)) - !!sym(paste0("historical_precipitation_", end)))
+      mutate(!!paste0("anomaly_relative_humidity_", end) := lag_relative_humidity - historical_relative_humidity,
+             !!paste0("anomaly_temperature_", end) := lag_temperature  -  historical_temperature,
+             !!paste0("anomaly_precipitation_", end) := lag_precipitation - historical_precipitation) |> 
+      select(-starts_with("lag"), -starts_with("historical"))
   }) |> 
-    reduce(left_join, by = c("x", "y"))
-  
-  # get selected day info and pull in all calculated data
-  date_selected_all_dat <- weather_dataset |> 
-    filter(date == !!date_selected) |> 
-    full_join(anomalies,  by = c("x", "y"))
+    reduce(left_join, by = c("x", "y")) |> 
+    mutate(date = date_selected) |> 
+    relocate(date)
   
   # Save as parquet 
-  write_dataset(date_selected_all_dat, here::here(nasa_weather_anomalies_directory_dataset, save_filename), compression = "gzip", compression_level = 5)
+  write_parquet(anomalies, here::here(nasa_weather_anomalies_directory_dataset, save_filename), compression = "gzip", compression_level = 5)
   
   return(file.path(nasa_weather_anomalies_directory_dataset, save_filename))
   

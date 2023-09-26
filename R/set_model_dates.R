@@ -22,7 +22,6 @@ set_model_dates <- function(start_year, end_year, n_per_month, lag_intervals, se
            day = format(dates, "%d"),
            day_of_year = format(dates, "%j")) |>     
     mutate(across(c(year, month, day, day_of_year), as.integer)) |> 
-    mutate(year_day_of_year = paste(year, day_of_year, sep = "_")) |> 
     group_by(month, year) |> 
     mutate(select_date = row_number() %in% sample(n(), n_per_month)) |> 
     ungroup()  |> 

@@ -21,6 +21,8 @@ tar_option_set(resources = tar_resources(
   workspace_on_error = TRUE # allows interactive session for failed branches
 )
 
+future::plan(future::multisession, workers = 2)
+
 # Static Data Download ----------------------------------------------------
 static_targets <- tar_plan(
   
@@ -293,7 +295,6 @@ data_targets <- tar_plan(
   tar_target(nasa_weather_anomalies_directory_dataset, 
              create_data_directory(directory_path = "data/nasa_weather_anomalies_dataset")),
   
-  # TODO take nasa_weather_directory_dataset and do full lag calcs in this function using duckdb, then collect into memory
   tar_target(weather_data, process_weather_data(nasa_weather_dataset, # enforce dependency
                                                 nasa_weather_directory_dataset,
                                                 nasa_weather_anomalies_directory_dataset,
@@ -301,10 +302,11 @@ data_targets <- tar_plan(
                                                 model_dates_selected,
                                                 lag_intervals,
                                                 overwrite = FALSE),
-             pattern = head(model_dates_selected, 2),
+             pattern = head(model_dates_selected, 20),
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
+  # at 10 min per date, this would take 4260 minutes = 71 hours = 3 days when run sequentially
 
   # tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_dataset, sentinel_ndvi_dataset, model_dates_random_select))
   
