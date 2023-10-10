@@ -21,7 +21,7 @@ tar_option_set(resources = tar_resources(
   workspace_on_error = TRUE # allows interactive session for failed branches
 )
 
-future::plan(future::multisession, workers = 2)
+future::plan(future::multisession, workers = 16)
 
 # Static Data Download ----------------------------------------------------
 static_targets <- tar_plan(
@@ -292,22 +292,31 @@ data_targets <- tar_plan(
   tar_target(model_dates, set_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, lag_intervals, seed = 212)),
   tar_target(model_dates_selected, model_dates |> filter(select_date) |> pull(date)),
   
-  tar_target(nasa_weather_anomalies_directory_dataset, 
-             create_data_directory(directory_path = "data/nasa_weather_anomalies_dataset")),
+  # weather data
   
-  tar_target(weather_data, process_weather_data(nasa_weather_dataset, # enforce dependency
-                                                nasa_weather_directory_dataset,
-                                                nasa_weather_anomalies_directory_dataset,
-                                                model_dates,
-                                                model_dates_selected,
-                                                lag_intervals,
-                                                overwrite = FALSE),
+  tar_target(weather_historical_means_directory_dataset, 
+             create_data_directory(directory_path = "data/weather_historical_means_dataset")),
+  
+  tar_target(weather_historical_means, calculate_weather_historical_means(nasa_weather_dataset, # enforce dependency
+                                                                          nasa_weather_directory_dataset,
+                                                                          weather_historical_means_directory_dataset)),
+  
+  tar_target(weather_anomalies_directory_dataset, 
+             create_data_directory(directory_path = "data/weather_anomalies_dataset")),
+  
+  tar_target(weather_anomalies, calculate_weather_anomalies(nasa_weather_dataset, # enforce dependency
+                                                            nasa_weather_directory_dataset,
+                                                            nasa_weather_anomalies_directory_dataset,
+                                                            model_dates,
+                                                            model_dates_selected,
+                                                            lag_intervals,
+                                                            overwrite = FALSE),
              pattern = head(model_dates_selected, 20),
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
   # at 10 min per date, this would take 4260 minutes = 71 hours = 3 days when run sequentially
-
+  
   # tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_dataset, sentinel_ndvi_dataset, model_dates_random_select))
   
 )

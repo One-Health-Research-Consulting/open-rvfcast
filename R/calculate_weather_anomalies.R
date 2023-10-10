@@ -8,13 +8,13 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-process_weather_data <- function(nasa_weather_dataset, # enforce dependency
-                                 nasa_weather_directory_dataset,
-                                 nasa_weather_anomalies_directory_dataset,
-                                 model_dates,
-                                 model_dates_selected,
-                                 lag_intervals,
-                                 overwrite = FALSE) {
+calculate_weather_anomalies <- function(nasa_weather_dataset, # enforce dependency
+                                        nasa_weather_directory_dataset,
+                                        nasa_weather_anomalies_directory_dataset,
+                                        model_dates,
+                                        model_dates_selected,
+                                        lag_intervals,
+                                        overwrite = FALSE) {
   
   date_selected <- model_dates_selected
   save_filename <- glue::glue("{date_selected}.gz.parquet")
