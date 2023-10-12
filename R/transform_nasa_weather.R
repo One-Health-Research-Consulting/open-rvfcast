@@ -5,12 +5,12 @@
 #' @title
 #' @param nasa_weather_downloaded
 #' @param continent_raster_template
-#' @param nasa_weather_directory_dataset
+#' @param nasa_weather_directory_transformed
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-create_nasa_weather_dataset <- function(nasa_weather_pre_dataset,
-                                        nasa_weather_directory_dataset, 
+transform_nasa_weather <- function(nasa_weather_pre_dataset,
+                                        nasa_weather_directory_transformed, 
                                         continent_raster_template,
                                         overwrite = FALSE) {
   
@@ -20,10 +20,10 @@ create_nasa_weather_dataset <- function(nasa_weather_pre_dataset,
   message(paste0("Transforming ", save_filename))
   
   # Check if file already exists
-  existing_files <- list.files(nasa_weather_directory_dataset)
+  existing_files <- list.files(nasa_weather_directory_transformed)
   if(dirname(save_filename) %in% existing_files & !overwrite){
     message("files already exist, skipping transform")
-    return(file.path(nasa_weather_directory_dataset, save_filename))
+    return(file.path(nasa_weather_directory_transformed, save_filename))
   }
   
   # Read in continent template raster
@@ -59,11 +59,11 @@ create_nasa_weather_dataset <- function(nasa_weather_pre_dataset,
   # this crashes r
   # dat_out |> 
   #   group_by(year, month) |> 
-  #   write_dataset(nasa_weather_directory_dataset)
+  #   write_dataset(nasa_weather_directory_transformed)
   
-  suppressWarnings(dir.create(here::here(nasa_weather_directory_dataset, dirname(save_filename))))
-  write_parquet(dat_out, here::here(nasa_weather_directory_dataset, save_filename), compression = "gzip", compression_level = 5)
+  suppressWarnings(dir.create(here::here(nasa_weather_directory_transformed, dirname(save_filename))))
+  write_parquet(dat_out, here::here(nasa_weather_directory_transformed, save_filename), compression = "gzip", compression_level = 5)
   
-  return(file.path(nasa_weather_directory_dataset, save_filename))
+  return(file.path(nasa_weather_directory_transformed, save_filename))
   
 }

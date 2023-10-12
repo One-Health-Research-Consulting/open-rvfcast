@@ -62,8 +62,8 @@ dynamic_targets <- tar_plan(
   
   tar_target(sentinel_ndvi_directory_raw, 
              create_data_directory(directory_path = "data/sentinel_ndvi_raw")),
-  tar_target(sentinel_ndvi_directory_dataset, 
-             create_data_directory(directory_path = "data/sentinel_ndvi_dataset")),
+  tar_target(sentinel_ndvi_directory_transformed, 
+             create_data_directory(directory_path = "data/sentinel_ndvi_transformed")),
   
   # get API parameters
   tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters(), cue = tar_cue("thorough")), 
@@ -87,21 +87,21 @@ dynamic_targets <- tar_plan(
   
   # project to the template and save as parquets (these can now be queried for analysis)
   # this maintains the branches, saves separate files split by date
-  tar_target(sentinel_ndvi_dataset, 
-             create_sentinel_ndvi_dataset(sentinel_ndvi_downloaded, 
-                                          continent_raster_template,
-                                          sentinel_ndvi_directory_dataset,
-                                          overwrite = FALSE),
+  tar_target(sentinel_ndvi_transformed, 
+             transform_sentinel_ndvi(sentinel_ndvi_downloaded, 
+                                     continent_raster_template,
+                                     sentinel_ndvi_directory_transformed,
+                                     overwrite = FALSE),
              pattern = sentinel_ndvi_downloaded,
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")), 
   
   # save transformed to AWS bucket
-  tar_target(sentinel_ndvi_dataset_upload_aws_s3,  {sentinel_ndvi_dataset; # enforce dependency
-    aws_s3_upload(path = sentinel_ndvi_directory_dataset,
+  tar_target(sentinel_ndvi_transformed_upload_aws_s3,  {sentinel_ndvi_transformed; # enforce dependency
+    aws_s3_upload(path = sentinel_ndvi_directory_transformed,
                   bucket =  aws_bucket,
-                  key = sentinel_ndvi_directory_dataset, 
+                  key = sentinel_ndvi_directory_transformed, 
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
@@ -111,8 +111,8 @@ dynamic_targets <- tar_plan(
   # 16 day period
   tar_target(modis_ndvi_directory_raw, 
              create_data_directory(directory_path = "data/modis_ndvi_raw")),
-  tar_target(modis_ndvi_directory_dataset, 
-             create_data_directory(directory_path = "data/modis_ndvi_dataset")),
+  tar_target(modis_ndvi_directory_transformed, 
+             create_data_directory(directory_path = "data/modis_ndvi_transformed")),
   
   # get authorization token
   # this expires after 48 hours
@@ -159,21 +159,21 @@ dynamic_targets <- tar_plan(
   
   # project to the template and save as parquets (these can now be queried for analysis)
   # this maintains the branches, saves separate files split by date
-  tar_target(modis_ndvi_dataset, 
-             create_modis_ndvi_dataset(modis_ndvi_downloaded_subset, 
-                                       continent_raster_template,
-                                       modis_ndvi_directory_dataset,
-                                       overwrite = FALSE),
+  tar_target(modis_ndvi_transformed, 
+             transform_modis_ndvi(modis_ndvi_downloaded_subset, 
+                                  continent_raster_template,
+                                  modis_ndvi_directory_transformed,
+                                  overwrite = FALSE),
              pattern = modis_ndvi_downloaded_subset,
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")), 
   
   # save transformed to AWS bucket
-  tar_target(modis_ndvi_dataset_upload_aws_s3,  {modis_ndvi_dataset; # enforce dependency
-    aws_s3_upload(path = modis_ndvi_directory_dataset,
+  tar_target(modis_ndvi_transformed_upload_aws_s3,  {modis_ndvi_transformed; # enforce dependency
+    aws_s3_upload(path = modis_ndvi_directory_transformed,
                   bucket =  aws_bucket,
-                  key = modis_ndvi_directory_dataset, 
+                  key = modis_ndvi_directory_transformed, 
                   check = TRUE)}, 
     cue = tar_cue("thorough")), 
   
@@ -184,10 +184,10 @@ dynamic_targets <- tar_plan(
   
   tar_target(nasa_weather_directory_raw, 
              create_data_directory(directory_path = "data/nasa_weather_raw")),
-  tar_target(nasa_weather_directory_pre_dataset, 
-             create_data_directory(directory_path = "data/nasa_weather_pre_dataset")),
-  tar_target(nasa_weather_directory_dataset, 
-             create_data_directory(directory_path = "data/nasa_weather_dataset")),
+  tar_target(nasa_weather_directory_pre_transformed, 
+             create_data_directory(directory_path = "data/nasa_weather_pre_transformed")),
+  tar_target(nasa_weather_directory_transformed, 
+             create_data_directory(directory_path = "data/nasa_weather_transformed")),
   
   # set branching for nasa
   tar_target(nasa_weather_years, 2005:2023),
@@ -218,25 +218,25 @@ dynamic_targets <- tar_plan(
   
   # remove dupes due to having overlapping country bounding boxes
   # save as arrow dataset, grouped by year
-  tar_target(nasa_weather_pre_dataset, preprocess_nasa_weather_dataset(nasa_weather_downloaded,
-                                                                       nasa_weather_directory_pre_dataset)), 
+  tar_target(nasa_weather_pre_transformed, preprocess_nasa_weather_transformed(nasa_weather_downloaded,
+                                                                               nasa_weather_directory_pre_transformed)), 
   
   # project to the template and save as arrow dataset
-  tar_target(nasa_weather_dataset, 
-             create_nasa_weather_dataset(nasa_weather_pre_dataset,
-                                         nasa_weather_directory_dataset, 
-                                         continent_raster_template,
-                                         overwrite = FALSE),
-             pattern = nasa_weather_pre_dataset,
+  tar_target(nasa_weather_transformed, 
+             transform_nasa_weather(nasa_weather_pre_transformed,
+                                    nasa_weather_directory_transformed, 
+                                    continent_raster_template,
+                                    overwrite = FALSE),
+             pattern = nasa_weather_pre_transformed,
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
   
   # save dataset to AWS bucket
-  tar_target(nasa_weather_dataset_upload_aws_s3,  {nasa_weather_dataset; # enforce dependency
-    aws_s3_upload(path = nasa_weather_directory_dataset,
+  tar_target(nasa_weather_transformed_upload_aws_s3,  {nasa_weather_transformed; # enforce dependency
+    aws_s3_upload(path = nasa_weather_directory_transformed,
                   bucket =  aws_bucket,
-                  key = nasa_weather_directory_dataset, 
+                  key = nasa_weather_directory_transformed, 
                   check = TRUE)}, 
     cue = tar_cue("thorough")),    
   
@@ -244,8 +244,8 @@ dynamic_targets <- tar_plan(
   
   tar_target(ecmwf_forecasts_directory_raw, 
              create_data_directory(directory_path = "data/ecmwf_forecasts_raw")),
-  tar_target(ecmwf_forecasts_directory_dataset, 
-             create_data_directory(directory_path = "data/ecmwf_forecasts_dataset")),
+  tar_target(ecmwf_forecasts_directory_transformed, 
+             create_data_directory(directory_path = "data/ecmwf_forecasts_transformed")),
   
   # set branching for ecmwf
   tar_target(ecmwf_forecasts_api_parameters, set_ecmwf_api_parameter(years = 2005:2023,
@@ -274,21 +274,21 @@ dynamic_targets <- tar_plan(
     cue = tar_cue("never")), # only run this if you need to upload new data
   
   # project to the template and save as arrow dataset
-  tar_target(ecmwf_forecasts_dataset, 
-             create_ecmwf_forecasts_dataset(ecmwf_forecasts_downloaded,
-                                            ecmwf_forecasts_directory_dataset, 
-                                            continent_raster_template,
-                                            overwrite = TRUE),
+  tar_target(ecmwf_forecasts_transformed, 
+             transform_ecmwf_forecasts(ecmwf_forecasts_downloaded,
+                                       ecmwf_forecasts_directory_transformed, 
+                                       continent_raster_template,
+                                       overwrite = TRUE),
              pattern = ecmwf_forecasts_downloaded,
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
   
   # save dataset to AWS bucket
-  tar_target(ecmwf_forecasts_dataset_upload_aws_s3,  {ecmwf_forecasts_dataset; # enforce dependency
-    aws_s3_upload(path = ecmwf_forecasts_directory_dataset,
+  tar_target(ecmwf_forecasts_transformed_upload_aws_s3,  {ecmwf_forecasts_transformed; # enforce dependency
+    aws_s3_upload(path = ecmwf_forecasts_directory_transformed,
                   bucket =  aws_bucket,
-                  key = ecmwf_forecasts_directory_dataset, 
+                  key = ecmwf_forecasts_directory_transformed, 
                   check = TRUE)}, 
     cue = tar_cue("thorough")),   
   
@@ -303,19 +303,19 @@ data_targets <- tar_plan(
   
   # weather data
   
-  tar_target(weather_historical_means_directory_dataset, 
-             create_data_directory(directory_path = "data/weather_historical_means_dataset")),
+  tar_target(weather_historical_means_directory_transformed, 
+             create_data_directory(directory_path = "data/weather_historical_means_transformed")),
   
-  tar_target(weather_historical_means, calculate_weather_historical_means(nasa_weather_dataset, # enforce dependency
-                                                                          nasa_weather_directory_dataset,
-                                                                          weather_historical_means_directory_dataset)),
+  tar_target(weather_historical_means, calculate_weather_historical_means(nasa_weather_transformed, # enforce dependency
+                                                                          nasa_weather_directory_transformed,
+                                                                          weather_historical_means_directory_transformed)),
   
-  tar_target(weather_anomalies_directory_dataset, 
-             create_data_directory(directory_path = "data/weather_anomalies_dataset")),
+  tar_target(weather_anomalies_directory_transformed, 
+             create_data_directory(directory_path = "data/weather_anomalies_transformed")),
   
-  tar_target(weather_anomalies, calculate_weather_anomalies(nasa_weather_dataset, # enforce dependency
-                                                            nasa_weather_directory_dataset,
-                                                            nasa_weather_anomalies_directory_dataset,
+  tar_target(weather_anomalies, calculate_weather_anomalies(nasa_weather_transformed, # enforce dependency
+                                                            nasa_weather_directory_transformed,
+                                                            nasa_weather_anomalies_directory_transformed,
                                                             model_dates,
                                                             model_dates_selected,
                                                             lag_intervals,
@@ -326,7 +326,7 @@ data_targets <- tar_plan(
              cue = tar_cue("thorough")),  
   # at 10 min per date, this would take 4260 minutes = 71 hours = 3 days when run sequentially
   
-  # tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_dataset, sentinel_ndvi_dataset, model_dates_random_select))
+  # tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_transformed, sentinel_ndvi_transformed, model_dates_random_select))
   
 )
 

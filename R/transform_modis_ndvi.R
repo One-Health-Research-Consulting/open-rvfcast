@@ -5,14 +5,14 @@
 #' @title
 #' @param modis_ndvi_downloaded
 #' @param continent_raster_template
-#' @param modis_ndvi_directory_dataset
+#' @param modis_ndvi_directory_transformed
 #' @param overwrite
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-create_modis_ndvi_dataset <- function(modis_ndvi_downloaded_subset,
+transform_modis_ndvi <- function(modis_ndvi_downloaded_subset,
                                       continent_raster_template,
-                                      modis_ndvi_directory_dataset, overwrite =
+                                      modis_ndvi_directory_transformed, overwrite =
                                         FALSE) {
   
   # Extract start and end dates from the raw downloaded file name
@@ -26,10 +26,10 @@ create_modis_ndvi_dataset <- function(modis_ndvi_downloaded_subset,
   message(paste0("Transforming ", save_filename))
   
   # Check if file already exists
-  existing_files <- list.files(modis_ndvi_directory_dataset)
+  existing_files <- list.files(modis_ndvi_directory_transformed)
   if(save_filename %in% existing_files & !overwrite){
     message("file already exists, skipping transform")
-    return(file.path(modis_ndvi_directory_dataset, save_filename))
+    return(file.path(modis_ndvi_directory_transformed, save_filename))
   }
   
   # Transform with template raster
@@ -44,9 +44,9 @@ create_modis_ndvi_dataset <- function(modis_ndvi_downloaded_subset,
            end_date = end_date)
   
   # Save as parquet 
-  write_parquet(dat_out, here::here(modis_ndvi_directory_dataset, save_filename), compression = "gzip", compression_level = 5)
+  write_parquet(dat_out, here::here(modis_ndvi_directory_transformed, save_filename), compression = "gzip", compression_level = 5)
   
-  return(file.path(modis_ndvi_directory_dataset, save_filename))
+  return(file.path(modis_ndvi_directory_transformed, save_filename))
   
   
 }

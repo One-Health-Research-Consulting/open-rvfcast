@@ -4,27 +4,27 @@
 #'
 #' @title
 #' @param ecmwf_forecasts_downloaded
-#' @param necmwf_forecasts_directory_dataset
+#' @param necmwf_forecasts_directory_transformed
 #' @param continent_raster_template
 #' @param overwrite
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-create_ecmwf_forecasts_dataset <- function(ecmwf_forecasts_downloaded,
-                                           ecmwf_forecasts_directory_dataset,
+transform_ecmwf_forecasts <- function(ecmwf_forecasts_downloaded,
+                                           ecmwf_forecasts_directory_transformed,
                                            continent_raster_template, 
                                            overwrite = FALSE) {
 
   filename <- tools::file_path_sans_ext(basename(ecmwf_forecasts_downloaded))
   save_filename <- glue::glue("{filename}.gz.parquet")
   
-  existing_files <- list.files(ecmwf_forecasts_directory_dataset)
+  existing_files <- list.files(ecmwf_forecasts_directory_transformed)
   
   message(paste0("Transforming ", save_filename))
   
   if(save_filename %in% existing_files & !overwrite){
     message("file already exists, skipping transform")
-    return(file.path(ecmwf_forecasts_directory_dataset, save_filename))
+    return(file.path(ecmwf_forecasts_directory_transformed, save_filename))
   }
   
   # read in with terra
@@ -68,9 +68,9 @@ create_ecmwf_forecasts_dataset <- function(ecmwf_forecasts_downloaded,
     arrange(variable_id, x, y) |> 
     select(x,y, mean, std, data_date, step_range, data_type, short_name)
   # Save as parquet 
-  write_parquet(dat_out, here::here(ecmwf_forecasts_directory_dataset, save_filename), compression = "gzip", compression_level = 5)
+  write_parquet(dat_out, here::here(ecmwf_forecasts_directory_transformed, save_filename), compression = "gzip", compression_level = 5)
   
-  return(file.path(ecmwf_forecasts_directory_dataset, save_filename))
+  return(file.path(ecmwf_forecasts_directory_transformed, save_filename))
   
   
 }

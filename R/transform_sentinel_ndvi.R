@@ -5,13 +5,13 @@
 #' @title
 #' @param raster_file
 #' @param template
-#' @param sentinel_ndvi_directory_dataset
+#' @param sentinel_ndvi_directory_transformed
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-create_sentinel_ndvi_dataset <- function(sentinel_ndvi_downloaded,
+transform_sentinel_ndvi <- function(sentinel_ndvi_downloaded,
                                     continent_raster_template,
-                                    sentinel_ndvi_directory_dataset,
+                                    sentinel_ndvi_directory_transformed,
                                     overwrite = FALSE) {
   
   filename <- basename(sentinel_ndvi_downloaded)
@@ -20,13 +20,13 @@ create_sentinel_ndvi_dataset <- function(sentinel_ndvi_downloaded,
   end_date <- as.Date(str_sub(filename, 33, 40), format = "%Y%m%d")
   save_filename <- glue::glue("transformed_sentinel_NDVI_{start_date}_to_{end_date}.gz.parquet")
   
-  existing_files <- list.files(sentinel_ndvi_directory_dataset)
+  existing_files <- list.files(sentinel_ndvi_directory_transformed)
   
   message(paste0("Transforming ", save_filename))
   
   if(save_filename %in% existing_files & !overwrite){
     message("file already exists, skipping transform")
-    return(file.path(sentinel_ndvi_directory_dataset, save_filename))
+    return(file.path(sentinel_ndvi_directory_transformed, save_filename))
   }
   
   transformed_raster <- transform_raster(raw_raster = rast(sentinel_ndvi_downloaded),
@@ -40,8 +40,8 @@ create_sentinel_ndvi_dataset <- function(sentinel_ndvi_downloaded,
            end_date = end_date)
   
   # Save as parquet 
-  write_parquet(dat_out, here::here(sentinel_ndvi_directory_dataset, save_filename), compression = "gzip", compression_level = 5)
+  write_parquet(dat_out, here::here(sentinel_ndvi_directory_transformed, save_filename), compression = "gzip", compression_level = 5)
   
-  return(file.path(sentinel_ndvi_directory_dataset, save_filename))
+  return(file.path(sentinel_ndvi_directory_transformed, save_filename))
 
 }
