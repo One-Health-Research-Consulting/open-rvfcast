@@ -99,11 +99,11 @@ dynamic_targets <- tar_plan(
   
   # save transformed to AWS bucket
   tar_target(sentinel_ndvi_transformed_upload_aws_s3,  {sentinel_ndvi_transformed; # enforce dependency
-    aws_s3_upload(path = sentinel_ndvi_directory_transformed,
-                  bucket =  aws_bucket,
-                  key = sentinel_ndvi_directory_transformed, 
-                  check = TRUE)}, 
-    cue = tar_cue("thorough")), 
+    aws_s3_upload_single_type(directory_path = sentinel_ndvi_directory_transformed,
+                              bucket =  aws_bucket,
+                              key = sentinel_ndvi_directory_transformed, 
+                              check = TRUE)}, 
+    cue = tar_cue("never")), 
   
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
@@ -171,11 +171,11 @@ dynamic_targets <- tar_plan(
   
   # save transformed to AWS bucket
   tar_target(modis_ndvi_transformed_upload_aws_s3,  {modis_ndvi_transformed; # enforce dependency
-    aws_s3_upload(path = modis_ndvi_directory_transformed,
-                  bucket =  aws_bucket,
-                  key = modis_ndvi_directory_transformed, 
-                  check = TRUE)}, 
-    cue = tar_cue("thorough")), 
+    aws_s3_upload_single_type(directory_path = modis_ndvi_directory_transformed,
+                              bucket =  aws_bucket,
+                              key = modis_ndvi_directory_transformed, 
+                              check = TRUE)}, 
+    cue = tar_cue("never")), 
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
@@ -218,10 +218,11 @@ dynamic_targets <- tar_plan(
   
   # remove dupes due to having overlapping country bounding boxes
   # save as arrow dataset, grouped by year
-  tar_target(nasa_weather_pre_transformed, preprocess_nasa_weather_transformed(nasa_weather_downloaded,
-                                                                               nasa_weather_directory_pre_transformed)), 
+  tar_target(nasa_weather_pre_transformed, preprocess_nasa_weather(nasa_weather_downloaded,
+                                                                   nasa_weather_directory_pre_transformed)), 
   
   # project to the template and save as arrow dataset
+  # TODO failing for 2023 because data coverage is not even for last few days
   tar_target(nasa_weather_transformed, 
              transform_nasa_weather(nasa_weather_pre_transformed,
                                     nasa_weather_directory_transformed, 
@@ -232,13 +233,13 @@ dynamic_targets <- tar_plan(
              repository = "local",
              cue = tar_cue("thorough")),  
   
-  # save dataset to AWS bucket
+  # save transformed to AWS bucket
   tar_target(nasa_weather_transformed_upload_aws_s3,  {nasa_weather_transformed; # enforce dependency
-    aws_s3_upload(path = nasa_weather_directory_transformed,
-                  bucket =  aws_bucket,
-                  key = nasa_weather_directory_transformed, 
-                  check = TRUE)}, 
-    cue = tar_cue("thorough")),    
+    aws_s3_upload_single_type(directory_path = nasa_weather_directory_transformed,
+                              bucket =  aws_bucket,
+                              key = nasa_weather_directory_transformed, 
+                              check = TRUE)}, 
+    cue = tar_cue("never")),    
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   
@@ -286,11 +287,11 @@ dynamic_targets <- tar_plan(
   
   # save dataset to AWS bucket
   tar_target(ecmwf_forecasts_transformed_upload_aws_s3,  {ecmwf_forecasts_transformed; # enforce dependency
-    aws_s3_upload(path = ecmwf_forecasts_directory_transformed,
-                  bucket =  aws_bucket,
-                  key = ecmwf_forecasts_directory_transformed, 
-                  check = TRUE)}, 
-    cue = tar_cue("thorough")),   
+    aws_s3_upload_single_type(directory_path = ecmwf_forecasts_directory_transformed,
+                              bucket =  aws_bucket,
+                              key = ecmwf_forecasts_directory_transformed, 
+                              check = TRUE)}, 
+    cue = tar_cue("never")),   
   
 )
 

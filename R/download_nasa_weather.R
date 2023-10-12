@@ -21,7 +21,7 @@ download_nasa_weather <- function(nasa_weather_coordinates,
   start <- paste0(nasa_weather_years, "-01-01")
   end <- paste0(nasa_weather_years, "-12-31")
   current_time <- Sys.Date()
-  if(nasa_weather_years == year(current_time)) end <- as.character(current_time)
+  if(nasa_weather_years == year(current_time)) end <- as.character(current_time-1)
   dates <- c(start, end)
   
   filename <- paste("nasa", "recorded_weather", nasa_weather_coordinates$country_iso3c, nasa_weather_years, sep = "_")
@@ -44,6 +44,7 @@ download_nasa_weather <- function(nasa_weather_coordinates,
     x <- unlist(grp$x) 
     y <- unlist(grp$y) 
     
+    # TODO add NA checks
     nasapower::get_power(community = "ag",
                          lonlat = c(x[1], y[1], x[2], y[2]), # xmin (W), ymin (S), xmax (E), ymax (N)
                          pars = nasa_weather_variables,

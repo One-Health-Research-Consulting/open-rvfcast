@@ -11,34 +11,34 @@
 #' @author Emma Mendelsohn
 #' @export
 transform_ecmwf_forecasts <- function(ecmwf_forecasts_downloaded,
-                                           ecmwf_forecasts_directory_transformed,
-                                           continent_raster_template, 
-                                           overwrite = FALSE) {
-
+                                      ecmwf_forecasts_directory_transformed,
+                                      continent_raster_template, 
+                                      overwrite = FALSE) {
+  
+  # Get filename for saving from the raw data
   filename <- tools::file_path_sans_ext(basename(ecmwf_forecasts_downloaded))
   save_filename <- glue::glue("{filename}.gz.parquet")
   
+  # Check if file already exists
   existing_files <- list.files(ecmwf_forecasts_directory_transformed)
-  
   message(paste0("Transforming ", save_filename))
-  
   if(save_filename %in% existing_files & !overwrite){
     message("file already exists, skipping transform")
     return(file.path(ecmwf_forecasts_directory_transformed, save_filename))
   }
   
-  # read in with terra
+  # Read in with terra
   grib <- rast(ecmwf_forecasts_downloaded)
-
-  # get template
+  
+  # Read in continent template raster
   continent_raster_template <- rast(continent_raster_template)
   
-  # get associated metadata and remove non-df rowsz
+  # Get associated metadata and remove non-df rows
   grib_meta <- system(paste("grib_ls", ecmwf_forecasts_downloaded), intern = TRUE)
   remove <- c(1, (length(grib_meta)-2):length(grib_meta)) 
   grib_meta <- grib_meta[-remove]
   
-  # processing metadata to join with actual data
+  # Processing metadata to join with actual data
   meta <- read.table(text = grib_meta, header = TRUE) |>
     as_tibble() |> 
     janitor::clean_names() |> 
@@ -67,6 +67,7 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_downloaded,
     left_join(distinct(meta), by = "variable_id") |> 
     arrange(variable_id, x, y) |> 
     select(x,y, mean, std, data_date, step_range, data_type, short_name)
+  
   # Save as parquet 
   write_parquet(dat_out, here::here(ecmwf_forecasts_directory_transformed, save_filename), compression = "gzip", compression_level = 5)
   

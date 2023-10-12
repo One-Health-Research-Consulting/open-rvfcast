@@ -11,9 +11,9 @@
 #' @author Emma Mendelsohn
 #' @export
 transform_modis_ndvi <- function(modis_ndvi_downloaded_subset,
-                                      continent_raster_template,
-                                      modis_ndvi_directory_transformed, overwrite =
-                                        FALSE) {
+                                 continent_raster_template,
+                                 modis_ndvi_directory_transformed, 
+                                 overwrite = FALSE) {
   
   # Extract start and end dates from the raw downloaded file name
   filename <- basename(modis_ndvi_downloaded_subset)

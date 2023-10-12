@@ -9,14 +9,14 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-transform_nasa_weather <- function(nasa_weather_pre_dataset,
-                                        nasa_weather_directory_transformed, 
-                                        continent_raster_template,
-                                        overwrite = FALSE) {
+transform_nasa_weather <- function(nasa_weather_pre_transformed,
+                                   nasa_weather_directory_transformed, 
+                                   continent_raster_template,
+                                   overwrite = FALSE) {
   
   
   # Get filename for saving from the pre-processed arrow dataset
-  save_filename <-  sub(".*/(year=\\d{4}/part-\\d\\.parquet)", "\\1", nasa_weather_pre_dataset)
+  save_filename <-  sub(".*/(year=\\d{4}/part-\\d\\.parquet)", "\\1", nasa_weather_pre_transformed)
   message(paste0("Transforming ", save_filename))
   
   # Check if file already exists
@@ -30,11 +30,12 @@ transform_nasa_weather <- function(nasa_weather_pre_dataset,
   continent_raster_template <- rast(continent_raster_template)
   
   # Read in pre-processed arrow dataset, make sure the first two columns are x and y
-  raw_flat <- arrow::read_parquet(nasa_weather_pre_dataset) |> 
+  raw_flat <- arrow::read_parquet(nasa_weather_pre_transformed) |> 
     mutate(year = as.integer(year(date)))
   assertthat::assert_that(names(raw_flat)[1]=="x")
   assertthat::assert_that(names(raw_flat)[2]=="y")
   
+  # Check for even data coverage
   check_rows <- raw_flat |> group_by(x, y) |> count() |> ungroup() |> distinct(n)
   assertthat::are_equal(1, nrow(check_rows))
   check_rows <- raw_flat |> group_by(day_of_year) |> count() |> ungroup() |> distinct(n)
@@ -54,14 +55,14 @@ transform_nasa_weather <- function(nasa_weather_pre_dataset,
         select(x, y, everything())
     }) 
   
-  # Save as file
-  
-  # this crashes r
+
+  # This crashes r
   # dat_out |> 
   #   group_by(year, month) |> 
   #   write_dataset(nasa_weather_directory_transformed)
   
-  suppressWarnings(dir.create(here::here(nasa_weather_directory_transformed, dirname(save_filename))))
+  # Save as parquet 
+  suppressWarnings(dir.create(here::here(nasa_weather_directory_transformed, dirname(save_filename)))) # unnecessary but matching structure of pretransformed dataset
   write_parquet(dat_out, here::here(nasa_weather_directory_transformed, save_filename), compression = "gzip", compression_level = 5)
   
   return(file.path(nasa_weather_directory_transformed, save_filename))
