@@ -41,6 +41,10 @@ transform_nasa_weather <- function(nasa_weather_pre_transformed,
   check_rows <- raw_flat |> group_by(day_of_year) |> count() |> ungroup() |> distinct(n)
   assertthat::are_equal(1, nrow(check_rows))
   
+  # For 2023, there are NAs for the last day of the year
+  # TODO make this a less risky step
+  raw_flat <- drop_na(raw_flat)
+  
   # Split by day of year and transform with template raster. Return as a row-binded dataframe
   dat_out <- raw_flat |> 
     group_split(month, day, year, day_of_year, date) |> 

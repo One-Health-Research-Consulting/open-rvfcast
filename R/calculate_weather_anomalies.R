@@ -30,12 +30,12 @@ calculate_weather_anomalies <- function(nasa_weather_dataset, # enforce dependen
   
   weather_dataset <- open_dataset(nasa_weather_directory_dataset) #|> to_duckdb(table_name = "weather")
   
-  # TODO this could go into create_nasa_weather_dataset() to avoid repeating it on each branch
-  weather_dataset <- weather_dataset |> 
-    mutate(across(c(year, month, day, day_of_year), as.integer)) |> 
-    mutate(date = lubridate::make_date(year, month, day)) |> 
-    select(x, y, date, day_of_year, relative_humidity, temperature, precipitation)
-  
+  # # TODO this could go into create_nasa_weather_dataset() to avoid repeating it on each branch
+  # weather_dataset <- weather_dataset |> 
+  #   mutate(across(c(year, month, day, day_of_year), as.integer)) |> 
+  #   mutate(date = lubridate::make_date(year, month, day)) |> 
+  #   select(x, y, date, day_of_year, relative_humidity, temperature, precipitation)
+  # 
   # generate the weather dataset - get the lagged anomolies for selected dates
   # map over the lag intervals
   row_select <- which(model_dates$date == date_selected)

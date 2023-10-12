@@ -222,7 +222,6 @@ dynamic_targets <- tar_plan(
                                                                    nasa_weather_directory_pre_transformed)), 
   
   # project to the template and save as arrow dataset
-  # TODO failing for 2023 because data coverage is not even for last few days
   tar_target(nasa_weather_transformed, 
              transform_nasa_weather(nasa_weather_pre_transformed,
                                     nasa_weather_directory_transformed, 
@@ -242,7 +241,6 @@ dynamic_targets <- tar_plan(
     cue = tar_cue("never")),    
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
-  
   tar_target(ecmwf_forecasts_directory_raw, 
              create_data_directory(directory_path = "data/ecmwf_forecasts_raw")),
   tar_target(ecmwf_forecasts_directory_transformed, 
@@ -285,7 +283,7 @@ dynamic_targets <- tar_plan(
              repository = "local",
              cue = tar_cue("thorough")),  
   
-  # save dataset to AWS bucket
+  # save transformed to AWS bucket
   tar_target(ecmwf_forecasts_transformed_upload_aws_s3,  {ecmwf_forecasts_transformed; # enforce dependency
     aws_s3_upload_single_type(directory_path = ecmwf_forecasts_directory_transformed,
                               bucket =  aws_bucket,
@@ -304,15 +302,15 @@ data_targets <- tar_plan(
   
   # weather data
   
-  tar_target(weather_historical_means_directory_transformed, 
-             create_data_directory(directory_path = "data/weather_historical_means_transformed")),
+  tar_target(weather_historical_means_directory, 
+             create_data_directory(directory_path = "data/weather_historical_means")),
   
   tar_target(weather_historical_means, calculate_weather_historical_means(nasa_weather_transformed, # enforce dependency
                                                                           nasa_weather_directory_transformed,
-                                                                          weather_historical_means_directory_transformed)),
+                                                                          weather_historical_means_directory)),
   
-  tar_target(weather_anomalies_directory_transformed, 
-             create_data_directory(directory_path = "data/weather_anomalies_transformed")),
+  tar_target(weather_anomalies_directory, 
+             create_data_directory(directory_path = "data/weather_anomalies")),
   
   tar_target(weather_anomalies, calculate_weather_anomalies(nasa_weather_transformed, # enforce dependency
                                                             nasa_weather_directory_transformed,
