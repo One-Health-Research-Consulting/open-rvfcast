@@ -213,8 +213,10 @@ dynamic_targets <- tar_plan(
   # remove dupes due to having overlapping country bounding boxes
   # save as arrow dataset, grouped by year
   tar_target(nasa_weather_pre_transformed, preprocess_nasa_weather(nasa_weather_downloaded,
-                                                                   nasa_weather_directory_pre_transformed)), 
-  
+                                                                   nasa_weather_directory_pre_transformed),
+             format = "file", 
+             repository = "local"),  
+
   # project to the template and save as arrow dataset
   tar_target(nasa_weather_transformed, 
              transform_nasa_weather(nasa_weather_pre_transformed,
