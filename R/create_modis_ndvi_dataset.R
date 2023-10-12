@@ -10,27 +10,29 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-create_modis_ndvi_dataset <- function(modis_ndvi_downloaded,
+create_modis_ndvi_dataset <- function(modis_ndvi_downloaded_subset,
                                       continent_raster_template,
                                       modis_ndvi_directory_dataset, overwrite =
                                         FALSE) {
   
-  filename <- basename(modis_ndvi_downloaded)
-  
+  # Extract start and end dates from the raw downloaded file name
+  filename <- basename(modis_ndvi_downloaded_subset)
   year_doy <- sub(".*doy(\\d+).*", "\\1", filename) 
   start_date <- as.Date(year_doy, format = "%Y%j") # confirmed this is start date through manual download tests 
   end_date <- start_date + 16 
+  
+  # Set filename for saving
   save_filename <- glue::glue("transformed_modis_NDVI_{start_date}_to_{end_date}.gz.parquet")
-  
-  existing_files <- list.files(modis_ndvi_directory_dataset)
-  
   message(paste0("Transforming ", save_filename))
   
+  # Check if file already exists
+  existing_files <- list.files(modis_ndvi_directory_dataset)
   if(save_filename %in% existing_files & !overwrite){
     message("file already exists, skipping transform")
     return(file.path(modis_ndvi_directory_dataset, save_filename))
   }
   
+  # Transform with template raster
   transformed_raster <- transform_raster(raw_raster = rast(modis_ndvi_downloaded),
                                          template = rast(continent_raster_template))
   
