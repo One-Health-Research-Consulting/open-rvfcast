@@ -9,65 +9,61 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-create_nasa_weather_dataset <- function(nasa_weather_downloaded,
+create_nasa_weather_dataset <- function(nasa_weather_pre_dataset,
                                         nasa_weather_directory_dataset, 
                                         continent_raster_template,
                                         overwrite = FALSE) {
   
-  nasa_weather_directory_raw <- unique(dirname(nasa_weather_downloaded))
   
-  # Lazy/imperfect way of checking whether to overwrite or not
-  current_year <- year(Sys.Date())
-  file_names <- paste0("year=", 2005:current_year)
+  # Get filename for saving from the pre-processed arrow dataset
+  save_filename <-  sub(".*/(year=\\d{4}/part-\\d\\.parquet)", "\\1", nasa_weather_pre_dataset)
+  message(paste0("Transforming ", save_filename))
+  
+  # Check if file already exists
   existing_files <- list.files(nasa_weather_directory_dataset)
-  if(all(file_names %in% existing_files) & !overwrite){
+  if(dirname(save_filename) %in% existing_files & !overwrite){
     message("files already exist, skipping transform")
-    nasa_weather_preprocess_files <- list.files(nasa_weather_directory_dataset, full.names = TRUE, recursive = TRUE)
-    return(nasa_weather_preprocess_files)
+    return(file.path(nasa_weather_directory_dataset, save_filename))
   }
-
-  # remove dupes due to having overlapping country bounding boxes
-  # resave as arrow dataset, grouped by year
-  open_dataset(nasa_weather_directory_raw) |> 
-    distinct() |> 
-    rename_all(tolower) |> 
-    rename(relative_humidity = rh2m, temperature = t2m, precipitation= prectotcorr,
-           month = mm, day = dd, x = lon, y = lat, day_of_year = doy) |> 
-    select(x, y, everything(), -yyyymmdd) |>  # terra::rast - the first with x (or longitude) and the second with y (or latitude) coordinates 
-    group_by(year) |> 
-    write_dataset(nasa_weather_directory_dataset)
   
-  nasa_weather_preprocess_files <- list.files(nasa_weather_directory_dataset, full.names = TRUE, recursive = TRUE)
-
+  # Read in continent template raster
   continent_raster_template <- rast(continent_raster_template)
   
-  walk(nasa_weather_preprocess_files, function(file){
-    
-    raw_flat <- arrow::read_parquet(file)
-    assertthat::assert_that(names(raw_flat)[1]=="x")
-    assertthat::assert_that(names(raw_flat)[2]=="y")
-    
-    check_rows <- raw_flat |> group_by(x, y) |> count() |> ungroup() |> distinct(n)
-    assertthat::are_equal(1, nrow(check_rows))
-    check_rows <- raw_flat |> group_by(day_of_year) |> count() |> ungroup() |> distinct(n)
-    assertthat::are_equal(1, nrow(check_rows))
-    
-    # theres probably a nicer way to do this - combine into stack then transform all (then back to parquet??)
-    dat_out <- raw_flat |> 
-      group_split(day_of_year) |>  
-      map_dfr(function(daily){
-        raw_raster <- terra::rast(daily) 
-        crs(raw_raster) <-  crs(rast()) 
-        transformed_raster <- transform_raster(raw_raster = raw_raster,
-                                               template = continent_raster_template)
-        as.data.frame(transformed_raster, xy = TRUE) 
-      })
-    
-    # Save as parquets 
-    write_parquet(dat_out, file, compression = "gzip", compression_level = 5)
-    
-  })
+  # Read in pre-processed arrow dataset, make sure the first two columns are x and y
+  raw_flat <- arrow::read_parquet(nasa_weather_pre_dataset) |> 
+    mutate(year = as.integer(year(date)))
+  assertthat::assert_that(names(raw_flat)[1]=="x")
+  assertthat::assert_that(names(raw_flat)[2]=="y")
   
-  return(nasa_weather_preprocess_files)
+  check_rows <- raw_flat |> group_by(x, y) |> count() |> ungroup() |> distinct(n)
+  assertthat::are_equal(1, nrow(check_rows))
+  check_rows <- raw_flat |> group_by(day_of_year) |> count() |> ungroup() |> distinct(n)
+  assertthat::are_equal(1, nrow(check_rows))
+  
+  # Split by day of year and transform with template raster. Return as a row-binded dataframe
+  dat_out <- raw_flat |> 
+    group_split(month, day, year, day_of_year, date) |> 
+    map_dfr(function(daily){
+      daily_info <- distinct(daily, month, day, year, day_of_year, date)
+      daily_rast <- select(daily, -month, -day, -year, -day_of_year, -date)
+      raw_raster <- terra::rast(daily_rast) 
+      crs(raw_raster) <-  crs(rast()) 
+      transformed_raster <- transform_raster(raw_raster = raw_raster,
+                                             template = continent_raster_template)
+      cbind(daily_info, as.data.frame(transformed_raster, xy = TRUE)) |> 
+        select(x, y, everything())
+    }) 
+  
+  # Save as file
+  
+  # this crashes r
+  # dat_out |> 
+  #   group_by(year, month) |> 
+  #   write_dataset(nasa_weather_directory_dataset)
+  
+  suppressWarnings(dir.create(here::here(nasa_weather_directory_dataset, dirname(save_filename))))
+  write_parquet(dat_out, here::here(nasa_weather_directory_dataset, save_filename), compression = "gzip", compression_level = 5)
+  
+  return(file.path(nasa_weather_directory_dataset, save_filename))
   
 }
