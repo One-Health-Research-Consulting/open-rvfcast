@@ -8,7 +8,7 @@ message("downloading sentinel ndvi raw")
 sentinel_ndvi_downloaded <- tar_read(sentinel_ndvi_downloaded)
 
 # PARALLEL set number of workers
-n_workers <- 40
+n_workers <- 1
 
 plan(multisession, workers = n_workers)
 future_map(sentinel_ndvi_downloaded, function(x){

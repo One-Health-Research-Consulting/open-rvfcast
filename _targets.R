@@ -79,11 +79,11 @@ dynamic_targets <- tar_plan(
   
   # save raw to AWS bucket
   tar_target(sentinel_ndvi_raw_upload_aws_s3, {sentinel_ndvi_downloaded; # enforce dependency
-    aws_s3_upload(path = sentinel_ndvi_directory_raw,
-                  bucket =  aws_bucket ,
-                  key = sentinel_ndvi_directory_raw, 
-                  check = TRUE)}, 
-    cue = tar_cue("thorough")), 
+    aws_s3_upload_single_type(directory_path = sentinel_ndvi_directory_raw,
+                              bucket =  aws_bucket ,
+                              key = sentinel_ndvi_directory_raw, 
+                              check = TRUE)}, 
+    cue = tar_cue("never")), # only run this if you need to upload new data
   
   # project to the template and save as parquets (these can now be queried for analysis)
   # this maintains the branches, saves separate files split by date
@@ -147,22 +147,24 @@ dynamic_targets <- tar_plan(
              cue = tar_cue("thorough")),
   
   # save raw to AWS bucket
-  # maybe switch to rsync or minio
   tar_target(modis_ndvi_raw_upload_aws_s3, {modis_ndvi_downloaded; # enforce dependency
-    aws_s3_upload(path = modis_ndvi_directory_raw,
-                  bucket =  aws_bucket ,
-                  key = modis_ndvi_directory_raw, 
-                  check = TRUE)}, 
-    cue = tar_cue("thorough")), 
+    aws_s3_upload_single_type(directory_path = modis_ndvi_directory_raw,
+                              bucket =  aws_bucket ,
+                              key = modis_ndvi_directory_raw, 
+                              check = TRUE)}, 
+    cue = tar_cue("never")), # only run this if you need to upload new data
+  
+  # Remove the quality files
+  tar_target(modis_ndvi_downloaded_subset, modis_ndvi_downloaded[str_detect(basename(modis_ndvi_downloaded), "NDVI")]),
   
   # project to the template and save as parquets (these can now be queried for analysis)
   # this maintains the branches, saves separate files split by date
   tar_target(modis_ndvi_dataset, 
-             create_modis_ndvi_dataset(modis_ndvi_downloaded, 
+             create_modis_ndvi_dataset(modis_ndvi_downloaded_subset, 
                                        continent_raster_template,
                                        modis_ndvi_directory_dataset,
                                        overwrite = FALSE),
-             pattern = modis_ndvi_downloaded,
+             pattern = modis_ndvi_downloaded_subset,
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")), 
@@ -182,6 +184,8 @@ dynamic_targets <- tar_plan(
   
   tar_target(nasa_weather_directory_raw, 
              create_data_directory(directory_path = "data/nasa_weather_raw")),
+  tar_target(nasa_weather_directory_pre_dataset, 
+             create_data_directory(directory_path = "data/nasa_weather_pre_dataset")),
   tar_target(nasa_weather_directory_dataset, 
              create_data_directory(directory_path = "data/nasa_weather_dataset")),
   
@@ -205,20 +209,25 @@ dynamic_targets <- tar_plan(
   
   # save raw to AWS bucket
   tar_target(nasa_weather_raw_upload_aws_s3,  {nasa_weather_downloaded; # enforce dependency
-    aws_s3_upload(path = nasa_weather_directory_raw,
-                  bucket =  aws_bucket ,
-                  key = nasa_weather_directory_raw, 
-                  check = TRUE)}, 
-    cue = tar_cue("thorough")), 
+    aws_s3_upload_single_type(directory_path = nasa_weather_directory_raw,
+                              bucket =  aws_bucket,
+                              key = nasa_weather_directory_raw, 
+                              check = TRUE)}, 
+    cue = tar_cue("never")), # only run this if you need to upload new data
+  
+  
+  # remove dupes due to having overlapping country bounding boxes
+  # save as arrow dataset, grouped by year
+  tar_target(nasa_weather_pre_dataset, preprocess_nasa_weather_dataset(nasa_weather_downloaded,
+                                                                       nasa_weather_directory_pre_dataset)), 
   
   # project to the template and save as arrow dataset
-  # this combines all the branches because they are already saved as parquets and can be accessed as a dataset
-  # this also removes dupes due to having overlapping country bounding boxes
   tar_target(nasa_weather_dataset, 
-             create_nasa_weather_dataset(nasa_weather_downloaded,
+             create_nasa_weather_dataset(nasa_weather_pre_dataset,
                                          nasa_weather_directory_dataset, 
                                          continent_raster_template,
                                          overwrite = FALSE),
+             pattern = nasa_weather_pre_dataset,
              format = "file", 
              repository = "local",
              cue = tar_cue("thorough")),  
@@ -258,11 +267,11 @@ dynamic_targets <- tar_plan(
   
   # save raw to AWS bucket
   tar_target(ecmwf_forecasts_raw_upload_aws_s3,  {ecmwf_forecasts_downloaded; # enforce dependency
-    aws_s3_upload(path = ecmwf_forecasts_directory_raw,
-                  bucket =  aws_bucket ,
-                  key = ecmwf_forecasts_directory_raw,
-                  check = TRUE)},
-    cue = tar_cue("thorough")),
+    aws_s3_upload_single_type(directory_path = ecmwf_forecasts_directory_raw,
+                              bucket =  aws_bucket ,
+                              key = ecmwf_forecasts_directory_raw,
+                              check = TRUE)},
+    cue = tar_cue("never")), # only run this if you need to upload new data
   
   # project to the template and save as arrow dataset
   tar_target(ecmwf_forecasts_dataset, 

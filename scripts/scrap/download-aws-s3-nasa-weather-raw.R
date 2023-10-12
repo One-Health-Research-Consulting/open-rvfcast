@@ -8,7 +8,7 @@ message("downloading nasa weather raw")
 nasa_weather_downloaded <- tar_read(nasa_weather_downloaded)
 
 # PARALLEL set number of workers
-n_workers <- 40
+n_workers <- 1
 
 plan(multisession, workers = n_workers)
 future_map(nasa_weather_downloaded, function(x){
