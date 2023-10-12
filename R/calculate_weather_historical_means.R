@@ -11,20 +11,35 @@
 #' @export
 calculate_weather_historical_means <- function(nasa_weather_transformed,
                                                nasa_weather_directory_transformed,
-                                               weather_historical_means_directory) {
+                                               weather_historical_means_directory,
+                                               days_of_year) {
   
-  weather_dataset <- open_dataset(nasa_weather_directory_transformed) #|> to_duckdb(table_name = "weather")
+  # Set filename
+  doy <- days_of_year
+  doy_frmt <- str_pad(doy,width = 3, side = "left", pad = "0")
+  save_filename <- glue::glue("historical_weather_mean_doy_{doy_frmt}.gz.parquet")
   
+  message(paste("calculating historical weather means and standard deviations for doy", doy_frmt))
+  
+  # Open dataset to transformed data
+  weather_dataset <- open_dataset(nasa_weather_directory_transformed)
+  
+  # Filter for day of year and calculate historical means and standard deviations
   historical_means <- weather_dataset |> 
+    filter(day_of_year == doy) |> 
     group_by(x, y, day_of_year) |> 
-    summarize(historical_relative_humidity = mean(relative_humidity),
-              historical_temperature = mean(temperature),
-              historical_precipitation = mean(precipitation)) |> 
-    ungroup() |> 
-    group_by(day_of_year) |> 
-    write_dataset(weather_historical_means_directory)
+    summarize(historical_relative_humidity_mean = mean(relative_humidity),
+              historical_temperature_mean = mean(temperature),
+              historical_precipitation_mean = mean(precipitation),
+              historical_relative_humidity_sd = sd(relative_humidity),
+              historical_temperature_sd = sd(temperature),
+              historical_precipitation_sd = sd(precipitation)) |> 
+    ungroup() 
   
-  return(list.files(weather_historical_means_directory, full.names = TRUE, recursive = TRUE))
+  # Save as parquet 
+  write_parquet(historical_means, here::here(weather_historical_means_directory, save_filename), compression = "gzip", compression_level = 5)
   
-
+  return(file.path(weather_historical_means_directory, save_filename))
+  
+  
 }

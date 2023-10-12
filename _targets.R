@@ -66,7 +66,7 @@ dynamic_targets <- tar_plan(
              create_data_directory(directory_path = "data/sentinel_ndvi_transformed")),
   
   # get API parameters
-  tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters(), cue = tar_cue("thorough")), 
+  tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters()), 
   
   # download files from source (locally)
   tar_target(sentinel_ndvi_downloaded, download_sentinel_ndvi(sentinel_ndvi_api_parameters,
@@ -74,8 +74,7 @@ dynamic_targets <- tar_plan(
                                                               overwrite = FALSE),
              pattern = sentinel_ndvi_api_parameters, 
              format = "file", 
-             repository = "local",
-             cue = tar_cue("thorough")),
+             repository = "local"),
   
   # save raw to AWS bucket
   tar_target(sentinel_ndvi_raw_upload_aws_s3, {sentinel_ndvi_downloaded; # enforce dependency
@@ -94,8 +93,7 @@ dynamic_targets <- tar_plan(
                                      overwrite = FALSE),
              pattern = sentinel_ndvi_downloaded,
              format = "file", 
-             repository = "local",
-             cue = tar_cue("thorough")), 
+             repository = "local"), 
   
   # save transformed to AWS bucket
   tar_target(sentinel_ndvi_transformed_upload_aws_s3,  {sentinel_ndvi_transformed; # enforce dependency
@@ -143,8 +141,7 @@ dynamic_targets <- tar_plan(
                                                         overwrite = FALSE),
              pattern = modis_ndvi_bundle_request, 
              format = "file", 
-             repository = "local",
-             cue = tar_cue("thorough")),
+             repository = "local"),
   
   # save raw to AWS bucket
   tar_target(modis_ndvi_raw_upload_aws_s3, {modis_ndvi_downloaded; # enforce dependency
@@ -166,8 +163,7 @@ dynamic_targets <- tar_plan(
                                   overwrite = FALSE),
              pattern = modis_ndvi_downloaded_subset,
              format = "file", 
-             repository = "local",
-             cue = tar_cue("thorough")), 
+             repository = "local"), 
   
   # save transformed to AWS bucket
   tar_target(modis_ndvi_transformed_upload_aws_s3,  {modis_ndvi_transformed; # enforce dependency
@@ -203,9 +199,7 @@ dynamic_targets <- tar_plan(
                                    overwrite = FALSE),
              pattern = crossing(nasa_weather_years, nasa_weather_coordinates),
              format = "file",
-             repository = "local",
-             cue = tar_cue("thorough")
-  ),
+             repository = "local"),
   
   # save raw to AWS bucket
   tar_target(nasa_weather_raw_upload_aws_s3,  {nasa_weather_downloaded; # enforce dependency
@@ -229,8 +223,7 @@ dynamic_targets <- tar_plan(
                                     overwrite = FALSE),
              pattern = nasa_weather_pre_transformed,
              format = "file", 
-             repository = "local",
-             cue = tar_cue("thorough")),  
+             repository = "local"),  
   
   # save transformed to AWS bucket
   tar_target(nasa_weather_transformed_upload_aws_s3,  {nasa_weather_transformed; # enforce dependency
@@ -260,9 +253,7 @@ dynamic_targets <- tar_plan(
                                       overwrite = FALSE),
              pattern = ecmwf_forecasts_api_parameters,
              format = "file",
-             repository = "local",
-             cue = tar_cue("thorough")
-  ),
+             repository = "local"),
   
   # save raw to AWS bucket
   tar_target(ecmwf_forecasts_raw_upload_aws_s3,  {ecmwf_forecasts_downloaded; # enforce dependency
@@ -280,8 +271,7 @@ dynamic_targets <- tar_plan(
                                        overwrite = TRUE),
              pattern = ecmwf_forecasts_downloaded,
              format = "file", 
-             repository = "local",
-             cue = tar_cue("thorough")),  
+             repository = "local"),  
   
   # save transformed to AWS bucket
   tar_target(ecmwf_forecasts_transformed_upload_aws_s3,  {ecmwf_forecasts_transformed; # enforce dependency
@@ -297,6 +287,7 @@ dynamic_targets <- tar_plan(
 data_targets <- tar_plan(
   
   tar_target(lag_intervals, c(30, 60, 90)), 
+  tar_target(days_of_year, 1:366),
   tar_target(model_dates, set_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, lag_intervals, seed = 212)),
   tar_target(model_dates_selected, model_dates |> filter(select_date) |> pull(date)),
   
@@ -307,8 +298,12 @@ data_targets <- tar_plan(
   
   tar_target(weather_historical_means, calculate_weather_historical_means(nasa_weather_transformed, # enforce dependency
                                                                           nasa_weather_directory_transformed,
-                                                                          weather_historical_means_directory)),
-  
+                                                                          weather_historical_means_directory,
+                                                                          days_of_year),
+             pattern = days_of_year,
+             format = "file", 
+             repository = "local"),  
+
   tar_target(weather_anomalies_directory, 
              create_data_directory(directory_path = "data/weather_anomalies")),
   
@@ -321,8 +316,7 @@ data_targets <- tar_plan(
                                                             overwrite = FALSE),
              pattern = head(model_dates_selected, 20),
              format = "file", 
-             repository = "local",
-             cue = tar_cue("thorough")),  
+             repository = "local"),  
   # at 10 min per date, this would take 4260 minutes = 71 hours = 3 days when run sequentially
   
   # tar_target(ndvi_data, process_ndvi_data(sentinel_ndvi_directory_transformed, sentinel_ndvi_transformed, model_dates_random_select))
