@@ -214,26 +214,26 @@ dynamic_targets <- tar_plan(
   # save as arrow dataset, grouped by year
   tar_target(nasa_weather_pre_transformed, preprocess_nasa_weather(nasa_weather_downloaded,
                                                                    nasa_weather_directory_pre_transformed),
-             format = "file", 
-             repository = "local"),  
-
+             repository = "local"), 
+  
   # project to the template and save as arrow dataset
   tar_target(nasa_weather_transformed, 
-             transform_nasa_weather(nasa_weather_pre_transformed,
-                                    nasa_weather_directory_transformed, 
-                                    continent_raster_template,
-                                    overwrite = FALSE),
+             tranform_nasa_weather(nasa_weather_pre_transformed,
+                                   nasa_weather_directory_transformed, 
+                                   continent_raster_template,
+                                   overwrite = FALSE),
              pattern = nasa_weather_pre_transformed,
              format = "file", 
              repository = "local"),  
   
   # save transformed to AWS bucket
-  tar_target(nasa_weather_transformed_upload_aws_s3,  {nasa_weather_transformed; # enforce dependency
-    aws_s3_upload_single_type(directory_path = nasa_weather_directory_transformed,
-                              bucket =  aws_bucket,
-                              key = nasa_weather_directory_transformed, 
-                              check = TRUE)}, 
-    cue = tar_cue("never")),    
+  tar_target(nasa_weather_transformed_upload_aws_s3,  
+             aws_s3_upload(path = nasa_weather_transformed,
+                           bucket =  aws_bucket,
+                           key = nasa_weather_transformed,
+                           check = TRUE), 
+             pattern = nasa_weather_transformed,
+             cue = tar_cue("thorough")),    
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   tar_target(ecmwf_forecasts_directory_raw, 
@@ -305,7 +305,7 @@ data_targets <- tar_plan(
              pattern = days_of_year,
              format = "file", 
              repository = "local"),  
-
+  
   tar_target(weather_anomalies_directory, 
              create_data_directory(directory_path = "data/weather_anomalies")),
   
