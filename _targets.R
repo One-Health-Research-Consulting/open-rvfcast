@@ -323,7 +323,7 @@ data_targets <- tar_plan(
                model_dates_selected,
                lag_intervals,
                overwrite = FALSE),
-             pattern = head(model_dates_selected, 20),
+             pattern = model_dates_selected,
              format = "file", 
              repository = "local"),  
   # at 10 min per date, this would take 4260 minutes = 71 hours = 3 days when run sequentially

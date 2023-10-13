@@ -54,7 +54,7 @@ calculate_weather_anomalies <-
       lag_dates <- model_dates |> slice((row_select - start):(row_select - end))
       
       # Lag: calculate mean by pixel for the preceding x days
-      lagged_means <- weather_dataset |> 
+      lagged_means <- weather_transformed_dataset |> 
         filter(date %in% !!lag_dates$date) |> 
         group_by(x, y) |> 
         summarize(lag_relative_humidity_mean = mean(relative_humidity),

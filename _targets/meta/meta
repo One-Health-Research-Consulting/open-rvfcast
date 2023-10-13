@@ -6521,3 +6521,4 @@ transform_modis_ndvi|function|28d79a3d7f63479a
 get_wahis_rvf_outbreaks_raw|function|a8564ce9127c9c1d
 get_nasa_weather_coordinates|function|2c23f9e4d93cd8ca
 ecmwf_forecasts_transformed_39321319|branch|3acf03c76cfe7948|65f4c5c000b3cdb0|df72ad0db9d40283|-1425929150|data/ecmwf_forecasts_transformed/ecmwf_seasonal_forecast_sys5_2013.gz.parquet|t19643.7287401079s|00558ffa7074450f|3048433881|file|local|vector|ecmwf_forecasts_transformed||931.08||
+weather_anomalies_ed20e728|branch|d63f00a95328aa64|5ef87258cf0b822e|504645e86440039f|258210251|data/weather_anomalies/weather_anomaly_2014-01-03.gz.parquet|t19643.7668759296s|be1ce42ffa69c406|25575651|file|local|vector|weather_anomalies||46.615||
