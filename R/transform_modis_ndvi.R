@@ -3,7 +3,7 @@
 #' .. content for \details{} ..
 #'
 #' @title
-#' @param modis_ndvi_downloaded
+#' @param modis_ndvi_downloaded_subset
 #' @param continent_raster_template
 #' @param modis_ndvi_directory_transformed
 #' @param overwrite
@@ -33,7 +33,7 @@ transform_modis_ndvi <- function(modis_ndvi_downloaded_subset,
   }
   
   # Transform with template raster
-  transformed_raster <- transform_raster(raw_raster = rast(modis_ndvi_downloaded),
+  transformed_raster <- transform_raster(raw_raster = rast(modis_ndvi_downloaded_subset),
                                          template = rast(continent_raster_template))
   
   # Convert to dataframe
