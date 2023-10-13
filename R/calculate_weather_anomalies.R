@@ -11,7 +11,7 @@
 calculate_weather_anomalies <- 
   function( # tranformed files
     nasa_weather_transformed,
-    nasa_weather_directory_transformed, # TODO rename this to nasa_weather_transformed_directory
+    nasa_weather_transformed_directory, # TODO rename this to nasa_weather_transformed_directory
     # historical means
     weather_historical_means,
     # directory for saving anomalies 
@@ -35,7 +35,7 @@ calculate_weather_anomalies <-
     }
     
     # Open dataset to transformed data
-    weather_transformed_dataset <- open_dataset(nasa_weather_directory_transformed)
+    weather_transformed_dataset <- open_dataset(nasa_weather_transformed_directory)
     
     # Get historical means for DOY
     doy <- model_dates |> filter(date == date_selected) |> pull(day_of_year)

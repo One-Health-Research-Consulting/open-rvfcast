@@ -11,7 +11,7 @@
 #' @author Emma Mendelsohn
 #' @export
 download_modis_ndvi_delete <- function(modis_ndvi_token, modis_ndvi_bundle_request,
-                                download_directory = modis_ndvi_directory_raw,
+                                download_directory = modis_ndvi_raw_directory,
                                 overwrite = FALSE) {
 
   return(modis_ndvi_token)

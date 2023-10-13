@@ -5,13 +5,13 @@
 #' @title
 #' @param raster_file
 #' @param template
-#' @param sentinel_ndvi_directory_transformed
+#' @param sentinel_ndvi_transformed_directory
 #' @return
 #' @author Emma Mendelsohn
 #' @export
 transform_sentinel_ndvi <- function(sentinel_ndvi_downloaded,
                                     continent_raster_template,
-                                    sentinel_ndvi_directory_transformed,
+                                    sentinel_ndvi_transformed_directory,
                                     overwrite = FALSE) {
   
   # Extract start and end dates from the raw downloaded file name
@@ -25,10 +25,10 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_downloaded,
   message(paste0("Transforming ", save_filename))
   
   # Check if file already exists
-  existing_files <- list.files(sentinel_ndvi_directory_transformed)
+  existing_files <- list.files(sentinel_ndvi_transformed_directory)
   if(save_filename %in% existing_files & !overwrite){
     message("file already exists, skipping transform")
-    return(file.path(sentinel_ndvi_directory_transformed, save_filename))
+    return(file.path(sentinel_ndvi_transformed_directory, save_filename))
   }
   
   # Transform with template raster
@@ -43,8 +43,8 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_downloaded,
            end_date = end_date)
   
   # Save as parquet 
-  write_parquet(dat_out, here::here(sentinel_ndvi_directory_transformed, save_filename), compression = "gzip", compression_level = 5)
+  write_parquet(dat_out, here::here(sentinel_ndvi_transformed_directory, save_filename), compression = "gzip", compression_level = 5)
   
-  return(file.path(sentinel_ndvi_directory_transformed, save_filename))
+  return(file.path(sentinel_ndvi_transformed_directory, save_filename))
   
 }

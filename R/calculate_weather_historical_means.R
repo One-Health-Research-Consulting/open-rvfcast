@@ -4,13 +4,13 @@
 #'
 #' @title
 #' @param nasa_weather_transformed
-#' @param nasa_weather_directory_transformed
+#' @param nasa_weather_transformed_directory
 #' @param weather_historical_means_directory
 #' @return
 #' @author Emma Mendelsohn
 #' @export
 calculate_weather_historical_means <- function(nasa_weather_transformed,
-                                               nasa_weather_directory_transformed,
+                                               nasa_weather_transformed_directory,
                                                weather_historical_means_directory,
                                                days_of_year,
                                                overwrite = FALSE) {
@@ -28,7 +28,7 @@ calculate_weather_historical_means <- function(nasa_weather_transformed,
     return(file.path(weather_historical_means_directory, save_filename))
   }
   # Open dataset to transformed data
-  weather_transformed_dataset <- open_dataset(nasa_weather_directory_transformed)
+  weather_transformed_dataset <- open_dataset(nasa_weather_transformed_directory)
   
   # Filter for day of year and calculate historical means and standard deviations
   historical_means <- weather_transformed_dataset |> 

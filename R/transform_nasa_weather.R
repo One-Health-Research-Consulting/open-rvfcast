@@ -5,12 +5,12 @@
 #' @title
 #' @param nasa_weather_downloaded
 #' @param continent_raster_template
-#' @param nasa_weather_directory_transformed
+#' @param nasa_weather_transformed_directory
 #' @return
 #' @author Emma Mendelsohn
 #' @export
 transform_nasa_weather <- function(nasa_weather_pre_transformed,
-                                   nasa_weather_directory_transformed, 
+                                   nasa_weather_transformed_directory, 
                                    continent_raster_template,
                                    overwrite = FALSE) {
   
@@ -20,10 +20,10 @@ transform_nasa_weather <- function(nasa_weather_pre_transformed,
   message(paste0("Transforming ", save_filename))
   
   # Check if file already exists
-  existing_files <- list.files(nasa_weather_directory_transformed)
+  existing_files <- list.files(nasa_weather_transformed_directory)
   if(dirname(save_filename) %in% existing_files & !overwrite){
     message("files already exist, skipping transform")
-    return(file.path(nasa_weather_directory_transformed, save_filename))
+    return(file.path(nasa_weather_transformed_directory, save_filename))
   }
   
   # Read in continent template raster
@@ -63,12 +63,12 @@ transform_nasa_weather <- function(nasa_weather_pre_transformed,
   # This crashes r
   # dat_out |> 
   #   group_by(year, month) |> 
-  #   write_dataset(nasa_weather_directory_transformed)
+  #   write_dataset(nasa_weather_transformed_directory)
   
   # Save as parquet 
-  suppressWarnings(dir.create(here::here(nasa_weather_directory_transformed, dirname(save_filename)))) # unnecessary but matching structure of pretransformed dataset
-  write_parquet(dat_out, here::here(nasa_weather_directory_transformed, save_filename), compression = "gzip", compression_level = 5)
+  suppressWarnings(dir.create(here::here(nasa_weather_transformed_directory, dirname(save_filename)))) # unnecessary but matching structure of pretransformed dataset
+  write_parquet(dat_out, here::here(nasa_weather_transformed_directory, save_filename), compression = "gzip", compression_level = 5)
   
-  return(file.path(nasa_weather_directory_transformed, save_filename))
+  return(file.path(nasa_weather_transformed_directory, save_filename))
   
 }
