@@ -21,7 +21,7 @@ tar_option_set(resources = tar_resources(
   workspace_on_error = TRUE # allows interactive session for failed branches
 )
 
-future::plan(future::multisession, workers = 16)
+# future::plan(future::multisession, workers = 16)
 
 # Static Data Download ----------------------------------------------------
 static_targets <- tar_plan(
@@ -39,8 +39,7 @@ static_targets <- tar_plan(
   tar_target(continent_polygon, create_africa_polygon()),
   tar_target(continent_bounding_box, sf::st_bbox(continent_polygon)),
   tar_target(continent_raster_template,
-             wrap(terra::rast(ext(continent_polygon), 
-                              resolution = 0.1))), #TODO change to 0.1 (might cause error in transform, leaving at 0.5 for now)
+             wrap(terra::rast(ext(continent_polygon), resolution = 0.1))), 
   # nasa power resolution = 0.5; 
   # ecmwf = 1; 
   # sentinel ndvi = 0.01
@@ -59,7 +58,6 @@ dynamic_targets <- tar_plan(
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
   # 10 day period
-  
   tar_target(sentinel_ndvi_raw_directory, 
              create_data_directory(directory_path = "data/sentinel_ndvi_raw")),
   tar_target(sentinel_ndvi_transformed_directory, 
@@ -77,7 +75,7 @@ dynamic_targets <- tar_plan(
              repository = "local"),
   
   # save raw to AWS bucket
-  tar_target(sentinel_ndvi_raw_upload_aws_s3, {sentinel_ndvi_downloaded; # enforce dependency
+  tar_target(sentinel_ndvi_raw_upload_aws_s3, {sentinel_ndvi_downloaded;
     aws_s3_upload_single_type(directory_path = sentinel_ndvi_raw_directory,
                               bucket =  aws_bucket ,
                               key = sentinel_ndvi_raw_directory, 
@@ -145,14 +143,14 @@ dynamic_targets <- tar_plan(
              repository = "local"),
   
   # save raw to AWS bucket
-  tar_target(modis_ndvi_raw_upload_aws_s3, {modis_ndvi_downloaded; # enforce dependency
+  tar_target(modis_ndvi_raw_upload_aws_s3, {modis_ndvi_downloaded;
     aws_s3_upload_single_type(directory_path = modis_ndvi_raw_directory,
                               bucket =  aws_bucket ,
                               key = modis_ndvi_raw_directory, 
                               check = TRUE)}, 
     cue = tar_cue("never")), # only run this if you need to upload new data
   
-  # Remove the quality files
+  # remove the "quality" files
   tar_target(modis_ndvi_downloaded_subset, modis_ndvi_downloaded[str_detect(basename(modis_ndvi_downloaded), "NDVI")]),
   
   # project to the template and save as parquets (these can now be queried for analysis)
@@ -179,7 +177,6 @@ dynamic_targets <- tar_plan(
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
   # T2M             MERRA-2 Temperature at 2 Meters (C) ;
   # PRECTOTCORR     MERRA-2 Precipitation Corrected (mm/day)  
-  
   tar_target(nasa_weather_raw_directory, 
              create_data_directory(directory_path = "data/nasa_weather_raw")),
   tar_target(nasa_weather_pre_transformed_directory, 
@@ -187,7 +184,7 @@ dynamic_targets <- tar_plan(
   tar_target(nasa_weather_transformed_directory, 
              create_data_directory(directory_path = "data/nasa_weather_transformed")),
   
-  # set branching for nasa
+  # set branching for nasa download
   tar_target(nasa_weather_years, 2005:2023),
   tar_target(nasa_weather_variables, c("RH2M", "T2M", "PRECTOTCORR")),
   tar_target(nasa_weather_coordinates, get_nasa_weather_coordinates(country_bounding_boxes)),
@@ -204,7 +201,7 @@ dynamic_targets <- tar_plan(
              repository = "local"),
   
   # save raw to AWS bucket
-  tar_target(nasa_weather_raw_upload_aws_s3,  {nasa_weather_downloaded; # enforce dependency
+  tar_target(nasa_weather_raw_upload_aws_s3,  {nasa_weather_downloaded;
     aws_s3_upload_single_type(directory_path = nasa_weather_raw_directory,
                               bucket =  aws_bucket,
                               key = nasa_weather_raw_directory, 
@@ -243,7 +240,7 @@ dynamic_targets <- tar_plan(
   tar_target(ecmwf_forecasts_transformed_directory, 
              create_data_directory(directory_path = "data/ecmwf_forecasts_transformed")),
   
-  # set branching for ecmwf
+  # set branching for ecmwf download
   tar_target(ecmwf_forecasts_api_parameters, set_ecmwf_api_parameter(years = 2005:2023,
                                                                      bbox_coords = continent_bounding_box,
                                                                      variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
@@ -260,7 +257,7 @@ dynamic_targets <- tar_plan(
              repository = "local"),
   
   # save raw to AWS bucket
-  tar_target(ecmwf_forecasts_raw_upload_aws_s3,  {ecmwf_forecasts_downloaded; # enforce dependency
+  tar_target(ecmwf_forecasts_raw_upload_aws_s3,  {ecmwf_forecasts_downloaded;
     aws_s3_upload_single_type(directory_path = ecmwf_forecasts_raw_directory,
                               bucket =  aws_bucket ,
                               key = ecmwf_forecasts_raw_directory,
@@ -279,7 +276,7 @@ dynamic_targets <- tar_plan(
              repository = "local"),  
   
   # save transformed to AWS bucket
-  tar_target(ecmwf_forecasts_transformed_upload_aws_s3,  # enforce dependency
+  tar_target(ecmwf_forecasts_transformed_upload_aws_s3, 
              aws_s3_upload(path = ecmwf_forecasts_transformed,
                            bucket =  aws_bucket,
                            key = ecmwf_forecasts_transformed, 
@@ -298,7 +295,6 @@ data_targets <- tar_plan(
   tar_target(model_dates_selected, model_dates |> filter(select_date) |> pull(date)),
   
   # weather data
-  
   tar_target(weather_historical_means_directory, 
              create_data_directory(directory_path = "data/weather_historical_means")),
   
@@ -314,19 +310,27 @@ data_targets <- tar_plan(
   tar_target(weather_anomalies_directory, 
              create_data_directory(directory_path = "data/weather_anomalies")),
   
-  tar_target(weather_anomalies, 
-             calculate_weather_anomalies(
-               nasa_weather_transformed,
-               nasa_weather_transformed_directory, # TODO rename this to nasa_weather_transformed_directory
-               weather_historical_means,
-               weather_anomalies_directory,
-               model_dates,
-               model_dates_selected,
-               lag_intervals,
-               overwrite = FALSE),
+  tar_target(weather_anomalies, calculate_weather_anomalies(nasa_weather_transformed,
+                                                            nasa_weather_transformed_directory,
+                                                            weather_historical_means,
+                                                            weather_anomalies_directory,
+                                                            model_dates,
+                                                            model_dates_selected,
+                                                            lag_intervals,
+                                                            overwrite = FALSE),
              pattern = model_dates_selected,
              format = "file", 
              repository = "local"),  
+  
+  # save anomalies to AWS bucket
+  tar_target(weather_anomalies_upload_aws_s3, 
+             aws_s3_upload(path = weather_anomalies,
+                           bucket =  aws_bucket,
+                           key = weather_anomalies, 
+                           check = TRUE), 
+             pattern = weather_anomalies,
+             cue = tar_cue("never")),   
+  
 )
 
 # Model -----------------------------------------------------------
