@@ -312,13 +312,20 @@ data_targets <- tar_plan(
   tar_target(weather_anomalies_directory, 
              create_data_directory(directory_path = "data/weather_anomalies")),
   
-  tar_target(weather_anomalies, calculate_weather_anomalies(nasa_weather_transformed, # enforce dependency
-                                                            nasa_weather_directory_transformed,
-                                                            nasa_weather_anomalies_directory_transformed,
-                                                            model_dates,
-                                                            model_dates_selected,
-                                                            lag_intervals,
-                                                            overwrite = FALSE),
+  tar_target(weather_anomalies, 
+             calculate_weather_anomalies(
+               # tranformed files
+               nasa_weather_transformed,
+               nasa_weather_directory_transformed, # TODO rename this to nasa_weather_transformed_directory
+               # historical means
+               weather_historical_means,
+               # directory for saving anomalies 
+               weather_anomalies_directory,
+               # dates and lags selected
+               model_dates,
+               model_dates_selected,
+               lag_intervals,
+               overwrite = FALSE),
              pattern = head(model_dates_selected, 20),
              format = "file", 
              repository = "local"),  
