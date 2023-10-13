@@ -168,7 +168,7 @@ dynamic_targets <- tar_plan(
   
   # save transformed to AWS bucket
   tar_target(modis_ndvi_transformed_upload_aws_s3,
-             aws_s3_upload(directory_path = modis_ndvi_transformed,
+             aws_s3_upload(path = modis_ndvi_transformed,
                            bucket =  aws_bucket,
                            key = modis_ndvi_transformed, 
                            check = TRUE), 
@@ -279,7 +279,7 @@ dynamic_targets <- tar_plan(
   
   # save transformed to AWS bucket
   tar_target(ecmwf_forecasts_transformed_upload_aws_s3,  # enforce dependency
-             aws_s3_upload(directory_path = ecmwf_forecasts_transformed,
+             aws_s3_upload(path = ecmwf_forecasts_transformed,
                            bucket =  aws_bucket,
                            key = ecmwf_forecasts_transformed, 
                            check = TRUE), 
