@@ -305,7 +305,8 @@ data_targets <- tar_plan(
   tar_target(weather_historical_means, calculate_weather_historical_means(nasa_weather_transformed, # enforce dependency
                                                                           nasa_weather_directory_transformed,
                                                                           weather_historical_means_directory,
-                                                                          days_of_year),
+                                                                          days_of_year,
+                                                                          overwrite = FALSE),
              pattern = days_of_year,
              format = "file", 
              repository = "local"),  

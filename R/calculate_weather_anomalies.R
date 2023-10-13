@@ -27,7 +27,6 @@ calculate_weather_anomalies <-
     save_filename <- glue::glue("weather_anomaly_{date_selected}.gz.parquet")
     message(paste0("Calculating weather anomalies for ", date_selected))
     
-    
     # Check if file already exists
     existing_files <- list.files(weather_anomalies_directory)
     if(save_filename %in% existing_files & !overwrite) {
