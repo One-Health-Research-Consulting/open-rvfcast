@@ -13,6 +13,7 @@
 transform_ecmwf_forecasts <- function(ecmwf_forecasts_downloaded,
                                       ecmwf_forecasts_directory_transformed,
                                       continent_raster_template, 
+                                      n_workers = 1,
                                       overwrite = FALSE) {
   
   # Get filename for saving from the raw data

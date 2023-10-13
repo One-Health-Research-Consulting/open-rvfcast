@@ -272,7 +272,8 @@ dynamic_targets <- tar_plan(
              transform_ecmwf_forecasts(ecmwf_forecasts_downloaded,
                                        ecmwf_forecasts_directory_transformed, 
                                        continent_raster_template,
-                                       overwrite = TRUE),
+                                       n_workers = 2,
+                                       overwrite = FALSE),
              pattern = ecmwf_forecasts_downloaded,
              format = "file", 
              repository = "local"),  
@@ -314,14 +315,10 @@ data_targets <- tar_plan(
   
   tar_target(weather_anomalies, 
              calculate_weather_anomalies(
-               # tranformed files
                nasa_weather_transformed,
                nasa_weather_directory_transformed, # TODO rename this to nasa_weather_transformed_directory
-               # historical means
                weather_historical_means,
-               # directory for saving anomalies 
                weather_anomalies_directory,
-               # dates and lags selected
                model_dates,
                model_dates_selected,
                lag_intervals,
