@@ -39,9 +39,12 @@ tar_load(nasa_weather_transformed)
 assertthat::are_equal(length(nasa_weather_transformed), length(nasa_weather_transformed_directory_files))
 
 # ECMWF Forecasts -----------------------------------------------------------
-# message("downloading ecmwf_forecasts_transformed_directory")
-# ecmwf_forecasts_transformed_directory <- tar_read(ecmwf_forecasts_transformed_directory)
-# aws_s3_download(path = ecmwf_forecasts_transformed_directory,
-#                 bucket = aws_bucket ,
-#                 key = ecmwf_forecasts_transformed_directory,
-#                 check = TRUE)
+message("downloading ecmwf_forecasts_transformed_directory")
+ecmwf_forecasts_transformed_directory <- tar_read(ecmwf_forecasts_transformed_directory)
+aws_s3_download(path = ecmwf_forecasts_transformed_directory,
+                bucket = aws_bucket ,
+                key = ecmwf_forecasts_transformed_directory,
+                check = TRUE)
+ecmwf_forecasts_transformed_directory_files <- list.files(ecmwf_forecasts_transformed_directory)
+tar_load(ecmwf_forecasts_transformed)
+assertthat::are_equal(length(ecmwf_forecasts_transformed), length(ecmwf_forecasts_transformed_directory_files))
