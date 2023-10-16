@@ -1,6 +1,6 @@
 {
   "R": {
-    "Version": "4.3.0",
+    "Version": "4.3.1",
     "Repositories": [
       {
         "Name": "RSPM",
@@ -17,17 +17,59 @@
     ]
   },
   "Packages": {
+    "DBI": {
+      "Source": "Repository",
+      "Package": "DBI",
+      "Version": "1.1.3",
+      "Repository": "CRAN"
+    },
+    "R6": {
+      "Source": "Repository",
+      "Package": "R6",
+      "Version": "2.5.1",
+      "Repository": "CRAN"
+    },
+    "RApiSerialize": {
+      "Source": "Repository",
+      "Package": "RApiSerialize",
+      "Version": "0.1.2",
+      "Repository": "CRAN"
+    },
+    "RColorBrewer": {
+      "Source": "Repository",
+      "Package": "RColorBrewer",
+      "Version": "1.1-3",
+      "Repository": "CRAN"
+    },
+    "Rcpp": {
+      "Source": "Repository",
+      "Package": "Rcpp",
+      "Version": "1.0.11",
+      "Repository": "CRAN"
+    },
+    "RcppParallel": {
+      "Source": "Repository",
+      "Package": "RcppParallel",
+      "Version": "5.1.7",
+      "Repository": "CRAN"
+    },
+    "arrow": {
+      "Source": "Repository",
+      "Package": "arrow",
+      "Version": "12.0.0",
+      "Repository": "CRAN"
+    },
     "askpass": {
       "Source": "Repository",
       "Package": "askpass",
-      "Version": "1.2.0",
-      "Repository": "RSPM"
+      "Version": "1.1",
+      "Repository": "CRAN"
     },
     "assertthat": {
       "Source": "Repository",
       "Package": "assertthat",
       "Version": "0.2.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "atcursor": {
       "Source": "GitHub",
@@ -40,39 +82,134 @@
       "RemoteRef": "main",
       "RemoteSha": "52445666e612650cfa787814c3b195eaa1012ab8"
     },
+    "aws.s3": {
+      "Source": "Repository",
+      "Package": "aws.s3",
+      "Version": "0.3.21",
+      "Repository": "CRAN"
+    },
+    "aws.signature": {
+      "Source": "Repository",
+      "Package": "aws.signature",
+      "Version": "0.6.0",
+      "Repository": "CRAN"
+    },
+    "backports": {
+      "Source": "Repository",
+      "Package": "backports",
+      "Version": "1.4.1",
+      "Repository": "CRAN"
+    },
+    "base64enc": {
+      "Source": "Repository",
+      "Package": "base64enc",
+      "Version": "0.1-3",
+      "Repository": "CRAN"
+    },
     "base64url": {
       "Source": "Repository",
       "Package": "base64url",
       "Version": "1.4",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "bit": {
+      "Source": "Repository",
+      "Package": "bit",
+      "Version": "4.0.5",
+      "Repository": "CRAN"
+    },
+    "bit64": {
+      "Source": "Repository",
+      "Package": "bit64",
+      "Version": "4.0.5",
+      "Repository": "CRAN"
     },
     "blastula": {
       "Source": "Repository",
       "Package": "blastula",
       "Version": "0.3.4",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "blob": {
+      "Source": "Repository",
+      "Package": "blob",
+      "Version": "1.2.4",
+      "Repository": "CRAN"
     },
     "broom": {
       "Source": "Repository",
       "Package": "broom",
       "Version": "1.0.5",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "bslib": {
       "Source": "Repository",
       "Package": "bslib",
       "Version": "0.5.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "cachem": {
+      "Source": "Repository",
+      "Package": "cachem",
+      "Version": "1.0.8",
+      "Repository": "CRAN"
+    },
+    "callr": {
+      "Source": "Repository",
+      "Package": "callr",
+      "Version": "3.7.3",
+      "Repository": "CRAN"
     },
     "capsule": {
       "Source": "Repository",
       "Package": "capsule",
       "Version": "0.4.2",
       "Repository": "https://milesmcbain.r-universe.dev",
-      "RemoteType": "repository",
       "RemoteUrl": "https://github.com/milesmcbain/capsule",
       "RemoteRef": "master",
       "RemoteSha": "401d0c98adc329c17d0bb129069c9ec220a26646"
+    },
+    "cellranger": {
+      "Source": "Repository",
+      "Package": "cellranger",
+      "Version": "1.1.0",
+      "Repository": "CRAN"
+    },
+    "classInt": {
+      "Source": "Repository",
+      "Package": "classInt",
+      "Version": "0.4-9",
+      "Repository": "CRAN"
+    },
+    "cli": {
+      "Source": "Repository",
+      "Package": "cli",
+      "Version": "3.6.1",
+      "Repository": "CRAN"
+    },
+    "clipr": {
+      "Source": "Repository",
+      "Package": "clipr",
+      "Version": "0.8.0",
+      "Repository": "CRAN"
+    },
+    "colorspace": {
+      "Source": "Repository",
+      "Package": "colorspace",
+      "Version": "2.1-0",
+      "Repository": "CRAN"
+    },
+    "commonmark": {
+      "Source": "Repository",
+      "Package": "commonmark",
+      "Version": "1.9.0",
+      "Repository": "CRAN"
+    },
+    "conflicted": {
+      "Source": "Repository",
+      "Package": "conflicted",
+      "Version": "1.2.0",
+      "Repository": "CRAN"
     },
     "containerTemplateUtils": {
       "Source": "GitHub",
@@ -89,49 +226,127 @@
       "Source": "Repository",
       "Package": "countrycode",
       "Version": "1.5.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "cpp11": {
       "Source": "Repository",
       "Package": "cpp11",
       "Version": "0.4.6",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "crayon": {
+      "Source": "Repository",
+      "Package": "crayon",
+      "Version": "1.5.2",
+      "Repository": "CRAN"
     },
     "credentials": {
       "Source": "Repository",
       "Package": "credentials",
-      "Version": "2.0.1",
-      "Repository": "RSPM"
+      "Version": "1.3.2",
+      "Repository": "CRAN"
+    },
+    "crul": {
+      "Source": "Repository",
+      "Package": "crul",
+      "Version": "1.4.0",
+      "Repository": "CRAN"
     },
     "curl": {
       "Source": "Repository",
       "Package": "curl",
       "Version": "5.0.2",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "data.table": {
+      "Source": "Repository",
+      "Package": "data.table",
+      "Version": "1.14.8",
+      "Repository": "CRAN"
+    },
+    "dbplyr": {
+      "Source": "Repository",
+      "Package": "dbplyr",
+      "Version": "2.3.2",
+      "Repository": "CRAN"
+    },
+    "desc": {
+      "Source": "Repository",
+      "Package": "desc",
+      "Version": "1.4.2",
+      "Repository": "CRAN"
+    },
+    "digest": {
+      "Source": "Repository",
+      "Package": "digest",
+      "Version": "0.6.31",
+      "Repository": "CRAN"
     },
     "dotenv": {
       "Source": "Repository",
       "Package": "dotenv",
       "Version": "1.0.3",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "dplyr": {
+      "Source": "Repository",
+      "Package": "dplyr",
+      "Version": "1.1.2",
+      "Repository": "CRAN"
+    },
+    "dtplyr": {
+      "Source": "Repository",
+      "Package": "dtplyr",
+      "Version": "1.3.1",
+      "Repository": "CRAN"
+    },
+    "e1071": {
+      "Source": "Repository",
+      "Package": "e1071",
+      "Version": "1.7-13",
+      "Repository": "CRAN"
     },
     "ecmwfr": {
       "Source": "Repository",
       "Package": "ecmwfr",
       "Version": "1.5.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "ellipsis": {
+      "Source": "Repository",
+      "Package": "ellipsis",
+      "Version": "0.3.2",
+      "Repository": "CRAN"
+    },
+    "evaluate": {
+      "Source": "Repository",
+      "Package": "evaluate",
+      "Version": "0.21",
+      "Repository": "CRAN"
     },
     "fansi": {
       "Source": "Repository",
       "Package": "fansi",
-      "Version": "1.0.5",
-      "Repository": "RSPM"
+      "Version": "1.0.4",
+      "Repository": "CRAN"
+    },
+    "farver": {
+      "Source": "Repository",
+      "Package": "farver",
+      "Version": "2.1.1",
+      "Repository": "CRAN"
+    },
+    "fastmap": {
+      "Source": "Repository",
+      "Package": "fastmap",
+      "Version": "1.1.1",
+      "Repository": "CRAN"
     },
     "filelock": {
       "Source": "Repository",
       "Package": "filelock",
       "Version": "1.0.2",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "fnmate": {
       "Source": "GitHub",
@@ -139,247 +354,529 @@
       "Version": "0.0.6",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
+      "RemoteUsername": "milesmcbain",
       "RemoteRepo": "fnmate",
-      "RemoteUsername": "MilesMcBain",
-      "RemoteRef": "HEAD",
+      "RemoteRef": "master",
       "RemoteSha": "18a4c00536e0deafeb6b3f91e48b53b641f47e6a"
+    },
+    "fontawesome": {
+      "Source": "Repository",
+      "Package": "fontawesome",
+      "Version": "0.5.1",
+      "Repository": "CRAN"
+    },
+    "forcats": {
+      "Source": "Repository",
+      "Package": "forcats",
+      "Version": "1.0.0",
+      "Repository": "CRAN"
+    },
+    "fs": {
+      "Source": "Repository",
+      "Package": "fs",
+      "Version": "1.6.2",
+      "Repository": "CRAN"
+    },
+    "furrr": {
+      "Source": "Repository",
+      "Package": "furrr",
+      "Version": "0.3.1",
+      "Repository": "CRAN"
     },
     "future.callr": {
       "Source": "Repository",
       "Package": "future.callr",
       "Version": "0.8.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "future": {
+      "Source": "Repository",
+      "Package": "future",
+      "Version": "1.32.0",
+      "Repository": "CRAN"
     },
     "gargle": {
       "Source": "Repository",
       "Package": "gargle",
       "Version": "1.5.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "generics": {
+      "Source": "Repository",
+      "Package": "generics",
+      "Version": "0.1.3",
+      "Repository": "CRAN"
     },
     "gert": {
       "Source": "Repository",
       "Package": "gert",
-      "Version": "2.0.0",
-      "Repository": "RSPM"
+      "Version": "1.9.2",
+      "Repository": "CRAN"
     },
     "getPass": {
       "Source": "Repository",
       "Package": "getPass",
       "Version": "0.2-2",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "ggplot2": {
+      "Source": "Repository",
+      "Package": "ggplot2",
+      "Version": "3.4.2",
+      "Repository": "CRAN"
+    },
+    "gh": {
+      "Source": "Repository",
+      "Package": "gh",
+      "Version": "1.4.0",
+      "Repository": "CRAN"
+    },
+    "gitcreds": {
+      "Source": "Repository",
+      "Package": "gitcreds",
+      "Version": "0.1.2",
+      "Repository": "CRAN"
+    },
+    "globals": {
+      "Source": "Repository",
+      "Package": "globals",
+      "Version": "0.16.2",
+      "Repository": "CRAN"
+    },
+    "glue": {
+      "Source": "Repository",
+      "Package": "glue",
+      "Version": "1.6.2",
+      "Repository": "CRAN"
     },
     "googledrive": {
       "Source": "Repository",
       "Package": "googledrive",
       "Version": "2.1.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "googlesheets4": {
       "Source": "Repository",
       "Package": "googlesheets4",
       "Version": "1.1.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "gtable": {
+      "Source": "Repository",
+      "Package": "gtable",
+      "Version": "0.3.3",
+      "Repository": "CRAN"
+    },
+    "haven": {
+      "Source": "Repository",
+      "Package": "haven",
+      "Version": "2.5.2",
+      "Repository": "CRAN"
+    },
+    "here": {
+      "Source": "Repository",
+      "Package": "here",
+      "Version": "1.0.1",
+      "Repository": "CRAN"
+    },
+    "highr": {
+      "Source": "Repository",
+      "Package": "highr",
+      "Version": "0.10",
+      "Repository": "CRAN"
+    },
+    "hms": {
+      "Source": "Repository",
+      "Package": "hms",
+      "Version": "1.1.3",
+      "Repository": "CRAN"
+    },
+    "htmltools": {
+      "Source": "Repository",
+      "Package": "htmltools",
+      "Version": "0.5.5",
+      "Repository": "CRAN"
+    },
+    "htmlwidgets": {
+      "Source": "Repository",
+      "Package": "htmlwidgets",
+      "Version": "1.6.2",
+      "Repository": "CRAN"
+    },
+    "httpcode": {
+      "Source": "Repository",
+      "Package": "httpcode",
+      "Version": "0.3.0",
+      "Repository": "CRAN"
     },
     "httr": {
       "Source": "Repository",
       "Package": "httr",
       "Version": "1.4.7",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "httr2": {
+      "Source": "Repository",
+      "Package": "httr2",
+      "Version": "0.2.3",
+      "Repository": "CRAN"
+    },
+    "ids": {
+      "Source": "Repository",
+      "Package": "ids",
+      "Version": "1.0.1",
+      "Repository": "CRAN"
     },
     "igraph": {
       "Source": "Repository",
       "Package": "igraph",
       "Version": "1.4.3",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "ini": {
+      "Source": "Repository",
+      "Package": "ini",
+      "Version": "0.3.1",
+      "Repository": "CRAN"
+    },
+    "isoband": {
+      "Source": "Repository",
+      "Package": "isoband",
+      "Version": "0.2.7",
+      "Repository": "CRAN"
     },
     "janitor": {
       "Source": "Repository",
       "Package": "janitor",
       "Version": "2.2.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "jquerylib": {
+      "Source": "Repository",
+      "Package": "jquerylib",
+      "Version": "0.1.4",
+      "Repository": "CRAN"
     },
     "jsonlite": {
       "Source": "Repository",
       "Package": "jsonlite",
       "Version": "1.8.7",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "kableExtra": {
       "Source": "Repository",
       "Package": "kableExtra",
       "Version": "1.3.4",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "keyring": {
       "Source": "Repository",
       "Package": "keyring",
       "Version": "1.3.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "knitr": {
       "Source": "Repository",
       "Package": "knitr",
       "Version": "1.43",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "labeling": {
+      "Source": "Repository",
+      "Package": "labeling",
+      "Version": "0.4.2",
+      "Repository": "CRAN"
+    },
+    "lifecycle": {
+      "Source": "Repository",
+      "Package": "lifecycle",
+      "Version": "1.0.3",
+      "Repository": "CRAN"
+    },
+    "listenv": {
+      "Source": "Repository",
+      "Package": "listenv",
+      "Version": "0.9.0",
+      "Repository": "CRAN"
+    },
+    "lubridate": {
+      "Source": "Repository",
+      "Package": "lubridate",
+      "Version": "1.9.2",
+      "Repository": "CRAN"
+    },
+    "magrittr": {
+      "Source": "Repository",
+      "Package": "magrittr",
+      "Version": "2.0.3",
+      "Repository": "CRAN"
+    },
+    "memoise": {
+      "Source": "Repository",
+      "Package": "memoise",
+      "Version": "2.0.1",
+      "Repository": "CRAN"
+    },
+    "mime": {
+      "Source": "Repository",
+      "Package": "mime",
+      "Version": "0.12",
+      "Repository": "CRAN"
+    },
+    "modelr": {
+      "Source": "Repository",
+      "Package": "modelr",
+      "Version": "0.1.11",
+      "Repository": "CRAN"
+    },
+    "munsell": {
+      "Source": "Repository",
+      "Package": "munsell",
+      "Version": "0.5.0",
+      "Repository": "CRAN"
     },
     "nasapower": {
       "Source": "Repository",
       "Package": "nasapower",
       "Version": "4.0.10",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "openssl": {
       "Source": "Repository",
       "Package": "openssl",
       "Version": "2.1.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "parallelly": {
       "Source": "Repository",
       "Package": "parallelly",
       "Version": "1.36.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "paws.analytics": {
       "Source": "Repository",
       "Package": "paws.analytics",
       "Version": "0.3.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "paws.application.integration": {
       "Source": "Repository",
       "Package": "paws.application.integration",
       "Version": "0.3.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "paws.common": {
       "Source": "Repository",
       "Package": "paws.common",
       "Version": "0.5.8",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "paws.compute": {
       "Source": "Repository",
       "Package": "paws.compute",
       "Version": "0.3.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "paws.cost.management": {
       "Source": "Repository",
       "Package": "paws.cost.management",
       "Version": "0.3.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "paws.customer.engagement": {
       "Source": "Repository",
       "Package": "paws.customer.engagement",
       "Version": "0.3.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "paws.database": {
       "Source": "Repository",
       "Package": "paws.database",
       "Version": "0.3.0",
-      "Repository": "RSPM"
-    },
-    "paws": {
-      "Source": "Repository",
-      "Package": "paws",
-      "Version": "0.2.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "paws.developer.tools": {
       "Source": "Repository",
       "Package": "paws.developer.tools",
       "Version": "0.3.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "paws.end.user.computing": {
       "Source": "Repository",
       "Package": "paws.end.user.computing",
       "Version": "0.3.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "paws.machine.learning": {
       "Source": "Repository",
       "Package": "paws.machine.learning",
       "Version": "0.3.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "paws.management": {
       "Source": "Repository",
       "Package": "paws.management",
       "Version": "0.3.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "paws.networking": {
       "Source": "Repository",
       "Package": "paws.networking",
       "Version": "0.3.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "paws.security.identity": {
       "Source": "Repository",
       "Package": "paws.security.identity",
       "Version": "0.3.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "paws.storage": {
       "Source": "Repository",
       "Package": "paws.storage",
       "Version": "0.3.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "paws": {
+      "Source": "Repository",
+      "Package": "paws",
+      "Version": "0.2.0",
+      "Repository": "CRAN"
+    },
+    "pillar": {
+      "Source": "Repository",
+      "Package": "pillar",
+      "Version": "1.9.0",
+      "Repository": "CRAN"
+    },
+    "pkgconfig": {
+      "Source": "Repository",
+      "Package": "pkgconfig",
+      "Version": "2.0.3",
+      "Repository": "CRAN"
+    },
+    "plyr": {
+      "Source": "Repository",
+      "Package": "plyr",
+      "Version": "1.8.8",
+      "Repository": "CRAN"
     },
     "prettyunits": {
       "Source": "Repository",
       "Package": "prettyunits",
-      "Version": "1.2.0",
-      "Repository": "RSPM"
+      "Version": "1.1.1",
+      "Repository": "CRAN"
     },
     "processx": {
       "Source": "Repository",
       "Package": "processx",
       "Version": "3.8.2",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "progress": {
+      "Source": "Repository",
+      "Package": "progress",
+      "Version": "1.2.2",
+      "Repository": "CRAN"
+    },
+    "proxy": {
+      "Source": "Repository",
+      "Package": "proxy",
+      "Version": "0.4-27",
+      "Repository": "CRAN"
+    },
+    "ps": {
+      "Source": "Repository",
+      "Package": "ps",
+      "Version": "1.7.5",
+      "Repository": "CRAN"
     },
     "purrr": {
       "Source": "Repository",
       "Package": "purrr",
-      "Version": "1.0.2",
-      "Repository": "RSPM"
+      "Version": "1.0.1",
+      "Repository": "CRAN"
     },
     "qs": {
       "Source": "Repository",
       "Package": "qs",
       "Version": "0.25.5",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
-    "RApiSerialize": {
+    "ragg": {
       "Source": "Repository",
-      "Package": "RApiSerialize",
-      "Version": "0.1.2",
-      "Repository": "RSPM"
+      "Package": "ragg",
+      "Version": "1.2.5",
+      "Repository": "CRAN"
     },
-    "Rcpp": {
+    "rappdirs": {
       "Source": "Repository",
-      "Package": "Rcpp",
-      "Version": "1.0.11",
-      "Repository": "RSPM"
+      "Package": "rappdirs",
+      "Version": "0.3.3",
+      "Repository": "CRAN"
+    },
+    "readr": {
+      "Source": "Repository",
+      "Package": "readr",
+      "Version": "2.1.4",
+      "Repository": "CRAN"
+    },
+    "readxl": {
+      "Source": "Repository",
+      "Package": "readxl",
+      "Version": "1.4.2",
+      "Repository": "CRAN"
+    },
+    "rematch": {
+      "Source": "Repository",
+      "Package": "rematch",
+      "Version": "1.0.1",
+      "Repository": "CRAN"
+    },
+    "rematch2": {
+      "Source": "Repository",
+      "Package": "rematch2",
+      "Version": "2.1.2",
+      "Repository": "CRAN"
     },
     "remotes": {
       "Source": "Repository",
       "Package": "remotes",
       "Version": "2.4.2.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "renv": {
       "Source": "Repository",
       "Package": "renv",
       "Version": "1.0.2.9000",
-      "RemoteType": "repository",
+      "Repository": "https://milesmcbain.r-universe.dev",
       "RemoteUrl": "https://github.com/rstudio/renv",
       "RemoteRef": "HEAD",
       "RemoteSha": "d9c90e35cff14bd5cbf43245dd22d50d5dcb32ea"
+    },
+    "reprex": {
+      "Source": "Repository",
+      "Package": "reprex",
+      "Version": "2.0.2",
+      "Repository": "CRAN"
+    },
+    "reshape2": {
+      "Source": "Repository",
+      "Package": "reshape2",
+      "Version": "1.4.4",
+      "Repository": "CRAN"
+    },
+    "rlang": {
+      "Source": "Repository",
+      "Package": "rlang",
+      "Version": "1.1.1",
+      "Repository": "CRAN"
+    },
+    "rmarkdown": {
+      "Source": "Repository",
+      "Package": "rmarkdown",
+      "Version": "2.21",
+      "Repository": "CRAN"
     },
     "rnaturalearth": {
       "Source": "Repository",
@@ -398,6 +895,12 @@
       "RemoteRef": "master",
       "RemoteSha": "c3785a8c44738de6ae8f797080c0a337ebed929d"
     },
+    "rprojroot": {
+      "Source": "Repository",
+      "Package": "rprojroot",
+      "Version": "2.0.3",
+      "Repository": "CRAN"
+    },
     "rstac": {
       "Source": "GitHub",
       "Package": "rstac",
@@ -413,73 +916,127 @@
       "Source": "Repository",
       "Package": "rstudioapi",
       "Version": "0.15.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "rvest": {
+      "Source": "Repository",
+      "Package": "rvest",
+      "Version": "1.0.3",
+      "Repository": "CRAN"
     },
     "s2": {
       "Source": "Repository",
       "Package": "s2",
       "Version": "1.1.4",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "sass": {
       "Source": "Repository",
       "Package": "sass",
       "Version": "0.4.7",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "scales": {
+      "Source": "Repository",
+      "Package": "scales",
+      "Version": "1.2.1",
+      "Repository": "CRAN"
+    },
+    "selectr": {
+      "Source": "Repository",
+      "Package": "selectr",
+      "Version": "0.4-2",
+      "Repository": "CRAN"
     },
     "sf": {
       "Source": "Repository",
       "Package": "sf",
       "Version": "1.0-14",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "snakecase": {
       "Source": "Repository",
       "Package": "snakecase",
       "Version": "0.11.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "sodium": {
       "Source": "Repository",
       "Package": "sodium",
       "Version": "1.2.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "sourcetools": {
+      "Source": "Repository",
+      "Package": "sourcetools",
+      "Version": "0.1.7-1",
+      "Repository": "CRAN"
     },
     "sp": {
       "Source": "Repository",
       "Package": "sp",
       "Version": "2.0-0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "stringfish": {
       "Source": "Repository",
       "Package": "stringfish",
       "Version": "0.15.8",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "stringi": {
+      "Source": "Repository",
+      "Package": "stringi",
+      "Version": "1.7.12",
+      "Repository": "CRAN"
+    },
+    "stringr": {
+      "Source": "Repository",
+      "Package": "stringr",
+      "Version": "1.5.0",
+      "Repository": "CRAN"
+    },
+    "svglite": {
+      "Source": "Repository",
+      "Package": "svglite",
+      "Version": "2.1.1",
+      "Repository": "CRAN"
     },
     "sys": {
       "Source": "Repository",
       "Package": "sys",
       "Version": "3.4.2",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "systemfonts": {
+      "Source": "Repository",
+      "Package": "systemfonts",
+      "Version": "1.0.4",
+      "Repository": "CRAN"
     },
     "tarchetypes": {
       "Source": "Repository",
       "Package": "tarchetypes",
       "Version": "0.7.6",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "targets": {
       "Source": "Repository",
       "Package": "targets",
       "Version": "1.1.3",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "terra": {
       "Source": "Repository",
       "Package": "terra",
       "Version": "1.7-39",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "textshaping": {
+      "Source": "Repository",
+      "Package": "textshaping",
+      "Version": "0.3.6",
+      "Repository": "CRAN"
     },
     "tflow": {
       "Source": "GitHub",
@@ -492,711 +1049,164 @@
       "RemoteRef": "master",
       "RemoteSha": "889afee6c16fdd8ef3cba9484999caf5944eab47"
     },
+    "tibble": {
+      "Source": "Repository",
+      "Package": "tibble",
+      "Version": "3.2.1",
+      "Repository": "CRAN"
+    },
+    "tidyr": {
+      "Source": "Repository",
+      "Package": "tidyr",
+      "Version": "1.3.0",
+      "Repository": "CRAN"
+    },
+    "tidyselect": {
+      "Source": "Repository",
+      "Package": "tidyselect",
+      "Version": "1.2.0",
+      "Repository": "CRAN"
+    },
+    "tidyverse": {
+      "Source": "Repository",
+      "Package": "tidyverse",
+      "Version": "2.0.0",
+      "Repository": "CRAN"
+    },
+    "timechange": {
+      "Source": "Repository",
+      "Package": "timechange",
+      "Version": "0.2.0",
+      "Repository": "CRAN"
+    },
+    "tinytex": {
+      "Source": "Repository",
+      "Package": "tinytex",
+      "Version": "0.45",
+      "Repository": "CRAN"
+    },
+    "triebeard": {
+      "Source": "Repository",
+      "Package": "triebeard",
+      "Version": "0.4.1",
+      "Repository": "CRAN"
+    },
+    "tzdb": {
+      "Source": "Repository",
+      "Package": "tzdb",
+      "Version": "0.4.0",
+      "Repository": "CRAN"
+    },
     "units": {
       "Source": "Repository",
       "Package": "units",
       "Version": "0.8-3",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "urltools": {
+      "Source": "Repository",
+      "Package": "urltools",
+      "Version": "1.7.3",
+      "Repository": "CRAN"
     },
     "usethis": {
       "Source": "Repository",
       "Package": "usethis",
       "Version": "2.2.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "using": {
       "Source": "Repository",
       "Package": "using",
       "Version": "0.4.0",
       "Repository": "https://milesmcbain.r-universe.dev",
-      "RemoteType": "repository",
       "RemoteUrl": "https://github.com/anthonynorth/using",
       "RemoteRef": "HEAD",
       "RemoteSha": "c33a88c5c42c64fd84423a65af7b5a3ae8d5e64a"
-    },
-    "uuid": {
-      "Source": "Repository",
-      "Package": "uuid",
-      "Version": "1.1-1",
-      "Repository": "RSPM"
-    },
-    "vctrs": {
-      "Source": "Repository",
-      "Package": "vctrs",
-      "Version": "0.6.3",
-      "Repository": "RSPM"
-    },
-    "vroom": {
-      "Source": "Repository",
-      "Package": "vroom",
-      "Version": "1.6.4",
-      "Repository": "RSPM"
-    },
-    "withr": {
-      "Source": "Repository",
-      "Package": "withr",
-      "Version": "2.5.1",
-      "Repository": "RSPM"
-    },
-    "arrow": {
-      "Source": "Repository",
-      "Package": "arrow",
-      "Version": "12.0.0",
-      "Repository": "RSPM"
-    },
-    "backports": {
-      "Source": "Repository",
-      "Package": "backports",
-      "Version": "1.4.1",
-      "Repository": "RSPM"
-    },
-    "base64enc": {
-      "Source": "Repository",
-      "Package": "base64enc",
-      "Version": "0.1-3",
-      "Repository": "RSPM"
-    },
-    "bit64": {
-      "Source": "Repository",
-      "Package": "bit64",
-      "Version": "4.0.5",
-      "Repository": "RSPM"
-    },
-    "bit": {
-      "Source": "Repository",
-      "Package": "bit",
-      "Version": "4.0.5",
-      "Repository": "RSPM"
-    },
-    "blob": {
-      "Source": "Repository",
-      "Package": "blob",
-      "Version": "1.2.4",
-      "Repository": "RSPM"
-    },
-    "cachem": {
-      "Source": "Repository",
-      "Package": "cachem",
-      "Version": "1.0.8",
-      "Repository": "RSPM"
-    },
-    "callr": {
-      "Source": "Repository",
-      "Package": "callr",
-      "Version": "3.7.3",
-      "Repository": "RSPM"
-    },
-    "cellranger": {
-      "Source": "Repository",
-      "Package": "cellranger",
-      "Version": "1.1.0",
-      "Repository": "RSPM"
-    },
-    "classInt": {
-      "Source": "Repository",
-      "Package": "classInt",
-      "Version": "0.4-9",
-      "Repository": "RSPM"
-    },
-    "cli": {
-      "Source": "Repository",
-      "Package": "cli",
-      "Version": "3.6.1",
-      "Repository": "RSPM"
-    },
-    "clipr": {
-      "Source": "Repository",
-      "Package": "clipr",
-      "Version": "0.8.0",
-      "Repository": "RSPM"
-    },
-    "colorspace": {
-      "Source": "Repository",
-      "Package": "colorspace",
-      "Version": "2.1-0",
-      "Repository": "RSPM"
-    },
-    "commonmark": {
-      "Source": "Repository",
-      "Package": "commonmark",
-      "Version": "1.9.0",
-      "Repository": "RSPM"
-    },
-    "conflicted": {
-      "Source": "Repository",
-      "Package": "conflicted",
-      "Version": "1.2.0",
-      "Repository": "RSPM"
-    },
-    "crayon": {
-      "Source": "Repository",
-      "Package": "crayon",
-      "Version": "1.5.2",
-      "Repository": "RSPM"
-    },
-    "crul": {
-      "Source": "Repository",
-      "Package": "crul",
-      "Version": "1.4.0",
-      "Repository": "RSPM"
-    },
-    "data.table": {
-      "Source": "Repository",
-      "Package": "data.table",
-      "Version": "1.14.8",
-      "Repository": "RSPM"
-    },
-    "DBI": {
-      "Source": "Repository",
-      "Package": "DBI",
-      "Version": "1.1.3",
-      "Repository": "RSPM"
-    },
-    "dbplyr": {
-      "Source": "Repository",
-      "Package": "dbplyr",
-      "Version": "2.3.2",
-      "Repository": "RSPM"
-    },
-    "desc": {
-      "Source": "Repository",
-      "Package": "desc",
-      "Version": "1.4.2",
-      "Repository": "RSPM"
-    },
-    "digest": {
-      "Source": "Repository",
-      "Package": "digest",
-      "Version": "0.6.31",
-      "Repository": "RSPM"
-    },
-    "dplyr": {
-      "Source": "Repository",
-      "Package": "dplyr",
-      "Version": "1.1.2",
-      "Repository": "RSPM"
-    },
-    "dtplyr": {
-      "Source": "Repository",
-      "Package": "dtplyr",
-      "Version": "1.3.1",
-      "Repository": "RSPM"
-    },
-    "e1071": {
-      "Source": "Repository",
-      "Package": "e1071",
-      "Version": "1.7-13",
-      "Repository": "RSPM"
-    },
-    "ellipsis": {
-      "Source": "Repository",
-      "Package": "ellipsis",
-      "Version": "0.3.2",
-      "Repository": "RSPM"
-    },
-    "evaluate": {
-      "Source": "Repository",
-      "Package": "evaluate",
-      "Version": "0.21",
-      "Repository": "RSPM"
-    },
-    "farver": {
-      "Source": "Repository",
-      "Package": "farver",
-      "Version": "2.1.1",
-      "Repository": "RSPM"
-    },
-    "fastmap": {
-      "Source": "Repository",
-      "Package": "fastmap",
-      "Version": "1.1.1",
-      "Repository": "RSPM"
-    },
-    "fontawesome": {
-      "Source": "Repository",
-      "Package": "fontawesome",
-      "Version": "0.5.1",
-      "Repository": "RSPM"
-    },
-    "forcats": {
-      "Source": "Repository",
-      "Package": "forcats",
-      "Version": "1.0.0",
-      "Repository": "RSPM"
-    },
-    "fs": {
-      "Source": "Repository",
-      "Package": "fs",
-      "Version": "1.6.2",
-      "Repository": "RSPM"
-    },
-    "furrr": {
-      "Source": "Repository",
-      "Package": "furrr",
-      "Version": "0.3.1",
-      "Repository": "RSPM"
-    },
-    "future": {
-      "Source": "Repository",
-      "Package": "future",
-      "Version": "1.32.0",
-      "Repository": "RSPM"
-    },
-    "generics": {
-      "Source": "Repository",
-      "Package": "generics",
-      "Version": "0.1.3",
-      "Repository": "RSPM"
-    },
-    "ggplot2": {
-      "Source": "Repository",
-      "Package": "ggplot2",
-      "Version": "3.4.2",
-      "Repository": "RSPM"
-    },
-    "gh": {
-      "Source": "Repository",
-      "Package": "gh",
-      "Version": "1.4.0",
-      "Repository": "RSPM"
-    },
-    "gitcreds": {
-      "Source": "Repository",
-      "Package": "gitcreds",
-      "Version": "0.1.2",
-      "Repository": "RSPM"
-    },
-    "globals": {
-      "Source": "Repository",
-      "Package": "globals",
-      "Version": "0.16.2",
-      "Repository": "RSPM"
-    },
-    "glue": {
-      "Source": "Repository",
-      "Package": "glue",
-      "Version": "1.6.2",
-      "Repository": "RSPM"
-    },
-    "gtable": {
-      "Source": "Repository",
-      "Package": "gtable",
-      "Version": "0.3.3",
-      "Repository": "RSPM"
-    },
-    "haven": {
-      "Source": "Repository",
-      "Package": "haven",
-      "Version": "2.5.2",
-      "Repository": "RSPM"
-    },
-    "here": {
-      "Source": "Repository",
-      "Package": "here",
-      "Version": "1.0.1",
-      "Repository": "RSPM"
-    },
-    "highr": {
-      "Source": "Repository",
-      "Package": "highr",
-      "Version": "0.10",
-      "Repository": "RSPM"
-    },
-    "hms": {
-      "Source": "Repository",
-      "Package": "hms",
-      "Version": "1.1.3",
-      "Repository": "RSPM"
-    },
-    "htmltools": {
-      "Source": "Repository",
-      "Package": "htmltools",
-      "Version": "0.5.5",
-      "Repository": "RSPM"
-    },
-    "htmlwidgets": {
-      "Source": "Repository",
-      "Package": "htmlwidgets",
-      "Version": "1.6.2",
-      "Repository": "RSPM"
-    },
-    "httpcode": {
-      "Source": "Repository",
-      "Package": "httpcode",
-      "Version": "0.3.0",
-      "Repository": "RSPM"
-    },
-    "httr2": {
-      "Source": "Repository",
-      "Package": "httr2",
-      "Version": "0.2.3",
-      "Repository": "RSPM"
-    },
-    "ids": {
-      "Source": "Repository",
-      "Package": "ids",
-      "Version": "1.0.1",
-      "Repository": "RSPM"
-    },
-    "ini": {
-      "Source": "Repository",
-      "Package": "ini",
-      "Version": "0.3.1",
-      "Repository": "RSPM"
-    },
-    "isoband": {
-      "Source": "Repository",
-      "Package": "isoband",
-      "Version": "0.2.7",
-      "Repository": "RSPM"
-    },
-    "jquerylib": {
-      "Source": "Repository",
-      "Package": "jquerylib",
-      "Version": "0.1.4",
-      "Repository": "RSPM"
-    },
-    "labeling": {
-      "Source": "Repository",
-      "Package": "labeling",
-      "Version": "0.4.2",
-      "Repository": "RSPM"
-    },
-    "lifecycle": {
-      "Source": "Repository",
-      "Package": "lifecycle",
-      "Version": "1.0.3",
-      "Repository": "RSPM"
-    },
-    "listenv": {
-      "Source": "Repository",
-      "Package": "listenv",
-      "Version": "0.9.0",
-      "Repository": "RSPM"
-    },
-    "lubridate": {
-      "Source": "Repository",
-      "Package": "lubridate",
-      "Version": "1.9.2",
-      "Repository": "RSPM"
-    },
-    "magrittr": {
-      "Source": "Repository",
-      "Package": "magrittr",
-      "Version": "2.0.3",
-      "Repository": "RSPM"
-    },
-    "memoise": {
-      "Source": "Repository",
-      "Package": "memoise",
-      "Version": "2.0.1",
-      "Repository": "RSPM"
-    },
-    "mime": {
-      "Source": "Repository",
-      "Package": "mime",
-      "Version": "0.12",
-      "Repository": "RSPM"
-    },
-    "modelr": {
-      "Source": "Repository",
-      "Package": "modelr",
-      "Version": "0.1.11",
-      "Repository": "RSPM"
-    },
-    "munsell": {
-      "Source": "Repository",
-      "Package": "munsell",
-      "Version": "0.5.0",
-      "Repository": "RSPM"
-    },
-    "pillar": {
-      "Source": "Repository",
-      "Package": "pillar",
-      "Version": "1.9.0",
-      "Repository": "RSPM"
-    },
-    "pkgconfig": {
-      "Source": "Repository",
-      "Package": "pkgconfig",
-      "Version": "2.0.3",
-      "Repository": "RSPM"
-    },
-    "plyr": {
-      "Source": "Repository",
-      "Package": "plyr",
-      "Version": "1.8.8",
-      "Repository": "RSPM"
-    },
-    "progress": {
-      "Source": "Repository",
-      "Package": "progress",
-      "Version": "1.2.2",
-      "Repository": "RSPM"
-    },
-    "proxy": {
-      "Source": "Repository",
-      "Package": "proxy",
-      "Version": "0.4-27",
-      "Repository": "RSPM"
-    },
-    "ps": {
-      "Source": "Repository",
-      "Package": "ps",
-      "Version": "1.7.5",
-      "Repository": "RSPM"
-    },
-    "R6": {
-      "Source": "Repository",
-      "Package": "R6",
-      "Version": "2.5.1",
-      "Repository": "RSPM"
-    },
-    "ragg": {
-      "Source": "Repository",
-      "Package": "ragg",
-      "Version": "1.2.5",
-      "Repository": "RSPM"
-    },
-    "rappdirs": {
-      "Source": "Repository",
-      "Package": "rappdirs",
-      "Version": "0.3.3",
-      "Repository": "RSPM"
-    },
-    "RColorBrewer": {
-      "Source": "Repository",
-      "Package": "RColorBrewer",
-      "Version": "1.1-3",
-      "Repository": "RSPM"
-    },
-    "RcppParallel": {
-      "Source": "Repository",
-      "Package": "RcppParallel",
-      "Version": "5.1.7",
-      "Repository": "RSPM"
-    },
-    "readr": {
-      "Source": "Repository",
-      "Package": "readr",
-      "Version": "2.1.4",
-      "Repository": "RSPM"
-    },
-    "readxl": {
-      "Source": "Repository",
-      "Package": "readxl",
-      "Version": "1.4.2",
-      "Repository": "RSPM"
-    },
-    "rematch2": {
-      "Source": "Repository",
-      "Package": "rematch2",
-      "Version": "2.1.2",
-      "Repository": "RSPM"
-    },
-    "rematch": {
-      "Source": "Repository",
-      "Package": "rematch",
-      "Version": "1.0.1",
-      "Repository": "RSPM"
-    },
-    "reprex": {
-      "Source": "Repository",
-      "Package": "reprex",
-      "Version": "2.0.2",
-      "Repository": "RSPM"
-    },
-    "reshape2": {
-      "Source": "Repository",
-      "Package": "reshape2",
-      "Version": "1.4.4",
-      "Repository": "RSPM"
-    },
-    "rlang": {
-      "Source": "Repository",
-      "Package": "rlang",
-      "Version": "1.1.1",
-      "Repository": "RSPM"
-    },
-    "rmarkdown": {
-      "Source": "Repository",
-      "Package": "rmarkdown",
-      "Version": "2.21",
-      "Repository": "RSPM"
-    },
-    "rprojroot": {
-      "Source": "Repository",
-      "Package": "rprojroot",
-      "Version": "2.0.3",
-      "Repository": "RSPM"
-    },
-    "rvest": {
-      "Source": "Repository",
-      "Package": "rvest",
-      "Version": "1.0.3",
-      "Repository": "RSPM"
-    },
-    "scales": {
-      "Source": "Repository",
-      "Package": "scales",
-      "Version": "1.2.1",
-      "Repository": "RSPM"
-    },
-    "selectr": {
-      "Source": "Repository",
-      "Package": "selectr",
-      "Version": "0.4-2",
-      "Repository": "RSPM"
-    },
-    "sourcetools": {
-      "Source": "Repository",
-      "Package": "sourcetools",
-      "Version": "0.1.7-1",
-      "Repository": "RSPM"
-    },
-    "stringi": {
-      "Source": "Repository",
-      "Package": "stringi",
-      "Version": "1.7.12",
-      "Repository": "RSPM"
-    },
-    "stringr": {
-      "Source": "Repository",
-      "Package": "stringr",
-      "Version": "1.5.0",
-      "Repository": "RSPM"
-    },
-    "svglite": {
-      "Source": "Repository",
-      "Package": "svglite",
-      "Version": "2.1.1",
-      "Repository": "RSPM"
-    },
-    "systemfonts": {
-      "Source": "Repository",
-      "Package": "systemfonts",
-      "Version": "1.0.4",
-      "Repository": "RSPM"
-    },
-    "textshaping": {
-      "Source": "Repository",
-      "Package": "textshaping",
-      "Version": "0.3.6",
-      "Repository": "RSPM"
-    },
-    "tibble": {
-      "Source": "Repository",
-      "Package": "tibble",
-      "Version": "3.2.1",
-      "Repository": "RSPM"
-    },
-    "tidyr": {
-      "Source": "Repository",
-      "Package": "tidyr",
-      "Version": "1.3.0",
-      "Repository": "RSPM"
-    },
-    "tidyselect": {
-      "Source": "Repository",
-      "Package": "tidyselect",
-      "Version": "1.2.0",
-      "Repository": "RSPM"
-    },
-    "tidyverse": {
-      "Source": "Repository",
-      "Package": "tidyverse",
-      "Version": "2.0.0",
-      "Repository": "RSPM"
-    },
-    "timechange": {
-      "Source": "Repository",
-      "Package": "timechange",
-      "Version": "0.2.0",
-      "Repository": "RSPM"
-    },
-    "tinytex": {
-      "Source": "Repository",
-      "Package": "tinytex",
-      "Version": "0.45",
-      "Repository": "RSPM"
-    },
-    "triebeard": {
-      "Source": "Repository",
-      "Package": "triebeard",
-      "Version": "0.4.1",
-      "Repository": "RSPM"
-    },
-    "tzdb": {
-      "Source": "Repository",
-      "Package": "tzdb",
-      "Version": "0.4.0",
-      "Repository": "RSPM"
-    },
-    "urltools": {
-      "Source": "Repository",
-      "Package": "urltools",
-      "Version": "1.7.3",
-      "Repository": "RSPM"
     },
     "utf8": {
       "Source": "Repository",
       "Package": "utf8",
       "Version": "1.2.3",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "uuid": {
+      "Source": "Repository",
+      "Package": "uuid",
+      "Version": "1.1-1",
+      "Repository": "CRAN"
+    },
+    "vctrs": {
+      "Source": "Repository",
+      "Package": "vctrs",
+      "Version": "0.6.3",
+      "Repository": "CRAN"
     },
     "viridisLite": {
       "Source": "Repository",
       "Package": "viridisLite",
       "Version": "0.4.2",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "visNetwork": {
       "Source": "Repository",
       "Package": "visNetwork",
       "Version": "2.1.2",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "vroom": {
+      "Source": "Repository",
+      "Package": "vroom",
+      "Version": "1.6.3",
+      "Repository": "CRAN"
     },
     "webshot": {
       "Source": "Repository",
       "Package": "webshot",
       "Version": "0.5.4",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "whisker": {
       "Source": "Repository",
       "Package": "whisker",
       "Version": "0.4.1",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
+    },
+    "withr": {
+      "Source": "Repository",
+      "Package": "withr",
+      "Version": "2.5.0",
+      "Repository": "CRAN"
     },
     "wk": {
       "Source": "Repository",
       "Package": "wk",
       "Version": "0.7.3",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "xfun": {
       "Source": "Repository",
       "Package": "xfun",
       "Version": "0.39",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "xml2": {
       "Source": "Repository",
       "Package": "xml2",
       "Version": "1.3.4",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "yaml": {
       "Source": "Repository",
       "Package": "yaml",
       "Version": "2.3.7",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "zip": {
       "Source": "Repository",
       "Package": "zip",
       "Version": "2.3.0",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     }
   }
 }

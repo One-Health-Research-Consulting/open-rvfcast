@@ -100,7 +100,7 @@ dynamic_targets <- tar_plan(
                            key = sentinel_ndvi_transformed, 
                            check = TRUE), 
              pattern = sentinel_ndvi_transformed,
-             cue = tar_cue("never")),    
+             cue = tar_cue("never")), # only run this if you need to upload new data
   
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
@@ -171,7 +171,7 @@ dynamic_targets <- tar_plan(
                            key = modis_ndvi_transformed, 
                            check = TRUE), 
              pattern = modis_ndvi_transformed,
-             cue = tar_cue("never")), 
+             cue = tar_cue("never")), # only run this if you need to upload new data 
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
@@ -232,7 +232,7 @@ dynamic_targets <- tar_plan(
                            key = nasa_weather_transformed,
                            check = TRUE), 
              pattern = nasa_weather_transformed,
-             cue = tar_cue("never")),    
+             cue = tar_cue("never")), # only run this if you need to upload new data
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   tar_target(ecmwf_forecasts_raw_directory, 
@@ -276,13 +276,16 @@ dynamic_targets <- tar_plan(
              repository = "local"),  
   
   # save transformed to AWS bucket
+  # using aws.s3::put_object for multipart functionality
   tar_target(ecmwf_forecasts_transformed_upload_aws_s3, 
-             aws_s3_upload(path = ecmwf_forecasts_transformed,
-                           bucket =  aws_bucket,
-                           key = ecmwf_forecasts_transformed, 
-                           check = TRUE), 
+             aws.s3::put_object(file = ecmwf_forecasts_transformed, 
+                                object = ecmwf_forecasts_transformed,
+                                bucket = aws_bucket, 
+                                multipart = TRUE,
+                                verbose = TRUE,
+                                show_progress = TRUE),
              pattern = ecmwf_forecasts_transformed,
-             cue = tar_cue("never")),   
+             cue = tar_cue("never")), # only run this if you need to upload new data 
   
 )
 
@@ -329,7 +332,7 @@ data_targets <- tar_plan(
                            key = weather_anomalies, 
                            check = TRUE), 
              pattern = weather_anomalies,
-             cue = tar_cue("never")),   
+             cue = tar_cue("never")), # only run this if you need to upload new data  
   
 )
 
