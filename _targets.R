@@ -361,5 +361,11 @@ test_targets <- tar_plan(
   
 )
 
+# Documentation -----------------------------------------------------------
+documentation_targets <- tar_plan(
+  tar_render(readme, path = "README.Rmd")
+)
+
+
 # List targets -----------------------------------------------------------------
 all_targets()

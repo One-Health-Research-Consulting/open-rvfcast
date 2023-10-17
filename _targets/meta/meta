@@ -1,5 +1,5 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|f2b69f1fa7d15536|||||||||||||||
+.Random.seed|object|8832ec75f83b5550|||||||||||||||
 all_targets|function|2dda5afbd1f92385|||||||||||||||
 aws_bucket|object|d9cf2c5ff7cc1be4|||||||||||||||
 aws_s3_upload_single_type|function|6d277b68ccbb67a2|||||||||||||||
@@ -26,6 +26,7 @@ days_of_year|stem|e2673220ee124699|1e42c49f9959f217|787f005495551c49|-84662016|b
 define_bounding_boxes|function|e614caacc0592e73|||||||||||||||
 define_country_regions|function|54808365a1bb460e|||||||||||||||
 deploy_targets|object|1eb1bc8d77111ded|||||||||||||||
+documentation_targets|object|df5d49907788074b|||||||||||||||
 download_ecmwf_forecasts|function|f0ec062fa450f802|||||||||||||||
 download_modis_ndvi|function|104ef42cc2cdbbc6|||||||||||||||
 download_modis_ndvi_delete|function|98fa92fb3d3db8fb|||||||||||||||
@@ -4931,6 +4932,7 @@ process_ndvi_data|function|8a56ce9bd504bbec|||||||||||||||
 process_weather_data|function|b29a917bff83bf09|||||||||||||||
 random_select_model_dates|function|75d79de28b5c2e87|||||||||||||||
 read_transform_raster|function|f7518264efa394ed|||||||||||||||
+readme|stem|61211399f70244f9|2419a0f44a0792be|4745aa592080ea1d|-165896733|README.md*README.Rmd|t19647.5883162095s|51d2a93de096e351|15409|file|local|vector|||6.498||
 report_targets|object|1eb1bc8d77111ded|||||||||||||||
 rolling_box|function|1195d491d98c697b|||||||||||||||
 save_transform_ecmwf_grib|function|6a76f13bf2e8bad9|||||||||||||||
@@ -6135,7 +6137,7 @@ transform_modis_ndvi|function|6c3795e38607c026|||||||||||||||
 transform_nasa_weather|function|4ccbd4810fe93074|||||||||||||||
 transform_raster|function|47f20ba2b9ef9722|||||||||||||||
 transform_sentinel_ndvi|function|e34eead242be1095|||||||||||||||
-user_rprof|object|1775b8a76e537c7c|||||||||||||||
+user_rprof|object|045616f1c85573d0|||||||||||||||
 wahis_rvf_outbreaks_preprocessed|stem|30ccd988b415d773|3ea98184b5887c93|275a59d310ff2a63|2127878318|bucket=open-rvfcast-data*region=NULL*key=_targets/wahis_rvf_outbreaks_preprocessed*endpoint=TlVMTA*version=|t19517.6952212142s||172965|qs|aws|vector|||0.043||
 wahis_rvf_outbreaks_raw|stem|6fc7e6c7238977b3|b988ec4215d4213c|5ed4661ae3efb1aa|1933416983|bucket=open-rvfcast-data*region=NULL*key=_targets/wahis_rvf_outbreaks_raw*endpoint=TlVMTA*version=|t19517.6952047733s||173410|qs|aws|vector|||29.629||
 wahis_rvf_query|function|9836433f6f1061fb|||||||||||||||
