@@ -4,7 +4,7 @@
 #'
 #' @title
 #' @param ecmwf_forecasts_downloaded
-#' @param necmwf_forecasts_transformed_directory
+#' @param ecmwf_forecasts_transformed_directory
 #' @param continent_raster_template
 #' @param overwrite
 #' @return
