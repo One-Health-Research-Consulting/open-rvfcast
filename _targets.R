@@ -38,12 +38,47 @@ static_targets <- tar_plan(
   tar_target(continent_bounding_box, sf::st_bbox(continent_polygon)),
   tar_target(continent_raster_template,
              wrap(terra::rast(ext(continent_polygon), 
-                              resolution = 0.5))), #TODO change to 0.1 (might cause error in transform, leaving at 0.5 for now)
+                              resolution = 0.1))), #TODO change to 0.1 (might cause error in transform, leaving at 0.5 for now)
   # nasa power resolution = 0.5; enmwf = ; ndvi = 
   # tar_target(continent_raster_template_plot, create_raster_template_plot(rast(continent_raster_template), continent_polygon))
-  
-)
 
+  # SOIL -----------------------------------------------------------
+  tar_target(soil_directory_raw, 
+             create_data_directory(directory_path = "data/soil")),
+  tar_target(soil_downloaded, soil_download(soil_directory_raw),
+             format = "file", 
+             repository = "local"),
+  tar_target(soil_preprocessed, 
+             preprocess_soil(soil_downloaded, continent_raster_template)),
+  
+  # SLOPE and ASPECT -------------------------------------------------
+  tar_target(slope_aspect_directory_raw, 
+             create_data_directory(directory_path = "data/slope_aspect")),
+  tar_target(slope_aspect_downloaded, get_slope_aspect(slope_aspect_directory_raw, continent_polygon),
+    format = "file", 
+    repository = "local"),
+ 
+   # Gridded Livestock of the world -----------------------------------------------------------
+  tar_target(glw_directory_raw, 
+             create_data_directory(directory_path = "data/glw")),
+  tar_target(glw_downloaded, get_glw_data(glw_directory_raw),
+             format = "file", 
+             repository = "local"),
+  tar_target(glw_preprocessed, 
+             preprocess_glw_data(glw_directory_raw, glw_downloaded, continent_raster_template)),
+
+
+# ELEVATION -----------------------------------------------------------
+tar_target(elevation_directory_raw, 
+           create_data_directory(directory_path = "data/elevation")),
+tar_target(elevation_downloaded, get_elevation(elevation_directory_raw),
+  format = "file", 
+  repository = "local"),
+tar_target(elevation_preprocessed, 
+           process_elevation(elevation_directory_raw, elevation_downloaded, continent_raster_template)),
+
+
+)
 # Dynamic Data Download -----------------------------------------------------------
 dynamic_targets <- tar_plan(
   
@@ -51,6 +86,7 @@ dynamic_targets <- tar_plan(
   tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()),
   tar_target(wahis_rvf_outbreaks_preprocessed, 
              preprocess_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw)),
+  
   
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
@@ -239,27 +275,7 @@ dynamic_targets <- tar_plan(
   format = "file"
   ),
   
-  ## GLW
-
-  tar_target(glw_cattle, get_glw()),
-  tar_target(glw_sheep, get_glw()),
-  tar_target(glw_goats, get_glw()),
-  tar_target(glw_cattle_preprocessed, preprocess_glw(glw_cattle, bounding_boxes)),
-  #need to cache
   
-  ## ELEVATION
-  
-  tar_target(elevation_layer_raw, get_elevation()),
-  tar_target(elevation_layer_processed, 
-             process_elevation(elevation_layer_processed, bounding_boxes)),
-  #need to cache
-  
-  ## GRAZING CAPACITY
-  
-  tar_target(grazingcap_raw, get_grazingcap()),
-  tar_target(grazingcap_processed, 
-             process_grazingcap(grazingcap_layer_processed, bounding_boxes)),
-  #need to cache
 
 )
 

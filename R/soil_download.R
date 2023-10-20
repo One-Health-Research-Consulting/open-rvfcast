@@ -7,29 +7,30 @@
 #' @return
 #' @author Whitney Bagge
 #' @export
-soil_download <- function() {
+soil_download <- function(soil_directory_raw) {
   
   options(timeout=200)
   
-  loc <- c("soil_database", "soil_raster")
-  for(loc in location) { 
+  location <- c("soil_database", "soil_raster")
+  
+  for(loc in location){ 
     
-    url_out<- switch(loc,  "soil_raster" = "https://s3.eu-west-1.amazonaws.com/data.gaezdev.aws.fao.org/HWSD/HWSD2_RASTER.zip", 
-                           "soil_database" = "https://www.isric.org/sites/default/files/HWSD2.sqlite")
+   url_out<- switch(loc,  "soil_raster" = "https://s3.eu-west-1.amazonaws.com/data.gaezdev.aws.fao.org/HWSD/HWSD2_RASTER.zip", 
+                          "soil_database" = "https://www.isric.org/sites/default/files/HWSD2.sqlite")
 
-    file_ext<- switch(loc,"soil_raster" = ".zip", "soil_database" = ".sqlite")
-    
-    file_name <- paste("data/soil/", loc, file_ext, sep="")
-    
-    download.file(url=url_out, destfile = file_name)
-    
-    if (loc == "soil_raster" ){
-     unzip(file_name, exdir = "data/soil/")
-    }
+   file_ext<- switch(loc,"soil_raster" = ".zip", "soil_database" = ".sqlite")
+   
+   filename <- paste("data/soil/", loc, file_ext, sep="")
+   
+   download.file(url=url_out, destfile = filename)
+   
+   if (loc == "soil_raster" ){
+    unzip(filename, exdir = "data/soil/")
+   }
 
   }
   
-  return(file.path(download_directory, filename))
+  return(soil_directory_raw)
   
 
 }
