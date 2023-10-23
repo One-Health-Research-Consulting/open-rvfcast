@@ -297,7 +297,7 @@ data_targets <- tar_plan(
   tar_target(model_dates, set_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, lag_intervals, seed = 212)),
   tar_target(model_dates_selected, model_dates |> filter(select_date) |> pull(date)),
   
-  # weather data
+  # weather anomalies data
   tar_target(weather_historical_means_directory, 
              create_data_directory(directory_path = "data/weather_historical_means")),
   
@@ -333,6 +333,19 @@ data_targets <- tar_plan(
                            check = TRUE), 
              pattern = weather_anomalies,
              cue = tar_cue("never")), # only run this if you need to upload new data  
+  
+  # ndvi anomalies data
+  tar_target(ndvi_date_lookup, 
+             create_ndvi_date_lookup(sentinel_ndvi_transformed,
+                                     sentinel_ndvi_transformed_directory,
+                                     modis_ndvi_transformed,
+                                     modis_ndvi_transformed_directory)),
+  
+  
+  tar_target(ndvi_historical_means_directory, 
+             create_data_directory(directory_path = "data/ndvi_historical_means")),
+  
+  
   
 )
 
