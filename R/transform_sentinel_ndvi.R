@@ -15,6 +15,8 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_downloaded,
                                     overwrite = FALSE) {
   
   # Extract start and end dates from the raw downloaded file name
+  # naming conventions
+  # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-3-synergy/naming-conventions
   filename <- basename(sentinel_ndvi_downloaded)
   assertthat::are_equal(nchar(filename), 97)
   start_date <- as.Date(str_sub(filename, 17, 24), format = "%Y%m%d")
