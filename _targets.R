@@ -345,17 +345,28 @@ data_targets <- tar_plan(
   tar_target(ndvi_historical_means_directory, 
              create_data_directory(directory_path = "data/ndvi_historical_means")),
   
-  tar_target(ndvi_historical_means, calculate_ndvi_historical_means(sentinel_ndvi_transformed,
-                                                                    sentinel_ndvi_transformed_directory,
-                                                                    modis_ndvi_transformed,
-                                                                    modis_ndvi_transformed_directory,
-                                                                    ndvi_historical_means_directory,
+  tar_target(ndvi_historical_means, calculate_ndvi_historical_means(ndvi_historical_means_directory,
                                                                     ndvi_date_lookup,
                                                                     days_of_year,
                                                                     overwrite = FALSE),
              pattern = days_of_year,
              format = "file", 
              repository = "local"),  
+  
+  tar_target(ndvi_anomalies_directory, 
+             create_data_directory(directory_path = "data/ndvi_anomalies")),
+  
+  tar_target(ndvi_anomalies, calculate_ndvi_anomalies(ndvi_date_lookup,
+                                                      ndvi_historical_means,
+                                                      ndvi_anomalies_directory,
+                                                      model_dates,
+                                                      model_dates_selected,
+                                                      lag_intervals,
+                                                      overwrite = FALSE),
+             pattern = head(model_dates_selected, 1),
+             format = "file", 
+             repository = "local"),  
+  
   
   
   

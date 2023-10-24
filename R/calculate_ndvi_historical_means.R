@@ -13,11 +13,7 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-calculate_ndvi_historical_means <- function(sentinel_ndvi_transformed,
-                                            sentinel_ndvi_transformed_directory,
-                                            modis_ndvi_transformed,
-                                            modis_ndvi_transformed_directory,
-                                            ndvi_historical_means_directory,
+calculate_ndvi_historical_means <- function(ndvi_historical_means_directory,
                                             ndvi_date_lookup, days_of_year,
                                             overwrite = FALSE) {
   
