@@ -38,10 +38,6 @@ calculate_ndvi_historical_means <- function(sentinel_ndvi_transformed,
   doy_lookup <-  ndvi_date_lookup |> 
     filter(map_lgl(lookup_day_of_year, ~any(. == doy)))
   
-  # TODO investigate some overlaps in modis data !!
-  # length(reduce(doy_lookup$lookup_dates, c))
-  # n_distinct(reduce(doy_lookup$lookup_dates, c))
-  
   # Create dataset of relevant files
   ndvi_dataset <- open_dataset(doy_lookup$filename)
   

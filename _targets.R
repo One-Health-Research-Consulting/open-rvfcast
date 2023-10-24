@@ -171,7 +171,7 @@ dynamic_targets <- tar_plan(
                            key = modis_ndvi_transformed, 
                            check = TRUE), 
              pattern = modis_ndvi_transformed,
-             cue = tar_cue("thorough")), # only run this if you need to upload new data 
+             cue = tar_cue("never")), # only run this if you need to upload new data 
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
