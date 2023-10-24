@@ -16,29 +16,31 @@ create_ndvi_date_lookup <- function(sentinel_ndvi_transformed,
                                     modis_ndvi_transformed_directory) {
 
   
-  sent_dataset <- open_dataset(sentinel_ndvi_transformed_directory) 
-  modi_dataset <- open_dataset(modis_ndvi_transformed_directory) 
+  sentinel_dataset <- open_dataset(sentinel_ndvi_transformed_directory) 
+  modis_dataset <- open_dataset(modis_ndvi_transformed_directory) 
   
   # create lookup table so we know which rows to query, without doing an expansion on the actual data
-  sent_dates <- sent_dataset |> 
+  sentinel_dates <- sentinel_dataset |> 
     distinct(start_date, end_date) |> 
     arrange(start_date) |> 
     collect() |> 
     mutate(lookup_dates = map2(start_date, end_date, ~seq(.x, .y-1, by = "1 day"))) |>  
-    mutate(satellite = "sentinel")
+    mutate(satellite = "sentinel") |> 
+    mutate(filename = sort(sentinel_ndvi_transformed))
   
-  min_sent_start <- min(sent_dates$start_date) # this is when sentinel starts
+  min_sentinel_start <- min(sentinel_dates$start_date) # this is when sentinel starts
   
-  modi_dates <- modi_dataset |> 
+  modis_dates <- modis_dataset |> 
     distinct(start_date, end_date) |> 
     arrange(start_date) |> 
     collect() |> 
     mutate(lookup_dates = map2(start_date, end_date, ~seq(.x, .y-1, by = "1 day"))) |> 
     mutate(satellite = "modis") |> 
-    mutate(lookup_dates = map(lookup_dates, ~na.omit(if_else(.>=min_sent_start, NA, .)))) |> 
-    filter(map_lgl(lookup_dates, ~length(.) > 0))
+    mutate(filename = sort(modis_ndvi_transformed)) |> 
+    mutate(lookup_dates = map(lookup_dates, ~na.omit(if_else(.>=min_sentinel_start, NA, .)))) |> 
+    filter(map_lgl(lookup_dates, ~length(.) > 0)) 
   
-  ndvi_dates <- bind_rows(modi_dates, sent_dates) |> 
+  ndvi_dates <- bind_rows(modis_dates, sentinel_dates) |> 
     mutate(lookup_day_of_year = map(lookup_dates, yday)) |> 
     relocate(satellite)
   
