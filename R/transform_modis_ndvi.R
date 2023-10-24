@@ -19,10 +19,9 @@ transform_modis_ndvi <- function(modis_ndvi_downloaded_subset,
   filename <- basename(modis_ndvi_downloaded_subset)
   year_doy <- sub(".*doy(\\d+).*", "\\1", filename) 
   start_date <- as.Date(year_doy, format = "%Y%j") # confirmed this is start date through manual download tests 
-  end_date <- start_date + 16 
-  
+
   # Set filename for saving
-  save_filename <- glue::glue("transformed_modis_NDVI_{start_date}_to_{end_date}.gz.parquet")
+  save_filename <- glue::glue("transformed_modis_NDVI_{start_date}.gz.parquet")
   message(paste0("Transforming ", save_filename))
   
   # Check if file already exists
@@ -40,8 +39,7 @@ transform_modis_ndvi <- function(modis_ndvi_downloaded_subset,
   dat_out <- as.data.frame(transformed_raster, xy = TRUE) |> 
     as_tibble() |> 
     rename(ndvi = 3) |> 
-    mutate(start_date = start_date,
-           end_date = end_date)
+    mutate(start_date = start_date)
   
   # Save as parquet 
   write_parquet(dat_out, here::here(modis_ndvi_transformed_directory, save_filename), compression = "gzip", compression_level = 5)
