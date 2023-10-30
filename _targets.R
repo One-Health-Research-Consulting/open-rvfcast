@@ -297,7 +297,8 @@ data_targets <- tar_plan(
   tar_target(model_dates, set_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, lag_intervals, seed = 212)),
   tar_target(model_dates_selected, model_dates |> filter(select_date) |> pull(date)),
   
-  # weather data
+  
+  # weather anomalies --------------------------------------------------
   tar_target(weather_historical_means_directory, 
              create_data_directory(directory_path = "data/weather_historical_means")),
   
@@ -333,6 +334,50 @@ data_targets <- tar_plan(
                            check = TRUE), 
              pattern = weather_anomalies,
              cue = tar_cue("never")), # only run this if you need to upload new data  
+  
+  # ndvi anomalies --------------------------------------------------
+  tar_target(ndvi_date_lookup, 
+             create_ndvi_date_lookup(sentinel_ndvi_transformed,
+                                     sentinel_ndvi_transformed_directory,
+                                     modis_ndvi_transformed,
+                                     modis_ndvi_transformed_directory)),
+  
+  
+  tar_target(ndvi_historical_means_directory, 
+             create_data_directory(directory_path = "data/ndvi_historical_means")),
+  
+  tar_target(ndvi_historical_means, calculate_ndvi_historical_means(ndvi_historical_means_directory,
+                                                                    ndvi_date_lookup,
+                                                                    days_of_year,
+                                                                    overwrite = FALSE),
+             pattern = days_of_year,
+             format = "file", 
+             repository = "local"),  
+  
+  tar_target(ndvi_anomalies_directory, 
+             create_data_directory(directory_path = "data/ndvi_anomalies")),
+  
+  tar_target(ndvi_anomalies, calculate_ndvi_anomalies(ndvi_date_lookup,
+                                                      ndvi_historical_means,
+                                                      ndvi_anomalies_directory,
+                                                      model_dates,
+                                                      model_dates_selected,
+                                                      lag_intervals,
+                                                      overwrite = FALSE),
+             pattern = model_dates_selected,
+             format = "file", 
+             repository = "local"),  
+  
+  
+  # save anomalies to AWS bucket
+  tar_target(ndvi_anomalies_upload_aws_s3, 
+             aws_s3_upload(path = ndvi_anomalies,
+                           bucket =  aws_bucket,
+                           key = ndvi_anomalies, 
+                           check = TRUE), 
+             pattern = ndvi_anomalies,
+             cue = tar_cue("never")), # only run this if you need to upload new data  
+  
   
 )
 
