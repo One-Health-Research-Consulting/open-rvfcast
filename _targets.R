@@ -298,7 +298,7 @@ data_targets <- tar_plan(
   tar_target(model_dates_selected, model_dates |> filter(select_date) |> pull(date)),
   
   
-  # weather anomalies --------------------------------------------------
+  # recorded weather anomalies --------------------------------------------------
   tar_target(weather_historical_means_directory, 
              create_data_directory(directory_path = "data/weather_historical_means")),
   
@@ -334,6 +334,22 @@ data_targets <- tar_plan(
                            check = TRUE), 
              pattern = weather_anomalies,
              cue = tar_cue("never")), # only run this if you need to upload new data  
+  
+  
+  # forecast weather anomalies ----------------------------------------------------------------------
+  tar_target(forecasts_anomalies_directory, 
+             create_data_directory(directory_path = "data/forecast_anomalies")),
+  
+  tar_target(forecasts_anomalies, calculate_forecasts_anomalies(ecmwf_forecasts_transformed,
+                                                                ecmwf_forecasts_transformed_directory,
+                                                                weather_historical_means,
+                                                                forecast_anomalies_directory,
+                                                                model_dates,
+                                                                model_dates_selected,
+                                                                overwrite = FALSE),
+             pattern = model_dates_selected,
+             format = "file", 
+             repository = "local"),    
   
   # ndvi anomalies --------------------------------------------------
   tar_target(ndvi_date_lookup, 

@@ -7,15 +7,15 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-download_ecmwf_forecasts <- function(ecmwf_api_parameters,
+download_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
                                      download_directory,
                                      overwrite = FALSE){
   
   existing_files <- list.files(download_directory)
   
-  system <- ecmwf_api_parameters$system
-  year <- ecmwf_api_parameters$year
-  month <- unlist(ecmwf_api_parameters$month)
+  system <- ecmwf_forecasts_api_parameters$system
+  year <- ecmwf_forecasts_api_parameters$year
+  month <- unlist(ecmwf_forecasts_api_parameters$month)
 
   filename <- paste("ecmwf", "seasonal_forecast", paste0("sys", system), year, sep = "_")
   filename <- paste0(filename, ".grib")
@@ -29,12 +29,12 @@ download_ecmwf_forecasts <- function(ecmwf_api_parameters,
   request <- list(
     originating_centre = "ecmwf",
     system = system,
-    variable = unlist(ecmwf_api_parameters$variables),
-    product_type = unlist(ecmwf_api_parameters$product_types),
+    variable = unlist(ecmwf_forecasts_api_parameters$variables),
+    product_type = unlist(ecmwf_forecasts_api_parameters$product_types),
     year = year,
     month = month,
-    leadtime_month = unlist(ecmwf_api_parameters$leadtime_months),
-    area = round(unlist(ecmwf_api_parameters$spatial_bounds), 1),
+    leadtime_month = unlist(ecmwf_forecasts_api_parameters$leadtime_months),
+    area = round(unlist(ecmwf_forecasts_api_parameters$spatial_bounds), 1),
     format = "grib",
     dataset_short_name = "seasonal-monthly-single-levels",
     target = filename
