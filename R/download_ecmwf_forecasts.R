@@ -8,9 +8,9 @@
 #' @author Emma Mendelsohn
 #' @export
 download_ecmwf_forecasts <- function(ecmwf_api_parameters,
-                                     download_directory){
+                                     download_directory,
+                                     overwrite = FALSE){
   
-  suppressWarnings(dir.create(download_directory, recursive = TRUE))
   existing_files <- list.files(download_directory)
   
   system <- ecmwf_api_parameters$system
@@ -22,7 +22,7 @@ download_ecmwf_forecasts <- function(ecmwf_api_parameters,
 
   message(paste0("Downloading ", filename))
   
-  if(filename %in% existing_files) {
+  if(filename %in% existing_files & !overwrite) {
     message("file already exists, skipping download")
     return(file.path(download_directory, filename)) # skip if file exists
   }  
