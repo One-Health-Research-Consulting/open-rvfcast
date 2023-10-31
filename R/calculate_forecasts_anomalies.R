@@ -17,7 +17,8 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
                                           ecmwf_forecasts_transformed_directory,
                                           weather_historical_means,
                                           forecasts_anomalies_directory,
-                                          model_dates, lead_intervals,
+                                          model_dates_selected,
+                                          lead_intervals,
                                           overwrite = FALSE) {
   
   # Set filename
@@ -62,13 +63,14 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
     lead_means <- forecasts_transformed_dataset |> 
       filter(data_date == baseline_date) |> 
       filter(lead_month %in% lead_months) |> 
-      mutate(weight = case_when(lead_month == lead_months[1] ~ weight_a, 
-                                lead_month == lead_months[2] ~ weight_b)) |> 
+      mutate(weight = case_when(lead_month == !!lead_months[1] ~ !!weight_a, 
+                                lead_month == !!lead_months[2] ~ !!weight_b)) |> 
       group_by(x, y, short_name) |>
       summarize(lead_mean = sum(mean * weight)/ sum(weight)) |>
       ungroup() 
     
     # bring in historical means for the relevant days of the year
+    # lookup with the historical means that are pre generated - this requires averaging over means and SDs
     hist_doy <- yday(seq(lead_start_date, lead_end_date-1, by = "day"))
     hist_doy_frmt <- str_pad(hist_doy, width = 3, side = "left", pad = "0")
     hist_means <- open_dataset(weather_historical_means[str_detect(weather_historical_means, paste(hist_doy_frmt, collapse = "|"))]) |> 
@@ -78,6 +80,21 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
       ungroup() |> 
       collect()
     
+    # alternative approach using the actual data - takes 30 sec each run
+    # tar_load(nasa_weather_transformed)
+    # hist_doy <- yday(seq(lead_start_date, lead_end_date-1, by = "day"))
+    # hist_means <- open_dataset(nasa_weather_transformed) |> 
+    #   filter(day_of_year %in% hist_doy) |> 
+    #   group_by(x, y) |> 
+    #   summarize(historical_relative_humidity_mean = mean(relative_humidity),
+    #             historical_temperature_mean = mean(temperature),
+    #             historical_precipitation_mean = mean(precipitation),
+    #             historical_relative_humidity_sd = sd(relative_humidity),
+    #             historical_temperature_sd = sd(temperature),
+    #             historical_precipitation_sd = sd(precipitation)) |> 
+    #   ungroup() |> 
+    #   collect()
+
     # calculate anomalies - a bit inefficient because arrow doesn't allow reshaping (should have done so in the transform function)
     # NAs are expected because forecasts are for the whole continent, weather is just for areas of interest
     

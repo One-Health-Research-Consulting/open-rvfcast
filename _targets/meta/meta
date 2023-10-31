@@ -1,10 +1,10 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|2b2f11d0568d5961|||||||||||||||
+.Random.seed|object|1852a196ad09a863|||||||||||||||
 all_targets|function|2dda5afbd1f92385|||||||||||||||
 aws_bucket|object|d9cf2c5ff7cc1be4|||||||||||||||
 aws_s3_upload_single_type|function|6d277b68ccbb67a2|||||||||||||||
 cache_aws_branched_target|function|6e2abfa4969de1bf|||||||||||||||
-calculate_forecasts_anomalies|function|6e502181840d3175|||||||||||||||
+calculate_forecasts_anomalies|function|2c33916b90afc58a|||||||||||||||
 calculate_ndvi_anomalies|function|6db15a3294a84787|||||||||||||||
 calculate_ndvi_historical_means|function|a02a324eed41f50b|||||||||||||||
 calculate_weather_anomalies|function|57719f2f7340a5c0|||||||||||||||
@@ -24,7 +24,7 @@ create_nasa_weather_dataset|function|7eb26dcea55b80b9|||||||||||||||
 create_ndvi_date_lookup|function|acddeddb4382e68c|||||||||||||||
 create_raster_template_plot|function|db738156a3247831|||||||||||||||
 create_sentinel_ndvi_dataset|function|201d4eaf8c87d0c3|||||||||||||||
-data_targets|object|6036bf6e50664e06|||||||||||||||
+data_targets|object|1b2f208c4b9303d7|||||||||||||||
 days_of_year|stem|e2673220ee124699|1e42c49f9959f217|787f005495551c49|-84662016|bucket=open-rvfcast-data*region=NULL*key=_targets/days_of_year*endpoint=TlVMTA*version=|t19642.833473024s||1502|qs|aws|vector|||0.001||
 define_bounding_boxes|function|e614caacc0592e73|||||||||||||||
 define_country_regions|function|54808365a1bb460e|||||||||||||||
@@ -110,7 +110,14 @@ ecmwf_forecasts_transformed_upload_aws_s3_f77cea8f|branch|6e170a6bc685cec2|af110
 ecmwf_forecasts_transformed_upload_aws_s3_fe9ab7e6|branch|6e170a6bc685cec2|af1104937d66021a|d17be2bde46638f3|1048328926|bucket=open-rvfcast-data*region=NULL*key=_targets/ecmwf_forecasts_transformed_upload_aws_s3_fe9ab7e6*endpoint=TlVMTA*version=|t19661.0328043273s||34|qs|aws|vector|ecmwf_forecasts_transformed_upload_aws_s3||146.633||
 env_file|object|5e2c4c2bf6df65f0|||||||||||||||
 f|object|a03aededb6577b02|||||||||||||||
+forecasts_anomalies|pattern|b1db7fb50639c582|2a71e7308f1a819c||974940249||||140856617|file|local|vector||forecasts_anomalies_bfe33189*forecasts_anomalies_fb01d19b*forecasts_anomalies_faf7d552|50.182||
+forecasts_anomalies_34327510|branch|81dadbd751e94801|2a71e7308f1a819c|d914e4860a48748d|105621413|data/forecast_anomalies/forecast_anomaly_2005-05-19.gz.parquet|t19661.807405091s|0b2bdbe7f85610ce|47176229|file|local|vector|forecasts_anomalies||16.479||
+forecasts_anomalies_5e501efa|branch|322bd7ec4b31b77c|2a71e7308f1a819c|a360f0dc96b43647|532370768|data/forecast_anomalies/forecast_anomaly_2005-04-28.gz.parquet|t19661.8072136898s|8ffd96e497cf1bac|46860813|file|local|vector|forecasts_anomalies||16.712||
+forecasts_anomalies_94f732f8|branch|26bd70500e5ae0e9|2a71e7308f1a819c|f23b3ae1efac8745|1691016393|data/forecast_anomalies/forecast_anomaly_2005-04-14.gz.parquet|t19661.8070197251s|fbd65809c4cbbcb2|46828537|file|local|vector|forecasts_anomalies||15.035||
+forecasts_anomalies_bfe33189|branch|cc2d35a883614004|2a71e7308f1a819c|4091185a170173ed|997330808|data/forecast_anomalies/forecast_anomaly_2022-11-16.gz.parquet|t19661.8079051316s|2fe683f39b154805|46948262|file|local|vector|forecasts_anomalies||14.295||
 forecasts_anomalies_directory|stem|2a719642e605afbe|7400c7ba9dcd0dd4|3d3d9feae01275db|-220809547|bucket=open-rvfcast-data*region=NULL*key=_targets/forecasts_anomalies_directory*endpoint=TlVMTA*version=|t19661.6062197346s||55|qs|aws|vector|||0||
+forecasts_anomalies_faf7d552|branch|c9969040dac702a2|2a71e7308f1a819c|f3193b031dd1fe56|834705874|data/forecast_anomalies/forecast_anomaly_2022-12-17.gz.parquet|t19661.8083217238s|f9f75ca4b1e980df|46946950|file|local|vector|forecasts_anomalies||18.977||
+forecasts_anomalies_fb01d19b|branch|7df065c868d6a1da|2a71e7308f1a819c|9f88fba40594e019|-186920863|data/forecast_anomalies/forecast_anomaly_2022-12-16.gz.parquet|t19661.8081014229s|db26984609b1046b|46961405|file|local|vector|forecasts_anomalies||16.91||
 get_country_bounding_boxes|function|82b21d03b36ce8fe|||||||||||||||
 get_modis_ndvi_api_parameters|function|c30ed04e0978b176|||||||||||||||
 get_modis_ndvi_bundle|function|1f38d28bad794ce7|||||||||||||||
