@@ -293,6 +293,7 @@ dynamic_targets <- tar_plan(
 data_targets <- tar_plan(
   
   tar_target(lag_intervals, c(30, 60, 90)), 
+  tar_target(lead_intervals, c(30, 60, 90, 120, 150)), 
   tar_target(days_of_year, 1:366),
   tar_target(model_dates, set_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, lag_intervals, seed = 212)),
   tar_target(model_dates_selected, model_dates |> filter(select_date) |> pull(date)),
@@ -343,9 +344,9 @@ data_targets <- tar_plan(
   tar_target(forecasts_anomalies, calculate_forecasts_anomalies(ecmwf_forecasts_transformed,
                                                                 ecmwf_forecasts_transformed_directory,
                                                                 weather_historical_means,
-                                                                forecast_anomalies_directory,
-                                                                model_dates,
+                                                                forecasts_anomalies_directory,
                                                                 model_dates_selected,
+                                                                lead_intervals,
                                                                 overwrite = FALSE),
              pattern = model_dates_selected,
              format = "file", 

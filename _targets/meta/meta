@@ -1,10 +1,10 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|34508ac3370a0c36|||||||||||||||
+.Random.seed|object|2b2f11d0568d5961|||||||||||||||
 all_targets|function|2dda5afbd1f92385|||||||||||||||
 aws_bucket|object|d9cf2c5ff7cc1be4|||||||||||||||
 aws_s3_upload_single_type|function|6d277b68ccbb67a2|||||||||||||||
 cache_aws_branched_target|function|6e2abfa4969de1bf|||||||||||||||
-calculate_forecasts_anomalies|function|09633ac27cef6198|||||||||||||||
+calculate_forecasts_anomalies|function|6e502181840d3175|||||||||||||||
 calculate_ndvi_anomalies|function|6db15a3294a84787|||||||||||||||
 calculate_ndvi_historical_means|function|a02a324eed41f50b|||||||||||||||
 calculate_weather_anomalies|function|57719f2f7340a5c0|||||||||||||||
@@ -24,7 +24,7 @@ create_nasa_weather_dataset|function|7eb26dcea55b80b9|||||||||||||||
 create_ndvi_date_lookup|function|acddeddb4382e68c|||||||||||||||
 create_raster_template_plot|function|db738156a3247831|||||||||||||||
 create_sentinel_ndvi_dataset|function|201d4eaf8c87d0c3|||||||||||||||
-data_targets|object|4aca86d510d5e162|||||||||||||||
+data_targets|object|6036bf6e50664e06|||||||||||||||
 days_of_year|stem|e2673220ee124699|1e42c49f9959f217|787f005495551c49|-84662016|bucket=open-rvfcast-data*region=NULL*key=_targets/days_of_year*endpoint=TlVMTA*version=|t19642.833473024s||1502|qs|aws|vector|||0.001||
 define_bounding_boxes|function|e614caacc0592e73|||||||||||||||
 define_country_regions|function|54808365a1bb460e|||||||||||||||
@@ -110,6 +110,7 @@ ecmwf_forecasts_transformed_upload_aws_s3_f77cea8f|branch|6e170a6bc685cec2|af110
 ecmwf_forecasts_transformed_upload_aws_s3_fe9ab7e6|branch|6e170a6bc685cec2|af1104937d66021a|d17be2bde46638f3|1048328926|bucket=open-rvfcast-data*region=NULL*key=_targets/ecmwf_forecasts_transformed_upload_aws_s3_fe9ab7e6*endpoint=TlVMTA*version=|t19661.0328043273s||34|qs|aws|vector|ecmwf_forecasts_transformed_upload_aws_s3||146.633||
 env_file|object|5e2c4c2bf6df65f0|||||||||||||||
 f|object|a03aededb6577b02|||||||||||||||
+forecasts_anomalies_directory|stem|2a719642e605afbe|7400c7ba9dcd0dd4|3d3d9feae01275db|-220809547|bucket=open-rvfcast-data*region=NULL*key=_targets/forecasts_anomalies_directory*endpoint=TlVMTA*version=|t19661.6062197346s||55|qs|aws|vector|||0||
 get_country_bounding_boxes|function|82b21d03b36ce8fe|||||||||||||||
 get_modis_ndvi_api_parameters|function|c30ed04e0978b176|||||||||||||||
 get_modis_ndvi_bundle|function|1f38d28bad794ce7|||||||||||||||
@@ -121,6 +122,7 @@ get_wahis_rvf_outbreaks_raw|function|a8564ce9127c9c1d|||||||||||||||
 get_weather_anomalies|function|1956aa290dc4fc5d|||||||||||||||
 get_weather_data|function|1956aa290dc4fc5d|||||||||||||||
 lag_intervals|stem|f4c9e8a4d588925c|6b4f81cd41a7b83e|a3dad144c40657ed|1055089432|bucket=open-rvfcast-data*region=NULL*key=_targets/lag_intervals*endpoint=TlVMTA*version=|t19615.7794897048s||55|qs|aws|vector|||0||
+lead_intervals|stem|aab13460c8099242|a51b26cedde2c396|a3dad144c40657ed|-701347992|bucket=open-rvfcast-data*region=NULL*key=_targets/lead_intervals*endpoint=TlVMTA*version=|t19661.6592285323s||71|qs|aws|vector|||0||
 make_africa_outbreak_scale_map|function|1cf69dae8f3f7f78|||||||||||||||
 make_model_data|function|df0e5631ac6d7b53|||||||||||||||
 make_south_africa_outbreak_scale_map|function|6608b5446fc16c9f|||||||||||||||
