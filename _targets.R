@@ -307,6 +307,8 @@ data_targets <- tar_plan(
                                                                           nasa_weather_transformed_directory,
                                                                           weather_historical_means_directory,
                                                                           days_of_year,
+                                                                          lag_intervals,
+                                                                          lead_intervals,
                                                                           overwrite = FALSE),
              pattern = days_of_year,
              format = "file", 
