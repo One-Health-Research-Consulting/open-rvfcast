@@ -37,12 +37,14 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
   
   anomalies <- map2(lag_intervals_start, lag_intervals_end, function(start, end){
     
-    # get lag dates
+    # get lag dates, removing doy 366
     lag_dates <- seq(date_selected - end, date_selected - start, by = "day")
+    lag_doys <- yday(lag_dates)
+    if(366 %in% lag_doys) lag_doys <- c(head(lag_doys, 1) - 1, lag_doys[lag_doys!=366])
     
     # Get historical means for lag period
-    doy_start <- yday(lag_dates[1])
-    doy_end <- yday(lag_dates[length(lag_dates)])
+    doy_start <- head(lag_doys, 1)
+    doy_end <- tail(lag_doys, 1)
     doy_start_frmt <- str_pad(doy_start, width = 3, side = "left", pad = "0")
     doy_end_frmt <- str_pad(doy_end, width = 3, side = "left", pad = "0")
     doy_range <- glue::glue("{doy_start_frmt}_to_{doy_end_frmt}")

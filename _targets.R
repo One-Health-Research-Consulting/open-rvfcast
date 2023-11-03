@@ -294,7 +294,7 @@ data_targets <- tar_plan(
   
   tar_target(lag_intervals, c(30, 60, 90)), 
   tar_target(lead_intervals, c(30, 60, 90, 120, 150)), 
-  tar_target(days_of_year, 1:366),
+  tar_target(days_of_year, 1:365),
   tar_target(model_dates_selected, set_model_dates(start_year = 2005, 
                                                    end_year = 2022, 
                                                    n_per_month = 2, 
@@ -317,6 +317,16 @@ data_targets <- tar_plan(
              pattern = days_of_year,
              format = "file", 
              repository = "local"),  
+  
+  # save historical means to AWS bucket
+  tar_target(weather_historical_means_upload_aws_s3, 
+             aws_s3_upload(path = weather_historical_means,
+                           bucket =  aws_bucket,
+                           key = weather_historical_means, 
+                           check = TRUE), 
+             pattern = weather_historical_means,
+             cue = tar_cue("thorough")), # only run this if you need to upload new data  
+  
   
   tar_target(weather_anomalies_directory, 
              create_data_directory(directory_path = "data/weather_anomalies")),
@@ -376,6 +386,16 @@ data_targets <- tar_plan(
              pattern = days_of_year,
              format = "file", 
              repository = "local"),  
+  
+  # save historical means to AWS bucket
+  tar_target(ndvi_historical_means_upload_aws_s3, 
+             aws_s3_upload(path = ndvi_historical_means,
+                           bucket =  aws_bucket,
+                           key = ndvi_historical_means, 
+                           check = TRUE), 
+             pattern = ndvi_historical_means,
+             cue = tar_cue("thorough")), # only run this if you need to upload new data  
+  
   
   tar_target(ndvi_anomalies_directory, 
              create_data_directory(directory_path = "data/ndvi_anomalies")),
