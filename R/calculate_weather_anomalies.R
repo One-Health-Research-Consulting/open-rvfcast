@@ -32,15 +32,15 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
   weather_transformed_dataset <- open_dataset(nasa_weather_transformed_directory)
   
   # Get the lagged anomalies for selected dates, mapping over the lag intervals
-  lag_intervals_start <- c(1 , 1+lag_intervals[-length(lag_intervals)])
-  lag_intervals_end <- lag_intervals
+  lag_intervals_start <- c(1 , 1+lag_intervals[-length(lag_intervals)]) # 1 to start with previous day
+  lag_intervals_end <- lag_intervals # 30 days total including end day
   
   anomalies <- map2(lag_intervals_start, lag_intervals_end, function(start, end){
     
     # get lag dates
     lag_dates <- seq(date_selected - end, date_selected - start, by = "day")
     
-    # Get historical means for DOY
+    # Get historical means for lag period
     doy_start <- yday(lag_dates[1])
     doy_end <- yday(lag_dates[length(lag_dates)])
     doy_start_frmt <- str_pad(doy_start, width = 3, side = "left", pad = "0")
