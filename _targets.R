@@ -80,7 +80,7 @@ dynamic_targets <- tar_plan(
                               bucket =  aws_bucket ,
                               key = sentinel_ndvi_raw_directory, 
                               check = TRUE)}, 
-    cue = tar_cue("never")), # only run this if you need to upload new data
+    cue = tar_cue("thorough")), # only run this if you need to upload new data
   
   # project to the template and save as parquets (these can now be queried for analysis)
   # this maintains the branches, saves separate files split by date
@@ -100,7 +100,7 @@ dynamic_targets <- tar_plan(
                            key = sentinel_ndvi_transformed, 
                            check = TRUE), 
              pattern = sentinel_ndvi_transformed,
-             cue = tar_cue("never")), # only run this if you need to upload new data
+             cue = tar_cue("thorough")), # only run this if you need to upload new data
   
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
@@ -148,7 +148,7 @@ dynamic_targets <- tar_plan(
                               bucket =  aws_bucket ,
                               key = modis_ndvi_raw_directory, 
                               check = TRUE)}, 
-    cue = tar_cue("never")), # only run this if you need to upload new data
+    cue = tar_cue("thorough")), # only run this if you need to upload new data
   
   # remove the "quality" files
   tar_target(modis_ndvi_downloaded_subset, modis_ndvi_downloaded[str_detect(basename(modis_ndvi_downloaded), "NDVI")]),
@@ -171,7 +171,7 @@ dynamic_targets <- tar_plan(
                            key = modis_ndvi_transformed, 
                            check = TRUE), 
              pattern = modis_ndvi_transformed,
-             cue = tar_cue("never")), # only run this if you need to upload new data 
+             cue = tar_cue("thorough")), # only run this if you need to upload new data 
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
@@ -206,7 +206,7 @@ dynamic_targets <- tar_plan(
                               bucket =  aws_bucket,
                               key = nasa_weather_raw_directory, 
                               check = TRUE)}, 
-    cue = tar_cue("never")), # only run this if you need to upload new data
+    cue = tar_cue("thorough")), # only run this if you need to upload new data
   
   
   # remove dupes due to having overlapping country bounding boxes
@@ -232,7 +232,7 @@ dynamic_targets <- tar_plan(
                            key = nasa_weather_transformed,
                            check = TRUE), 
              pattern = nasa_weather_transformed,
-             cue = tar_cue("never")), # only run this if you need to upload new data
+             cue = tar_cue("thorough")), # only run this if you need to upload new data
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   tar_target(ecmwf_forecasts_raw_directory, 
@@ -262,7 +262,7 @@ dynamic_targets <- tar_plan(
                               bucket =  aws_bucket ,
                               key = ecmwf_forecasts_raw_directory,
                               check = TRUE)},
-    cue = tar_cue("never")), # only run this if you need to upload new data
+    cue = tar_cue("thorough")), # only run this if you need to upload new data
   
   # project to the template and save as arrow dataset
   tar_target(ecmwf_forecasts_transformed, 
@@ -285,7 +285,7 @@ dynamic_targets <- tar_plan(
                                 verbose = TRUE,
                                 show_progress = TRUE),
              pattern = ecmwf_forecasts_transformed,
-             cue = tar_cue("never")), # only run this if you need to upload new data 
+             cue = tar_cue("thorough")), # only run this if you need to upload new data 
   
 )
 
@@ -295,10 +295,14 @@ data_targets <- tar_plan(
   tar_target(lag_intervals, c(30, 60, 90)), 
   tar_target(lead_intervals, c(30, 60, 90, 120, 150)), 
   tar_target(days_of_year, 1:366),
-  tar_target(model_dates, set_model_dates(start_year = 2005, end_year = 2022, n_per_month = 2, lag_intervals, seed = 212)),
-  tar_target(model_dates_selected, model_dates |> filter(select_date) |> pull(date)),
-  
-  
+  tar_target(model_dates_selected, set_model_dates(start_year = 2005, 
+                                                   end_year = 2022, 
+                                                   n_per_month = 2, 
+                                                   lag_intervals, 
+                                                   seed = 212) |> 
+               filter(select_date) |> pull(date)
+               ),
+
   # recorded weather anomalies --------------------------------------------------
   tar_target(weather_historical_means_directory, 
              create_data_directory(directory_path = "data/weather_historical_means")),
@@ -321,10 +325,9 @@ data_targets <- tar_plan(
                                                             nasa_weather_transformed_directory,
                                                             weather_historical_means,
                                                             weather_anomalies_directory,
-                                                            model_dates,
                                                             model_dates_selected,
                                                             lag_intervals,
-                                                            overwrite = FALSE),
+                                                            overwrite = TRUE),
              pattern = model_dates_selected,
              format = "file", 
              repository = "local"),  
@@ -336,7 +339,7 @@ data_targets <- tar_plan(
                            key = weather_anomalies, 
                            check = TRUE), 
              pattern = weather_anomalies,
-             cue = tar_cue("never")), # only run this if you need to upload new data  
+             cue = tar_cue("thorough")), # only run this if you need to upload new data  
   
   
   # forecast weather anomalies ----------------------------------------------------------------------
@@ -395,7 +398,7 @@ data_targets <- tar_plan(
                            key = ndvi_anomalies, 
                            check = TRUE), 
              pattern = ndvi_anomalies,
-             cue = tar_cue("never")), # only run this if you need to upload new data  
+             cue = tar_cue("thorough")), # only run this if you need to upload new data  
   
   
 )

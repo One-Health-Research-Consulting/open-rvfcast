@@ -12,7 +12,6 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
                                         nasa_weather_transformed_directory,
                                         weather_historical_means,
                                         weather_anomalies_directory,
-                                        model_dates,
                                         model_dates_selected,
                                         lag_intervals,
                                         overwrite = FALSE) {
@@ -32,24 +31,28 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
   # Open dataset to transformed data
   weather_transformed_dataset <- open_dataset(nasa_weather_transformed_directory)
   
-  # Get historical means for DOY
-  doy <- model_dates |> filter(date == date_selected) |> pull(day_of_year)
-  doy_frmt <- str_pad(doy,width = 3, side = "left", pad = "0")
-  historical_means <- read_parquet(weather_historical_means[str_detect(weather_historical_means, doy_frmt)]) |> 
-    select(-day_of_year)
-  
   # Get the lagged anomalies for selected dates, mapping over the lag intervals
-  row_select <- which(model_dates$date == date_selected)
-  
   lag_intervals_start <- c(1 , 1+lag_intervals[-length(lag_intervals)])
   lag_intervals_end <- lag_intervals
   
   anomalies <- map2(lag_intervals_start, lag_intervals_end, function(start, end){
-    lag_dates <- model_dates |> slice((row_select - start):(row_select - end))
     
-    # Lag: calculate mean by pixel for the preceding x days
+    # get lag dates
+    lag_dates <- seq(date_selected - end, date_selected - start, by = "day")
+    
+    # Get historical means for DOY
+    doy_start <- yday(lag_dates[1])
+    doy_end <- yday(lag_dates[length(lag_dates)])
+    doy_start_frmt <- str_pad(doy_start, width = 3, side = "left", pad = "0")
+    doy_end_frmt <- str_pad(doy_end, width = 3, side = "left", pad = "0")
+    doy_range <- glue::glue("{doy_start_frmt}_to_{doy_end_frmt}")
+    
+    historical_means <- read_parquet(weather_historical_means[str_detect(weather_historical_means, doy_range)]) 
+    assertthat::assert_that(nrow(historical_means) > 0)
+    
+    # Lag: calculate mean by pixel for the lag days
     lagged_means <- weather_transformed_dataset |> 
-      filter(date %in% !!lag_dates$date) |> 
+      filter(date %in% lag_dates) |> 
       group_by(x, y) |> 
       summarize(lag_relative_humidity_mean = mean(relative_humidity),
                 lag_temperature_mean = mean(temperature),
