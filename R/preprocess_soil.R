@@ -9,7 +9,7 @@
 #' @export
 library(DBI)
 library(RSQLite)
-preprocess_soil <- function(soil_downloaded, continent_raster_template, soil_directory_raw) {
+preprocess_soil <- function(soil_directory_dataset, soil_directory_raw, continent_raster_template, soil_downloaded) {
 
     #read in the raster file
 
@@ -27,7 +27,7 @@ preprocess_soil <- function(soil_downloaded, continent_raster_template, soil_dir
   #hwsd_bounded.utm <- project(hwsd_bounded, paste0("EPSG:", epsg), method = "near")
   
   #terra::resample(hwsd_bounded.utm, method = "near")
-  
+   
   transformed_raster <- transform_raster(raw_raster = rast(paste0(soil_downloaded, "/HWSD2.bil")),
                                          template = rast(continent_raster_template))
   
@@ -125,14 +125,14 @@ preprocess_soil <- function(soil_downloaded, continent_raster_template, soil_dir
   dat_out2$HWSD2 <- as.numeric(as.character(dat_out2$HWSD2))
   
   # Save as parquet 
-  write_parquet(dat_out,  "data/soil/soil_texture", compression = "gzip", compression_level = 5)
-  write_parquet(dat_out2, "data/soil/soil_drainage", compression = "gzip", compression_level = 5)
+  write_parquet(dat_out,  "data/soil_dataset/soil_texture", compression = "gzip", compression_level = 5)
+  write_parquet(dat_out2, "data/soil_dataset/soil_drainage", compression = "gzip", compression_level = 5)
   
   #writeRaster(hwsd.zhnj.drainage, "data/soil/drainage_raster.tif", overwrite=TRUE)
   #writeRaster(hwsd.zhnj.texture, "data/soil/texture_class_raster.tif", overwrite=TRUE)
   #writeRaster(x, sand_clay_raster, overwrite=TRUE)
   
   
-  return("/data/soil")
+  return(soil_directory_dataset)
   
 }
