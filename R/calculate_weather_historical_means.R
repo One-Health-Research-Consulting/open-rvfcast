@@ -21,10 +21,9 @@ calculate_weather_historical_means <- function(nasa_weather_transformed, # enfor
   assertthat::are_equal(length(interval_length), 1)
   
   # Set filename
-  
   # use dummy dates to keep date logic
   doy_start <- days_of_year
-  dummy_date_start  <- ymd("20200101") + doy_start - 1
+  dummy_date_start  <- ymd("20210101") + doy_start - 1
   dummy_date_end  <- dummy_date_start + interval_length - 1
   doy_end <- yday(dummy_date_end)
       
@@ -43,7 +42,7 @@ calculate_weather_historical_means <- function(nasa_weather_transformed, # enfor
   # Open dataset to transformed data
   weather_transformed_dataset <- open_dataset(nasa_weather_transformed_directory)
   
-  # Filter for day of year and calculate historical means and standard deviations
+  # Filter for relevant days of the year and calculate historical means and standard deviations
   doy_select <- yday(seq(dummy_date_start, dummy_date_end, by = "day"))
   
   historical_means <- weather_transformed_dataset |> 
