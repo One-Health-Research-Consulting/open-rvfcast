@@ -11,17 +11,7 @@ for (f in list.files(here::here("R"), full.names = TRUE)) source (f)
 aws_bucket = Sys.getenv("AWS_BUCKET_ID")
 
 # Targets options
-
-tar_option_set(resources = tar_resources(
-  aws = tar_resources_aws(bucket = Sys.getenv("AWS_BUCKET_ID"), prefix = "_targets"),
-  qs = tar_resources_qs(preset = "fast")),
-  repository = "aws",
-  format = "qs",
-  error = "null", # allow branches to error without stopping the pipeline
-  workspace_on_error = TRUE # allows interactive session for failed branches
-)
-
-# future::plan(future::multisession, workers = 16)
+source("_targets_settings.R")
 
 # Static Data Download ----------------------------------------------------
 static_targets <- tar_plan(
