@@ -40,7 +40,10 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
     # get lag dates, removing doy 366
     lag_dates <- seq(date_selected - end, date_selected - start, by = "day")
     lag_doys <- yday(lag_dates)
-    if(366 %in% lag_doys) lag_doys <- c(head(lag_doys, 1) - 1, lag_doys[lag_doys!=366])
+    if(366 %in% lag_doys){
+      lag_doys <- lag_doys[lag_doys!=366]
+      lag_doys <- c(head(lag_doys, 1) - 1, lag_doys)
+    }
     
     # Get historical means for lag period
     doy_start <- head(lag_doys, 1)
