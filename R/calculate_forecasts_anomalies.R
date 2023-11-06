@@ -73,8 +73,13 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
     lead_dates <- seq(lead_start_date, lead_end_date, by = "day")
     lead_doys <- yday(lead_dates)
     if(366 %in% lead_doys) {
-      lead_doys <- lead_doys[lead_doys!=366]
-      lead_doys <- c(lead_doys, tail(lead_doys, 1) + 1)
+      if(tail(lead_doys, 1) == 366){
+        lead_doys <- lead_doys[lead_doys!=366]
+        lead_doys <- c(lead_doys, 1)
+      }else{
+        lead_doys <- lead_doys[lead_doys!=366]
+        lead_doys <- c(lead_doys, tail(lead_doys, 1) + 1)
+      }
     }
     
     doy_start <- head(lead_doys, 1)
