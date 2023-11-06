@@ -424,7 +424,6 @@ data_targets <- tar_plan(
   tar_target(ndvi_anomalies, calculate_ndvi_anomalies(ndvi_date_lookup,
                                                       ndvi_historical_means,
                                                       ndvi_anomalies_directory,
-                                                      model_dates,
                                                       model_dates_selected,
                                                       lag_intervals,
                                                       overwrite = FALSE),

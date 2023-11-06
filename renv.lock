@@ -252,6 +252,12 @@
       "Version": "1.3.2",
       "Repository": "CRAN"
     },
+    "crew": {
+      "Source": "Repository",
+      "Package": "crew",
+      "Version": "0.4.0",
+      "Repository": "CRAN"
+    },
     "crul": {
       "Source": "Repository",
       "Package": "crul",
@@ -423,6 +429,12 @@
       "Source": "Repository",
       "Package": "getPass",
       "Version": "0.2-2",
+      "Repository": "CRAN"
+    },
+    "getip": {
+      "Source": "Repository",
+      "Package": "getip",
+      "Version": "0.1-3",
       "Repository": "CRAN"
     },
     "ggforce": {
@@ -641,6 +653,12 @@
       "Version": "0.12",
       "Repository": "CRAN"
     },
+    "mirai": {
+      "Source": "Repository",
+      "Package": "mirai",
+      "Version": "0.9.1",
+      "Repository": "CRAN"
+    },
     "modelr": {
       "Source": "Repository",
       "Package": "modelr",
@@ -651,6 +669,12 @@
       "Source": "Repository",
       "Package": "munsell",
       "Version": "0.5.0",
+      "Repository": "CRAN"
+    },
+    "nanonext": {
+      "Source": "Repository",
+      "Package": "nanonext",
+      "Version": "0.9.1",
       "Repository": "CRAN"
     },
     "nasapower": {
