@@ -14,7 +14,7 @@
 #' @author Emma Mendelsohn
 #' @export
 calculate_ndvi_anomalies <- function(ndvi_date_lookup, ndvi_historical_means,
-                                     ndvi_anomalies_directory, model_dates,
+                                     ndvi_anomalies_directory,
                                      model_dates_selected, lag_intervals,
                                      overwrite = FALSE) {
   
@@ -30,25 +30,33 @@ calculate_ndvi_anomalies <- function(ndvi_date_lookup, ndvi_historical_means,
     return(file.path(ndvi_anomalies_directory, save_filename))
   }
   
-  # Get historical means for DOY
-  doy <- model_dates |> filter(date == date_selected) |> pull(day_of_year)
-  doy_frmt <- str_pad(doy,width = 3, side = "left", pad = "0")
-  historical_means <- read_parquet(ndvi_historical_means[str_detect(ndvi_historical_means, doy_frmt)]) |> 
-    select(-day_of_year)
-  
   # Get the lagged anomalies for selected dates, mapping over the lag intervals
-  row_select <- which(model_dates$date == date_selected)
-  
-  lag_intervals_start <- c(1 , 1+lag_intervals[-length(lag_intervals)])
-  lag_intervals_end <- lag_intervals
+  lag_intervals_start <- c(1 , 1+lag_intervals[-length(lag_intervals)]) # 1 to start with previous day
+  lag_intervals_end <- lag_intervals # 30 days total including end day
   
   anomalies <- map2(lag_intervals_start, lag_intervals_end, function(start, end){
     
-    lag_dates <- model_dates |> slice((row_select - start):(row_select - end))
+    # get lag dates, removing doy 366
+    lag_dates <- seq(date_selected - end, date_selected - start, by = "day")
+    lag_doys <- yday(lag_dates)
+    if(366 %in% lag_doys){
+      lag_doys <- lag_doys[lag_doys!=366]
+      lag_doys <- c(head(lag_doys, 1) - 1, lag_doys)
+    }
     
+    # Get historical means for lag period
+    doy_start <- head(lag_doys, 1)
+    doy_end <- tail(lag_doys, 1)
+    doy_start_frmt <- str_pad(doy_start, width = 3, side = "left", pad = "0")
+    doy_end_frmt <- str_pad(doy_end, width = 3, side = "left", pad = "0")
+    doy_range <- glue::glue("{doy_start_frmt}_to_{doy_end_frmt}")
+    
+    historical_means <- read_parquet(ndvi_historical_means[str_detect(ndvi_historical_means, doy_range)]) 
+    assertthat::assert_that(nrow(historical_means) > 0)
+
     # get files and weights for the calculations
     weights <- ndvi_date_lookup |> 
-      mutate(lag_date = map(lookup_dates, ~. %in% lag_dates$date)) |> 
+      mutate(lag_date = map(lookup_dates, ~. %in% lag_dates)) |> 
       mutate(weight = unlist(map(lag_date, sum))) |> 
       filter(weight > 0) |> 
       select(start_date, filename, weight)

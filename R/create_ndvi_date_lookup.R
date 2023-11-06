@@ -28,7 +28,6 @@ create_ndvi_date_lookup <- function(sentinel_ndvi_transformed,
     distinct(start_date, end_date) |> 
     arrange(start_date) |> 
     collect() |> 
-    mutate(lookup_dates = map2(start_date, end_date, ~seq(.x, .y, by = "1 day"))) |>  
     mutate(satellite = "sentinel") |> 
     mutate(filename = sort(sentinel_ndvi_transformed))
   
@@ -36,15 +35,24 @@ create_ndvi_date_lookup <- function(sentinel_ndvi_transformed,
   sentinel_dates <- sentinel_dates |> 
     filter(year(start_date) > 2018)
   
-  # Notice that the intervals are mostly 9 or 10 days
+  # Notice that the reported intervals are mostly 10 or 11 days
   # 7 day lengths are 2/21 - 2/28
   # 9 day lengths: end date does not overlap with the next start date
   # 10 day lengths: end date does overlap with the next start date
-  sentinel_interval_lengths <- map_int(sentinel_dates$lookup_dates, length)
+  reported_sentinel_interval_lengths <- sentinel_dates$end_date - sentinel_dates$start_date
+  # sentinel_dates |> slice(which(reported_sentinel_interval_lengths == 7))
+  # sentinel_dates |> slice(which(reported_sentinel_interval_lengths == 9))
+  # sentinel_dates |> slice(which(reported_sentinel_interval_lengths == 10))
   
-  # Notice that there is three day overlap at one point in 2020
-  sentinel_overlap_dates <- sentinel_dates |> filter(start_date %in% c("2020-05-04", "2020-05-11"))
-  
+  # Check reported overlap between end of one reporting cycle and start of next
+  # the negative values are missing dates. two cases of 10-11 days missing. two cases of 2 days missing. 
+  # the positive values reflects a three day overlap in 2020
+  reported_sentinel_overlap <- sentinel_dates$end_date[-length(sentinel_dates$end_date)] - sentinel_dates$start_date[-1]
+  # check_neg <- which(reported_sentinel_overlap < -1)
+  # sentinel_dates |> slice(sort(c(check_neg, check_neg+1)))
+  # check_pos <- which(reported_sentinel_overlap >0 )
+  # sentinel_dates |> slice(sort(c(check_pos, check_pos+1)))
+
   # Because of above, to avoid overlaps: let's assume the end date is the day before the next start date
   sentinel_dates_diffs <- diff(sentinel_dates$start_date)
   sentinel_dates_diffs <- c(sentinel_dates_diffs, "NA") # NA for the last start date
