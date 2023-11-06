@@ -13,6 +13,15 @@ aws_bucket = Sys.getenv("AWS_BUCKET_ID")
 # Targets options
 source("_targets_settings.R")
 
+# Targets cue
+# By default, the tar_cue is "thorough", which means that when `tar_make()` is called, it will rebuild a target if any of the code has changed
+# If the code has not changed, `tar_make()` will skip over the target
+# For some targets with many branches (i.e., COMTRADE), it takes a long time for `tar_make()` to check and skip over already-built targets
+# For development purposes only, it can be helpful to set these targets to have a tar_cue of tar_cue_upload_aws, which means targets will not check the target for changes after it has been built once
+
+tar_cue_general = "thorough" # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
+tar_cue_upload_aws = "never" 
+
 # Static Data Download ----------------------------------------------------
 static_targets <- tar_plan(
   
@@ -62,7 +71,8 @@ dynamic_targets <- tar_plan(
                                                               overwrite = FALSE),
              pattern = sentinel_ndvi_api_parameters, 
              format = "file", 
-             repository = "local"),
+             repository = "local",
+             cue = tar_cue(tar_cue_general)),
   
   # save raw to AWS bucket
   tar_target(sentinel_ndvi_raw_upload_aws_s3, {sentinel_ndvi_downloaded;
@@ -70,7 +80,7 @@ dynamic_targets <- tar_plan(
                               bucket =  aws_bucket ,
                               key = sentinel_ndvi_raw_directory, 
                               check = TRUE)}, 
-    cue = tar_cue("thorough")), # only run this if you need to upload new data
+    cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
   
   # project to the template and save as parquets (these can now be queried for analysis)
   # this maintains the branches, saves separate files split by date
@@ -81,7 +91,8 @@ dynamic_targets <- tar_plan(
                                      overwrite = FALSE),
              pattern = sentinel_ndvi_downloaded,
              format = "file", 
-             repository = "local"), 
+             repository = "local",
+             cue = tar_cue(tar_cue_general)), 
   
   # save transformed to AWS bucket
   tar_target(sentinel_ndvi_transformed_upload_aws_s3, 
@@ -90,7 +101,7 @@ dynamic_targets <- tar_plan(
                            key = sentinel_ndvi_transformed, 
                            check = TRUE), 
              pattern = sentinel_ndvi_transformed,
-             cue = tar_cue("thorough")), # only run this if you need to upload new data
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
   
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
@@ -130,7 +141,8 @@ dynamic_targets <- tar_plan(
                                                         overwrite = FALSE),
              pattern = modis_ndvi_bundle_request, 
              format = "file", 
-             repository = "local"),
+             repository = "local",
+             cue = tar_cue(tar_cue_general)),
   
   # save raw to AWS bucket
   tar_target(modis_ndvi_raw_upload_aws_s3, {modis_ndvi_downloaded;
@@ -138,7 +150,7 @@ dynamic_targets <- tar_plan(
                               bucket =  aws_bucket ,
                               key = modis_ndvi_raw_directory, 
                               check = TRUE)}, 
-    cue = tar_cue("thorough")), # only run this if you need to upload new data
+    cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
   
   # remove the "quality" files
   tar_target(modis_ndvi_downloaded_subset, modis_ndvi_downloaded[str_detect(basename(modis_ndvi_downloaded), "NDVI")]),
@@ -152,7 +164,8 @@ dynamic_targets <- tar_plan(
                                   overwrite = FALSE),
              pattern = modis_ndvi_downloaded_subset,
              format = "file", 
-             repository = "local"), 
+             repository = "local",
+             cue = tar_cue(tar_cue_general)), 
   
   # save transformed to AWS bucket
   tar_target(modis_ndvi_transformed_upload_aws_s3,
@@ -161,7 +174,7 @@ dynamic_targets <- tar_plan(
                            key = modis_ndvi_transformed, 
                            check = TRUE), 
              pattern = modis_ndvi_transformed,
-             cue = tar_cue("thorough")), # only run this if you need to upload new data 
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data 
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
@@ -188,7 +201,8 @@ dynamic_targets <- tar_plan(
                                    overwrite = FALSE),
              pattern = crossing(nasa_weather_years, nasa_weather_coordinates),
              format = "file",
-             repository = "local"),
+             repository = "local",
+             cue = tar_cue(tar_cue_general)),
   
   # save raw to AWS bucket
   tar_target(nasa_weather_raw_upload_aws_s3,  {nasa_weather_downloaded;
@@ -196,14 +210,15 @@ dynamic_targets <- tar_plan(
                               bucket =  aws_bucket,
                               key = nasa_weather_raw_directory, 
                               check = TRUE)}, 
-    cue = tar_cue("thorough")), # only run this if you need to upload new data
+    cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
   
   
   # remove dupes due to having overlapping country bounding boxes
   # save as arrow dataset, grouped by year
   tar_target(nasa_weather_pre_transformed, preprocess_nasa_weather(nasa_weather_downloaded,
                                                                    nasa_weather_pre_transformed_directory),
-             repository = "local"), 
+             repository = "local",
+             cue = tar_cue(tar_cue_general)), 
   
   # project to the template and save as arrow dataset
   tar_target(nasa_weather_transformed, 
@@ -213,7 +228,8 @@ dynamic_targets <- tar_plan(
                                     overwrite = FALSE),
              pattern = nasa_weather_pre_transformed,
              format = "file", 
-             repository = "local"),  
+             repository = "local",
+             cue = tar_cue(tar_cue_general)),  
   
   # save transformed to AWS bucket
   tar_target(nasa_weather_transformed_upload_aws_s3,  
@@ -222,7 +238,7 @@ dynamic_targets <- tar_plan(
                            key = nasa_weather_transformed,
                            check = TRUE), 
              pattern = nasa_weather_transformed,
-             cue = tar_cue("thorough")), # only run this if you need to upload new data
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   tar_target(ecmwf_forecasts_raw_directory, 
@@ -244,7 +260,8 @@ dynamic_targets <- tar_plan(
                                       overwrite = FALSE),
              pattern = ecmwf_forecasts_api_parameters,
              format = "file",
-             repository = "local"),
+             repository = "local",
+             cue = tar_cue(tar_cue_general)),
   
   # save raw to AWS bucket
   tar_target(ecmwf_forecasts_raw_upload_aws_s3,  {ecmwf_forecasts_downloaded;
@@ -252,7 +269,7 @@ dynamic_targets <- tar_plan(
                               bucket =  aws_bucket ,
                               key = ecmwf_forecasts_raw_directory,
                               check = TRUE)},
-    cue = tar_cue("thorough")), # only run this if you need to upload new data
+    cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
   
   # project to the template and save as arrow dataset
   tar_target(ecmwf_forecasts_transformed, 
@@ -263,7 +280,8 @@ dynamic_targets <- tar_plan(
                                        overwrite = FALSE),
              pattern = ecmwf_forecasts_downloaded,
              format = "file", 
-             repository = "local"),  
+             repository = "local",
+             cue = tar_cue(tar_cue_general)),  
   
   # save transformed to AWS bucket
   # using aws.s3::put_object for multipart functionality
@@ -275,7 +293,7 @@ dynamic_targets <- tar_plan(
                                 verbose = TRUE,
                                 show_progress = TRUE),
              pattern = ecmwf_forecasts_transformed,
-             cue = tar_cue("thorough")), # only run this if you need to upload new data 
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data 
   
 )
 
@@ -306,7 +324,8 @@ data_targets <- tar_plan(
                                                                           overwrite = FALSE),
              pattern = days_of_year,
              format = "file", 
-             repository = "local"),  
+             repository = "local",
+             cue = tar_cue(tar_cue_general)),  
   
   # save historical means to AWS bucket
   tar_target(weather_historical_means_upload_aws_s3, 
@@ -315,7 +334,7 @@ data_targets <- tar_plan(
                            key = weather_historical_means, 
                            check = TRUE), 
              pattern = weather_historical_means,
-             cue = tar_cue("thorough")), # only run this if you need to upload new data  
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
   
   
   tar_target(weather_anomalies_directory, 
@@ -330,7 +349,8 @@ data_targets <- tar_plan(
                                                             overwrite = TRUE),
              pattern = model_dates_selected,
              format = "file", 
-             repository = "local"),  
+             repository = "local",
+             cue = tar_cue(tar_cue_general)),  
   
   # save anomalies to AWS bucket
   tar_target(weather_anomalies_upload_aws_s3, 
@@ -339,7 +359,7 @@ data_targets <- tar_plan(
                            key = weather_anomalies, 
                            check = TRUE), 
              pattern = weather_anomalies,
-             cue = tar_cue("thorough")), # only run this if you need to upload new data  
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
   
   
   # forecast weather anomalies ----------------------------------------------------------------------
@@ -355,7 +375,17 @@ data_targets <- tar_plan(
                                                                 overwrite = FALSE),
              pattern = model_dates_selected,
              format = "file", 
-             repository = "local"),    
+             repository = "local",
+             cue = tar_cue(tar_cue_general)),    
+  
+  # save anomalies to AWS bucket
+  tar_target(forecasts_anomalies_upload_aws_s3, 
+             aws_s3_upload(path = forecasts_anomalies,
+                           bucket =  aws_bucket,
+                           key = forecasts_anomalies, 
+                           check = TRUE), 
+             pattern = forecasts_anomalies,
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
   
   # ndvi anomalies --------------------------------------------------
   tar_target(ndvi_date_lookup, 
@@ -375,7 +405,8 @@ data_targets <- tar_plan(
                                                                     overwrite = FALSE),
              pattern = days_of_year,
              format = "file", 
-             repository = "local"),  
+             repository = "local",
+             cue = tar_cue(tar_cue_general)),  
   
   # save historical means to AWS bucket
   tar_target(ndvi_historical_means_upload_aws_s3, 
@@ -384,7 +415,7 @@ data_targets <- tar_plan(
                            key = ndvi_historical_means, 
                            check = TRUE), 
              pattern = ndvi_historical_means,
-             cue = tar_cue("thorough")), # only run this if you need to upload new data  
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
   
   
   tar_target(ndvi_anomalies_directory, 
@@ -399,7 +430,8 @@ data_targets <- tar_plan(
                                                       overwrite = FALSE),
              pattern = model_dates_selected,
              format = "file", 
-             repository = "local"),  
+             repository = "local",
+             cue = tar_cue(tar_cue_general)),  
   
   
   # save anomalies to AWS bucket
@@ -409,7 +441,7 @@ data_targets <- tar_plan(
                            key = ndvi_anomalies, 
                            check = TRUE), 
              pattern = ndvi_anomalies,
-             cue = tar_cue("thorough")), # only run this if you need to upload new data  
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
   
   
 )
