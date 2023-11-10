@@ -1,5 +1,5 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|4d94028f07a15121|||||||||||||||
+.Random.seed|object|c3d04f83fd4a9f0e|||||||||||||||
 all_targets|function|2dda5afbd1f92385|||||||||||||||
 aws_bucket|object|d9cf2c5ff7cc1be4|||||||||||||||
 aws_s3_upload_single_type|function|6d277b68ccbb67a2|||||||||||||||
@@ -37,7 +37,7 @@ download_modis_ndvi1|function|84be97854223222b|||||||||||||||
 download_nasa_recorded_weather|function|6a773d3a570df8e3|||||||||||||||
 download_nasa_weather|function|7833150f49a20c75|||||||||||||||
 download_sentinel_ndvi|function|03e5942d01ac5cc7|||||||||||||||
-dynamic_targets|object|546d472d7e0c633a|||||||||||||||
+dynamic_targets|object|71127d34c086b0ca|||||||||||||||
 ecmwf_forecasts_api_parameters|stem|e2f32218fa634195|0bdeb27065a5c91c|37ee5a84ea2c3af5|2047345647|bucket=open-rvfcast-data*region=NULL*key=_targets/ecmwf_forecasts_api_parameters*endpoint=TlVMTA*version=|t19594.5957909587s||4621|qs|aws|vector|||0.035||
 ecmwf_forecasts_downloaded|pattern|0b179198488b1353|950aed4902a96366||411166749||||5721883200|file|local|vector||ecmwf_forecasts_downloaded_436aae04*ecmwf_forecasts_downloaded_7c5c6691*ecmwf_forecasts_downloaded_a9ce1318*ecmwf_forecasts_downloaded_e7e5ad03*ecmwf_forecasts_downloaded_5c905023*ecmwf_forecasts_downloaded_1d3cec98*ecmwf_forecasts_downloaded_8f12c76b*ecmwf_forecasts_downloaded_7cda2402*ecmwf_forecasts_downloaded_ca4f42e3*ecmwf_forecasts_downloaded_f0947441*ecmwf_forecasts_downloaded_770518a3*ecmwf_forecasts_downloaded_f7878af2*ecmwf_forecasts_downloaded_e0a730a8*ecmwf_forecasts_downloaded_4afff85a*ecmwf_forecasts_downloaded_a6bfb7dd*ecmwf_forecasts_downloaded_6161fb50*ecmwf_forecasts_downloaded_eb1974f7*ecmwf_forecasts_downloaded_dde75b5d*ecmwf_forecasts_downloaded_6ce35942*ecmwf_forecasts_downloaded_60ef7e91*ecmwf_forecasts_downloaded_7f96f0da|0.018||
 ecmwf_forecasts_downloaded_1d3cec98|branch|c6e598dac99401d7|67d4b3431b1345d6|5d50ccd68c4a4319|873901600|data/ecmwf_forecasts_raw/ecmwf_seasonal_forecast_sys5_2007.grib|t19642.9333278179s|492bce0b7868c1a6|225720000|file|local|vector|ecmwf_forecasts_downloaded||0||
@@ -972,6 +972,7 @@ get_modis_ndvi_bundle_request|function|1f38d28bad794ce7|||||||||||||||
 get_modis_ndvi_token|function|f7872f64690bfba2|||||||||||||||
 get_nasa_weather_coordinates|function|2c23f9e4d93cd8ca|||||||||||||||
 get_sentinel_ndvi_api_parameters|function|ec6ebe60c7637311|||||||||||||||
+get_wahis_rvf_controls_raw|function|1616f0c48da01829|||||||||||||||
 get_wahis_rvf_outbreaks_raw|function|f5ec912c0f3610fb|||||||||||||||
 get_weather_anomalies|function|1956aa290dc4fc5d|||||||||||||||
 get_weather_data|function|1956aa290dc4fc5d|||||||||||||||
@@ -4701,6 +4702,7 @@ plot_targets|object|1eb1bc8d77111ded|||||||||||||||
 preprocess_ecmwf_forecasts|function|033bd8a3c45b4d46|||||||||||||||
 preprocess_nasa_weather|function|eab787d86769c2f9|||||||||||||||
 preprocess_nasa_weather_dataset|function|dffa4816bb9a77f0|||||||||||||||
+preprocess_wahis_rvf_controls|function|c2469ccc7d90c840|||||||||||||||
 preprocess_wahis_rvf_outbreaks|function|4762c7a06a997965|||||||||||||||
 process_ndvi_data|function|8a56ce9bd504bbec|||||||||||||||
 process_weather_data|function|b29a917bff83bf09|||||||||||||||
@@ -5238,6 +5240,8 @@ transform_nasa_weather|function|4ccbd4810fe93074|||||||||||||||
 transform_raster|function|47f20ba2b9ef9722|||||||||||||||
 transform_sentinel_ndvi|function|e34eead242be1095|||||||||||||||
 user_rprof|object|4960cb8e62564fd8|||||||||||||||
+wahis_rvf_controls_preprocessed|stem|4fe28bd9012b5468|f69b42b2b71db9e6|e9d102bc275b63a3|-891979186|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_rvf_controls_preprocessed*endpoint=TlVMTA*version=|t19671.7281849312s||132807|qs|aws|vector|||0.92|1m22mThere was 1 warning in mutate.1m22m36mℹ39m In argument iso_code  countrycodecountrycodecountry, origin   country.name, destination  iso3c.Caused by warning33m39m Some values were not matched unambiguously ceuta, dominican rep., guadaloupe, melilla. 1m22mThere was 1 warning in mutate.1m22m36mℹ39m In argument continent  countrycodecountrycodecountry, origin   country.name, destination  continent.Caused by warning33m39m Some values were not matched unambiguously ceuta, dominican rep., guadaloupe, melilla|
+wahis_rvf_controls_raw|stem|f26f36ee3a979b39|e4495f4a0c0cba3b|e8439aeec79e7204|-31127431|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_rvf_controls_raw*endpoint=TlVMTA*version=|t19671.720703493s||726918|qs|aws|vector|||44.775||
 wahis_rvf_outbreaks_preprocessed|stem|9e69846ad130ea8d|3ea98184b5887c93|c76bf3f372b7e7b2|2127878318|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_rvf_outbreaks_preprocessed*endpoint=TlVMTA*version=|t19671.7082309806s||155766|qs|aws|vector|||0.078||
 wahis_rvf_outbreaks_raw|stem|b065def0d657a857|b988ec4215d4213c|245e1e9067cc6917|1933416983|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_rvf_outbreaks_raw*endpoint=TlVMTA*version=|t19671.7044708468s||157742|qs|aws|vector|||9.03||
 wahis_rvf_query|function|c19f35545698ee31|||||||||||||||

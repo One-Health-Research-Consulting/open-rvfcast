@@ -54,6 +54,10 @@ dynamic_targets <- tar_plan(
   tar_target(wahis_rvf_outbreaks_preprocessed, 
              preprocess_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw)),
   
+  tar_target(wahis_rvf_controls_raw, get_wahis_rvf_controls_raw()),
+  tar_target(wahis_rvf_controls_preprocessed, 
+             preprocess_wahis_rvf_controls(wahis_rvf_controls_raw)),
+  
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
   # 10 day period
