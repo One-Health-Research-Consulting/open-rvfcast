@@ -10,9 +10,13 @@
 get_wahis_rvf_outbreaks_raw <- function() {
   
   
-  # Eead full dataset into memory and filter for RVF
+  # Read full dataset into memory and filter for RVF
   wahis_outbreaks <- read_csv("https://www.dolthub.com/csv/ecohealthalliance/wahisdb/main/wahis_outbreaks") |>
     filter(standardized_disease_name == "rift valley fever")
+  
+  return(wahis_outbreaks)
+  
+  # Below is archived code for retrieving data via SQL query through dolthub API
   
   # # intialize API download parameters
   # offset <- 0 
@@ -51,8 +55,6 @@ get_wahis_rvf_outbreaks_raw <- function() {
   #     break
   #   }
   # }
-  
-  return(wahis_outbreaks)
   
 }
 
