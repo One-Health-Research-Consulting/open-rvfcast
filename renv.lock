@@ -151,7 +151,7 @@
     "bslib": {
       "Source": "Repository",
       "Package": "bslib",
-      "Version": "0.5.0",
+      "Version": "0.5.1",
       "Repository": "CRAN"
     },
     "cachem": {
@@ -184,7 +184,7 @@
     "classInt": {
       "Source": "Repository",
       "Package": "classInt",
-      "Version": "0.4-9",
+      "Version": "0.4-10",
       "Repository": "CRAN"
     },
     "cli": {
@@ -333,7 +333,7 @@
     "evaluate": {
       "Source": "Repository",
       "Package": "evaluate",
-      "Version": "0.21",
+      "Version": "0.23",
       "Repository": "CRAN"
     },
     "fansi": {
@@ -374,7 +374,7 @@
     "fontawesome": {
       "Source": "Repository",
       "Package": "fontawesome",
-      "Version": "0.5.1",
+      "Version": "0.5.2",
       "Repository": "CRAN"
     },
     "forcats": {
@@ -386,7 +386,7 @@
     "fs": {
       "Source": "Repository",
       "Package": "fs",
-      "Version": "1.6.2",
+      "Version": "1.6.3",
       "Repository": "CRAN"
     },
     "furrr": {
@@ -446,7 +446,7 @@
     "ggplot2": {
       "Source": "Repository",
       "Package": "ggplot2",
-      "Version": "3.4.2",
+      "Version": "3.4.4",
       "Repository": "CRAN"
     },
     "ggrepel": {
@@ -494,7 +494,7 @@
     "gtable": {
       "Source": "Repository",
       "Package": "gtable",
-      "Version": "0.3.3",
+      "Version": "0.3.4",
       "Repository": "CRAN"
     },
     "haven": {
@@ -524,7 +524,7 @@
     "htmltools": {
       "Source": "Repository",
       "Package": "htmltools",
-      "Version": "0.5.5",
+      "Version": "0.5.7",
       "Repository": "CRAN"
     },
     "htmlwidgets": {
@@ -608,19 +608,19 @@
     "knitr": {
       "Source": "Repository",
       "Package": "knitr",
-      "Version": "1.43",
+      "Version": "1.45",
       "Repository": "CRAN"
     },
     "labeling": {
       "Source": "Repository",
       "Package": "labeling",
-      "Version": "0.4.2",
+      "Version": "0.4.3",
       "Repository": "CRAN"
     },
     "lifecycle": {
       "Source": "Repository",
       "Package": "lifecycle",
-      "Version": "1.0.3",
+      "Version": "1.0.4",
       "Repository": "CRAN"
     },
     "listenv": {
@@ -920,7 +920,7 @@
     "rmarkdown": {
       "Source": "Repository",
       "Package": "rmarkdown",
-      "Version": "2.21",
+      "Version": "2.25",
       "Repository": "CRAN"
     },
     "rnaturalearth": {
@@ -1020,7 +1020,7 @@
     "sp": {
       "Source": "Repository",
       "Package": "sp",
-      "Version": "2.0-0",
+      "Version": "2.1-1",
       "Repository": "CRAN"
     },
     "stringfish": {
@@ -1074,7 +1074,7 @@
     "terra": {
       "Source": "Repository",
       "Package": "terra",
-      "Version": "1.7-39",
+      "Version": "1.7-55",
       "Repository": "CRAN"
     },
     "textshaping": {
@@ -1127,7 +1127,7 @@
     "tinytex": {
       "Source": "Repository",
       "Package": "tinytex",
-      "Version": "0.45",
+      "Version": "0.48",
       "Repository": "CRAN"
     },
     "triebeard": {
@@ -1151,7 +1151,7 @@
     "units": {
       "Source": "Repository",
       "Package": "units",
-      "Version": "0.8-3",
+      "Version": "0.8-4",
       "Repository": "CRAN"
     },
     "urltools": {
@@ -1178,7 +1178,7 @@
     "utf8": {
       "Source": "Repository",
       "Package": "utf8",
-      "Version": "1.2.3",
+      "Version": "1.2.4",
       "Repository": "CRAN"
     },
     "uuid": {
@@ -1190,7 +1190,7 @@
     "vctrs": {
       "Source": "Repository",
       "Package": "vctrs",
-      "Version": "0.6.3",
+      "Version": "0.6.4",
       "Repository": "CRAN"
     },
     "viridisLite": {
@@ -1226,19 +1226,19 @@
     "withr": {
       "Source": "Repository",
       "Package": "withr",
-      "Version": "2.5.1",
+      "Version": "2.5.2",
       "Repository": "CRAN"
     },
     "wk": {
       "Source": "Repository",
       "Package": "wk",
-      "Version": "0.7.3",
+      "Version": "0.9.0",
       "Repository": "CRAN"
     },
     "xfun": {
       "Source": "Repository",
       "Package": "xfun",
-      "Version": "0.40",
+      "Version": "0.41",
       "Repository": "CRAN"
     },
     "xml2": {
