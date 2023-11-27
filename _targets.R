@@ -444,7 +444,7 @@ data_targets <- tar_plan(
                            key = ndvi_anomalies, 
                            check = TRUE), 
              pattern = ndvi_anomalies,
-             cue = tar_cue("thorough")), # only run this if you need to upload new data  
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
   
   # all anomalies --------------------------------------------------
   tar_target(augmented_data_directory, 
@@ -465,7 +465,7 @@ data_targets <- tar_plan(
                            key = augmented_data, 
                            check = TRUE), 
              pattern = augmented_data,
-             cue = tar_cue("thorough")), # only run this if you need to upload new data  
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
   
 )
 
