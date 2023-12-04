@@ -1,7 +1,14 @@
-local({
+# Load env vars from any file starting with `.env`. This allows user-specific
+# options to be set in `.env_user` (which is .gitignored), and to have both
+# encrypted and non-encrypted .env files
+load_env <- function(){
   for (env_file in list.files(all.files = TRUE, pattern = "^\\.env.*")) {
     try(readRenviron(env_file), silent = TRUE)
   }
+}
+load_env()
+
+local({
   user_rprof <- Sys.getenv("R_PROFILE_USER", normalizePath("~/.Rprofile", mustWork = FALSE))
   if(interactive() && file.exists(user_rprof)) {
     source(user_rprof)
@@ -22,6 +29,7 @@ if(Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true")) {
   }
 } else {
   source("renv/activate.R")
+  load_env() # reload project .env files, after renv/activate.R runs renv::load() which reads user's .renviron
 }
 
 # Use the local user's .Rprofile when interactive.
