@@ -33,18 +33,15 @@ if (nzchar( Sys.getenv("TAR_PROJECT"))) {
   message("targets project is default")
 }
 
+# Set options for renv convenience
 options(
-  repos = c(RSPM = "https://packagemanager.rstudio.com/all/latest",
-            CRAN = "https://cran.rstudio.com/",
-            INLA = "https://inla.r-inla-download.org/R/testing"),
-  
-  renv.config.auto.snapshot = TRUE, ## Attempt to keep renv.lock updated automatically
-  renv.config.rspm.enabled = TRUE, ## Use RStudio Package manager for pre-built package binaries
-  renv.config.install.shortcuts = TRUE, ## Use the existing local library to fetch copies of packages for renv
-  renv.config.cache.enabled = TRUE,   ## Use the renv build cache to speed up install times
-  renv.config.cache.symlinks = TRUE,  ## Keep full copies of packages locally than symlinks to make the project portable in/out of containers
-  renv.config.install.transactional = FALSE
-  
+  repos = c(CRAN = "https://cloud.r-project.org",
+            MILESMCBAIN = "https://milesmcbin.r-universe.dev",
+            ROPENSCI = "https://ropensci.r-universe.dev"),
+  renv.config.auto.snapshot = FALSE, ## Attempt to keep renv.lock updated automatically
+  renv.config.rspm.enabled = TRUE, ## Use RStudio Package manager for pre-built package binaries for linux
+  renv.config.install.shortcuts = FALSE, ## Use the existing local library to fetch copies of packages for renv
+  renv.config.cache.enabled = TRUE   ## Use the renv build cache to speed up install times
 )
 
 # Set maximum allowed total size (in bytes) of global variables for future package. Used to prevent too large exports.
