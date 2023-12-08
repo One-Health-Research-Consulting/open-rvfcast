@@ -30,7 +30,13 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
   existing_files <- list.files(forecasts_anomalies_directory)
   if(save_filename %in% existing_files & !overwrite) {
     message("file already exists, skipping download")
+    saved <- read_parquet(file.path(forecasts_anomalies_directory, save_filename))
+    saved_check <- col_na(saved)
+    if(!any(saved_check)) {
     return(file.path(forecasts_anomalies_directory, save_filename))
+    }else{
+      message("NAs found, regenerating file")
+    }
   }
   
   # Open dataset to transformed data
