@@ -459,13 +459,12 @@ data_targets <- tar_plan(
              repository = "local",
              cue = tar_cue(tar_cue_general)),  
   
-  tar_target(augmented_data_upload_aws_s3, 
+  tar_target(augmented_data_upload_aws_s3,
              aws_s3_upload(path = augmented_data,
                            bucket =  aws_bucket,
-                           key = augmented_data, 
-                           check = TRUE), 
-             pattern = augmented_data,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
+                           key = augmented_data,
+                           check = TRUE),
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
   
 )
 

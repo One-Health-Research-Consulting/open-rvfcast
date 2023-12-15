@@ -41,6 +41,6 @@ augment_data <- function(weather_anomalies, forecasts_anomalies,
     group_by(date) |> 
     write_dataset(augmented_data_directory)
   
-  return(list.files(augmented_data_directory))
+  return(augmented_data_directory)
   
 }
