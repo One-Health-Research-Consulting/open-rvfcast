@@ -32,12 +32,19 @@ ui <- fluidPage(
   titlePanel("NDVI Maps"),
   sidebarLayout(
     sidebarPanel(
-      selectInput("selected_date", "Select a Date", choices = model_dates_selected)
+      shinyWidgets::sliderTextInput("selected_date", "Select a Date", 
+                  # min = min(model_dates_selected),
+                  # max = max(model_dates_selected),
+                  # value = max(model_dates_selected),
+                  choices = model_dates_selected,
+                 # step = 1, 
+                  animate = TRUE
+      )
     ),
     mainPanel(
       fluidRow(
-      column(6, leafletOutput("ndvi_map")),
-      column(6, leafletOutput("ndvi_anomalies_map"))
+        column(6, leafletOutput("ndvi_map")),
+        column(6, leafletOutput("ndvi_anomalies_map"))
       )
     )
   )
@@ -65,19 +72,20 @@ server <- function(input, output) {
     leafmap |> 
       leaflet::addRasterImage(r_ndvi, colors = pal_ndvi) |> 
       leaflet::addLegend(pal = pal_ndvi,
-                values = terra::values(r_ndvi),
-                title = "NDVI")
+                         values = terra::values(r_ndvi),
+                         title = "NDVI")
   })
   
   output$ndvi_anomalies_map <- renderLeaflet({
     
-    r_ndvi_anomalies <- arrow::open_dataset(ndvi_anomalies) |> 
-      dplyr::filter(date == input$selected_date) |>
+    filename <- ndvi_anomalies[grepl(input$selected_date, ndvi_anomalies)]
+    
+    r_ndvi_anomalies <- arrow::open_dataset(filename) |> 
       dplyr::select(x, y, anomaly_ndvi_30) |>
       dplyr::collect() |>
       terra::rast() |>
       terra::`crs<-`(raster_crs)
-
+    
     pal_ndvi_anomalies <- colorNumeric(palette = c("#783f04", "#f6efee","green"), domain = c(-1, 0 , 1),  na.color = "transparent")
     
     leafmap |> 
@@ -86,9 +94,9 @@ server <- function(input, output) {
                 values = terra::values(r_ndvi_anomalies),
                 title = "NDVI anomalies")
     
-
+    
   })
-
+  
 }
 
 # Run the application 
