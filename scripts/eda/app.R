@@ -20,11 +20,12 @@ leafmap <- leaflet() |>
 
 # NDVI
 ndvi_date_lookup <- targets::tar_read(ndvi_date_lookup, store = targets_store)
-
+ndvi_anomalies <- targets::tar_read(ndvi_anomalies, store = targets_store)
+ndvi_anomalies <- here::here(ndvi_anomalies)
 
 # testing
-input <- list()
-input$selected_date <- model_dates_selected[[100]]
+# input <- list()
+# input$selected_date <- model_dates_selected[[100]]
 
 # UI ----------------------------------------------------------------------
 ui <- fluidPage(
@@ -34,8 +35,10 @@ ui <- fluidPage(
       selectInput("selected_date", "Select a Date", choices = model_dates_selected)
     ),
     mainPanel(
-      leafletOutput("ndvi_map"),
-      leafletOutput("ndvi_anomalies_map")
+      fluidRow(
+      column(6, leafletOutput("ndvi_map")),
+      column(6, leafletOutput("ndvi_anomalies_map"))
+      )
     )
   )
 )
@@ -67,6 +70,23 @@ server <- function(input, output) {
   })
   
   output$ndvi_anomalies_map <- renderLeaflet({
+    
+    r_ndvi_anomalies <- arrow::open_dataset(ndvi_anomalies) |> 
+      dplyr::filter(date == input$selected_date) |>
+      dplyr::select(x, y, anomaly_ndvi_30) |>
+      dplyr::collect() |>
+      terra::rast() |>
+      terra::`crs<-`(raster_crs)
+
+    pal_ndvi_anomalies <- colorNumeric(palette = c("#783f04", "#f6efee","green"), domain = c(-1, 0 , 1),  na.color = "transparent")
+    
+    leafmap |> 
+      addRasterImage(r_ndvi_anomalies, colors = pal_ndvi_anomalies) |> 
+      addLegend(pal = pal_ndvi_anomalies, 
+                values = terra::values(r_ndvi_anomalies),
+                title = "NDVI anomalies")
+    
+
   })
 
 }
