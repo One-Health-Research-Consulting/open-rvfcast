@@ -133,7 +133,7 @@ ui <- fluidPage(
              condition = "input.selected_dataset == 'NDVI'",
              leaflet::leafletOutput("ndvi_anomalies_map_90")
            ))
-  ),
+  ), # fluidRow
   
   ## Temperature Maps
   fluidRow(
@@ -170,87 +170,110 @@ ui <- fluidPage(
              leaflet::leafletOutput("temperature_anomalies_map_90")
            )
     )
-  )
+  ), # fluidRow
 )
 # server ----------------------------------------------------------------------
 server <- function(input, output) {
   
   
   # NDVI --------------------------------------------------------------------
-  ndvi <- reactive({
-    filename <- ndvi_anomalies[grepl(input$selected_date, ndvi_anomalies)]
+  # ndvi <- reactive({
+  #   filename <- ndvi_anomalies[grepl(input$selected_date, ndvi_anomalies)]
+  #   arrow::open_dataset(filename) 
+  # })
+  # 
+  # weather <- reactive({
+  #   filename <- weather_anomalies[grepl(input$selected_date, weather_anomalies)]
+  #   arrow::open_dataset(filename) 
+  # })
+  
+  conn <- reactive({
+    files <- switch(input$selected_dataset, 
+                    "NDVI" = ndvi_anomalies,
+                    "Temperature" = weather_anomalies)
+    
+    filename <- files[grepl(input$selected_date, files)]
     arrow::open_dataset(filename) 
+  })
+  
+  pal <- reactive({
+    switch(input$selected_dataset, 
+           "NDVI" = pal_ndvi_anomalies,
+           "Temperature" = pal_temperature_anomalies)
+  })
+  
+  dom <- reactive({
+    switch(input$selected_dataset, 
+           "NDVI" = c(-0.65, 0, 0.65),
+           "Temperature" = c(-6.4, 0, 6.4))
   })
   
   output$ndvi_anomalies_map_30 <- renderLeaflet({
     
-    create_arrow_leaflet(conn = ndvi(), 
-                         field =  "anomaly_ndvi_30", 
+    create_arrow_leaflet(conn = conn(), 
+                         field =  tolower(paste0("anomaly_", input$selected_dataset, "_30")),
                          selected_date = input$selected_date, 
-                         palette = pal_ndvi_anomalies,  
-                         domain = c(-0.65, 0, 0.65),
+                         palette = pal(),  
+                         domain = dom(),
                          include_legend = TRUE)
     
   })
   
   output$ndvi_anomalies_map_60 <- renderLeaflet({
     
-    create_arrow_leaflet(conn = ndvi(), 
-                         field =  "anomaly_ndvi_60", 
+    create_arrow_leaflet(conn = conn(), 
+                         field =  tolower(paste0("anomaly_", input$selected_dataset, "_60")),
                          selected_date = input$selected_date, 
-                         palette = pal_ndvi_anomalies,  
-                         domain = c(-0.65, 0, 0.65),
+                         palette = pal(),  
+                         domain = dom(),
                          include_legend = FALSE)
   })
   
   output$ndvi_anomalies_map_90 <- renderLeaflet({
     
-    create_arrow_leaflet(conn = ndvi(), 
-                         field =  "anomaly_ndvi_90", 
+    create_arrow_leaflet(conn = conn(), 
+                         field =  tolower(paste0("anomaly_", input$selected_dataset, "_30")),
                          selected_date = input$selected_date, 
-                         palette = pal_ndvi_anomalies,  
-                         domain = c(-0.65, 0, 0.65),
+                         palette = pal(),  
+                         domain = dom(),
                          include_legend = FALSE)
+    
   })
   
   # Weather -----------------------------------------------------------------
-  weather <- reactive({
-    filename <- weather_anomalies[grepl(input$selected_date, weather_anomalies)]
-    arrow::open_dataset(filename) 
-  })
   
-  output$temperature_anomalies_map_30 <- renderLeaflet({
-    
-    create_arrow_leaflet(conn = weather(), 
-                         field =  "anomaly_temperature_30", 
-                         selected_date = input$selected_date, 
-                         palette = pal_temperature_anomalies,  
-                         domain = c(-6.4, 0, 6.4),
-                         include_legend = TRUE)
-    
-  })
-  
-  output$temperature_anomalies_map_60 <- renderLeaflet({
-    
-    create_arrow_leaflet(conn = weather(), 
-                         field =  "anomaly_temperature_60", 
-                         selected_date = input$selected_date, 
-                         palette = pal_temperature_anomalies,  
-                         domain = c(-6.4, 0, 6.4),
-                         include_legend = FALSE)
-    
-  })
-  
-  output$temperature_anomalies_map_90 <- renderLeaflet({
-    
-    create_arrow_leaflet(conn = weather(), 
-                         field =  "anomaly_temperature_90", 
-                         selected_date = input$selected_date, 
-                         palette = pal_temperature_anomalies,  
-                         domain = c(-6.4, 0, 6.4),
-                         include_legend = FALSE)
-    
-  })
+  # output$temperature_anomalies_map_30 <- renderLeaflet({
+  #   
+  #   create_arrow_leaflet(conn = weather(), 
+  #                        field =  "anomaly_temperature_30", 
+  #                        selected_date = input$selected_date, 
+  #                        palette = pal_temperature_anomalies,  
+  #                        domain = c(-6.4, 0, 6.4),
+  #                        include_legend = TRUE)
+  #   
+  # })
+  # 
+  # output$temperature_anomalies_map_60 <- renderLeaflet({
+  #   
+  #   create_arrow_leaflet(conn = weather(), 
+  #                        field =  "anomaly_temperature_60", 
+  #                        selected_date = input$selected_date, 
+  #                        palette = pal_temperature_anomalies,  
+  #                        domain = c(-6.4, 0, 6.4),
+  #                        include_legend = FALSE)
+  #   
+  # })
+  # 
+  # output$temperature_anomalies_map_90 <- renderLeaflet({
+  #   
+  #   create_arrow_leaflet(conn = weather(), 
+  #                        field =  "anomaly_temperature_90", 
+  #                        selected_date = input$selected_date, 
+  #                        palette = pal_temperature_anomalies,  
+  #                        domain = c(-6.4, 0, 6.4),
+  #                        include_legend = FALSE)
+  #   
+  # })
   
   
   
