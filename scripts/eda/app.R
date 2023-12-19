@@ -42,22 +42,30 @@ pal_ndvi_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#4
 # UI ----------------------------------------------------------------------
 ui <- fluidPage(
   titlePanel("OpenRVF Dynamic Rasters"),
-  shinyWidgets::sliderTextInput("selected_date", "Select a Date",
-                                choices = model_dates_selected,
-                                animate = TRUE), # animationOptions to set faster but data load cant keep up
+  fluidRow(
+    column(4, shinyWidgets::sliderTextInput("selected_date", "Select a Date",
+                                            choices = model_dates_selected,
+                                            animate = TRUE)), # animationOptions to set faster but data load cant keep up
+    column(4, radioButtons("selected_dataset", "Select Dataset", choices = c("NDVI", "Temperature"), inline = TRUE))
+  ),
   fluidRow(
     column(4, 
-           tags$h5("NDVI Anomalies (30 day lag)"),
-           leaflet::leafletOutput("ndvi_anomalies_map_30")),
+           conditionalPanel(
+             condition = "input.selected_dataset == 'NDVI'",
+             leaflet::leafletOutput("ndvi_anomalies_map_30")
+           )),
     column(4, 
-           tags$h5("NDVI Anomalies (60 day lag)"),
-           leaflet::leafletOutput("ndvi_anomalies_map_60")),
+           conditionalPanel(
+             condition = "input.selected_dataset == 'NDVI'",
+             leaflet::leafletOutput("ndvi_anomalies_map_60")
+           )),
     column(4, 
-           tags$h5("NDVI Anomalies (90 day lag)"),
-           leaflet::leafletOutput("ndvi_anomalies_map_90")),
+           conditionalPanel(
+             condition = "input.selected_dataset == 'NDVI'",
+             leaflet::leafletOutput("ndvi_anomalies_map_90")
+           ))
   )
 )
-
 # server ----------------------------------------------------------------------
 server <- function(input, output) {
   
