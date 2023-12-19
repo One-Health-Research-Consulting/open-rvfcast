@@ -41,14 +41,20 @@ pal_ndvi_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#4
 
 # UI ----------------------------------------------------------------------
 ui <- fluidPage(
-  titlePanel("NDVI Maps"),
+  titlePanel("OpenRVF Dynamic Rasters"),
   shinyWidgets::sliderTextInput("selected_date", "Select a Date",
                                 choices = model_dates_selected,
                                 animate = TRUE), # animationOptions to set faster but data load cant keep up
   fluidRow(
-    column(4, leaflet::leafletOutput("ndvi_anomalies_map_30")),
-    column(4, leaflet::leafletOutput("ndvi_anomalies_map_60")),
-    column(4, leaflet::leafletOutput("ndvi_anomalies_map_90"))
+    column(4, 
+           tags$h5("NDVI Anomalies (30 day lag)"),
+           leaflet::leafletOutput("ndvi_anomalies_map_30")),
+    column(4, 
+           tags$h5("NDVI Anomalies (60 day lag)"),
+           leaflet::leafletOutput("ndvi_anomalies_map_60")),
+    column(4, 
+           tags$h5("NDVI Anomalies (90 day lag)"),
+           leaflet::leafletOutput("ndvi_anomalies_map_90")),
   )
 )
 
@@ -72,10 +78,9 @@ server <- function(input, output) {
       leaflet::addRasterImage(r_ndvi_anomalies, colors = pal_ndvi_anomalies) |>
       leaflet::addControl(html = sprintf("<p style='font-size: 14px;'> %s</p>", input$selected_date),
                           position = "topright") |>
-      #leaflet::addTitle("NDVI Anomalies (30 lag)") |> 
       leaflet::addLegend(pal = pal_ndvi_anomalies,
                 values = c(-0.65, terra::values(r_ndvi_anomalies), 0.65),
-                title = "NDVI Anomalies", position = "bottomleft")
+                position = "bottomleft")
     
     
   })
