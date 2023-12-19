@@ -41,7 +41,7 @@ pal_ndvi_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#4
 #     dplyr::select(anomaly_temperature_30, anomaly_temperature_60, anomaly_temperature_90) |> 
 #     dplyr::collect() |>
 #     as.matrix()
-pal_temperature_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#4C392D", "#C4A484", "#DDDAC3", "#90EE90", "#005249"), interpolate = "linear"), 
+pal_temperature_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#00008B", "#ADD8E6", "#DDDAC3", "#FFB6C1", "#FF0000"), interpolate = "linear"), 
                                                    domain = c(-6.4, 0, 6.4),  # hardcode min/max from v_ndvi_anomalies
                                                    na.color = "transparent")
 
@@ -83,17 +83,34 @@ ui <- fluidPage(
   
   ## NDVI Maps
   fluidRow(
+    ### 30 days
     column(4, 
+           conditionalPanel(
+             condition = "input.selected_dataset == 'NDVI'",
+             tags$h5("NDVI Anomalies (1-30 days previous)")
+           ),
            conditionalPanel(
              condition = "input.selected_dataset == 'NDVI'",
              leaflet::leafletOutput("ndvi_anomalies_map_30")
-           )),
+           )
+    ),
+    ### 60 days
     column(4, 
            conditionalPanel(
              condition = "input.selected_dataset == 'NDVI'",
+             tags$h5("NDVI Anomalies (31-60 days previous)")
+           ),
+           conditionalPanel(
+             condition = "input.selected_dataset == 'NDVI'",
              leaflet::leafletOutput("ndvi_anomalies_map_60")
-           )),
+           )
+    ),
+    ### 90 days
     column(4, 
+           conditionalPanel(
+             condition = "input.selected_dataset == 'NDVI'",
+             tags$h5("NDVI Anomalies (61-90 days previous)")
+           ),
            conditionalPanel(
              condition = "input.selected_dataset == 'NDVI'",
              leaflet::leafletOutput("ndvi_anomalies_map_90")
@@ -102,21 +119,39 @@ ui <- fluidPage(
   
   ## Temperature Maps
   fluidRow(
+    ### 30 days
     column(4, 
+           conditionalPanel(
+             condition = "input.selected_dataset == 'Temperature'",
+             tags$h5("Temperature Anomalies (1-30 days previous)")
+           ),
            conditionalPanel(
              condition = "input.selected_dataset == 'Temperature'",
              leaflet::leafletOutput("temperature_anomalies_map_30")
-           )),
+           )
+    ),
+    ### 60 days
     column(4, 
+           conditionalPanel(
+             condition = "input.selected_dataset == 'Temperature'",
+             tags$h5("Temperature Anomalies (31-60 days previous)")
+           ),
            conditionalPanel(
              condition = "input.selected_dataset == 'Temperature'",
              leaflet::leafletOutput("temperature_anomalies_map_60")
-           )),
+           )
+    ),
+    ### 90 days
     column(4, 
            conditionalPanel(
              condition = "input.selected_dataset == 'Temperature'",
+             tags$h5("Temperature Anomalies (31-90 days previous)")
+           ),
+           conditionalPanel(
+             condition = "input.selected_dataset == 'Temperature'",
              leaflet::leafletOutput("temperature_anomalies_map_90")
-           ))
+           )
+    )
   )
 )
 # server ----------------------------------------------------------------------
@@ -174,6 +209,28 @@ server <- function(input, output) {
                          palette = pal_temperature_anomalies,  
                          domain = c(-6.4, 0, 6.4),
                          include_legend = TRUE)
+    
+  })
+  
+  output$temperature_anomalies_map_60 <- renderLeaflet({
+    
+    create_arrow_leaflet(conn = weather(), 
+                         field =  "anomaly_temperature_60", 
+                         selected_date = input$selected_date, 
+                         palette = pal_temperature_anomalies,  
+                         domain = c(-6.4, 0, 6.4),
+                         include_legend = FALSE)
+    
+  })
+  
+  output$temperature_anomalies_map_90 <- renderLeaflet({
+    
+    create_arrow_leaflet(conn = weather(), 
+                         field =  "anomaly_temperature_90", 
+                         selected_date = input$selected_date, 
+                         palette = pal_temperature_anomalies,  
+                         domain = c(-6.4, 0, 6.4),
+                         include_legend = FALSE)
     
   })
   
