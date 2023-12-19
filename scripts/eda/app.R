@@ -60,9 +60,9 @@ create_arrow_leaflet <- function(conn, field, selected_date, palette, domain, in
                         position = "topright")
   
   if(include_legend){
-  l <- l |> leaflet::addLegend(pal = palette,
-                       values = domain,
-                       position = "bottomleft")
+    l <- l |> leaflet::addLegend(pal = palette,
+                                 values = domain,
+                                 position = "bottomleft")
   }
   
   return(l)
@@ -132,43 +132,35 @@ server <- function(input, output) {
   output$ndvi_anomalies_map_30 <- renderLeaflet({
     
     create_arrow_leaflet(conn = ndvi(), 
-                   field =  "anomaly_ndvi_30", 
-                   selected_date = input$selected_date, 
-                   palette = pal_ndvi_anomalies,  
-                   domain = c(-0.65, 0, 0.65),
-                   include_legend = TRUE)
+                         field =  "anomaly_ndvi_30", 
+                         selected_date = input$selected_date, 
+                         palette = pal_ndvi_anomalies,  
+                         domain = c(-0.65, 0, 0.65),
+                         include_legend = TRUE)
     
   })
   
   output$ndvi_anomalies_map_60 <- renderLeaflet({
     
-    r_ndvi_anomalies <- ndvi() |> 
-      dplyr::select(x, y, anomaly_ndvi_60) |>
-      dplyr::collect() |>
-      terra::rast() |>
-      terra::`crs<-`(raster_crs)
-    
-    leafmap |>
-      leaflet::addRasterImage(r_ndvi_anomalies, colors = pal_ndvi_anomalies) |>
-      leaflet::addControl(html = sprintf("<p style='font-size: 14px;'> %s</p>", input$selected_date),
-                          position = "topright") 
+    create_arrow_leaflet(conn = ndvi(), 
+                         field =  "anomaly_ndvi_60", 
+                         selected_date = input$selected_date, 
+                         palette = pal_ndvi_anomalies,  
+                         domain = c(-0.65, 0, 0.65),
+                         include_legend = FALSE)
   })
   
   output$ndvi_anomalies_map_90 <- renderLeaflet({
     
-    r_ndvi_anomalies <- ndvi() |> 
-      dplyr::select(x, y, anomaly_ndvi_90) |>
-      dplyr::collect() |>
-      terra::rast() |>
-      terra::`crs<-`(raster_crs)
-    
-    leafmap |>
-      leaflet::addRasterImage(r_ndvi_anomalies, colors = pal_ndvi_anomalies) |>
-      leaflet::addControl(html = sprintf("<p style='font-size: 14px;'> %s</p>", input$selected_date),
-                          position = "topright") 
+    create_arrow_leaflet(conn = ndvi(), 
+                         field =  "anomaly_ndvi_90", 
+                         selected_date = input$selected_date, 
+                         palette = pal_ndvi_anomalies,  
+                         domain = c(-0.65, 0, 0.65),
+                         include_legend = FALSE)
   })
   
-# Weather -----------------------------------------------------------------
+  # Weather -----------------------------------------------------------------
   weather <- reactive({
     filename <- weather_anomalies[grepl(input$selected_date, weather_anomalies)]
     arrow::open_dataset(filename) 
@@ -176,19 +168,13 @@ server <- function(input, output) {
   
   output$temperature_anomalies_map_30 <- renderLeaflet({
     
-    r_temperature_anomalies <- weather() |> 
-      dplyr::select(x, y, anomaly_temperature_30) |>
-      dplyr::collect() |>
-      terra::rast() |>
-      terra::`crs<-`(raster_crs)
+    create_arrow_leaflet(conn = weather(), 
+                         field =  "anomaly_temperature_30", 
+                         selected_date = input$selected_date, 
+                         palette = pal_temperature_anomalies,  
+                         domain = c(-6.4, 0, 6.4),
+                         include_legend = TRUE)
     
-    leafmap |>
-      leaflet::addRasterImage(r_temperature_anomalies, colors = pal_temperature_anomalies) |>
-      leaflet::addControl(html = sprintf("<p style='font-size: 14px;'> %s</p>", input$selected_date),
-                          position = "topright") |>
-      leaflet::addLegend(pal = pal_temperature_anomalies,
-                         values = c(-6.4, terra::values(r_temperature_anomalies), 6.4),
-                         position = "bottomleft")
   })
   
   
