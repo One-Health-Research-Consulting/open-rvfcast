@@ -45,8 +45,8 @@ pal_temperature_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRam
                                                    domain = c(-6.4, 0, 6.4),  # hardcode min/max from v_ndvi_anomalies
                                                    na.color = "transparent")
 
-# define function to make maps from arrow dataset collected into memory
-create_leaflet <- function(conn, field, selected_date, palette, domain){
+# define function to make maps from arrow dataset
+create_arrow_leaflet <- function(conn, field, selected_date, palette, domain, include_legend = FALSE){
   
   r <- conn  |>
     dplyr::select(x, y, !!field) |>
@@ -54,13 +54,18 @@ create_leaflet <- function(conn, field, selected_date, palette, domain){
     terra::rast() |>
     terra::`crs<-`(raster_crs)
   
-  leafmap |>
+  l <- leafmap |>
     leaflet::addRasterImage(r, colors = palette) |>
     leaflet::addControl(html = sprintf("<p style='font-size: 14px;'> %s</p>", selected_date),
-                        position = "topright") |>
-    leaflet::addLegend(pal = palette,
+                        position = "topright")
+  
+  if(include_legend){
+  l <- l |> leaflet::addLegend(pal = palette,
                        values = domain,
                        position = "bottomleft")
+  }
+  
+  return(l)
 }
 
 
@@ -126,25 +131,13 @@ server <- function(input, output) {
   
   output$ndvi_anomalies_map_30 <- renderLeaflet({
     
-    create_leaflet(conn = ndvi(), 
+    create_arrow_leaflet(conn = ndvi(), 
                    field =  "anomaly_ndvi_30", 
                    selected_date = input$selected_date, 
                    palette = pal_ndvi_anomalies,  
-                   domain = c(-0.65, 0, 0.65))
+                   domain = c(-0.65, 0, 0.65),
+                   include_legend = TRUE)
     
-    # r_ndvi_anomalies <- ndvi() |>
-    #   dplyr::select(x, y, anomaly_ndvi_30) |>
-    #   dplyr::collect() |>
-    #   terra::rast() |>
-    #   terra::`crs<-`(raster_crs)
-    # 
-    # leafmap |>
-    #   leaflet::addRasterImage(r_ndvi_anomalies, colors = pal_ndvi_anomalies) |>
-    #   leaflet::addControl(html = sprintf("<p style='font-size: 14px;'> %s</p>", input$selected_date),
-    #                       position = "topright") |>
-    #   leaflet::addLegend(pal = pal_ndvi_anomalies,
-    #                      values = c(-0.65, terra::values(r_ndvi_anomalies), 0.65),
-    #                      position = "bottomleft")
   })
   
   output$ndvi_anomalies_map_60 <- renderLeaflet({
