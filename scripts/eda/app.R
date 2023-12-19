@@ -1,7 +1,6 @@
 library(shiny)
 library(leaflet)
 library(targets)
-library(terra)
 
 # set targets store
 targets_store <- here::here(targets::tar_config_get("store"))
@@ -15,11 +14,11 @@ continent_bounding_box <- targets::tar_read(continent_bounding_box, store = targ
 model_dates_selected <- targets::tar_read(model_dates_selected, store = targets_store)
 
 # leaflet base
-leafmap <- leaflet() |>
-  setView(lng = median(c(continent_bounding_box["xmin"], continent_bounding_box["xmax"])),
+leafmap <- leaflet::leaflet() |>
+  leaflet::setView(lng = median(c(continent_bounding_box["xmin"], continent_bounding_box["xmax"])),
           lat = median(c(continent_bounding_box["ymin"], continent_bounding_box["ymax"])) - 3, 
           zoom = 2.5) |>
-  addTiles()
+  leaflet::addTiles()
 
 # NDVI data
 ndvi_anomalies <- here::here(targets::tar_read(ndvi_anomalies, store = targets_store))
@@ -32,7 +31,7 @@ ndvi_anomalies <- here::here(targets::tar_read(ndvi_anomalies, store = targets_s
 # anomaly is the current value minus the historical mean
 # positive means more green or less brown
 # negative means less green or more brown
-pal_ndvi_anomalies <- colorNumeric(palette = grDevices::colorRamp(c("#4C392D", "#C4A484", "#DDDAC3", "#90EE90", "#005249"), interpolate = "linear"), 
+pal_ndvi_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#4C392D", "#C4A484", "#DDDAC3", "#90EE90", "#005249"), interpolate = "linear"), 
                                    domain = c(-0.65, 0, 0.65),  # hardcode min/max from v_ndvi_anomalies
                                    na.color = "transparent")
 
@@ -47,30 +46,68 @@ ui <- fluidPage(
                                 choices = model_dates_selected,
                                 animate = TRUE), # animationOptions to set faster but data load cant keep up
   fluidRow(
-    column(6, leafletOutput("ndvi_anomalies_map"))
+    column(4, leaflet::leafletOutput("ndvi_anomalies_map_30")),
+    column(4, leaflet::leafletOutput("ndvi_anomalies_map_60")),
+    column(4, leaflet::leafletOutput("ndvi_anomalies_map_90"))
   )
 )
 
 # server ----------------------------------------------------------------------
 server <- function(input, output) {
   
-  output$ndvi_anomalies_map <- renderLeaflet({
-    
+  ndvi <- reactive({
     filename <- ndvi_anomalies[grepl(input$selected_date, ndvi_anomalies)]
+    arrow::open_dataset(filename) 
+  })
+  
+  output$ndvi_anomalies_map_30 <- renderLeaflet({
     
-    r_ndvi_anomalies <- arrow::open_dataset(filename) |>
+    r_ndvi_anomalies <- ndvi() |> 
       dplyr::select(x, y, anomaly_ndvi_30) |>
       dplyr::collect() |>
       terra::rast() |>
       terra::`crs<-`(raster_crs)
     
     leafmap |>
-      addRasterImage(r_ndvi_anomalies, colors = pal_ndvi_anomalies) |>
+      leaflet::addRasterImage(r_ndvi_anomalies, colors = pal_ndvi_anomalies) |>
       leaflet::addControl(html = sprintf("<p style='font-size: 14px;'> %s</p>", input$selected_date),
                           position = "topright") |>
-      addLegend(pal = pal_ndvi_anomalies,
+      #leaflet::addTitle("NDVI Anomalies (30 lag)") |> 
+      leaflet::addLegend(pal = pal_ndvi_anomalies,
                 values = c(-0.65, terra::values(r_ndvi_anomalies), 0.65),
-                title = "NDVI Anomalies")
+                title = "NDVI Anomalies", position = "bottomleft")
+    
+    
+  })
+  
+  output$ndvi_anomalies_map_60 <- renderLeaflet({
+    
+    r_ndvi_anomalies <- ndvi() |> 
+      dplyr::select(x, y, anomaly_ndvi_60) |>
+      dplyr::collect() |>
+      terra::rast() |>
+      terra::`crs<-`(raster_crs)
+    
+    leafmap |>
+      leaflet::addRasterImage(r_ndvi_anomalies, colors = pal_ndvi_anomalies) |>
+      leaflet::addControl(html = sprintf("<p style='font-size: 14px;'> %s</p>", input$selected_date),
+                          position = "topright") 
+    
+    
+  })
+  
+  output$ndvi_anomalies_map_90 <- renderLeaflet({
+    
+    r_ndvi_anomalies <- ndvi() |> 
+      dplyr::select(x, y, anomaly_ndvi_90) |>
+      dplyr::collect() |>
+      terra::rast() |>
+      terra::`crs<-`(raster_crs)
+    
+    leafmap |>
+      leaflet::addRasterImage(r_ndvi_anomalies, colors = pal_ndvi_anomalies) |>
+      leaflet::addControl(html = sprintf("<p style='font-size: 14px;'> %s</p>", input$selected_date),
+                          position = "topright") 
     
     
   })
