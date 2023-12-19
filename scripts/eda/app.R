@@ -22,17 +22,9 @@ leafmap <- leaflet() |>
   addTiles()
 
 # NDVI data
-ndvi_date_lookup <- targets::tar_read(ndvi_date_lookup, store = targets_store) |> dplyr::mutate(filename = here::here(filename))
-ndvi_anomalies <-  here::here(targets::tar_read(ndvi_anomalies, store = targets_store))
+ndvi_anomalies <- here::here(targets::tar_read(ndvi_anomalies, store = targets_store))
 
 # NDVI palettes
-# v_ndvi <- arrow::open_dataset(ndvi_date_lookup$filename) |> 
-#   dplyr::select(ndvi) |> 
-#   dplyr::collect()
-pal_ndvi <- colorNumeric(palette = rev(grDevices::terrain.colors(50)), 
-                         domain = c(-0.2, 0.96),  # hardcode min/max from v_ndvi
-                         na.color = "transparent")
-
 # v_ndvi_anomalies <- arrow::open_dataset(ndvi_anomalies) |> 
 #   dplyr::select(anomaly_ndvi_30, anomaly_ndvi_60, anomaly_ndvi_90) |> 
 #   dplyr::collect() |> 
@@ -55,36 +47,12 @@ ui <- fluidPage(
                                 choices = model_dates_selected,
                                 animate = TRUE), # animationOptions to set faster but data load cant keep up
   fluidRow(
-    column(6, leafletOutput("ndvi_map")),
     column(6, leafletOutput("ndvi_anomalies_map"))
   )
 )
 
 # server ----------------------------------------------------------------------
 server <- function(input, output) {
-  
-  output$ndvi_map <- renderLeaflet({
-    
-    # actual data 
-    ## subset for user selected date and read in to memory as raster
-    r_ndvi <- ndvi_date_lookup |> 
-      dplyr::filter(purrr::map_lgl(lookup_dates, ~input$selected_date %in% .)) |> 
-      dplyr::pull(filename) |>
-      arrow::open_dataset() |>
-      dplyr::select(x, y, ndvi) |>
-      dplyr::collect() |>
-      terra::rast() |>
-      terra::`crs<-`(raster_crs)
-    
-    leafmap |> 
-      leaflet::addRasterImage(r_ndvi, colors = pal_ndvi) |> 
-      leaflet::addControl(html = sprintf("<p style='font-size: 14px;'> %s</p>", input$selected_date),
-                          position = "topright") |> 
-      leaflet::addLegend(pal = pal_ndvi,
-                         values = c(-0.2, terra::values(r_ndvi), 0.96),
-                         title = "NDVI") 
-    
-  })
   
   output$ndvi_anomalies_map <- renderLeaflet({
     
