@@ -68,6 +68,9 @@ create_arrow_leaflet <- function(conn, field, selected_date, palette, domain, in
   return(l)
 }
 
+# anomaly text 
+anamaly_text <- "Anomalies are calculated as the mean value for the lag period minus the historical mean for the same period."
+
 
 # UI ----------------------------------------------------------------------
 ui <- fluidPage(
@@ -75,10 +78,25 @@ ui <- fluidPage(
   
   ## User Inputs 
   fluidRow(
-    column(4, shinyWidgets::sliderTextInput("selected_date", "Select a Date",
+    column(4, radioButtons("selected_dataset", 
+                           "Select Dataset", 
+                           choices = c("NDVI", "Temperature"), inline = TRUE)),
+    column(4, shinyWidgets::sliderTextInput("selected_date", 
+                                            "Select a Date",
                                             choices = model_dates_selected,
                                             animate = TRUE)), # animationOptions to set faster but data load cant keep up
-    column(4, radioButtons("selected_dataset", "Select Dataset", choices = c("NDVI", "Temperature"), inline = TRUE))
+    conditionalPanel(
+      condition = "input.selected_dataset == 'NDVI'",
+      tags$h5(glue::glue("{anamaly_text} 
+              Negative values indicate NDVI is more brown / less green than average.
+              Positive values indicate NDVI is more green / less brown than average."))
+    ),
+    conditionalPanel(
+      condition = "input.selected_dataset == 'Temperature'",
+      tags$h5(glue::glue("{anamaly_text} 
+              Negative values indicate temperature is colder than average.
+              Positive values indicate temperature is hotter than average."))
+    ),
   ),
   
   ## NDVI Maps
