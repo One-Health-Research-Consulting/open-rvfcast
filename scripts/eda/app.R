@@ -2,6 +2,9 @@ library(shiny)
 library(leaflet)
 library(targets)
 
+
+# Setup -------------------------------------------------------------------
+
 # set targets store
 targets_store <- here::here(targets::tar_config_get("store"))
 
@@ -20,41 +23,21 @@ leafmap <- leaflet::leaflet() |>
                    zoom = 2.5) |>
   leaflet::addTiles()
 
-# data
+# location of parquets
 ndvi_anomalies <- here::here(targets::tar_read(ndvi_anomalies, store = targets_store))
 weather_anomalies <- here::here(targets::tar_read(weather_anomalies, store = targets_store))
-
-# NDVI palette
-# v_ndvi_anomalies <- arrow::open_dataset(ndvi_anomalies) |> 
-#   dplyr::select(anomaly_ndvi_30, anomaly_ndvi_60, anomaly_ndvi_90) |> 
-#   dplyr::collect() |> 
-#   as.matrix()
-pal_ndvi_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#4C392D", "#C4A484", "#DDDAC3", "#90EE90", "#005249"), interpolate = "linear"), 
-                                            domain = c(-0.65, 0, 0.65),  # hardcode min/max from v_ndvi_anomalies
-                                            na.color = "transparent")
-
-# temp palette
-v_weather_anomalies <- arrow::open_dataset(weather_anomalies) |>
-    dplyr::select(anomaly_relative_humidity_30, anomaly_relative_humidity_60, anomaly_relative_humidity_90) |>
-    dplyr::collect() |>
-    as.matrix()
-pal_temperature_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#00008B", "#ADD8E6", "#DDDAC3", "#FFB6C1", "#FF0000"), interpolate = "linear"), 
-                                                   domain = c(-6.4, 0, 6.4),  # hardcode min/max 
-                                                   na.color = "transparent")
-pal_precipitation_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#4C392D", "#C4A484", "#DDDAC3", "#ADD8E6","#00008B"), interpolate = "linear"), 
-                                                     domain = c(-10, 0, 10),  # hardcode min/max (limit to 0.999%)
-                                                     na.color = "transparent")
-pal_relative_humidity_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#4C392D", "#C4A484", "#DDDAC3", "#ADD8E6","#00008B"), interpolate = "linear"), 
-                                                         domain = c(-20, 0, 20),  # hardcode min/max from v_ndvi_anomalies
-                                                         na.color = "transparent")
-
 
 # define function to make maps from arrow dataset
 create_arrow_leaflet <- function(conn, field, selected_date, palette, domain, include_legend = FALSE){
   
   r <- conn  |>
+    # get data via arrow
     dplyr::select(x, y, !!field) |>
-    dplyr::collect()|>
+    dplyr::collect() |> 
+    # for the purposes of visualizing data with long tails, replace values above the range of the domain (99%tile) with the min/max
+    dplyr::mutate(!!field := dplyr::case_when(!!dplyr::sym(field) < min(domain) ~ min(domain),
+                                              !!dplyr::sym(field) > max(domain) ~ max(domain),
+                                              TRUE ~ !!dplyr::sym(field)))  |> 
     terra::rast() |>
     terra::`crs<-`(raster_crs)
   
@@ -75,6 +58,47 @@ create_arrow_leaflet <- function(conn, field, selected_date, palette, domain, in
 # anomaly text 
 anamaly_text <- "Anomalies are calculated as the mean value for the lag period minus the historical mean for the same period."
 
+# Color Palettes ----------------------------------------------------------
+
+# NDVI palette
+# v_ndvi_anomalies <- arrow::open_dataset(ndvi_anomalies) |> dplyr::select(anomaly_ndvi_30, anomaly_ndvi_60, anomaly_ndvi_90) |> dplyr::collect() |> as.matrix()
+# min(v_ndvi_anomalies, na.rm = TRUE) # -0.5851203
+# max(v_ndvi_anomalies, na.rm = TRUE) # 0.6348975
+dom_ndvi <- c(-0.65, 0, 0.65)
+pal_ndvi_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#4C392D", "#C4A484", "#DDDAC3", "#90EE90", "#005249"), interpolate = "linear"), 
+                                            domain = dom_ndvi,  # hardcode min/max
+                                            na.color = "transparent")
+
+# temp palette
+# v_temperature_anomalies <- arrow::open_dataset(weather_anomalies) |> dplyr::select(anomaly_temperature_30, anomaly_temperature_60, anomaly_temperature_90) |> dplyr::collect() |> as.matrix()
+# min(v_temperature_anomalies, na.rm = TRUE) # -6.081359
+# max(v_temperature_anomalies, na.rm = TRUE) # 6.317933
+dom_temperature <- c(-6.4, 0, 6.4)
+pal_temperature_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#00008B", "#ADD8E6", "#DDDAC3", "#FFB6C1", "#FF0000"), interpolate = "linear"), 
+                                                   domain = dom_temperature,  # hardcode min/max 
+                                                   na.color = "transparent")
+
+# precip palette
+# v_precipitation_anomalies <- arrow::open_dataset(weather_anomalies) |> dplyr::select(anomaly_precipitation_30, anomaly_precipitation_60, anomaly_precipitation_90) |> dplyr::collect() |> as.matrix()
+# min(v_precipitation_anomalies, na.rm = TRUE) # -18.51957
+# max(v_precipitation_anomalies, na.rm = TRUE) # 82.289
+# quantile(v_precipitation_anomalies, 0.01, na.rm = TRUE) # -3.116396 
+# quantile(v_precipitation_anomalies, 0.99, na.rm = TRUE) # 4.295101
+dom_precipitation <- c(-10, 0, 10)
+pal_precipitation_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#4C392D", "#C4A484", "#DDDAC3", "#ADD8E6","#00008B"), interpolate = "linear"), 
+                                                     domain = dom_precipitation,  # hardcode between 98th%tile and min/max
+                                                     na.color = "transparent")
+
+# rel humidity palette
+# v_relative_humidity_anomalies <- arrow::open_dataset(weather_anomalies) |> dplyr::select(anomaly_relative_humidity_30, anomaly_relative_humidity_60, anomaly_relative_humidity_90) |> dplyr::collect() |> as.matrix()
+# min(v_relative_humidity_anomalies, na.rm = TRUE) # -41.08809
+# max(v_relative_humidity_anomalies, na.rm = TRUE) # 36.32504
+# quantile(v_relative_humidity_anomalies, 0.01, na.rm = TRUE) # -13.55994
+# quantile(v_relative_humidity_anomalies, 0.99, na.rm = TRUE) # 14.21287
+dom_relative_humidity <- c(-20, 0, 20)
+pal_relative_humidity_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#4C392D", "#C4A484", "#DDDAC3", "#ADD8E6","#00008B"), interpolate = "linear"), 
+                                                         domain = dom_relative_humidity, # hardcode between 98th%tile and min/max
+                                                         na.color = "transparent")
 
 # UI ----------------------------------------------------------------------
 ui <- fluidPage(
@@ -175,7 +199,7 @@ server <- function(input, output) {
   output$anomalies_map_30 <- renderLeaflet({
     
     create_arrow_leaflet(conn = conn(), 
-                         field =  tolower(paste0("anomaly_", input$selected_dataset, "_30")),
+                         field = paste0("anomaly_", input$selected_dataset, "_30"),
                          selected_date = input$selected_date, 
                          palette = pal(),  
                          domain = dom(),
@@ -186,7 +210,7 @@ server <- function(input, output) {
   output$anomalies_map_60 <- renderLeaflet({
     
     create_arrow_leaflet(conn = conn(), 
-                         field =  tolower(paste0("anomaly_", input$selected_dataset, "_60")),
+                         field = paste0("anomaly_", input$selected_dataset, "_60"),
                          selected_date = input$selected_date, 
                          palette = pal(),  
                          domain = dom(),
@@ -196,7 +220,7 @@ server <- function(input, output) {
   output$anomalies_map_90 <- renderLeaflet({
     
     create_arrow_leaflet(conn = conn(), 
-                         field =  tolower(paste0("anomaly_", input$selected_dataset, "_30")),
+                         field = paste0("anomaly_", input$selected_dataset, "_30"),
                          selected_date = input$selected_date, 
                          palette = pal(),  
                          domain = dom(),
