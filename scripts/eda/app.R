@@ -1,7 +1,8 @@
 library(shiny)
 library(leaflet)
 library(targets)
-
+library(arrow)
+library(tidyverse)
 
 # Setup -------------------------------------------------------------------
 
@@ -210,7 +211,7 @@ server <- function(input, output) {
   })
   
   pal <- reactive({
-        get(glue::glue("pal_{input$selected_dataset}_anomalies"))
+    get(glue::glue("pal_{input$selected_dataset}_anomalies"))
   })
   
   dom <- reactive({
@@ -241,14 +242,14 @@ server <- function(input, output) {
   output$anomalies_map_90 <- renderLeaflet({
     
     create_arrow_leaflet(conn = conn(), 
-                         field = paste0("anomaly_", input$selected_dataset, "_30"),
+                         field = paste0("anomaly_", input$selected_dataset, "_90"),
                          selected_date = input$selected_date, 
                          palette = pal(),  
                          domain = dom(),
                          include_legend = FALSE)
     
   })
-
+  
   
 }
 
