@@ -24,8 +24,8 @@ leafmap <- leaflet::leaflet() |>
   leaflet::addTiles()
 
 # location of parquets
-ndvi_anomalies <- here::here(targets::tar_read(ndvi_anomalies, store = targets_store))
-weather_anomalies <- here::here(targets::tar_read(weather_anomalies, store = targets_store))
+augmented_data <- here::here(targets::tar_read(augmented_data, store = targets_store))
+
 
 # define function to make maps from arrow dataset
 create_arrow_leaflet <- function(conn, field, selected_date, palette, domain, include_legend = FALSE){
@@ -61,7 +61,7 @@ anamaly_text <- "Anomalies are calculated as the mean value for the lag period m
 # Color Palettes ----------------------------------------------------------
 
 # NDVI palette
-# v_ndvi_anomalies <- arrow::open_dataset(ndvi_anomalies) |> dplyr::select(anomaly_ndvi_30, anomaly_ndvi_60, anomaly_ndvi_90) |> dplyr::collect() |> as.matrix()
+# v_ndvi_anomalies <- arrow::open_dataset(augmented_data) |> dplyr::select(anomaly_ndvi_30, anomaly_ndvi_60, anomaly_ndvi_90) |> dplyr::collect() |> as.matrix()
 # min(v_ndvi_anomalies, na.rm = TRUE) # -0.5851203
 # max(v_ndvi_anomalies, na.rm = TRUE) # 0.6348975
 dom_ndvi <- c(-0.65, 0, 0.65)
@@ -70,7 +70,7 @@ pal_ndvi_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRamp(c("#4
                                             na.color = "transparent")
 
 # temp palette
-# v_temperature_anomalies <- arrow::open_dataset(weather_anomalies) |> dplyr::select(anomaly_temperature_30, anomaly_temperature_60, anomaly_temperature_90) |> dplyr::collect() |> as.matrix()
+# v_temperature_anomalies <- arrow::open_dataset(augmented_data) |> dplyr::select(anomaly_temperature_30, anomaly_temperature_60, anomaly_temperature_90) |> dplyr::collect() |> as.matrix()
 # min(v_temperature_anomalies, na.rm = TRUE) # -6.081359
 # max(v_temperature_anomalies, na.rm = TRUE) # 6.317933
 dom_temperature <- c(-6.4, 0, 6.4)
@@ -79,7 +79,7 @@ pal_temperature_anomalies <- leaflet::colorNumeric(palette = grDevices::colorRam
                                                    na.color = "transparent")
 
 # precip palette
-# v_precipitation_anomalies <- arrow::open_dataset(weather_anomalies) |> dplyr::select(anomaly_precipitation_30, anomaly_precipitation_60, anomaly_precipitation_90) |> dplyr::collect() |> as.matrix()
+# v_precipitation_anomalies <- arrow::open_dataset(augmented_data) |> dplyr::select(anomaly_precipitation_30, anomaly_precipitation_60, anomaly_precipitation_90) |> dplyr::collect() |> as.matrix()
 # min(v_precipitation_anomalies, na.rm = TRUE) # -18.51957
 # max(v_precipitation_anomalies, na.rm = TRUE) # 82.289
 # quantile(v_precipitation_anomalies, 0.01, na.rm = TRUE) # -3.116396 
@@ -169,14 +169,15 @@ ui <- fluidPage(
 server <- function(input, output) {
   
   conn <- reactive({
-    files <- switch(input$selected_dataset, 
-                    "ndvi" = ndvi_anomalies,
-                    "temperature" = weather_anomalies,
-                    "precipitation" = weather_anomalies,
-                    "relative_humidity" = weather_anomalies)
+    # files <- switch(input$selected_dataset, 
+    #                 "ndvi" = ndvi_anomalies,
+    #                 "temperature" = weather_anomalies,
+    #                 "precipitation" = weather_anomalies,
+    #                 "relative_humidity" = weather_anomalies)
     
-    filename <- files[grepl(input$selected_date, files)]
-    arrow::open_dataset(filename) 
+    # filename <- files[grepl(input$selected_date, files)]
+    arrow::open_dataset(augmented_data) |> 
+      dplyr::filter(date == input$selected_date)
   })
   
   pal <- reactive({
