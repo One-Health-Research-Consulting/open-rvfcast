@@ -169,13 +169,6 @@ ui <- fluidPage(
 server <- function(input, output) {
   
   conn <- reactive({
-    # files <- switch(input$selected_dataset, 
-    #                 "ndvi" = ndvi_anomalies,
-    #                 "temperature" = weather_anomalies,
-    #                 "precipitation" = weather_anomalies,
-    #                 "relative_humidity" = weather_anomalies)
-    
-    # filename <- files[grepl(input$selected_date, files)]
     arrow::open_dataset(augmented_data) |> 
       dplyr::filter(date == input$selected_date)
   })
@@ -191,10 +184,10 @@ server <- function(input, output) {
   
   dom <- reactive({
     switch(input$selected_dataset, 
-           "ndvi" = c(-0.65, 0, 0.65),
-           "temperature" = c(-6.4, 0, 6.4),
-           "precipitation" = c(-10, 0, 10),
-           "relative_humidity" = c(-20, 0, 20))
+           "ndvi" = dom_ndvi,
+           "temperature" = dom_temperature,
+           "precipitation" = dom_precipitation,
+           "relative_humidity" = dom_relative_humidity)
   })
   
   output$anomalies_map_30 <- renderLeaflet({
