@@ -23,9 +23,8 @@ leafmap <- leaflet::leaflet() |>
                    zoom = 2.5) |>
   leaflet::addTiles()
 
-# location of parquets
+# data parquet
 augmented_data <- here::here(targets::tar_read(augmented_data, store = targets_store))
-
 
 # define function to make maps from arrow dataset
 create_arrow_leaflet <- function(conn, field, selected_date, palette, domain, include_legend = FALSE){
@@ -211,20 +210,11 @@ server <- function(input, output) {
   })
   
   pal <- reactive({
-    switch(input$selected_dataset, 
-           "ndvi" = pal_ndvi_anomalies,
-           "temperature" = pal_temperature_anomalies,
-           "precipitation" = pal_precipitation_anomalies,
-           "relative_humidity" = pal_relative_humidity_anomalies)
-    
+        get(glue::glue("pal_{input$selected_dataset}_anomalies"))
   })
   
   dom <- reactive({
-    switch(input$selected_dataset, 
-           "ndvi" = dom_ndvi,
-           "temperature" = dom_temperature,
-           "precipitation" = dom_precipitation,
-           "relative_humidity" = dom_relative_humidity)
+    get(glue::glue("dom_{input$selected_dataset}"))
   })
   
   output$anomalies_map_30 <- renderLeaflet({
