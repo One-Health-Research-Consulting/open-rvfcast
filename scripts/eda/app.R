@@ -110,8 +110,12 @@ ui <- fluidPage(
                            "Select Dataset", 
                            choices = c("NDVI" = "ndvi", 
                                        "Temperature" = "temperature", 
+                                       "Temperature Forecast" = "temperature_forecast", 
                                        "Precipitation" = "precipitation", 
-                                       "Relative Humidity" = "relative_humidity"), inline = TRUE)),
+                                       "Precipitation Forecast" = "precipitation_forecast", 
+                                       "Relative Humidity" = "relative_humidity",
+                                       "Relative Humidity Forecast" = "relative_humidity_forecast"
+                           ), inline = TRUE)),
     column(4, shinyWidgets::sliderTextInput("selected_date", 
                                             "Select a Date",
                                             choices = model_dates_selected,
@@ -139,31 +143,64 @@ ui <- fluidPage(
     conditionalPanel(
       condition = "input.selected_dataset == 'relative_humidity'",
       tags$h5(glue::glue("{anamaly_text} 
-              Units are in %.
+              Units are in %. s
               Negative values indicate lower relative humidity than average.
               Positive values indicate higher relative humidity than average."))
     ),
   ),
   
   ## Maps
+  ### Recorded 
   fluidRow(
-    ### 30 days
+    #### 30 days
     column(4, 
            tags$h5("1-30 days previous"),
            leaflet::leafletOutput("anomalies_map_30")
     ),
-    ### 60 days
+    #### 60 days
     column(4, 
            tags$h5("31-60 days previous"),
            leaflet::leafletOutput("anomalies_map_60")
     ),
-    ### 90 days
+    #### 90 days
     column(4, 
            tags$h5("61-90 days previous"),
            leaflet::leafletOutput("anomalies_map_90")
-    ) 
-    
+           
+    )
+  ),
+  
+  ### Forecasted 
+  fluidRow(
+    #### 29 days
+    column(4, 
+           tags$h5("0-29 day forecast"),
+           leaflet::leafletOutput("anomalies_map_forecast_29")
+    ),
+    #### 59 days
+    column(4, 
+           tags$h5("30-59 day forecast"),
+           leaflet::leafletOutput("anomalies_map_forecast_59")
+    ),
+    #### 89 days
+    column(4, 
+           tags$h5("60-89 day forecast"),
+           leaflet::leafletOutput("anomalies_map_forecast_89")
+    ),
+    #### 119 days
+    column(4, 
+           tags$h5("90-119 day forecast"),
+           leaflet::leafletOutput("anomalies_map_forecast_119")
+    ),
+    #### 149 days
+    column(4, 
+           tags$h5("120-149 day forecast"),
+           leaflet::leafletOutput("anomalies_map_forecast_149")
+           
+    )
   )
+  
+  
 )
 # server ----------------------------------------------------------------------
 server <- function(input, output) {
@@ -221,6 +258,7 @@ server <- function(input, output) {
                          include_legend = FALSE)
     
   })
+
   
 }
 
