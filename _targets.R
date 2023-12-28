@@ -48,13 +48,17 @@ static_targets <- tar_plan(
   tar_target(soil_downloaded, soil_download(soil_directory_raw),
              format = "file", 
              repository = "local"),
+  tar_target(soil_directory_dataset, 
+             create_data_directory(directory_path = "data/soil_dataset")),
   tar_target(soil_preprocessed, 
-             preprocess_soil(soil_downloaded, continent_raster_template)),
+             preprocess_soil(soil_directory_dataset, soil_directory_raw, continent_raster_template, soil_downloaded)),
   
   # SLOPE and ASPECT -------------------------------------------------
   tar_target(slope_aspect_directory_raw, 
              create_data_directory(directory_path = "data/slope_aspect")),
-  tar_target(slope_aspect_downloaded, get_slope_aspect(slope_aspect_directory_raw, continent_polygon),
+  tar_target(slope_aspect_directory_dataset, 
+             create_data_directory(directory_path = "data/slope_aspect_dataset")),
+  tar_target(slope_aspect_downloaded, get_slope_aspect(slope_aspect_directory_dataset, slope_aspect_directory_raw, continent_raster_template),
     format = "file", 
     repository = "local"),
  
@@ -64,18 +68,22 @@ static_targets <- tar_plan(
   tar_target(glw_downloaded, get_glw_data(glw_directory_raw),
              format = "file", 
              repository = "local"),
+  tar_target(glw_directory_dataset, 
+             create_data_directory(directory_path = "data/glw_dataset")),
   tar_target(glw_preprocessed, 
-             preprocess_glw_data(glw_directory_raw, glw_downloaded, continent_raster_template)),
+             preprocess_glw_data(glw_directory_dataset, glw_directory_raw, glw_downloaded, continent_raster_template)),
 
 
 # ELEVATION -----------------------------------------------------------
 tar_target(elevation_directory_raw, 
            create_data_directory(directory_path = "data/elevation")),
-tar_target(elevation_downloaded, get_elevation(elevation_directory_raw),
+tar_target(elevation_downloaded, get_elevation(elevation_directory_raw, overwrite = FALSE),
   format = "file", 
   repository = "local"),
+tar_target(elevation_directory_dataset, 
+           create_data_directory(directory_path = "data/elevation_dataset")),
 tar_target(elevation_preprocessed, 
-           process_elevation(elevation_directory_raw, elevation_downloaded, continent_raster_template)),
+           process_elevation(elevation_directory_dataset, elevation_downloaded, elevation_directory_raw, continent_raster_template)),
 
 
 )

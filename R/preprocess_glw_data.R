@@ -10,7 +10,7 @@
 #' 
 library(raster)
 library(terra)
-preprocess_glw_data<- function(glw_directory_raw, glw_downloaded, continent_raster_template) {
+preprocess_glw_data<- function(glw_directory_dataset, glw_directory_raw, glw_downloaded, continent_raster_template) {
   
   transformed_raster_cat <- transform_raster(raw_raster = rast(paste0(glw_downloaded, "/url_cattle.tif")),
                                          template = rast(continent_raster_template))
@@ -28,9 +28,9 @@ preprocess_glw_data<- function(glw_directory_raw, glw_downloaded, continent_rast
     as_tibble() 
   
   # Save as parquet 
-  write_parquet(dat_out_cat,  "data/glw/glw_cattle", compression = "gzip", compression_level = 5)
-  write_parquet(dat_out_sh, "data/glw/glw_sheep", compression = "gzip", compression_level = 5)
-  write_parquet(dat_out_go, "data/glw/glw_goats", compression = "gzip", compression_level = 5)
+  write_parquet(dat_out_cat,  "data/glw_dataset/glw_cattle", compression = "gzip", compression_level = 5)
+  write_parquet(dat_out_sh, "data/glw_dataset/glw_sheep", compression = "gzip", compression_level = 5)
+  write_parquet(dat_out_go, "data/glw_dataset/glw_goats", compression = "gzip", compression_level = 5)
   
   
   return(glw_directory_raw)
