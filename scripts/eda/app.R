@@ -230,15 +230,11 @@ server <- function(input, output) {
     get(glue::glue("dom_{ds}"))
   })
   
-  create_map <- function(map_type, day, include_legend) {
+  render_arrow_leaflet <- function(map_type, day, include_legend) {
     
     output_id <- glue::glue("anomalies_map_{map_type}_{day}")
     
     output[[output_id]] <- renderLeaflet({
-      
-      req(input$selected_dataset)
-      req(input$selected_date)
-      
       create_arrow_leaflet(
         conn = conn(), 
         field = paste0("anomaly_", input$selected_dataset, "_", day),
@@ -250,57 +246,14 @@ server <- function(input, output) {
     })
   }
   
-  create_map(map_type = "recorded", day = "30", include_legend = TRUE)
-  create_map(map_type = "recorded", day = "60", include_legend = FALSE)
-  create_map(map_type = "recorded", day = "90", include_legend = FALSE)
-  create_map(map_type = "forecast", day = "29", include_legend = TRUE)
-  create_map(map_type = "forecast", day = "59", include_legend = FALSE)
-  create_map(map_type = "forecast", day = "89", include_legend = FALSE)
-  create_map(map_type = "forecast", day = "119", include_legend = FALSE)
-  create_map(map_type = "forecast", day = "149", include_legend = FALSE)
-  
-  # output$anomalies_map_30 <- renderLeaflet({
-  #   
-  #   create_arrow_leaflet(conn = conn(), 
-  #                        field = paste0("anomaly_", input$selected_dataset, "_30"),
-  #                        selected_date = input$selected_date, 
-  #                        palette = pal(),  
-  #                        domain = dom(),
-  #                        include_legend = TRUE)
-  # })
-  # 
-  # output$anomalies_map_60 <- renderLeaflet({
-  #   
-  #   create_arrow_leaflet(conn = conn(), 
-  #                        field = paste0("anomaly_", input$selected_dataset, "_60"),
-  #                        selected_date = input$selected_date, 
-  #                        palette = pal(),  
-  #                        domain = dom(),
-  #                        include_legend = FALSE)
-  # })
-  # 
-  # output$anomalies_map_90 <- renderLeaflet({
-  #   
-  #   create_arrow_leaflet(conn = conn(), 
-  #                        field = paste0("anomaly_", input$selected_dataset, "_90"),
-  #                        selected_date = input$selected_date, 
-  #                        palette = pal(),  
-  #                        domain = dom(),
-  #                        include_legend = FALSE)
-  #   
-  # })
-  # 
-  # output$anomalies_map_forecast_29 <- renderLeaflet({
-  #   
-  #   create_arrow_leaflet(conn = conn(), 
-  #                        field = paste0("anomaly_", input$selected_dataset, "_29"),
-  #                        selected_date = input$selected_date, 
-  #                        palette = pal(),  
-  #                        domain = dom(),
-  #                        include_legend = FALSE)
-  #   
-  # })
-  
+  render_arrow_leaflet(map_type = "recorded", day = "30", include_legend = TRUE)
+  render_arrow_leaflet(map_type = "recorded", day = "60", include_legend = FALSE)
+  render_arrow_leaflet(map_type = "recorded", day = "90", include_legend = FALSE)
+  render_arrow_leaflet(map_type = "forecast", day = "29", include_legend = TRUE)
+  render_arrow_leaflet(map_type = "forecast", day = "59", include_legend = FALSE)
+  render_arrow_leaflet(map_type = "forecast", day = "89", include_legend = FALSE)
+  render_arrow_leaflet(map_type = "forecast", day = "119", include_legend = FALSE)
+  render_arrow_leaflet(map_type = "forecast", day = "149", include_legend = FALSE)
   
 }
 
