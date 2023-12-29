@@ -151,57 +151,67 @@ ui <- fluidPage(
   
   ## Maps
   ### Recorded 
-  fluidRow(
-    #### 30 days
-    column(4, 
-           tags$h5("1-30 days previous"),
-           leaflet::leafletOutput("anomalies_map_30")
-    ),
-    #### 60 days
-    column(4, 
-           tags$h5("31-60 days previous"),
-           leaflet::leafletOutput("anomalies_map_60")
-    ),
-    #### 90 days
-    column(4, 
-           tags$h5("61-90 days previous"),
-           leaflet::leafletOutput("anomalies_map_90")
-           
+  conditionalPanel(
+    condition = "input.selected_dataset == 'ndvi' || input.selected_dataset == 'temperature' || input.selected_dataset == 'precipitation' || input.selected_dataset == 'relative_humidity'",
+    fluidRow(
+      #### 30 days
+      column(4, 
+             tags$h5("1-30 days previous"),
+             leaflet::leafletOutput("anomalies_map_30")
+      ),
+      #### 60 days
+      column(4, 
+             tags$h5("31-60 days previous"),
+             leaflet::leafletOutput("anomalies_map_60")
+      ),
+      #### 90 days
+      column(4, 
+             tags$h5("61-90 days previous"),
+             leaflet::leafletOutput("anomalies_map_90")
+      )   
     )
   ),
   
   ### Forecasted 
-  fluidRow(
-    #### 29 days
-    column(4, 
-           tags$h5("0-29 day forecast"),
-           leaflet::leafletOutput("anomalies_map_forecast_29")
-    ),
-    #### 59 days
-    column(4, 
-           tags$h5("30-59 day forecast"),
-           leaflet::leafletOutput("anomalies_map_forecast_59")
-    ),
-    #### 89 days
-    column(4, 
-           tags$h5("60-89 day forecast"),
-           leaflet::leafletOutput("anomalies_map_forecast_89")
-    ),
-    #### 119 days
-    column(4, 
-           tags$h5("90-119 day forecast"),
-           leaflet::leafletOutput("anomalies_map_forecast_119")
-    ),
-    #### 149 days
-    column(4, 
-           tags$h5("120-149 day forecast"),
-           leaflet::leafletOutput("anomalies_map_forecast_149")
-           
+  conditionalPanel(
+    condition = "input.selected_dataset == 'temperature_forecast' || input.selected_dataset == 'precipitation_forecast' || input.selected_dataset == 'relative_humidity_forecast'",
+    fluidRow(
+      #### 29 days
+      column(4, 
+             tags$h5("0-29 day forecast"),
+             leaflet::leafletOutput("anomalies_map_forecast_29")
+      ),
+      #### 59 days
+      column(4, 
+             tags$h5("30-59 day forecast"),
+             leaflet::leafletOutput("anomalies_map_forecast_59")
+      ),
+      #### 89 days
+      column(4, 
+             tags$h5("60-89 day forecast"),
+             leaflet::leafletOutput("anomalies_map_forecast_89")
+      ),
+      #### 119 days
+      column(4, 
+             tags$h5("90-119 day forecast"),
+             leaflet::leafletOutput("anomalies_map_forecast_119")
+      ),
+      #### 149 days
+      column(4, 
+             tags$h5("120-149 day forecast"),
+             leaflet::leafletOutput("anomalies_map_forecast_149")
+             
+      )      
     )
   )
   
   
 )
+
+# input <- list()
+# input$selected_date <- "2005-04-14"
+# input$selected_dataset <- "precipitation_forecast"
+
 # server ----------------------------------------------------------------------
 server <- function(input, output) {
   
@@ -211,11 +221,13 @@ server <- function(input, output) {
   })
   
   pal <- reactive({
-    get(glue::glue("pal_{input$selected_dataset}_anomalies"))
+    ds <- stringr::str_remove(input$selected_dataset, "_forecast")
+    get(glue::glue("pal_{ds}_anomalies"))
   })
   
   dom <- reactive({
-    get(glue::glue("dom_{input$selected_dataset}"))
+    ds <- stringr::str_remove(input$selected_dataset, "_forecast")
+    get(glue::glue("dom_{ds}"))
   })
   
   output$anomalies_map_30 <- renderLeaflet({
@@ -243,6 +255,17 @@ server <- function(input, output) {
     
     create_arrow_leaflet(conn = conn(), 
                          field = paste0("anomaly_", input$selected_dataset, "_90"),
+                         selected_date = input$selected_date, 
+                         palette = pal(),  
+                         domain = dom(),
+                         include_legend = FALSE)
+    
+  })
+  
+  output$anomalies_map_forecast_29 <- renderLeaflet({
+    
+    create_arrow_leaflet(conn = conn(), 
+                         field = paste0("anomaly_", input$selected_dataset, "_29"),
                          selected_date = input$selected_date, 
                          palette = pal(),  
                          domain = dom(),
