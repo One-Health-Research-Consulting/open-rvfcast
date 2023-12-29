@@ -188,6 +188,12 @@ ui <- fluidPage(
 # server ----------------------------------------------------------------------
 server <- function(input, output) {
   
+  # TODO have it be one slider on top (not tab dependent)
+  # TODO have the selected datasets dynamically update based on the tab - use observe event - https://stackoverflow.com/questions/72172338/create-a-reactive-variable-depending-on-active-tab-on-r-shiny
+  # TODO shiny spinner only when switching tabs
+  # TODO create comparison tab
+  
+  
   selected_date <- reactive({
     switch(input$tabs,
            "recorded_data" = input$selected_date_recorded,
