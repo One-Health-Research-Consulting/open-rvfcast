@@ -380,7 +380,9 @@ data_targets <- tar_plan(
              pattern = model_dates_selected,
              format = "file", 
              repository = "local",
-             cue = tar_cue(tar_cue_general)),    
+             cue = tar_cue(tar_cue_general)), 
+  
+  
   
   # save anomalies to AWS bucket
   tar_target(forecasts_anomalies_upload_aws_s3, 
@@ -390,6 +392,23 @@ data_targets <- tar_plan(
                            check = TRUE), 
              pattern = forecasts_anomalies,
              cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
+  
+  # compare forecast anomalies to actual data
+  tar_target(forecasts_validate_directory, 
+             create_data_directory(directory_path = "data/forecast_validation")),
+  
+  tar_target(forecasts_anomalies_validate, validate_forecasts_anomalies(forecasts_validate_directory,
+                                                                        forecasts_anomalies,
+                                                                        nasa_weather_transformed,
+                                                                        weather_historical_means,
+                                                                        model_dates_selected,
+                                                                        lead_intervals,
+                                                                        overwrite = FALSE),
+             pattern = head(model_dates_selected, 2),
+             format = "file", 
+             repository = "local",
+             cue = tar_cue(tar_cue_general)), 
+  
   
   # ndvi anomalies --------------------------------------------------
   tar_target(ndvi_date_lookup, 

@@ -188,9 +188,11 @@ server <- function(input, output, session) {
   
   # TODO add explanatory text
   # TODO allow user to select the days viewing (check boxes)
+  # TODO check forecast colors
   # TODO shiny spinner only when switching tabs
-  # TODO create comparison tab
-  
+  # TODO create comparison tab (this might require targets to compare same exact dates)
+  # TODO scaled option?
+
   observeEvent(input$data_options, {
     if (input$data_options == "recorded_data") {
       choices <- c("NDVI" = "ndvi", 
@@ -204,8 +206,6 @@ server <- function(input, output, session) {
     }
     updateRadioButtons(session, "selected_dataset", choices = choices, inline = TRUE)
   })
-      
-      
       conn <- reactive({
         arrow::open_dataset(augmented_data) |>
           dplyr::filter(date == input$selected_date)
@@ -224,6 +224,9 @@ server <- function(input, output, session) {
         output_id <- glue::glue("anomalies_map_{map_type}_{day}")
         
         output[[output_id]] <- renderLeaflet({
+          
+          shiny::req(conn(), pal(), dom())
+          
           create_arrow_leaflet(
             conn = conn(),
             field = paste0("anomaly_", input$selected_dataset, "_", day),
