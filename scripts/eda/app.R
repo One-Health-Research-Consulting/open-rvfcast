@@ -130,73 +130,15 @@ ui <- fluidPage(
                                             animate = TRUE)), # animationOptions to set faster but data load cant keep up
   ),
   
-  mainPanel(
+  fluidRow(
     uiOutput("maps")
   )
-  
-  ## Maps
-  ### Recorded 
-  # conditionalPanel(
-  #   condition = "input.selected_dataset == 'ndvi' || input.selected_dataset == 'temperature' || input.selected_dataset == 'precipitation' || input.selected_dataset == 'relative_humidity'",
-  #   
-  #   fluidRow(
-  #     #### 30 days
-  #     column(4,
-  #            tags$h5("1-30 days previous"),
-  #            leaflet::leafletOutput("anomalies_map_recorded_30")
-  #     ),
-  #     #### 60 days
-  #     column(4, 
-  #            tags$h5("31-60 days previous"),
-  #            leaflet::leafletOutput("anomalies_map_recorded_60")
-  #     ),
-  #     #### 90 days
-  #     column(4, 
-  #            tags$h5("61-90 days previous"),
-  #            leaflet::leafletOutput("anomalies_map_recorded_90")
-  #     )
-  #   )
-  # ),
-  
-  ## Maps
-  ### Recorded 
-  # conditionalPanel(
-  #   condition = "input.selected_dataset == 'temperature_forecast' || input.selected_dataset == 'precipitation_forecast' || input.selected_dataset == 'relative_humidity_forecast'",    
-  #   fluidRow(
-  #     #### 29 days
-  #     column(3, 
-  #            tags$h5("0-29 day forecast"),
-  #            leaflet::leafletOutput("anomalies_map_forecast_29")
-  #     ),
-  #     #### 59 days
-  #     column(3, 
-  #            tags$h5("30-59 day forecast"),
-  #            leaflet::leafletOutput("anomalies_map_forecast_59")
-  #     ),
-  #     #### 89 days
-  #     column(3, 
-  #            tags$h5("60-89 day forecast"),
-  #            leaflet::leafletOutput("anomalies_map_forecast_89")
-  #     ),
-  #     #### 119 days
-  #     column(3, 
-  #            tags$h5("90-119 day forecast"),
-  #            leaflet::leafletOutput("anomalies_map_forecast_119")
-  #     ),
-  #     #### 149 days
-  #     column(3, 
-  #            tags$h5("120-149 day forecast"),
-  #            leaflet::leafletOutput("anomalies_map_forecast_149")
-  #            
-  #     )      
-  #   )
-  # )
 )
 
 # server ----------------------------------------------------------------------
 server <- function(input, output, session) {
   
-  # TODO why won't dynamicUI layout fill the whole page?
+  # TODO tag updating isnt working as expected - maybe generate outside of render UI and feed it in
   # TODO fill in comparison table - I guess this will take the form of some if statements in the renderUI
   # TODO add explanatory text
   # TODO check forecast colors
@@ -231,15 +173,6 @@ server <- function(input, output, session) {
     }
   })
   
-  # Get tag
-  get_tag <- reactive({
-    if(input$data_options == c("recorded_data")){
-      paste(names(period_choices), "days previous")
-    } else if (input$data_options %in% c("comparison", "forecast_data")){
-      paste(names(period_choices), "days forecast")
-    }
-  })
-  
   # Range of values for maps
   get_dom <- reactive({
     get(glue::glue("dom_{stringr::str_remove(input$selected_dataset, '_forecast')}"))
@@ -249,7 +182,6 @@ server <- function(input, output, session) {
   get_pal <- reactive({
     get(glue::glue("pal_{stringr::str_remove(input$selected_dataset, '_forecast')}_anomalies"))
   })
-  
   
   # Render the maps
   output$maps <- renderUI({
@@ -265,6 +197,10 @@ server <- function(input, output, session) {
       )
     })
     
+    #TODO modify map_list when we're dealing with comparisons - side by side forecast, recorded, and difference
+    
+    req(period_choices)
+    
     tag_list <- purrr::map(input$selected_period, function(i){
       lab <- switch(input$data_options, 
                     "recorded_data" = "previous",
@@ -275,11 +211,11 @@ server <- function(input, output, session) {
     
     # Create dynamic columns
     columns <- purrr::map2(map_list, tag_list, function(map, tag) {
-      column(6, tags$h5(tag), map)  # Adjust the width as needed (e.g., 4 for one-third width)
+      column(4, tags$h5(tag), map)  
     })
     
     # Combine columns into a single list of tags
-    fluidRow(width = 12, do.call(tagList, columns))
+    do.call(tagList, columns)
   })
   
 }
