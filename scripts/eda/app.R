@@ -26,6 +26,7 @@ leafmap <- leaflet::leaflet() |>
 
 # data parquet
 augmented_data <- here::here(targets::tar_read(augmented_data, store = targets_store))
+forecasts_anomalies_validate <- here::here(targets::tar_read(forecasts_anomalies_validate, store = targets_store))
 
 # define function to make maps from arrow dataset
 create_arrow_leaflet <- function(conn, field, selected_date, palette, domain, include_legend = FALSE){
@@ -109,15 +110,20 @@ ui <- fluidPage(
                           "",
                           choices = c("Recorded" = "recorded_data",
                                       "Forecast" = "forecast_data",
-                                      "Comparison" = "Comparison"))),
-    column(6, radioButtons("selected_dataset", 
+                                      "Comparison" = "comparison"))),
+    column(4, radioButtons("selected_dataset", 
                            "", 
                            choices = c("NDVI" = "ndvi", 
                                        "Temperature" = "temperature", 
                                        "Precipitation" = "precipitation", 
                                        "Relative Humidity" = "relative_humidity"
                            ), 
-                           inline = TRUE)),
+                           inline = FALSE)),
+    column(2, checkboxGroupInput("selected_period", 
+                                 "", 
+                                 choices =  c("1-30" = 30, "31-60" = 60, "61-90" = 90), 
+                                 selected =  c("1-30" = 30, "31-60" = 60, "61-90" = 90))),
+    
     column(4, shinyWidgets::sliderTextInput("selected_date", 
                                             "",
                                             choices = model_dates_selected,
@@ -154,27 +160,27 @@ ui <- fluidPage(
     condition = "input.selected_dataset == 'temperature_forecast' || input.selected_dataset == 'precipitation_forecast' || input.selected_dataset == 'relative_humidity_forecast'",    
     fluidRow(
       #### 29 days
-      column(4, 
+      column(3, 
              tags$h5("0-29 day forecast"),
              leaflet::leafletOutput("anomalies_map_forecast_29")
       ),
       #### 59 days
-      column(4, 
+      column(3, 
              tags$h5("30-59 day forecast"),
              leaflet::leafletOutput("anomalies_map_forecast_59")
       ),
       #### 89 days
-      column(4, 
+      column(3, 
              tags$h5("60-89 day forecast"),
              leaflet::leafletOutput("anomalies_map_forecast_89")
       ),
       #### 119 days
-      column(4, 
+      column(3, 
              tags$h5("90-119 day forecast"),
              leaflet::leafletOutput("anomalies_map_forecast_119")
       ),
       #### 149 days
-      column(4, 
+      column(3, 
              tags$h5("120-149 day forecast"),
              leaflet::leafletOutput("anomalies_map_forecast_149")
              
@@ -192,61 +198,73 @@ server <- function(input, output, session) {
   # TODO shiny spinner only when switching tabs
   # TODO create comparison tab (this might require targets to compare same exact dates)
   # TODO scaled option?
-
+  
   observeEvent(input$data_options, {
     if (input$data_options == "recorded_data") {
-      choices <- c("NDVI" = "ndvi", 
+      dataset_choices <- c("NDVI" = "ndvi", 
                    "Temperature" = "temperature", 
                    "Precipitation" = "precipitation", 
                    "Relative Humidity" = "relative_humidity")
-    } else if (input$data_options == "forecast_data") {
-      choices <- c("Temperature" = "temperature_forecast", 
-                  "Precipitation" = "precipitation_forecast",
-                  "Relative Humidity" = "relative_humidity_forecast")
+      period_choices <- c("1-30" = 30, "31-60" = 60, "61-90" = 90)
+    } else if (input$data_options %in% c("forecast_data", "comparison")) {
+      dataset_choices <- c("Temperature" = "temperature_forecast", 
+                   "Precipitation" = "precipitation_forecast",
+                   "Relative Humidity" = "relative_humidity_forecast")
+      period_choices <- c("0-29" = 29, "30-59" = 59, "60-89" = 89, "90-119" = 119, "120-149" = 149)
     }
-    updateRadioButtons(session, "selected_dataset", choices = choices, inline = TRUE)
+    updateRadioButtons(session, "selected_dataset", choices = dataset_choices, inline = FALSE)
+    updateCheckboxGroupInput(session, "selected_period", choices = period_choices, selected = period_choices)
+    })
+  
+  
+  conn <- reactive({
+    if(input$data_options %in% c("recorded_data", "forecast_data")){
+      arrow::open_dataset(augmented_data) |>
+        dplyr::filter(date == input$selected_date)
+    } else if (input$data_options == "comparison"){
+      arrow::open_dataset(forecasts_anomalies_validate) |>
+        dplyr::filter(date == input$selected_date)
+    }
   })
-      conn <- reactive({
-        arrow::open_dataset(augmented_data) |>
-          dplyr::filter(date == input$selected_date)
-      })
+  
+  dom <- reactive({
+    get(glue::glue("dom_{stringr::str_remove(input$selected_dataset, '_forecast')}"))
+  })
+  
+  pal <- reactive({
+    get(glue::glue("pal_{stringr::str_remove(input$selected_dataset, '_forecast')}_anomalies"))
+  })
+  
+  render_arrow_leaflet <- function(map_type, day, include_legend) {
+    
+    output_id <- glue::glue("anomalies_map_{map_type}_{day}")
+    
+    output[[output_id]] <- renderLeaflet({
       
-      dom <- reactive({
-        get(glue::glue("dom_{stringr::str_remove(input$selected_dataset, '_forecast')}"))
-      })
+      shiny::req(conn(), pal(), dom())
       
-      pal <- reactive({
-        get(glue::glue("pal_{stringr::str_remove(input$selected_dataset, '_forecast')}_anomalies"))
-      })
-      
-      render_arrow_leaflet <- function(map_type, day, include_legend) {
-        
-        output_id <- glue::glue("anomalies_map_{map_type}_{day}")
-        
-        output[[output_id]] <- renderLeaflet({
-          
-          shiny::req(conn(), pal(), dom())
-          
-          create_arrow_leaflet(
-            conn = conn(),
-            field = paste0("anomaly_", input$selected_dataset, "_", day),
-            selected_date = input$selected_date,
-            palette = pal(),
-            domain = dom(),
-            include_legend = include_legend
-          )
-        })
-      }
-      
-      render_arrow_leaflet(map_type = "recorded", day = "30", include_legend = TRUE)
-      render_arrow_leaflet(map_type = "recorded", day = "60", include_legend = FALSE)
-      render_arrow_leaflet(map_type = "recorded", day = "90", include_legend = FALSE)
-      render_arrow_leaflet(map_type = "forecast", day = "29", include_legend = TRUE)
-      render_arrow_leaflet(map_type = "forecast", day = "59", include_legend = FALSE)
-      render_arrow_leaflet(map_type = "forecast", day = "89", include_legend = FALSE)
-      render_arrow_leaflet(map_type = "forecast", day = "119", include_legend = FALSE)
-      render_arrow_leaflet(map_type = "forecast", day = "149", include_legend = FALSE)
-      
+      create_arrow_leaflet(
+        conn = conn(),
+        field = paste0("anomaly_", input$selected_dataset, "_", day),
+        selected_date = input$selected_date,
+        palette = pal(),
+        domain = dom(),
+        include_legend = include_legend
+      )
+    })
+  }
+  
+  # DO THIS DYNAMICALLY FOR PERIODS IN selected_period
+  
+  render_arrow_leaflet(map_type = "recorded", day = "30", include_legend = TRUE)
+  render_arrow_leaflet(map_type = "recorded", day = "60", include_legend = FALSE)
+  render_arrow_leaflet(map_type = "recorded", day = "90", include_legend = FALSE)
+  render_arrow_leaflet(map_type = "forecast", day = "29", include_legend = TRUE)
+  render_arrow_leaflet(map_type = "forecast", day = "59", include_legend = FALSE)
+  render_arrow_leaflet(map_type = "forecast", day = "89", include_legend = FALSE)
+  render_arrow_leaflet(map_type = "forecast", day = "119", include_legend = FALSE)
+  render_arrow_leaflet(map_type = "forecast", day = "149", include_legend = FALSE)
+  
 }
 
 # Run the application 
