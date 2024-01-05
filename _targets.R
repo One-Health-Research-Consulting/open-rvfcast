@@ -404,11 +404,19 @@ data_targets <- tar_plan(
                                                                         model_dates_selected,
                                                                         lead_intervals,
                                                                         overwrite = FALSE),
-             pattern = head(model_dates_selected, 2),
+             pattern = model_dates_selected,
              format = "file", 
              repository = "local",
              cue = tar_cue(tar_cue_general)), 
   
+  # save validation to AWS bucket
+  tar_target(forecasts_anomalies_validate_upload_aws_s3, 
+             aws_s3_upload(path = forecasts_anomalies_validate,
+                           bucket =  aws_bucket,
+                           key = forecasts_anomalies_validate, 
+                           check = TRUE), 
+             pattern = forecasts_anomalies_validate,
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
   
   # ndvi anomalies --------------------------------------------------
   tar_target(ndvi_date_lookup, 
