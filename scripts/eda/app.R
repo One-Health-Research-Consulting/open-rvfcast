@@ -196,9 +196,10 @@ ui <- fluidPage(
 # server ----------------------------------------------------------------------
 server <- function(input, output, session) {
   
+  # TODO why won't dynamicUI layout fill the whole page?
+  # TODO fill in comparison table - I guess this will take the form of some if statements in the renderUI
   # TODO add explanatory text
   # TODO check forecast colors
-  # TODO create comparison tab (this might require targets to compare same exact dates)
   # TODO scaled option?
   
   # Update input options based on user selection
@@ -220,7 +221,7 @@ server <- function(input, output, session) {
   })
   
   # Connection to data
-  conn <- reactive({
+  get_conn <- reactive({
     if(input$data_options %in% c("recorded_data", "forecast_data")){
       arrow::open_dataset(augmented_data) |>
         dplyr::filter(date == input$selected_date)
@@ -230,68 +231,56 @@ server <- function(input, output, session) {
     }
   })
   
+  # Get tag
+  get_tag <- reactive({
+    if(input$data_options == c("recorded_data")){
+      paste(names(period_choices), "days previous")
+    } else if (input$data_options %in% c("comparison", "forecast_data")){
+      paste(names(period_choices), "days forecast")
+    }
+  })
+  
   # Range of values for maps
-  dom <- reactive({
+  get_dom <- reactive({
     get(glue::glue("dom_{stringr::str_remove(input$selected_dataset, '_forecast')}"))
   })
   
   # Palettes for maps
-  pal <- reactive({
+  get_pal <- reactive({
     get(glue::glue("pal_{stringr::str_remove(input$selected_dataset, '_forecast')}_anomalies"))
   })
   
   
   # Render the maps
   output$maps <- renderUI({
-    maps <- lapply(input$selected_period, function(i) {
-      
+    
+    map_list <- purrr::map(input$selected_period, function(i) {
       create_arrow_leaflet(
-        conn = conn(),
+        conn = get_conn(),
         field = paste0("anomaly_", input$selected_dataset, "_", i),
         selected_date = input$selected_date,
-        palette = pal(),
-        domain = dom(),
+        palette = get_pal(),
+        domain = get_dom(),
         include_legend = TRUE
       )
     })
-      do.call(tagList, maps)
+    
+    tag_list <- purrr::map(input$selected_period, function(i){
+      lab <- switch(input$data_options, 
+                    "recorded_data" = "previous",
+                    "forecast_data" = "forecast",
+                    "comparison" = "forecast")
+      paste(names(period_choices[period_choices == i]), "days", lab)
+    })
+    
+    # Create dynamic columns
+    columns <- purrr::map2(map_list, tag_list, function(map, tag) {
+      column(6, tags$h5(tag), map)  # Adjust the width as needed (e.g., 4 for one-third width)
+    })
+    
+    # Combine columns into a single list of tags
+    fluidRow(width = 12, do.call(tagList, columns))
   })
-  
-  # render_arrow_leaflet <- function(map_type, day, include_legend) {
-  #   
-  #   output_id <- glue::glue("anomalies_map_{map_type}_{day}")
-  #   
-  #   output[[output_id]] <- renderLeaflet({
-  #     
-  #     shiny::req(conn(), pal(), dom())
-  #     
-  #     create_arrow_leaflet(
-  #       conn = conn(),
-  #       field = paste0("anomaly_", input$selected_dataset, "_", day),
-  #       selected_date = input$selected_date,
-  #       palette = pal(),
-  #       domain = dom(),
-  #       include_legend = include_legend
-  #     )
-  #   })
-  # }
-  
-  # DO THIS DYNAMICALLY FOR PERIODS IN selected_period
-  # this can be in UI
-  # mainPanel(
-  #   uiOutput("maps")
-  # )
-  
-  # do the below as part of renderUI
-  
-  # render_arrow_leaflet(map_type = "recorded", day = "30", include_legend = TRUE)
-  # render_arrow_leaflet(map_type = "recorded", day = "60", include_legend = FALSE)
-  # render_arrow_leaflet(map_type = "recorded", day = "90", include_legend = FALSE)
-  # render_arrow_leaflet(map_type = "forecast", day = "29", include_legend = TRUE)
-  # render_arrow_leaflet(map_type = "forecast", day = "59", include_legend = FALSE)
-  # render_arrow_leaflet(map_type = "forecast", day = "89", include_legend = FALSE)
-  # render_arrow_leaflet(map_type = "forecast", day = "119", include_legend = FALSE)
-  # render_arrow_leaflet(map_type = "forecast", day = "149", include_legend = FALSE)
   
 }
 
