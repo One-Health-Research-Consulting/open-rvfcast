@@ -132,7 +132,7 @@ ui <- fluidPage(
     column(2, checkboxGroupInput("selected_period", 
                                  "", 
                                  choices =  recorded_periods, 
-                                 selected = recorded_periods)),
+                                 selected = recorded_periods[1])),
     
     column(4, shinyWidgets::sliderTextInput("selected_date", 
                                             "",
@@ -148,7 +148,6 @@ ui <- fluidPage(
 # server ----------------------------------------------------------------------
 server <- function(input, output, session) {
   
-  # TODO tag updating isnt working as expected - maybe generate outside of render UI and feed it in
   # TODO fill in comparison table - I guess this will take the form of some if statements in the renderUI
   # TODO add explanatory text
   # TODO check forecast colors
@@ -169,7 +168,7 @@ server <- function(input, output, session) {
     }
     
     updateRadioButtons(session, "selected_dataset", choices = dataset_choices, inline = FALSE)
-    updateCheckboxGroupInput(session, "selected_period", choices = period_choices, selected = period_choices)
+    updateCheckboxGroupInput(session, "selected_period", choices = period_choices, selected = period_choices[1])
   })
   
   # Connection to data
@@ -201,41 +200,73 @@ server <- function(input, output, session) {
   # Render the maps
   output$maps <- renderUI({
     
-    map_list <- purrr::map(input$selected_period, function(i) {
-      create_arrow_leaflet(
-        conn = get_conn(),
-        field = paste0("anomaly_", input$selected_dataset, "_", i),
-        selected_date = input$selected_date,
-        palette = get_pal(),
-        domain = get_dom(),
-        include_legend = TRUE
-      )
-    })
-    #TODO modify map_list when we're dealing with comparisons - side by side forecast, recorded, and difference
-    
-    
-    tag_list <- purrr::map(input$selected_period, function(i){
-      lab <- switch(input$data_options,
-                    "recorded_data" = "previous",
-                    "forecast_data" = "forecast",
-                    "comparison" = "forecast")
-      period_choices <- switch(input$data_options,
-                              "recorded_data" = "recorded",
-                              "forecast_data" = "forecast",
-                              "comparison" = "forecast")
-      period_choices <- get(glue::glue("{period_choices}_periods"))
+    # Iterate through each selected period and generate a map
+    if(input$data_options %in% c("recorded_data", "forecast_data")){
+      map_list <- purrr::map(input$selected_period, function(i) {
+        create_arrow_leaflet(
+          conn = get_conn(),
+          field = paste0("anomaly_", input$selected_dataset, "_", i),
+          selected_date = input$selected_date,
+          palette = get_pal(),
+          domain = get_dom(),
+          include_legend = TRUE
+        )
+      })
       
-      paste(names(period_choices[period_choices == i]), "days", lab)
-    })
+    } else if (input$data_options == "comparison"){
+      map_list <- purrr::map(input$selected_period, function(i) {
+        
+        selected_dataset <- stringr::str_remove(input$selected_dataset, '_forecast')
+        
+        list(create_arrow_leaflet(
+          conn = get_conn(),
+          field = paste0("anomaly_", selected_dataset, "_forecast_", i),
+          selected_date = input$selected_date,
+          palette = get_pal(),
+          domain = get_dom(),
+          include_legend = TRUE
+        ),
+        create_arrow_leaflet(
+          conn = get_conn(),
+          field = paste0("anomaly_", selected_dataset, "_recorded_", i),
+          selected_date = input$selected_date,
+          palette = get_pal(),
+          domain = get_dom(),
+          include_legend = TRUE
+        ),
+        create_arrow_leaflet(
+          conn = get_conn(),
+          field = paste0("anomaly_", selected_dataset, "_difference_", i),
+          selected_date = input$selected_date,
+          palette = get_pal(),
+          domain = get_dom(),
+          include_legend = TRUE
+        )
+        )
+      }) 
+      map_list <- unlist(map_list, recursive = FALSE)
+    }
+    
+    # Generate an associated tag for each map
+    # tag_list <- purrr::map(input$selected_period, function(i){
+    #   lab <- switch(input$data_options,
+    #                 "recorded_data" = "previous",
+    #                 "forecast_data" = "forecast",
+    #                 "comparison" = "forecast")
+    #   period_choices <- ifelse(lab == "previous", "recorded", lab)
+    #   period_choices <- get(glue::glue("{period_choices}_periods"))
+    #   
+    #   paste(names(period_choices[period_choices == i]), "days", lab)
+    # })
     
     # Create dynamic columns
-    columns <- purrr::map2(map_list, tag_list, function(map, tag) {
-      column(4, tags$h5(tag), map)
-    })
-    
-    # columns <- purrr::map(map_list, function(map) {
-    #   column(4, map)  
+    # columns <- purrr::map2(map_list, tag_list, function(map, tag) {
+    #   column(4, tags$h5(tag), map)
     # })
+    
+    columns <- purrr::map(map_list, function(map) {
+      column(4,  map)
+    })
     
     # Combine columns into a single list of tags
     do.call(tagList, columns)
