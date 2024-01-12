@@ -226,7 +226,7 @@ server <- function(input, output, session) {
                       "comparison" = "forecast")
         period_choices <- ifelse(lab == "previous", "recorded", lab)
         period_choices <- get(glue::glue("{period_choices}_periods"))
-
+        
         paste(names(period_choices[period_choices == i]), "days", lab)
       })
       
@@ -235,31 +235,17 @@ server <- function(input, output, session) {
         
         selected_dataset <- stringr::str_remove(input$selected_dataset, '_forecast')
         
-        list(create_arrow_leaflet(
-          conn = get_conn(),
-          field = paste0("anomaly_", selected_dataset, "_forecast_", i),
-          selected_date = input$selected_date,
-          palette = get_pal(),
-          domain = get_dom(),
-          include_legend = TRUE
-        ),
-        create_arrow_leaflet(
-          conn = get_conn(),
-          field = paste0("anomaly_", selected_dataset, "_recorded_", i),
-          selected_date = input$selected_date,
-          palette = get_pal(),
-          domain = get_dom(),
-          include_legend = TRUE
-        ),
-        create_arrow_leaflet(
-          conn = get_conn(),
-          field = paste0("anomaly_", selected_dataset, "_difference_", i),
-          selected_date = input$selected_date,
-          palette = get_pal(),
-          domain = get_dom(),
-          include_legend = TRUE
-        )
-        )
+        purrr::map(c("forecast", "recorded", "difference"), function(x){
+          create_arrow_leaflet(
+            conn = get_conn(),
+            field = paste0("anomaly_", selected_dataset, "_", x, "_", i),
+            selected_date = input$selected_date,
+            palette = get_pal(),
+            domain = get_dom(),
+            include_legend = TRUE
+          )
+        })
+        
       }) 
       map_list <- unlist(map_list, recursive = FALSE)
       
@@ -267,9 +253,9 @@ server <- function(input, output, session) {
       tag_list <- purrr::map(input$selected_period, function(i){
         period_choices <- get("forecast_periods")
         list(
-        paste(names(period_choices[period_choices == i]), "days ahead forecast"),
-        paste(names(period_choices[period_choices == i]), "days ahead recorded"),
-        paste(names(period_choices[period_choices == i]), "days", "difference forecast - recorded")
+          paste(names(period_choices[period_choices == i]), "days ahead forecast"),
+          paste(names(period_choices[period_choices == i]), "days ahead recorded"),
+          paste(names(period_choices[period_choices == i]), "days", "difference forecast - recorded")
         )
       })
       tag_list <- unlist(tag_list, recursive = FALSE)
