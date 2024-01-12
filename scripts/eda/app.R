@@ -59,6 +59,20 @@ create_arrow_leaflet <- function(conn, field, selected_date, palette, domain, in
 # anomaly text 
 anamaly_text <- "Anomalies are calculated as the mean value for the lag period minus the historical mean for the same period."
 
+# dataset and period choices
+recorded_dataset <- c("NDVI" = "ndvi", 
+                      "Temperature" = "temperature", 
+                      "Precipitation" = "precipitation", 
+                      "Relative Humidity" = "relative_humidity")
+
+forecast_dataset <- c("Temperature" = "temperature_forecast", 
+                      "Precipitation" = "precipitation_forecast",
+                      "Relative Humidity" = "relative_humidity_forecast")
+
+recorded_periods <- c("1-30" = 30, "31-60" = 60, "61-90" = 90)
+forecast_periods <- c("0-29" = 29, "30-59" = 59, "60-89" = 89, "90-119" = 119, "120-149" = 149)
+
+
 # Color Palettes ----------------------------------------------------------
 
 # NDVI palette
@@ -113,16 +127,12 @@ ui <- fluidPage(
                                       "Comparison" = "comparison"))),
     column(4, radioButtons("selected_dataset", 
                            "", 
-                           choices = c("NDVI" = "ndvi", 
-                                       "Temperature" = "temperature", 
-                                       "Precipitation" = "precipitation", 
-                                       "Relative Humidity" = "relative_humidity"
-                           ), 
+                           choices = recorded_dataset, 
                            inline = FALSE)),
     column(2, checkboxGroupInput("selected_period", 
                                  "", 
-                                 choices =  c("1-30" = 30, "31-60" = 60, "61-90" = 90), 
-                                 selected =  c("1-30" = 30, "31-60" = 60, "61-90" = 90))),
+                                 choices =  recorded_periods, 
+                                 selected = recorded_periods)),
     
     column(4, shinyWidgets::sliderTextInput("selected_date", 
                                             "",
@@ -146,31 +156,36 @@ server <- function(input, output, session) {
   
   # Update input options based on user selection
   observeEvent(input$data_options, {
+    
     if (input$data_options == "recorded_data") {
-      dataset_choices <- c("NDVI" = "ndvi", 
-                           "Temperature" = "temperature", 
-                           "Precipitation" = "precipitation", 
-                           "Relative Humidity" = "relative_humidity")
-      period_choices <- c("1-30" = 30, "31-60" = 60, "61-90" = 90)
+      
+      dataset_choices <- recorded_dataset
+      period_choices <- recorded_periods
+      
     } else if (input$data_options %in% c("forecast_data", "comparison")) {
-      dataset_choices <- c("Temperature" = "temperature_forecast", 
-                           "Precipitation" = "precipitation_forecast",
-                           "Relative Humidity" = "relative_humidity_forecast")
-      period_choices <- c("0-29" = 29, "30-59" = 59, "60-89" = 89, "90-119" = 119, "120-149" = 149)
+      
+      dataset_choices <- forecast_dataset
+      period_choices <- forecast_periods
     }
+    
     updateRadioButtons(session, "selected_dataset", choices = dataset_choices, inline = FALSE)
     updateCheckboxGroupInput(session, "selected_period", choices = period_choices, selected = period_choices)
   })
   
   # Connection to data
   get_conn <- reactive({
+    
     if(input$data_options %in% c("recorded_data", "forecast_data")){
+      
       arrow::open_dataset(augmented_data) |>
         dplyr::filter(date == input$selected_date)
+      
     } else if (input$data_options == "comparison"){
+      
       arrow::open_dataset(forecasts_anomalies_validate) |>
         dplyr::filter(date == input$selected_date)
     }
+    
   })
   
   # Range of values for maps
@@ -196,23 +211,31 @@ server <- function(input, output, session) {
         include_legend = TRUE
       )
     })
-    
     #TODO modify map_list when we're dealing with comparisons - side by side forecast, recorded, and difference
     
-    req(period_choices)
     
     tag_list <- purrr::map(input$selected_period, function(i){
-      lab <- switch(input$data_options, 
+      lab <- switch(input$data_options,
                     "recorded_data" = "previous",
                     "forecast_data" = "forecast",
                     "comparison" = "forecast")
+      period_choices <- switch(input$data_options,
+                              "recorded_data" = "recorded",
+                              "forecast_data" = "forecast",
+                              "comparison" = "forecast")
+      period_choices <- get(glue::glue("{period_choices}_periods"))
+      
       paste(names(period_choices[period_choices == i]), "days", lab)
     })
     
     # Create dynamic columns
     columns <- purrr::map2(map_list, tag_list, function(map, tag) {
-      column(4, tags$h5(tag), map)  
+      column(4, tags$h5(tag), map)
     })
+    
+    # columns <- purrr::map(map_list, function(map) {
+    #   column(4, map)  
+    # })
     
     # Combine columns into a single list of tags
     do.call(tagList, columns)
