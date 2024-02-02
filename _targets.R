@@ -26,6 +26,7 @@ tar_cue_upload_aws = "thorough"  # CAUTION changing this to never means targets 
 static_targets <- tar_plan(
   
   # Define country bounding boxes and years to set up download ----------------------------------------------------
+  # TODO change from rnaturalearth to rgeoboundaries to get ADM2 districts
   tar_target(country_polygons, create_country_polygons(countries =  c("Libya", "Kenya", "South Africa",
                                                                       "Mauritania", "Niger", "Namibia",
                                                                       "Madagascar", "Eswatini", "Botswana" ,
@@ -43,7 +44,7 @@ static_targets <- tar_plan(
   # ecmwf = 1; 
   # sentinel ndvi = 0.01
   # modis ndvi = 0.01
-  tar_target(rsa_polygon, continent_polygon |> filter(country_iso3c == "ZAF"))
+  tar_target(rsa_polygon, rgeoboundaries::geoboundaries("South Africa", "adm2"))
   
 )
 
@@ -507,17 +508,12 @@ model_targets <- tar_plan(
   tar_target(augmented_data_rsa_directory, 
              create_data_directory(directory_path = "data/augmented_data_rsa")),
   
-  tar_target(augmented_data_rsa,
-             filter_augmented_data(augmented_data, 
-                                   rsa_polygon, 
-                                   model_dates_selected,
-                                   augmented_data_rsa_directory),
-             pattern = model_dates_selected
+  tar_target(aggregated_data_rsa,
+             aggregate_augmented_data_by_adm(augmented_data, 
+                                             rsa_polygon, 
+                                             model_dates_selected),
+             pattern = head(model_dates_selected, 5)
   ),
-  
-  tar_target(augmented_data_rsa_by_district,
-             filter_augmented_data(augmented_data_rsa)
-  )
   
 )
 
