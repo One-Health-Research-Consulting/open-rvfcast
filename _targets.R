@@ -20,7 +20,7 @@ source("_targets_settings.R")
 # For development purposes only, it can be helpful to set these targets to have a tar_cue of tar_cue_upload_aws, which means targets will not check the target for changes after it has been built once
 
 tar_cue_general = "thorough" # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
-tar_cue_upload_aws = "never"  # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
+tar_cue_upload_aws = "thorough"  # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
 
 # Static Data Download ----------------------------------------------------
 static_targets <- tar_plan(
@@ -313,8 +313,8 @@ data_targets <- tar_plan(
                                                    lag_intervals, 
                                                    seed = 212) |> 
                filter(select_date) |> pull(date)
-               ),
-
+  ),
+  
   # recorded weather anomalies --------------------------------------------------
   tar_target(weather_historical_means_directory, 
              create_data_directory(directory_path = "data/weather_historical_means")),
@@ -444,8 +444,27 @@ data_targets <- tar_plan(
                            key = ndvi_anomalies, 
                            check = TRUE), 
              pattern = ndvi_anomalies,
-             cue = tar_cue("thorough")), # only run this if you need to upload new data  
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
   
+  # all anomalies --------------------------------------------------
+  tar_target(augmented_data_directory, 
+             create_data_directory(directory_path = "data/augmented_data")),
+  
+  tar_target(augmented_data, 
+             augment_data(weather_anomalies, 
+                          forecasts_anomalies, 
+                          ndvi_anomalies, 
+                          augmented_data_directory),
+             format = "file", 
+             repository = "local",
+             cue = tar_cue(tar_cue_general)),  
+  
+  tar_target(augmented_data_upload_aws_s3,
+             aws_s3_upload(path = augmented_data,
+                           bucket =  aws_bucket,
+                           key = augmented_data,
+                           check = TRUE),
+             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
   
 )
 

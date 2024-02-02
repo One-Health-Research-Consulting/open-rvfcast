@@ -38,3 +38,6 @@ all_targets <- function(env = parent.env(environment()), type = "tar_target", ad
 # tar_load_s3 <- function(target_name, ...) {
 #   
 # }
+
+#' Get NAs
+col_na <- function(df) purrr::map_lgl(df, ~any(is.na(.)))
