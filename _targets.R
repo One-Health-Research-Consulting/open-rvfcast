@@ -512,7 +512,7 @@ model_targets <- tar_plan(
              aggregate_augmented_data_by_adm(augmented_data, 
                                              rsa_polygon, 
                                              model_dates_selected),
-             pattern = head(model_dates_selected, 5)
+             pattern = model_dates_selected
   ),
   
 )
