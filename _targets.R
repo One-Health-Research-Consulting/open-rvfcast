@@ -26,6 +26,7 @@ tar_cue_upload_aws = "thorough"  # CAUTION changing this to never means targets 
 static_targets <- tar_plan(
   
   # Define country bounding boxes and years to set up download ----------------------------------------------------
+  # TODO change from rnaturalearth to rgeoboundaries to get ADM2 districts
   tar_target(country_polygons, create_country_polygons(countries =  c("Libya", "Kenya", "South Africa",
                                                                       "Mauritania", "Niger", "Namibia",
                                                                       "Madagascar", "Eswatini", "Botswana" ,
@@ -43,6 +44,7 @@ static_targets <- tar_plan(
   # ecmwf = 1; 
   # sentinel ndvi = 0.01
   # modis ndvi = 0.01
+  tar_target(rsa_polygon, rgeoboundaries::geoboundaries("South Africa", "adm2"))
   
 )
 
@@ -88,6 +90,7 @@ dynamic_targets <- tar_plan(
   
   # project to the template and save as parquets (these can now be queried for analysis)
   # this maintains the branches, saves separate files split by date
+  # TODO NAs outside of the continent
   tar_target(sentinel_ndvi_transformed, 
              transform_sentinel_ndvi(sentinel_ndvi_downloaded, 
                                      continent_raster_template,
@@ -161,6 +164,7 @@ dynamic_targets <- tar_plan(
   
   # project to the template and save as parquets (these can now be queried for analysis)
   # this maintains the branches, saves separate files split by date
+  # TODO NAs outside of the continent
   tar_target(modis_ndvi_transformed, 
              transform_modis_ndvi(modis_ndvi_downloaded_subset, 
                                   continent_raster_template,
@@ -225,6 +229,7 @@ dynamic_targets <- tar_plan(
              cue = tar_cue(tar_cue_general)), 
   
   # project to the template and save as arrow dataset
+  # TODO NAs outside of the continent
   tar_target(nasa_weather_transformed, 
              transform_nasa_weather(nasa_weather_pre_transformed,
                                     nasa_weather_transformed_directory, 
@@ -276,6 +281,7 @@ dynamic_targets <- tar_plan(
     cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
   
   # project to the template and save as arrow dataset
+  # TODO NAs outside of the continent
   tar_target(ecmwf_forecasts_transformed, 
              transform_ecmwf_forecasts(ecmwf_forecasts_downloaded,
                                        ecmwf_forecasts_transformed_directory, 
@@ -497,6 +503,17 @@ data_targets <- tar_plan(
 
 # Model -----------------------------------------------------------
 model_targets <- tar_plan(
+  
+  # RSA --------------------------------------------------
+  tar_target(augmented_data_rsa_directory, 
+             create_data_directory(directory_path = "data/augmented_data_rsa")),
+  
+  tar_target(aggregated_data_rsa,
+             aggregate_augmented_data_by_adm(augmented_data, 
+                                             rsa_polygon, 
+                                             model_dates_selected),
+             pattern = head(model_dates_selected, 5)
+  ),
   
 )
 
