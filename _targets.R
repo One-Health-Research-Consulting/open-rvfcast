@@ -19,8 +19,8 @@ source("_targets_settings.R")
 # For some targets with many branches (i.e., COMTRADE), it takes a long time for `tar_make()` to check and skip over already-built targets
 # For development purposes only, it can be helpful to set these targets to have a tar_cue of tar_cue_upload_aws, which means targets will not check the target for changes after it has been built once
 
-tar_cue_general = "thorough" # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
-tar_cue_upload_aws = "thorough"  # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
+tar_cue_general = "never" # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
+tar_cue_upload_aws = "never"  # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
 
 # Static Data Download ----------------------------------------------------
 static_targets <- tar_plan(
@@ -499,6 +499,12 @@ data_targets <- tar_plan(
                            check = TRUE),
              cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
   
+  # outbreak layer --------------------------------------------------
+  # get whether there has been an outbreak in a polygon
+  tar_target(rvf_outbreaks, create_outbreak_layer(wahis_rvf_outbreaks_preprocessed,
+                                                  rsa_polygon,
+                                                  model_dates_selected)),
+  
 )
 
 # Model -----------------------------------------------------------
@@ -514,6 +520,11 @@ model_targets <- tar_plan(
                                              model_dates_selected),
              pattern = model_dates_selected
   ),
+  
+  tar_target(aggregated_data_rsa_outbreaks,
+             left_join(aggregated_data_rsa, rvf_outbreaks, by = join_by(date, shapeName)) |>  mutate(outbreak_30 = replace_na(outbreak_30, FALSE))
+  )
+  
   
 )
 
