@@ -12,8 +12,7 @@
 #' @export
 tune_parameters <- function(model_workflow, training_splits, grid_size = 10,
                             n_cores = 4) {
-    library(doMC)
-    registerDoMC(cores=n_cores)
+    doMC::registerDoMC(cores=n_cores)
     
     xgboost_params <-
       dials::parameters(

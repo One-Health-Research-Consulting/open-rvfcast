@@ -17,7 +17,7 @@ aggregate_augmented_data_by_adm <- function(augmented_data,
   crs(r) <- crs(rast())
   r <- mask(r, rsa_polygon) 
   
-  p <- terra::extract(r, rsa_polygon, mean, na.rm = TRUE, weights = TRUE)
+  p <- terra::extract(r, rsa_polygon, mean, na.rm = TRUE, weights = TRUE) # weighted mean
   
   bind_cols(rsa_polygon, p) |> 
     as_tibble() |> 

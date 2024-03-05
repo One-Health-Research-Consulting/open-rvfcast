@@ -532,12 +532,15 @@ model_targets <- tar_plan(
   # Train/test --------------------------------------------------
   
   # Training and Testing (holdout dataset)
-  tar_target(model_data_split,initial_split(model_data, prop = 0.8, strata = outbreak_30)),
+  tar_target(model_data_split, initial_split(model_data, prop = 0.8, strata = outbreak_30)),
   tar_target(training_data, training(model_data_split)),
   tar_target(training_splits, vfold_cv(training_data, strata = outbreak_30)), # subsplit training analysis/assessment
   tar_target(holdout_data, testing(model_data_split)),
-  tar_target(model_workflow, build_workflow(model_data_train)),
-  tar_target(tuned_parameters, tune_parameters(model_workflow, training_splits, grid_size = 10, n_cores = 4))
+  tar_target(model_workflow, build_workflow(training_data)),
+  tar_target(tuned_parameters, tune_parameters(model_workflow, 
+                                               training_splits, 
+                                               grid_size = 10, 
+                                               n_cores = 4))
 
 )
 
