@@ -518,14 +518,27 @@ model_targets <- tar_plan(
              aggregate_augmented_data_by_adm(augmented_data, 
                                              rsa_polygon, 
                                              model_dates_selected),
-             pattern = model_dates_selected
+             pattern = model_dates_selected,
+             cue = tar_cue(tar_cue_general)
   ),
   
-  tar_target(aggregated_data_rsa_outbreaks,
-             left_join(aggregated_data_rsa, rvf_outbreaks, by = join_by(date, shapeName)) |>  mutate(outbreak_30 = replace_na(outbreak_30, FALSE))
-  )
+  tar_target(model_data,
+             left_join(aggregated_data_rsa, 
+                       rvf_outbreaks, 
+                       by = join_by(date, shapeName)) |>  
+               mutate(outbreak_30 = replace_na(outbreak_30, FALSE))
+  ),
   
+  # Train/test --------------------------------------------------
   
+  # Training and Testing (holdout dataset)
+  tar_target(model_data_split,initial_split(model_data, prop = 0.8, strata = outbreak_30)),
+  tar_target(training_data, training(model_data_split)),
+  tar_target(training_splits, vfold_cv(training_data, strata = outbreak_30)), # subsplit training analysis/assessment
+  tar_target(holdout_data, testing(model_data_split)),
+  tar_target(model_workflow, build_workflow(model_data_train)),
+  tar_target(tuned_parameters, tune_parameters(model_workflow, training_splits, grid_size = 10, n_cores = 4))
+
 )
 
 # Deploy -----------------------------------------------------------
