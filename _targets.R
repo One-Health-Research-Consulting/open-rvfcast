@@ -519,29 +519,47 @@ model_targets <- tar_plan(
                                              rsa_polygon, 
                                              model_dates_selected),
              pattern = model_dates_selected,
-             cue = tar_cue(tar_cue_general)
+             cue = tar_cue("thorough")
   ),
+  
+  tar_target(rsa_polygon_spatial_weights, rsa_polygon |> 
+               mutate(area = st_area(rsa_polygon)) |> 
+               as_tibble() |> 
+               select(shapeName, area)),
   
   tar_target(model_data,
              left_join(aggregated_data_rsa, 
                        rvf_outbreaks, 
                        by = join_by(date, shapeName)) |>  
-               mutate(outbreak_30 = replace_na(outbreak_30, FALSE))
+               mutate(outbreak_30 = replace_na(outbreak_30, FALSE)) |> 
+               left_join(rsa_polygon_spatial_weights, by = "shapeName")
   ),
   
-  # Train/test --------------------------------------------------
-  
-  # Training and Testing (holdout dataset)
-  tar_target(model_data_split, initial_split(model_data, prop = 0.8, strata = outbreak_30)),
+  # Splitting --------------------------------------------------
+  # Initial train and test (ie holdout)
+  tar_target(model_data_split, initial_split(model_data, prop = 0.8)), # pick random days left out of the training
   tar_target(training_data, training(model_data_split)),
-  tar_target(training_splits, vfold_cv(training_data, strata = outbreak_30)), # subsplit training analysis/assessment
   tar_target(holdout_data, testing(model_data_split)),
+  
+  # CV splits
+  # Mask from the training set the three months following the holdout dates for the given district and the surrounding districts. 
+  # Should this be on the whole training set, or just the analysis portion of the training set?
+  # In other words, it doesn't have to be masked from the model's assessments in the CV routine, we can use that data to assess performance
+  tar_target(masked_data, get_masks_for_training(holdout_data)),
+  tar_target(training_splits, vfold_cv(training_data)), # subsplit training analysis/assessment
+  tar_target(training_splits_masked, 1), # subsplit training analysis/assessment
+  
+  # Define formula and model
   tar_target(model_workflow, build_workflow(training_data)),
+  
+  # Run tuning
   tar_target(tuned_parameters, tune_parameters(model_workflow, 
                                                training_splits, 
                                                grid_size = 10, 
                                                n_cores = 4))
-
+  # Fit final model
+  # Generate predictions
+  
 )
 
 # Deploy -----------------------------------------------------------
