@@ -537,17 +537,19 @@ model_targets <- tar_plan(
   
   # Splitting --------------------------------------------------
   # Initial train and test (ie holdout)
-  tar_target(model_data_split, initial_split(model_data, prop = 0.8)), # pick random days left out of the training
+  tar_target(model_data_split, initial_split(model_data, prop = 0.8)), # pick random days and shapes to be withheld from training
   tar_target(training_data, training(model_data_split)),
   tar_target(holdout_data, testing(model_data_split)),
   
   # CV splits
   # Mask from the training set the three months following the holdout dates for the given district and the surrounding districts. 
   # Should this be on the whole training set, or just the analysis portion of the training set?
-  # In other words, it doesn't have to be masked from the model's assessments in the CV routine, we can use that data to assess performance
-  tar_target(masked_data, get_masks_for_training(holdout_data)),
+  # In other words, it doesn't have to be masked from the model's assessments in the CV routine, we can still use that data to assess performance
+  tar_target(mask_lookup, make_mask_lookup(model_dates_selected, rsa_polygon)),
+  tar_target(holdout_data_masks, holdout_data, mask_lookup), # TODO use mask_lookup against holdout_data to determine which dates/shapes need to be excluded from training
   tar_target(training_splits, vfold_cv(training_data)), # subsplit training analysis/assessment
-  tar_target(training_splits_masked, 1), # subsplit training analysis/assessment
+  tar_target(training_splits_masked, training_splits, holdout_data_masks), # TODO remove data from holdout_data_masks in analysis splits
+  # TODO in addition to the above step, we need to get assessment data masks from the splits, and mask these from each assessment split
   
   # Define formula and model
   tar_target(model_workflow, build_workflow(training_data)),
