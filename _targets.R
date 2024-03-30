@@ -543,15 +543,14 @@ model_targets <- tar_plan(
   
   # CV splits
   # Mask from the training set the three months following the holdout dates for the given district and the surrounding districts. 
-  # Should this be on the whole training set, or just the analysis portion of the training set?
-  # In other words, it doesn't have to be masked from the model's assessments in the CV routine, we can still use that data to assess performance
-  tar_target(mask_lookup, make_mask_lookup(model_dates_selected, rsa_polygon)),
-  tar_target(holdout_data_masks, holdout_data, mask_lookup), # TODO use mask_lookup against holdout_data to determine which dates/shapes need to be excluded from training
+  tar_target(mask_lookup, make_mask_lookup(model_dates_selected, rsa_polygon)), # helpful lookup to get masked dates for each model date, and masked shapes for each RSA shape
+  tar_target(holdout_data_masks, get_holdout_masks(holdout_data, mask_lookup)), # determine which date/shape combinations should be excluded from training
+  tar_target(traning_data_masked, anti_join(training_data, holdout_data_masks)),
   tar_target(training_splits, vfold_cv(training_data)), # subsplit training analysis/assessment
-  tar_target(training_splits_masked, training_splits, holdout_data_masks), # TODO remove data from holdout_data_masks in analysis splits
-  # TODO in addition to the above step, we need to get assessment data masks from the splits, and mask these from each assessment split
+  tar_target(training_splits_masked, training_splits, holdout_data_masks), # TODO we need to get assessment data masks from the splits, and mask these from each assessment split
   
   # Define formula and model
+  # TODO add weights handling
   tar_target(model_workflow, build_workflow(training_data)),
   
   # Run tuning
