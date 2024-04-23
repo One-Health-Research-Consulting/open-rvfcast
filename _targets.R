@@ -542,6 +542,9 @@ model_targets <- tar_plan(
   tar_target(holdout_data, testing(model_data_split)),
   tar_target(split_view, visualize_splits(training_data, holdout_data)),
   
+  
+  # what if we do rolling splits, then make a custom assessment algorithms that weights the positives if they are there
+  
   # CV splits
   # Mask from the training set:
   # a) three months following the holdout dates for the given district

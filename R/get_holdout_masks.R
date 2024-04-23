@@ -25,7 +25,7 @@ get_holdout_masks <- function(holdout_data, mask_lookup) {
   masks <- bind_rows(date_masks, shape_masks) |> 
     distinct()
   
-  return(shape_masks)
+  return(masks)
   
   # take 1 - mask shape and date (note this incorrectly misses having the district itself masked for 3 months)
  # holdout_data |> 

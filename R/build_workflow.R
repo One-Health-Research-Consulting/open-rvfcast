@@ -30,8 +30,8 @@ build_workflow <- function(model_data_train) {
                  
                  spec <-
                    boost_tree(trees = 1000, min_n = tune(), tree_depth = tune(), learn_rate = tune(),
-                              loss_reduction = tune()) %>%
-                   set_mode("classification" ) %>%
+                              loss_reduction = tune()) |>
+                   set_mode("classification" ) |>
                    set_engine("xgboost", num_class = 2, objective = "binary:logistic")
                  
                  model_workflow <-

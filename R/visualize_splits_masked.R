@@ -28,6 +28,8 @@ visualize_splits_masked <- function(training_data, holdout_data,
     mutate(split = coalesce(mask, split)) |> 
     select(-mask)
   
+  sum(dat$split == "mask") / nrow(dat)
+  
   ggplot(dat |> mutate(shapeName = factor(shapeName)), 
          aes(x = date, y = shapeName, fill = split)) +
     geom_tile(alpha = 1, width = 20) +
