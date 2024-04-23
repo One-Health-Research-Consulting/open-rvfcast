@@ -540,12 +540,17 @@ model_targets <- tar_plan(
   tar_target(model_data_split, initial_split(model_data, prop = 0.8)), # pick random days and shapes to be withheld from training
   tar_target(training_data, training(model_data_split)),
   tar_target(holdout_data, testing(model_data_split)),
+  tar_target(split_view, visualize_splits(training_data, holdout_data)),
   
   # CV splits
-  # Mask from the training set the three months following the holdout dates for the given district and the surrounding districts. 
+  # Mask from the training set:
+  # a) three months following the holdout dates for the given district
+  # b) all surrounding districts for the given date
   tar_target(mask_lookup, make_mask_lookup(model_dates_selected, rsa_polygon)), # helpful lookup to get masked dates for each model date, and masked shapes for each RSA shape
   tar_target(holdout_data_masks, get_holdout_masks(holdout_data, mask_lookup)), # determine which date/shape combinations should be excluded from training
+  tar_target(traning_data_view, visualize_splits_masked(training_data, holdout_data, holdout_data_masks)),
   tar_target(traning_data_masked, anti_join(training_data, holdout_data_masks)),
+  
   tar_target(training_splits, vfold_cv(training_data)), # subsplit training analysis/assessment
   tar_target(training_splits_masked, training_splits, holdout_data_masks), # TODO we need to get assessment data masks from the splits, and mask these from each assessment split
   

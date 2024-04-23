@@ -14,7 +14,7 @@ get_holdout_masks <- function(holdout_data, mask_lookup) {
     select(date, shapeName) |> 
     left_join(mask_lookup$masked_dates_90_days_lookup, by = join_by(date)) |> 
     unnest(mask) |> 
-    select(date = mask, shapeName,)
+    select(date = mask, shapeName)
   
   shape_masks <- holdout_data |> 
     select(date, shapeName) |> 
