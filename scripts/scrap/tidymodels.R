@@ -39,7 +39,7 @@ grid <- dials::grid_latin_hypercube(
   sample_size = dials::sample_prop(),
   dials::finalize(dials::mtry(), train),
   dials::learn_rate(),
-  size = 2
+  size = 10
 ) 
 
 rec <-  recipe(formula = as.formula(outbreak_30 ~

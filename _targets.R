@@ -531,43 +531,44 @@ model_targets <- tar_plan(
              left_join(aggregated_data_rsa, 
                        rvf_outbreaks, 
                        by = join_by(date, shapeName)) |>  
-               mutate(outbreak_30 = replace_na(outbreak_30, FALSE)) |> 
+               mutate(outbreak_30 = factor(replace_na(outbreak_30, FALSE))) |> 
                left_join(rsa_polygon_spatial_weights, by = "shapeName")
   ),
   
   # Splitting --------------------------------------------------
   # Initial train and test (ie holdout)
-  tar_target(model_data_split, initial_split(model_data, prop = 0.8)), # pick random days and shapes to be withheld from training
+  tar_target(split_prop, nrow(model_data[model_data$date <= "2017-12-31",])/nrow(model_data)),
+  tar_target(model_data_split, initial_time_split(model_data, prop = split_prop)), 
   tar_target(training_data, training(model_data_split)),
   tar_target(holdout_data, testing(model_data_split)),
-  tar_target(split_view, visualize_splits(training_data, holdout_data)),
+  
+  # formula/recipe 
+  tar_target(rec, model_recipe(training_data)),
+  tar_target(rec_juiced, juice(prep(rec))),
+  
+  # xgboost settings
+  tar_target(base_score, sum(training_data$outbreak_30==TRUE)/nrow(training_data)),
+  tar_target(interaction_constraints, '[[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], [15]]'), # area is the 16th col in rec_juiced
+  
+  # tuning
+  tar_target(spec, model_specs(base_score, interaction_constraints)),
+  tar_target(grid, model_grid(training_data)),
+  
+  # workflow
+  tar_target(wf, workflows::workflow(rec, spec)),
+  
+  # splits
+  tar_target(rolling_n, n_distinct(model_data$shapeName)),
+  tar_target(splits, rolling_origin(training_data, initial = rolling_n, assess = rolling_n, skip = rolling_n - 1)),
+  
+  # tuning
+  tar_target(tuned, model_tune(wf, splits, grid)),
+  
+
+  #TODO fit final model
+  #TODO test that interaction constraints worked - a) extract model object b) marginal effects
   
   
-  # what if we do rolling splits, then make a custom assessment algorithms that weights the positives if they are there
-  
-  # CV splits
-  # Mask from the training set:
-  # a) three months following the holdout dates for the given district
-  # b) all surrounding districts for the given date
-  tar_target(mask_lookup, make_mask_lookup(model_dates_selected, rsa_polygon)), # helpful lookup to get masked dates for each model date, and masked shapes for each RSA shape
-  tar_target(holdout_data_masks, get_holdout_masks(holdout_data, mask_lookup)), # determine which date/shape combinations should be excluded from training
-  tar_target(traning_data_view, visualize_splits_masked(training_data, holdout_data, holdout_data_masks)),
-  tar_target(traning_data_masked, anti_join(training_data, holdout_data_masks)),
-  
-  tar_target(training_splits, vfold_cv(training_data)), # subsplit training analysis/assessment
-  tar_target(training_splits_masked, training_splits, holdout_data_masks), # TODO we need to get assessment data masks from the splits, and mask these from each assessment split
-  
-  # Define formula and model
-  # TODO add weights handling
-  tar_target(model_workflow, build_workflow(training_data)),
-  
-  # Run tuning
-  tar_target(tuned_parameters, tune_parameters(model_workflow, 
-                                               training_splits, 
-                                               grid_size = 10, 
-                                               n_cores = 4))
-  # Fit final model
-  # Generate predictions
   
 )
 
