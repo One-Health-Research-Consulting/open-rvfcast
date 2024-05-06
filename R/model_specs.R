@@ -22,7 +22,9 @@ model_specs <- function(base_score, interaction_constraints) {
     parsnip::set_engine("xgboost", 
                         objective = "binary:logistic", 
                         base_score = base_score, # set the background/intercept rate - this allows the tree to split even when the training is all negatives
-                        interaction_constraints = interaction_constraints) |> # do not interact on area
+                        interaction_constraints = interaction_constraints, # do not interact on area
+                        monotone_constraints = monotone_constraints # enforce positive relationship for area
+                        ) |> 
     parsnip::set_mode("classification")
 
 }

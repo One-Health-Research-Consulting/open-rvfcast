@@ -549,9 +549,10 @@ model_targets <- tar_plan(
   # xgboost settings
   tar_target(base_score, sum(training_data$outbreak_30==TRUE)/nrow(training_data)),
   tar_target(interaction_constraints, '[[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], [15]]'), # area is the 16th col in rec_juiced
+  tar_target(monotone_constraints, c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)),
   
   # tuning
-  tar_target(spec, model_specs(base_score, interaction_constraints)),
+  tar_target(spec, model_specs(base_score, interaction_constraints, monotone_constraints)),
   tar_target(grid, model_grid(training_data)),
   
   # workflow
@@ -559,14 +560,70 @@ model_targets <- tar_plan(
   
   # splits
   tar_target(rolling_n, n_distinct(model_data$shapeName)),
-  tar_target(splits, rolling_origin(training_data, initial = rolling_n, assess = rolling_n, skip = rolling_n - 1)),
+  tar_target(splits, rolling_origin(training_data, 
+                                    initial = rolling_n, 
+                                    assess = rolling_n, 
+                                    skip = rolling_n - 1)),
   
   # tuning
   tar_target(tuned, model_tune(wf, splits, grid)),
   
-
+  # final model
+  # tar_target(final, {
+  #   final_wf <- finalize_workflow(
+  #     wf,
+  #     tuned[5,]
+  #   )
+  #   
+  #   library(DALEX)
+  #   library(ceterisParibus)
+  #   
+  #   # DALEX Explainer
+  #   tuned_model <- final_wf |> fit(training_data)
+  #   tuned_model_xg <- extract_fit_parsnip(tuned_model)
+  #   training_data_mx <- extract_mold(tuned_model)$predictors %>%
+  #     as.matrix()
+  #   
+  #   y <- extract_mold(tuned_model)$outcomes %>%
+  #     mutate(outbreak_30 = as.integer(outbreak_30 == "1")) %>%
+  #     pull(outbreak_30)
+  #   
+  #   explainer <- DALEX::explain(
+  #     model = tuned_model_xg,
+  #     data = training_data_mx,
+  #     y = y,
+  #     predict_function = predict_raw,
+  #     label = "RVF-EWS",
+  #     verbose = TRUE
+  #   )
+  #   
+  #   # CP plots
+  #   predictors <- extract_mold(tuned_model)$predictors |> colnames()
+  #   holdout_small <- as.data.frame(select_sample(training_data, 20)) |> 
+  #     select(all_of(predictors), outbreak_30) |> 
+  #     mutate(area = as.numeric(area)) |> 
+  #     mutate(outbreak_30 = as.integer(outbreak_30 == "1"))
+  # 
+  #   
+  #   
+  # 
+  #   cPplot <- ceterisParibus::ceteris_paribus(explainer, 
+  #                                             observation = holdout_small |> select(-outbreak_30),
+  #                                             y = holdout_small |>  pull(outbreak_30)#,
+  #                                             #variables = "area"
+  #                                             )
+  #   plot(cPplot)+
+  #     ceteris_paribus_layer(cPplot, show_rugs = TRUE)
+  #   
+  #   
+  # }),
+  
+  
+  
   #TODO fit final model
-  #TODO test that interaction constraints worked - a) extract model object b) marginal effects
+  #TODO test that interaction constraints worked - a) extract model object b) cp - 
+  # need the conditional effect - area is x, y is effect, should not change when you change other stuff
+  # ceteris parabus plots - should be parallel - points can differ but profile should be the same - expectation is that it is linear if doing it on area
   
   
   
