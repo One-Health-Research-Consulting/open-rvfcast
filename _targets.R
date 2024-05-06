@@ -532,7 +532,8 @@ model_targets <- tar_plan(
                        rvf_outbreaks, 
                        by = join_by(date, shapeName)) |>  
                mutate(outbreak_30 = factor(replace_na(outbreak_30, FALSE))) |> 
-               left_join(rsa_polygon_spatial_weights, by = "shapeName")
+               left_join(rsa_polygon_spatial_weights, by = "shapeName") |> 
+               mutate(area = as.numeric(area))
   ),
   
   # Splitting --------------------------------------------------

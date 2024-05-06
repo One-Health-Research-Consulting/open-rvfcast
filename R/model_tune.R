@@ -19,6 +19,8 @@ model_tune <- function(wf, splits, grid) {
     control = tune::control_grid(verbose = TRUE)
   )
   
-  tune::show_best(tuned_grid, metric = "brier_class")
+  list(obj_class = class(tuned_grid), obj_attributes = attributes(tuned_grid), tuned_grid= tuned_grid |> select(-splits))
+
+  # tune::show_best(tuned_grid, metric = "brier_class")
 
 }
