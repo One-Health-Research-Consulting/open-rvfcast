@@ -256,7 +256,7 @@ dynamic_targets <- tar_plan(
              create_data_directory(directory_path = "data/ecmwf_forecasts_transformed")),
   
   # set branching for ecmwf download
-  tar_target(ecmwf_forecasts_api_parameters, set_ecmwf_api_parameter(years = 2005:2023,
+  tar_target(ecmwf_forecasts_api_parameters, set_ecmwf_api_parameter(years = 2005:2023,# TODO this is not reflected in the function
                                                                      bbox_coords = continent_bounding_box,
                                                                      variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
                                                                      product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
@@ -264,7 +264,7 @@ dynamic_targets <- tar_plan(
   
   #  download files
   tar_target(ecmwf_forecasts_downloaded,
-             download_ecmwf_forecasts(ecmwf_forecasts_api_parameters,
+             download_ecmwf_forecasts(ecmwf_forecasts_api_parameters, 
                                       download_directory = ecmwf_forecasts_raw_directory,
                                       overwrite = FALSE),
              pattern = ecmwf_forecasts_api_parameters,
