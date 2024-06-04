@@ -19,8 +19,8 @@ source("_targets_settings.R")
 # For some targets with many branches (i.e., COMTRADE), it takes a long time for `tar_make()` to check and skip over already-built targets
 # For development purposes only, it can be helpful to set these targets to have a tar_cue of tar_cue_upload_aws, which means targets will not check the target for changes after it has been built once
 
-tar_cue_general = "thorough" # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
-tar_cue_upload_aws = "thorough"  # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
+tar_cue_general = "never" # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
+tar_cue_upload_aws = "never"  # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
 
 # Static Data Download ----------------------------------------------------
 static_targets <- tar_plan(
@@ -256,7 +256,7 @@ dynamic_targets <- tar_plan(
              create_data_directory(directory_path = "data/ecmwf_forecasts_transformed")),
   
   # set branching for ecmwf download
-  tar_target(ecmwf_forecasts_api_parameters, set_ecmwf_api_parameter(years = 2005:2023,
+  tar_target(ecmwf_forecasts_api_parameters, set_ecmwf_api_parameter(years = 2005:2023,# TODO this is not reflected in the function
                                                                      bbox_coords = continent_bounding_box,
                                                                      variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
                                                                      product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
@@ -264,7 +264,7 @@ dynamic_targets <- tar_plan(
   
   #  download files
   tar_target(ecmwf_forecasts_downloaded,
-             download_ecmwf_forecasts(ecmwf_forecasts_api_parameters,
+             download_ecmwf_forecasts(ecmwf_forecasts_api_parameters, 
                                       download_directory = ecmwf_forecasts_raw_directory,
                                       overwrite = FALSE),
              pattern = ecmwf_forecasts_api_parameters,
@@ -499,6 +499,12 @@ data_targets <- tar_plan(
                            check = TRUE),
              cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
   
+  # outbreak layer --------------------------------------------------
+  # get whether there has been an outbreak in a polygon
+  tar_target(rvf_outbreaks, create_outbreak_layer(wahis_rvf_outbreaks_preprocessed,
+                                                  rsa_polygon,
+                                                  model_dates_selected)),
+  
 )
 
 # Model -----------------------------------------------------------
@@ -512,8 +518,115 @@ model_targets <- tar_plan(
              aggregate_augmented_data_by_adm(augmented_data, 
                                              rsa_polygon, 
                                              model_dates_selected),
-             pattern = model_dates_selected
+             pattern = model_dates_selected,
+             cue = tar_cue("thorough")
   ),
+  
+  tar_target(rsa_polygon_spatial_weights, rsa_polygon |> 
+               mutate(area = st_area(rsa_polygon)) |> 
+               as_tibble() |> 
+               select(shapeName, area)),
+  
+  tar_target(model_data,
+             left_join(aggregated_data_rsa, 
+                       rvf_outbreaks, 
+                       by = join_by(date, shapeName)) |>  
+               mutate(outbreak_30 = factor(replace_na(outbreak_30, FALSE))) |> 
+               left_join(rsa_polygon_spatial_weights, by = "shapeName") |> 
+               mutate(area = as.numeric(area))
+  ),
+  
+  # Splitting --------------------------------------------------
+  # Initial train and test (ie holdout)
+  tar_target(split_prop, nrow(model_data[model_data$date <= "2017-12-31",])/nrow(model_data)),
+  tar_target(model_data_split, initial_time_split(model_data, prop = split_prop)), 
+  tar_target(training_data, training(model_data_split)),
+  tar_target(holdout_data, testing(model_data_split)),
+  
+  # formula/recipe 
+  tar_target(rec, model_recipe(training_data)),
+  tar_target(rec_juiced, juice(prep(rec))),
+  
+  # xgboost settings
+  tar_target(base_score, sum(training_data$outbreak_30==TRUE)/nrow(training_data)),
+  tar_target(interaction_constraints, '[[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], [15]]'), # area is the 16th col in rec_juiced
+  tar_target(monotone_constraints, c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)),
+  
+  # tuning
+  tar_target(spec, model_specs(base_score, interaction_constraints, monotone_constraints)),
+  tar_target(grid, model_grid(training_data)),
+  
+  # workflow
+  tar_target(wf, workflows::workflow(rec, spec)),
+  
+  # splits
+  tar_target(rolling_n, n_distinct(model_data$shapeName)),
+  tar_target(splits, rolling_origin(training_data, 
+                                    initial = rolling_n, 
+                                    assess = rolling_n, 
+                                    skip = rolling_n - 1)),
+  
+  # tuning
+  tar_target(tuned, model_tune(wf, splits, grid)),
+  
+  # final model
+  # tar_target(final, {
+  #   final_wf <- finalize_workflow(
+  #     wf,
+  #     tuned[5,]
+  #   )
+  #   
+  #   library(DALEX)
+  #   library(ceterisParibus)
+  #   
+  #   # DALEX Explainer
+  #   tuned_model <- final_wf |> fit(training_data)
+  #   tuned_model_xg <- extract_fit_parsnip(tuned_model)
+  #   training_data_mx <- extract_mold(tuned_model)$predictors %>%
+  #     as.matrix()
+  #   
+  #   y <- extract_mold(tuned_model)$outcomes %>%
+  #     mutate(outbreak_30 = as.integer(outbreak_30 == "1")) %>%
+  #     pull(outbreak_30)
+  #   
+  #   explainer <- DALEX::explain(
+  #     model = tuned_model_xg,
+  #     data = training_data_mx,
+  #     y = y,
+  #     predict_function = predict_raw,
+  #     label = "RVF-EWS",
+  #     verbose = TRUE
+  #   )
+  #   
+  #   # CP plots
+  #   predictors <- extract_mold(tuned_model)$predictors |> colnames()
+  #   holdout_small <- as.data.frame(select_sample(training_data, 20)) |> 
+  #     select(all_of(predictors), outbreak_30) |> 
+  #     mutate(area = as.numeric(area)) |> 
+  #     mutate(outbreak_30 = as.integer(outbreak_30 == "1"))
+  # 
+  #   
+  #   
+  # 
+  #   cPplot <- ceterisParibus::ceteris_paribus(explainer, 
+  #                                             observation = holdout_small |> select(-outbreak_30),
+  #                                             y = holdout_small |>  pull(outbreak_30)#,
+  #                                             #variables = "area"
+  #                                             )
+  #   plot(cPplot)+
+  #     ceteris_paribus_layer(cPplot, show_rugs = TRUE)
+  #   
+  #   
+  # }),
+  
+  
+  
+  #TODO fit final model
+  #TODO test that interaction constraints worked - a) extract model object b) cp - 
+  # need the conditional effect - area is x, y is effect, should not change when you change other stuff
+  # ceteris parabus plots - should be parallel - points can differ but profile should be the same - expectation is that it is linear if doing it on area
+  
+  
   
 )
 
