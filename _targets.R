@@ -90,7 +90,7 @@ dynamic_targets <- tar_plan(
   
   # project to the template and save as parquets (these can now be queried for analysis)
   # this maintains the branches, saves separate files split by date
-  # TODO NAs outside of the continent
+  
   tar_target(sentinel_ndvi_transformed, 
              transform_sentinel_ndvi(sentinel_ndvi_downloaded, 
                                      continent_raster_template,
@@ -164,7 +164,7 @@ dynamic_targets <- tar_plan(
   
   # project to the template and save as parquets (these can now be queried for analysis)
   # this maintains the branches, saves separate files split by date
-  # TODO NAs outside of the continent
+  
   tar_target(modis_ndvi_transformed, 
              transform_modis_ndvi(modis_ndvi_downloaded_subset, 
                                   continent_raster_template,
@@ -229,7 +229,7 @@ dynamic_targets <- tar_plan(
              cue = tar_cue(tar_cue_general)), 
   
   # project to the template and save as arrow dataset
-  # TODO NAs outside of the continent
+  
   tar_target(nasa_weather_transformed, 
              transform_nasa_weather(nasa_weather_pre_transformed,
                                     nasa_weather_transformed_directory, 
@@ -281,7 +281,8 @@ dynamic_targets <- tar_plan(
     cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
   
   # project to the template and save as arrow dataset
-  # TODO NAs outside of the continent
+  
+  # TODO add grib_ls
   tar_target(ecmwf_forecasts_transformed, 
              transform_ecmwf_forecasts(ecmwf_forecasts_downloaded,
                                        ecmwf_forecasts_transformed_directory, 
@@ -550,7 +551,7 @@ model_targets <- tar_plan(
   # xgboost settings
   tar_target(base_score, sum(training_data$outbreak_30==TRUE)/nrow(training_data)),
   tar_target(interaction_constraints, '[[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], [15]]'), # area is the 16th col in rec_juiced
-  tar_target(monotone_constraints, c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)),
+  tar_target(monotone_constraints, c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)), # enforce positive relationship for area
   
   # tuning
   tar_target(spec, model_specs(base_score, interaction_constraints, monotone_constraints)),
