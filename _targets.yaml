@@ -4,3 +4,5 @@ main:
 sandbox:
   store: _targets_sandbox
   script: _targets_sandbox.R
+s3:
+  store: _targets

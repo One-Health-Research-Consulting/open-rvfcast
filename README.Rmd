@@ -4,6 +4,12 @@ output: github_document
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
+```{r mermaid_script, echo=FALSE, message = FALSE, results='asis'}
+if(knitr::pandoc_to("html")) {
+  cat('<script src="https://unpkg.com/mermaid@10/dist/mermaid.min.js"></script>')
+}
+```
+
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
@@ -37,20 +43,29 @@ EcoHealth Alliance's ongoing OpenRVFcast project is developing a generalizable, 
     framework to organize build steps for analysis pipeline. The schematic figure below summarizes the steps. (The figure is generated using `mermaid.js` syntax and should display as a graph on GitHub.  It can also be viewed by pasting the code into <https://mermaid.live>.)
     
     
-```{r, echo=FALSE, message = FALSE, results='asis'}
-mer <- targets::tar_mermaid(targets_only = TRUE, outdated = FALSE, 
-                            legend = FALSE, color = FALSE, 
-                            exclude = c("readme", ends_with("_targets")))
-cat(
+```{r, echo=FALSE, message = T, results='asis'}
+
+# Use patched tar_mermaid giving it access to all of targets internal functions
+
+mer <- targets::tar_mermaid(targets_only = TRUE, 
+                            outdated = FALSE,
+                            legend = FALSE, 
+                            color = FALSE,
+                            script = here::here("_targets.R"))
+
+if(knitr::pandoc_to("html")) {
+  cat('<pre><div class="mermaid">', mer, '</div></pre>', sep = "\n")
+} else {
+  cat(
   "```mermaid",
-  mer[1], 
+  mer[1],
   #'Objects([""Objects""]) --- Functions>""Functions""]',
   'subgraph Project Workflow',
   mer[3:length(mer)],
   'linkStyle 0 stroke-width:0px;',
   "```",
-  sep = "\n"
-)
+  sep = "\n")
+}
 ```
 
 To run the pipeline, the user will need to adapt the `_targets.R` file to use their own object storage repository (we use AWS) and will need to supply keys in an `.env` file. 

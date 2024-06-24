@@ -4,23 +4,30 @@ author: "Nathan Layman"
 date: "`r Sys.Date()`"
 output: html_document
 ---
+```{r mermaid_script, echo=FALSE, message = FALSE, results='asis'}
+if(knitr::pandoc_to("html")) {
+  cat('<script src="https://unpkg.com/mermaid@10/dist/mermaid.min.js"></script>')
+}
+```
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 h <- here::here
 ```
 
-## R Markdown
+## Project pipeline
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r mermaid, echo=FALSE, message = FALSE, results='asis'}
+mer <- targets::tar_mermaid(targets_only = TRUE, 
+                            outdated = FALSE,
+                            legend = FALSE, 
+                            color = FALSE,
+                            script = h("_targets.R"))
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r mermaid}
-mer <- targets::tar_mermaid(targets_only = TRUE, outdated = FALSE,
-                   legend = FALSE, color = FALSE,
-                   script = h("_targets.R"))
-cat(
+if(knitr::pandoc_to("html")) {
+  cat('<pre><div class="mermaid">', mer, '</div></pre>', sep = "\n")
+} else {
+  cat(
   "```mermaid",
   mer[1],
   #'Objects([""Objects""]) --- Functions>""Functions""]',
@@ -29,14 +36,82 @@ cat(
   'linkStyle 0 stroke-width:0px;',
   "```",
   sep = "\n")
+}
+
 ```
 
-## Including Plots
+<details>
+<summary> Error: Error installing package 'nanonext': 
+</summary>
+<br>
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+Error:
+```
+* installing *source* package ‘nanonext’ ...
+** package ‘nanonext’ successfully unpacked and MD5 sums checked
+** using staged installation
+No existing 'libmbedtls' >= 2.5 found
+Detecting 'cmake'...
+Required 'cmake' not found
+ERROR: configuration failed for package ‘nanonext’
+* removing ‘/Users/nathanlayman/Documents/Academia/EHA/Projects/open-rvfcast/renv/staging/1/nanonext’
+install of package 'nanonext' failed [error code 1]
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Fix:
+```
+brew instal cmake
+```
+</details>
+
+<details>
+<summary> Error target readme: argument "store" is missing, with no default
+</summary>
+<br>
+
+Error:
+```
+Error:
+! Error running targets::tar_make()
+  Error messages: targets::tar_meta(fields = error, complete_only = TRUE)
+  Debugging guide: https://books.ropensci.org/targets/debugging.html
+  How to ask for help: https://books.ropensci.org/targets/help.html
+  Last error: argument "store" is missing, with no default
+```
+
+Fix:
+```
+Add store argument to tar_mermaid call in readme. Update targets to use here() for every file call. Change tar_mermaid to 
+
+mer <- targets::tar_mermaid(targets_only = TRUE, 
+                            outdated = FALSE,
+                            legend = FALSE, 
+                            color = FALSE,
+                            script = h("_targets.R"))
+                            
+```    
+
+</details>
+<details>
+<summary> Error target modis_ndvi_bundle_request: no applicable method for 'filter' applied to an object of class "list"
+</summary>
+<br>
+Error:
+```
+✖ error target modis_ndvi_bundle_request
+▶ end pipeline [2.272 hours]
+Warning messages:
+1: [readValues] raster has no values 
+2: 1 targets produced warnings. Run targets::tar_meta(fields = warnings, complete_only = TRUE) for the messages. 
+Error:
+! Error running targets::tar_make()
+  Error messages: targets::tar_meta(fields = error, complete_only = TRUE)
+  Debugging guide: https://books.ropensci.org/targets/debugging.html
+  How to ask for help: https://books.ropensci.org/targets/help.html
+  Last error: no applicable method for 'filter' applied to an object of class "list"
+```
+Fix:
+```
+Modis authentication token is expired. Renew token by forcing modis_ndvi_token target to re-run.
+```
+</details>
