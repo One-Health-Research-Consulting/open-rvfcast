@@ -1,17 +1,17 @@
 # Re-record current dependencies for CAPSULE users
 if(Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true"))
-  capsule::capshot(c("packages.R",
+  capsule::capshot(c(here::here("packages.R"),
                      list.files(pattern = "_targets.*\\.(r|R)$", full.names = TRUE),
                      list.files("R", pattern = "\\.(R|r)$", full.names = TRUE)))
 
 # Load packages (in packages.R) and load project-specific functions in R folder
-suppressPackageStartupMessages(source("packages.R"))
+suppressPackageStartupMessages(source(here::here("packages.R")))
 for (f in list.files(here::here("R"), full.names = TRUE)) source (f)
 
 aws_bucket = Sys.getenv("AWS_BUCKET_ID")
 
 # Targets options
-source("_targets_settings.R")
+source(here::here("_targets_settings.R"))
 
 # Targets cue
 # By default, the tar_cue is "thorough", which means that when `tar_make()` is called, it will rebuild a target if any of the code has changed
@@ -21,6 +21,7 @@ source("_targets_settings.R")
 
 tar_cue_general = "never" # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
 tar_cue_upload_aws = "never"  # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
+tar_cue_renew_auth = "never"
 
 # Static Data Download ----------------------------------------------------
 static_targets <- tar_plan(
@@ -121,7 +122,8 @@ dynamic_targets <- tar_plan(
   
   # get authorization token
   # this expires after 48 hours
-  tar_target(modis_ndvi_token, get_modis_ndvi_token()),
+  # Add cue to force regeneration of the token
+  tar_target(modis_ndvi_token, get_modis_ndvi_token(), cue = tar_cue(tar_cue_renew_auth)),
   
   # set modis ndvi dates
   tar_target(modis_ndvi_start_year, 2005),
@@ -653,7 +655,8 @@ test_targets <- tar_plan(
 
 # Documentation -----------------------------------------------------------
 documentation_targets <- tar_plan(
-  tar_render(readme, path = "README.Rmd")
+  # tar_target(readme, rmarkdown::render("README.Rmd"))
+  tar_render(readme, path = here::here("README.Rmd"))
 )
 
 
