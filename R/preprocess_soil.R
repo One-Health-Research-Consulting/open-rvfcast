@@ -77,8 +77,7 @@ preprocess_soil <- function(soil_directory_dataset, soil_directory_raw, continen
   #full_join (sand.d1, clay.d1)
   
   #changes from character to factor for the raster
-  for (i in names(records)[c(2:5,7:13,16:17,19:23)])
-  {
+  for (i in names(records)[c(2:5,7:13,16:17,19:23)]) {
     eval(parse(text=paste0("records$",i," <- as.factor(records$",i,")")))
   }
 
@@ -95,6 +94,8 @@ preprocess_soil <- function(soil_directory_dataset, soil_directory_raw, continen
   dat_out <- as.data.frame(hwsd.zhnj.texture, xy = TRUE) |> 
     as_tibble() 
   
+  # Re-code factor levels to collapse simplex. 
+  # Figure out where key is for the units are in HWSD2
   dat_out$HWSD2 <- if_else(dat_out$HWSD2=="5", "1",
                    if_else(dat_out$HWSD2=="7", "2",
                    if_else(dat_out$HWSD2=="8", "3",

@@ -90,6 +90,10 @@ tar_target(elevation_directory_dataset,
 tar_target(elevation_preprocessed, 
            process_elevation(elevation_directory_dataset, elevation_downloaded, elevation_directory_raw, continent_raster_template)),
 
+# Any missing static layers?
+# bioclim
+# forest cover
+#
 
 )
 # Dynamic Data Download -----------------------------------------------------------
