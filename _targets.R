@@ -47,7 +47,6 @@ static_targets <- tar_plan(
   tar_target(rsa_polygon, rgeoboundaries::geoboundaries("South Africa", "adm2")),
   
 
-
   # SOIL -----------------------------------------------------------
   tar_target(soil_directory_raw, 
              create_data_directory(directory_path = "data/soil")),
@@ -105,7 +104,7 @@ dynamic_targets <- tar_plan(
   tar_target(wahis_rvf_controls_preprocessed, 
              preprocess_wahis_rvf_controls(wahis_rvf_controls_raw)),
 
-  
+
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
   # 10 day period
@@ -352,7 +351,18 @@ dynamic_targets <- tar_plan(
              cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data 
 
   
-  
+
+  # cache locally
+  # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
+  # Format file here means if we delete or change the local cache it will force a re-download.
+  tar_target(nasa_recorded_weather_local, {suppressWarnings(dir.create(here::here("data/nasa_parquets"), recursive = TRUE))
+    cache_aws_branched_target(tmp_path = tar_read(nasa_recorded_weather_download),
+                              ext = ".gz.parquet") 
+  },
+  repository = "local", 
+  format = "file"
+  ),
+
 
 )
 
