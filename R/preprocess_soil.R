@@ -94,15 +94,30 @@ preprocess_soil <- function(soil_directory_dataset, soil_directory_raw, continen
   dat_out <- as.data.frame(hwsd.zhnj.texture, xy = TRUE) |> 
     as_tibble() 
   
+  # At this point:
+  # 1 - clay (heavy)
+  # 2 - silty clay
+  # 3 - clay
+  # 4 - silty clay loam
+  # 5 - clay loam
+  # 6 - silt
+  # 7 - silt loam
+  # 8 - sandy clay
+  # 9 - loam
+  # 10 - sandy clay loam
+  # 11 - sandy loam
+  # 12 - loamy sand
+  # 13 - sand
+  
   # Re-code factor levels to collapse simplex. 
   # Figure out where key is for the units are in HWSD2
-  dat_out$HWSD2 <- if_else(dat_out$HWSD2=="5", "1",
-                   if_else(dat_out$HWSD2=="7", "2",
-                   if_else(dat_out$HWSD2=="8", "3",
-                   if_else(dat_out$HWSD2=="9", "4",
-                   if_else(dat_out$HWSD2=="10", "5",
-                   if_else(dat_out$HWSD2=="11", "6",
-                   if_else(dat_out$HWSD2=="12", "7","0")))))))
+  dat_out$HWSD2 <- if_else(dat_out$HWSD2=="5", "1", # clay (heavy) + clay loam
+                   if_else(dat_out$HWSD2=="7", "2", # silty clay + silty loam aka
+                   if_else(dat_out$HWSD2=="8", "3", # clay + sandy clay
+                   if_else(dat_out$HWSD2=="9", "4", # silty clay loam
+                   if_else(dat_out$HWSD2=="10", "5", # clay loam + sandy clay loam BUT SEE RULE 1!!!
+                   if_else(dat_out$HWSD2=="11", "6", # silt sandy + loam
+                   if_else(dat_out$HWSD2=="12", "7","0"))))))) # loamy sand + silt loam
                                            
 
   #create matrix of map unit ids and the variable of interest - DRAINAGE
