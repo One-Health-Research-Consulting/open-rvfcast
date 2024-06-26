@@ -18,3 +18,8 @@ data/**/*.parquet
 data/**/*.zip
 data/**/*.nc
 data/**/*.tif
+data/elevation/*
+data/slope_aspect/*
+data/soil/*
+
+
