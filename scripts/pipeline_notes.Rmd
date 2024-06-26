@@ -115,3 +115,52 @@ Fix:
 Modis authentication token is expired. Renew token by forcing modis_ndvi_token target to re-run.
 ```
 </details>
+
+</details>
+<details>
+<summary> Error target sentinel_ndvi_downloaded: Failed to connect to catalogue.dataspace.copernicus.eu port 80 after 15 ms: Couldn't connect to serve
+</summary>
+<br>
+
+Error:
+```
+x errored branch sentinel_ndvi_downloaded_5cfced28d04857ef
+x errored pipeline [2.254 minutes]
+Warning messages:
+1: There was 1 warning in `mutate()`.
+ℹ In argument: `iso_code = countrycode::countrycode(country, origin =
+  "country.name", destination = "iso3c")`.
+Caused by warning:
+! Some values were not matched unambiguously: ceuta, dominican (rep.), melilla 
+2: There was 1 warning in `mutate()`.
+ℹ In argument: `continent = countrycode::countrycode(country, origin =
+  "country.name", destination = "continent")`.
+Caused by warning:
+! Some values were not matched unambiguously: ceuta, dominican (rep.), melilla 
+3: [readValues] raster has no values 
+4: 2 targets produced warnings. Run targets::tar_meta(fields = warnings, complete_only = TRUE) for the messages. 
+Error:
+! Error running targets::tar_make()
+Error messages: targets::tar_meta(fields = error, complete_only = TRUE)
+Debugging guide: https://books.ropensci.org/targets/debugging.html
+How to ask for help: https://books.ropensci.org/targets/help.html
+Last error message:
+    Failed to connect to catalogue.dataspace.copernicus.eu port 80 after 15 ms: Couldn't connect to server
+Last error traceback:
+    download_sentinel_ndvi(sentinel_ndvi_api_parameters, download_directory ...
+    GET(url, add_headers(Authorization = paste("Bearer", content(auth)$acces...
+    request_perform(req, hu$handle$handle)
+    request_fetch(req$output, req$url, handle)
+    request_fetch.write_disk(req$output, req$url, handle)
+    curl::curl_fetch_disk(url, x$path, handle = handle)
+    .handleSimpleError(function (condition)  {     state$error <- build_mess...
+    h(simpleError(msg, call))
+```
+
+Fix:
+```
+Firewalls sometimes block outbound access over port 80 for `http`. Change URL to use `https`.
+There was also some authentication problems due to curl forwarding the GET request to the new
+address (which happens to be https already). Updated new address to:
+https://download.dataspace.copernicus.eu/odata/v1/Products
+```

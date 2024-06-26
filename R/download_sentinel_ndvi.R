@@ -30,18 +30,19 @@ download_sentinel_ndvi <- function(sentinel_ndvi_api_parameters, download_direct
   
   # auth
   auth <- POST("https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token", 
-                   body = list(
-                     grant_type = "password",
-                     username = Sys.getenv("COPERNICUS_USERNAME"),
-                     password =  Sys.getenv("COPERNICUS_PASSWORD"),
-                     client_id = "cdse-public"
-                   ), 
-                   encode = "form")
+               body = list(
+                 grant_type = "password",
+                 username = Sys.getenv("COPERNICUS_USERNAME"),
+                 password =  Sys.getenv("COPERNICUS_PASSWORD"),
+                 client_id = "cdse-public"
+               ), 
+               encode = "form")
   
-  url <- glue::glue("http://catalogue.dataspace.copernicus.eu/odata/v1/Products({id})/$value")
+  url <- glue::glue("https://download.dataspace.copernicus.eu/odata/v1/Products({id})/$value")
   file <- here::here(download_directory, glue::glue("{download_filename}.zip"))
   response <- GET(url, add_headers(Authorization =  paste("Bearer", content(auth)$access_token)),
                   write_disk(file, overwrite = TRUE))
+  
   unzip(file, files = paste0(download_filename, c(".SEN3/NDVI.nc")), exdir= download_directory)
   file.remove(file)
   file.rename(here::here(download_directory, paste0(download_filename, ".SEN3/NDVI.nc")), 
