@@ -1,5 +1,5 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|3de2e7d622126d79|||||||||||||||
+.Random.seed|object|415a82260b1c25df|||||||||||||||
 aggregate_augmented_data_by_adm|function|0ba2d0669462f71c|||||||||||||||
 aggregated_data_rsa|pattern|6dbb43f34bc42ac8|ea0a3280c45817ae||-1696630435||||137860|qs|aws|vector||aggregated_data_rsa_94f732f8*aggregated_data_rsa_5e501efa*aggregated_data_rsa_34327510*aggregated_data_rsa_40e9884c*aggregated_data_rsa_5ababfa3|288.617||
 aggregated_data_rsa_34327510|branch|c1e4fd089c317f41|ea0a3280c45817ae|1b56fcad8b0f2922|1726064958|bucket=open-rvfcast-data*region=us-east-1*key=_targets/aggregated_data_rsa_34327510*endpoint=TlVMTA*version=|t19755.8889066061s||27572|qs|aws|vector|aggregated_data_rsa||56.413||
@@ -452,7 +452,7 @@ calculate_weather_historical_means|function|ac8b9ff61133bd68|||||||||||||||
 col_na|function|81bde41e453c6fa2|||||||||||||||
 continent_bounding_box|stem|cd4a4ddaa46d634a|bc00ded6218f3e10|d25ebcbef292030f|-1551480776|bucket=open-rvfcast-data*region=NULL*key=_targets/continent_bounding_box*endpoint=TlVMTA*version=|t19517.6854396s||650|qs|aws|vector|||0.001||
 continent_polygon|stem|ab9fc6665b7f4674|8fdc308f6950b209|8fda1350e825d6f0|-1018833134|bucket=open-rvfcast-data*region=us-east-1*key=_targets/continent_polygon*endpoint=TlVMTA*version=|t19920.7241617956s||40351|qs|aws|vector|||0.063||
-continent_raster_template|stem|771493b93d2909a2|bf03347c1fd4473c|acd9f343ba9c5f4d|-28395429|bucket=open-rvfcast-data*region=us-east-1*key=_targets/objects/continent_raster_template*endpoint=TlVMTA*version=|t19898.8595496191s||17991|qs|aws|vector|||0.029|readValues raster has no values|
+continent_raster_template|stem|f7447f449dab6127|59215772b6da1296|29b10148e1f5cc06|435814239|bucket=open-rvfcast-data*region=us-east-1*key=_targets/continent_raster_template*endpoint=TlVMTA*version=|t19920.7441088469s||17991|qs|aws|vector|||0.024|readValues raster has no values|
 country_bounding_boxes|stem|f3f68e55b6b77d77|30fec9e0e3d1a974|36097b0df0d06db0|1038934427|bucket=open-rvfcast-data*region=NULL*key=_targets/country_bounding_boxes*endpoint=TlVMTA*version=|t19517.695216638s||6273|qs|aws|vector|||0.024||
 country_polygons|stem|ece9c72b7e99dba6|cb7eceb109efaff7|a2cdedccfeb044ec|1321015204|bucket=open-rvfcast-data*region=NULL*key=_targets/country_polygons*endpoint=TlVMTA*version=|t19517.6808684524s||17365|qs|aws|vector|||0.901||
 create_africa_polygon|function|fb2ce70982e38cd3|||||||||||||||
@@ -478,7 +478,7 @@ download_modis_ndvi1|function|84be97854223222b|||||||||||||||
 download_nasa_recorded_weather|function|6a773d3a570df8e3|||||||||||||||
 download_nasa_weather|function|7833150f49a20c75|||||||||||||||
 download_sentinel_ndvi|function|03e5942d01ac5cc7|||||||||||||||
-dynamic_targets|object|ce1c53c89a6d81a0|||||||||||||||
+dynamic_targets|object|2e56e507a676ad34|||||||||||||||
 ecmwf_forecasts_api_parameters|stem|e2f32218fa634195|0bdeb27065a5c91c|37ee5a84ea2c3af5|2047345647|bucket=open-rvfcast-data*region=NULL*key=_targets/ecmwf_forecasts_api_parameters*endpoint=TlVMTA*version=|t19594.5957909587s||4621|qs|aws|vector|||0.035||
 ecmwf_forecasts_downloaded|pattern|0b179198488b1353|950aed4902a96366||411166749||||5721883200|file|local|vector||ecmwf_forecasts_downloaded_436aae04*ecmwf_forecasts_downloaded_7c5c6691*ecmwf_forecasts_downloaded_a9ce1318*ecmwf_forecasts_downloaded_e7e5ad03*ecmwf_forecasts_downloaded_5c905023*ecmwf_forecasts_downloaded_1d3cec98*ecmwf_forecasts_downloaded_8f12c76b*ecmwf_forecasts_downloaded_7cda2402*ecmwf_forecasts_downloaded_ca4f42e3*ecmwf_forecasts_downloaded_f0947441*ecmwf_forecasts_downloaded_770518a3*ecmwf_forecasts_downloaded_f7878af2*ecmwf_forecasts_downloaded_e0a730a8*ecmwf_forecasts_downloaded_4afff85a*ecmwf_forecasts_downloaded_a6bfb7dd*ecmwf_forecasts_downloaded_6161fb50*ecmwf_forecasts_downloaded_eb1974f7*ecmwf_forecasts_downloaded_dde75b5d*ecmwf_forecasts_downloaded_6ce35942*ecmwf_forecasts_downloaded_60ef7e91*ecmwf_forecasts_downloaded_7f96f0da|0.018||
 ecmwf_forecasts_downloaded_1d3cec98|branch|c6e598dac99401d7|67d4b3431b1345d6|5d50ccd68c4a4319|873901600|data/ecmwf_forecasts_raw/ecmwf_seasonal_forecast_sys5_2007.grib|t19642.6492724265s|492bce0b7868c1a6|225720000|file|local|vector|ecmwf_forecasts_downloaded||0||
@@ -551,7 +551,7 @@ ecmwf_forecasts_transformed_upload_aws_s3_f77cea8f|branch|6e170a6bc685cec2|af110
 ecmwf_forecasts_transformed_upload_aws_s3_fe9ab7e6|branch|6e170a6bc685cec2|af1104937d66021a|d17be2bde46638f3|1048328926|bucket=open-rvfcast-data*region=NULL*key=_targets/ecmwf_forecasts_transformed_upload_aws_s3_fe9ab7e6*endpoint=TlVMTA*version=|t19661.0328043273s||34|qs|aws|vector|ecmwf_forecasts_transformed_upload_aws_s3||146.633||
 elevation_directory_dataset|stem|707b9f535de2b985|36b8986f351764ad|3d3d9feae01275db|-1939550309|bucket=open-rvfcast-data*region=us-east-1*key=_targets/elevation_directory_dataset*endpoint=TlVMTA*version=|t19920.7241538229s||54|qs|aws|vector|||0.001||
 elevation_directory_raw|stem|6de45bc98e62fe5a|43d984583322c2a0|3d3d9feae01275db|-1529505470|bucket=open-rvfcast-data*region=us-east-1*key=_targets/elevation_directory_raw*endpoint=TlVMTA*version=|t19920.7240788535s||46|qs|aws|vector|||0.002||
-elevation_downloaded|stem|d969ebb8a65c36c1|c5c503f4479c63d0|bc96a75f6bbd466b|1948742855|data/elevation/srtm_africa.tif|t19898.8680764071s|19a3acac9e97f77e|3295145984|file|local|vector|||0.001||
+elevation_downloaded|stem|0f7af5732eb7c6a0|df4b18335425ef0a|161f165ebe9e09cd|881307834|data/elevation/srtm_africa.tif|t19900.8442125982s|af717140bcc6342f|202661888|file|local|vector|||0.001||
 elevation_preprocessed|stem||7205294ec7f618de|dec9e1efc79bb6a1|-816944013||t19898.8997716689s||0|qs|aws|vector|||0.107|TIFFFillTileRead error at row 4294967295, col 4294967295, tile 43264 got 0 bytes, expected 532 GDAL error 1. TIFFReadEncodedTile failed. GDAL error 1. UsersnathanlaymanDocumentsAcademiaEHAProjectsopenrvfcastdataelevationsrtm_africa.tif, band 1 IReadBlock failed at X offset 100, Y offset 66 TIFFReadEncodedTile failed. GDAL error 1|project warp failure
 env_file|object|5e2c4c2bf6df65f0|||||||||||||||
 f|object|6298f8b06e6691ad|||||||||||||||
@@ -2284,6 +2284,8 @@ get_weather_anomalies|function|1956aa290dc4fc5d|||||||||||||||
 get_weather_data|function|1956aa290dc4fc5d|||||||||||||||
 glw_directory_dataset|stem|0db943ebd4844fb6|4b3578e8cca155cd|3d3d9feae01275db|951928859|bucket=open-rvfcast-data*region=us-east-1*key=_targets/glw_directory_dataset*endpoint=TlVMTA*version=|t19920.7241143968s||48|qs|aws|vector|||0||
 glw_directory_raw|stem|62eb55ce05dad1c4|25a0698d9c96cd13|3d3d9feae01275db|-1665273680|bucket=open-rvfcast-data*region=us-east-1*key=_targets/glw_directory_raw*endpoint=TlVMTA*version=|t19920.7240834685s||39|qs|aws|vector|||0.002||
+glw_downloaded|stem|ff4116be3fbcc8d6|6bd485496d54fed5|783f2acb37f9482a|283169108|data/glw|t19920.7439316294s|6bcdaf2bca82d5ef|17994302|file|local|vector|||8.018||
+glw_preprocessed|stem|62eb55ce05dad1c4|64e8f6f8df3634d3|193db5524c58245e|1918602810|bucket=open-rvfcast-data*region=us-east-1*key=_targets/glw_preprocessed*endpoint=TlVMTA*version=|t19920.7441502523s||39|qs|aws|vector|||1.43||
 join_dynamic_anomalies|function|de1a6dab05fa2379|||||||||||||||
 lag_intervals|stem|f4c9e8a4d588925c|6b4f81cd41a7b83e|a3dad144c40657ed|1055089432|bucket=open-rvfcast-data*region=NULL*key=_targets/lag_intervals*endpoint=TlVMTA*version=|t19615.7794897048s||55|qs|aws|vector|||0||
 lead_intervals|stem|aab13460c8099242|a51b26cedde2c396|a3dad144c40657ed|-701347992|bucket=open-rvfcast-data*region=NULL*key=_targets/lead_intervals*endpoint=TlVMTA*version=|t19661.6592285323s||71|qs|aws|vector|||0||
@@ -6542,12 +6544,12 @@ set_model_dates|function|e64f4ff47f178768|||||||||||||||
 set_nasa_api_parameter|function|ac1cc420c9c9242c|||||||||||||||
 slope_aspect_directory_dataset|stem|06734456db8ee6a1|a7fd9bef49d6b724|3d3d9feae01275db|-2110937429|bucket=open-rvfcast-data*region=us-east-1*key=_targets/slope_aspect_directory_dataset*endpoint=TlVMTA*version=|t19920.7241188123s||57|qs|aws|vector|||0.002||
 slope_aspect_directory_raw|stem|e9c63d982fedd434|4c710e191fb28ec1|3d3d9feae01275db|1155822751|bucket=open-rvfcast-data*region=us-east-1*key=_targets/slope_aspect_directory_raw*endpoint=TlVMTA*version=|t19920.7241346971s||49|qs|aws|vector|||0.002||
-slope_aspect_downloaded|stem||3b3985d9342694c5|3e5f3af61576318e|1081669573||t19898.8621551513s||0|file|local|vector|||0.038|running command unrar lb dataslope_aspectaspect_zero.rar had status 10. GloAspectClN_30as.asc No such file or directory GDAL error 4|rast file does not exist GloAspectClN_30as.asc
+slope_aspect_downloaded|stem||67598aa665142f7b|bf8e65b3f2d97fb6|42953233||t19898.8621551513s||0|file|local|vector|||10.203|GloAspectClN_30as.asc No such file or directory GDAL error 4|rast file does not exist GloAspectClN_30as.asc
 soil_directory_dataset|stem|5367f73442caebca|6b87e3cd8dc09f31|3d3d9feae01275db|1696455129|bucket=open-rvfcast-data*region=us-east-1*key=_targets/soil_directory_dataset*endpoint=TlVMTA*version=|t19920.7241232166s||49|qs|aws|vector|||0.002||
 soil_directory_raw|stem|6d0bef71eae7763c|7be6d1311e8674de|3d3d9feae01275db|781979019|bucket=open-rvfcast-data*region=us-east-1*key=_targets/soil_directory_raw*endpoint=TlVMTA*version=|t19920.7240877431s||40|qs|aws|vector|||0.002||
 soil_download|function|371f9065fa1611a3|||||||||||||||
-soil_downloaded|stem|72149569d1221b09|6727391d268c9a43|4c82e4ae19f3b5e0|1723588957|data/soil|t19898.8595113766s|5a71b6754d07bf56|1955826087|file|local|vector|||14.263||
-soil_preprocessed|stem|3b34d30e767ef1db|7e54215b21889c2c|ca8593e5c2475549|-806785011|bucket=open-rvfcast-data*region=us-east-1*key=_targets/objects/soil_preprocessed*endpoint=TlVMTA*version=|t19898.8595806299s||49|qs|aws|vector|||1.868|set.cats setting categories like this is deprecated use a twocolumn data.frame instead. set.cats setting categories like this is deprecated use a twocolumn data.frame instead|
+soil_downloaded|stem|678485c3217017dc|73e8f917a50d005c|bc396cd8e73e5cc4|-1047214501|data/soil|t19920.7440889452s|16c3e5058e068190|1955832235|file|local|vector|||12.923||
+soil_preprocessed|stem|5367f73442caebca|7eacd6654f0fbf4a|992a2f44982341eb|1256321187|bucket=open-rvfcast-data*region=us-east-1*key=_targets/soil_preprocessed*endpoint=TlVMTA*version=|t19920.7441778077s||49|qs|aws|vector|||1.407|set.cats setting categories like this is deprecated use a twocolumn data.frame instead. set.cats setting categories like this is deprecated use a twocolumn data.frame instead|
 static_targets|object|198539be0a634d17|||||||||||||||
 submit_modis_ndvi_bundle_request|function|70d5dcdcf3510fa0|||||||||||||||
 submit_modis_ndvi_request|function|e6d950c0c17bd8cd|||||||||||||||
