@@ -1,5 +1,5 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|415a82260b1c25df|||||||||||||||
+.Random.seed|object|1bd09a8d963dce78|||||||||||||||
 aggregate_augmented_data_by_adm|function|0ba2d0669462f71c|||||||||||||||
 aggregated_data_rsa|pattern|6dbb43f34bc42ac8|ea0a3280c45817ae||-1696630435||||137860|qs|aws|vector||aggregated_data_rsa_94f732f8*aggregated_data_rsa_5e501efa*aggregated_data_rsa_34327510*aggregated_data_rsa_40e9884c*aggregated_data_rsa_5ababfa3|288.617||
 aggregated_data_rsa_34327510|branch|c1e4fd089c317f41|ea0a3280c45817ae|1b56fcad8b0f2922|1726064958|bucket=open-rvfcast-data*region=us-east-1*key=_targets/aggregated_data_rsa_34327510*endpoint=TlVMTA*version=|t19755.8889066061s||27572|qs|aws|vector|aggregated_data_rsa||56.413||
@@ -2277,14 +2277,14 @@ get_modis_ndvi_token|function|f7872f64690bfba2|||||||||||||||
 get_nasa_weather_coordinates|function|2c23f9e4d93cd8ca|||||||||||||||
 get_outbreak_distance_weights|function|07df51b4189d7aee|||||||||||||||
 get_sentinel_ndvi_api_parameters|function|ec6ebe60c7637311|||||||||||||||
-get_slope_aspect|function|ae2ba941f320dc20|||||||||||||||
+get_slope_aspect|function|12bb6266a7653baa|||||||||||||||
 get_wahis_rvf_controls_raw|function|1616f0c48da01829|||||||||||||||
 get_wahis_rvf_outbreaks_raw|function|f5ec912c0f3610fb|||||||||||||||
 get_weather_anomalies|function|1956aa290dc4fc5d|||||||||||||||
 get_weather_data|function|1956aa290dc4fc5d|||||||||||||||
 glw_directory_dataset|stem|0db943ebd4844fb6|4b3578e8cca155cd|3d3d9feae01275db|951928859|bucket=open-rvfcast-data*region=us-east-1*key=_targets/glw_directory_dataset*endpoint=TlVMTA*version=|t19920.7241143968s||48|qs|aws|vector|||0||
 glw_directory_raw|stem|62eb55ce05dad1c4|25a0698d9c96cd13|3d3d9feae01275db|-1665273680|bucket=open-rvfcast-data*region=us-east-1*key=_targets/glw_directory_raw*endpoint=TlVMTA*version=|t19920.7240834685s||39|qs|aws|vector|||0.002||
-glw_downloaded|stem|ff4116be3fbcc8d6|6bd485496d54fed5|783f2acb37f9482a|283169108|data/glw|t19920.7439316294s|6bcdaf2bca82d5ef|17994302|file|local|vector|||8.018||
+glw_downloaded|stem|ff4116be3fbcc8d6|6bd485496d54fed5|783f2acb37f9482a|283169108|data/glw|t19920.7404782598s|dd56a5971d025bfa|192|file|local|vector|||8.018||
 glw_preprocessed|stem|62eb55ce05dad1c4|64e8f6f8df3634d3|193db5524c58245e|1918602810|bucket=open-rvfcast-data*region=us-east-1*key=_targets/glw_preprocessed*endpoint=TlVMTA*version=|t19920.7441502523s||39|qs|aws|vector|||1.43||
 join_dynamic_anomalies|function|de1a6dab05fa2379|||||||||||||||
 lag_intervals|stem|f4c9e8a4d588925c|6b4f81cd41a7b83e|a3dad144c40657ed|1055089432|bucket=open-rvfcast-data*region=NULL*key=_targets/lag_intervals*endpoint=TlVMTA*version=|t19615.7794897048s||55|qs|aws|vector|||0||
@@ -6544,11 +6544,11 @@ set_model_dates|function|e64f4ff47f178768|||||||||||||||
 set_nasa_api_parameter|function|ac1cc420c9c9242c|||||||||||||||
 slope_aspect_directory_dataset|stem|06734456db8ee6a1|a7fd9bef49d6b724|3d3d9feae01275db|-2110937429|bucket=open-rvfcast-data*region=us-east-1*key=_targets/slope_aspect_directory_dataset*endpoint=TlVMTA*version=|t19920.7241188123s||57|qs|aws|vector|||0.002||
 slope_aspect_directory_raw|stem|e9c63d982fedd434|4c710e191fb28ec1|3d3d9feae01275db|1155822751|bucket=open-rvfcast-data*region=us-east-1*key=_targets/slope_aspect_directory_raw*endpoint=TlVMTA*version=|t19920.7241346971s||49|qs|aws|vector|||0.002||
-slope_aspect_downloaded|stem||67598aa665142f7b|bf8e65b3f2d97fb6|42953233||t19898.8621551513s||0|file|local|vector|||10.203|GloAspectClN_30as.asc No such file or directory GDAL error 4|rast file does not exist GloAspectClN_30as.asc
+slope_aspect_downloaded|stem||67598aa665142f7b|e816b7ac3caa7664|42953233||t19898.8621551513s||0|file|local|vector|||11.246|UsersnathanlaymanDocumentsAcademiaEHAProjectsopenrvfcastdataslope_aspectGloAspectClE_30as.asc No such file or directory GDAL error 4|rast file does not exist UsersnathanlaymanDocumentsAcademiaEHAProjectsopenrvfcastdataslope_aspectGloAspectClE_30as.asc
 soil_directory_dataset|stem|5367f73442caebca|6b87e3cd8dc09f31|3d3d9feae01275db|1696455129|bucket=open-rvfcast-data*region=us-east-1*key=_targets/soil_directory_dataset*endpoint=TlVMTA*version=|t19920.7241232166s||49|qs|aws|vector|||0.002||
 soil_directory_raw|stem|6d0bef71eae7763c|7be6d1311e8674de|3d3d9feae01275db|781979019|bucket=open-rvfcast-data*region=us-east-1*key=_targets/soil_directory_raw*endpoint=TlVMTA*version=|t19920.7240877431s||40|qs|aws|vector|||0.002||
 soil_download|function|371f9065fa1611a3|||||||||||||||
-soil_downloaded|stem|678485c3217017dc|73e8f917a50d005c|bc396cd8e73e5cc4|-1047214501|data/soil|t19920.7440889452s|16c3e5058e068190|1955832235|file|local|vector|||12.923||
+soil_downloaded|stem|678485c3217017dc|73e8f917a50d005c|bc396cd8e73e5cc4|-1047214501|data/soil|t19920.7441717959s|4fa881245fd93336|320|file|local|vector|||14.281||
 soil_preprocessed|stem|5367f73442caebca|7eacd6654f0fbf4a|992a2f44982341eb|1256321187|bucket=open-rvfcast-data*region=us-east-1*key=_targets/soil_preprocessed*endpoint=TlVMTA*version=|t19920.7441778077s||49|qs|aws|vector|||1.407|set.cats setting categories like this is deprecated use a twocolumn data.frame instead. set.cats setting categories like this is deprecated use a twocolumn data.frame instead|
 static_targets|object|198539be0a634d17|||||||||||||||
 submit_modis_ndvi_bundle_request|function|70d5dcdcf3510fa0|||||||||||||||

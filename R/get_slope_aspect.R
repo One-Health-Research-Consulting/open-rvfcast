@@ -22,6 +22,7 @@ get_slope_aspect <- function(slope_aspect_directory_dataset, slope_aspect_direct
   for(asp in slope_aspect) { 
     
     # Change to remove interim file so as not to clog up hd
+    # THIS IS WHERE YOU LEFT OFF!
     url_out<- switch(asp,  "aspect_zero" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClN_30as.rar",
                     "aspect_fortyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClE_30as.rar", 
                     "aspect_onethirtyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClS_30as.rar",
@@ -44,11 +45,11 @@ get_slope_aspect <- function(slope_aspect_directory_dataset, slope_aspect_direct
     system2("unrar", c("e", "-o+", filename, dirname(filename), ">/dev/null"))
 
     #
-    GloAspectClN_30as <- rast("GloAspectClN_30as.asc")
-    GloAspectClE_30as <- rast("GloAspectClE_30as.asc")
-    GloAspectClS_30as <- rast("GloAspectClS_30as.asc")
-    GloAspectClW_30as <- rast("GloAspectClW_30as.asc")
-    GloAspectClU_30as <- rast("GloAspectClU_30as.asc")
+    GloAspectClN_30as <- rast(here::here("data/slope_aspect", "GloAspectClN_30as.asc"))
+    GloAspectClE_30as <- rast(here::here("data/slope_aspect", "GloAspectClE_30as.asc"))
+    GloAspectClS_30as <- rast(here::here("data/slope_aspect", "GloAspectClS_30as.asc"))
+    GloAspectClW_30as <- rast(here::here("data/slope_aspect", "GloAspectClW_30as.asc"))
+    GloAspectClU_30as <- rast(here::here("data/slope_aspect", "GloAspectClU_30as.asc"))
     
     raster_stack_aspect <- c(GloAspectClN_30as, GloAspectClE_30as, GloAspectClS_30as, GloAspectClW_30as, GloAspectClU_30as)
     raster_stack_aspect <- c(GloAspectClN_30as, GloAspectClN_30as + 0.1)
