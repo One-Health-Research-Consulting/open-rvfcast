@@ -38,7 +38,7 @@ calc_outbreak_history <- function(wahis_rvf_outbreaks_preprocessed,
                                   beta_dist = .01,
                                   beta_time = 0.5,
                                   beta_cases = 1,
-                                  current_date = Sys.time(),
+                                  current_date = Sys.time() - years(2),
                                   within_km = 500,
                                   max_years = 10,
                                   recent = 1/6) {
@@ -61,8 +61,8 @@ calc_outbreak_history <- function(wahis_rvf_outbreaks_preprocessed,
   raster_template[] <- 1
   raster_template <- crop(raster_template, vect(continent_polygon$geometry), mask = TRUE) 
   
-  recent_outbreak_weights <- get_outbreak_weights(recent_outbreaks, raster_template, )
-  old_outbreaks_weights <- get_outbreak_weights(old_outbreaks, raster_template, )
+  recent_outbreak_distance_weights <- get_outbreak_distance_weights(recent_outbreaks, raster_template, within_km)
+  old_outbreaks_distance_weights <- get_outbreak_distance_weights(old_outbreaks, raster_template, within_km)
   
   # Amplification vs interference
   # Within previous season it might amplify - for current year
@@ -82,7 +82,7 @@ calc_outbreak_history <- function(wahis_rvf_outbreaks_preprocessed,
 # This needs to happen for each outbreak separately otherwise when we calculate weights
 # They can blend together. What I mean is that the distance matrix contains distances between
 # cells within each circle and every origin not just the origin of that circle.
-get_outbreak_weights <- function(outbreaks, points, origin, ) {
+get_outbreak_distance_weights <- function(outbreaks, raster_template, within_km = 500) {
   
   # outbreak_circles <- vect(outbreaks$geometry) |> 
   #   terra::buffer(within_km * 1000)
@@ -122,8 +122,8 @@ get_outbreak_weights <- function(outbreaks, points, origin, ) {
   weights <- rowSums(exp(-beta_dist*matches_dist/1000)) # /1000 to get to meters
   
   raster_template[idx] <- weights
+  raster_template
   
   # Convert xy into tibble and add weights column
   # as_tibble(xy) |> rename(long = x, lat = y) |> mutate(weight = weights)
-  
 }
