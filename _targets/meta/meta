@@ -1,5 +1,5 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|2e87ff9a053636ed|||||||||||||||
+.Random.seed|object|6fd5f048f6d30a34|||||||||||||||
 aggregate_augmented_data_by_adm|function|0ba2d0669462f71c|||||||||||||||
 aggregated_data_rsa|pattern|6dbb43f34bc42ac8|ea0a3280c45817ae||-1696630435||||137860|qs|aws|vector||aggregated_data_rsa_94f732f8*aggregated_data_rsa_5e501efa*aggregated_data_rsa_34327510*aggregated_data_rsa_40e9884c*aggregated_data_rsa_5ababfa3|288.617||
 aggregated_data_rsa_34327510|branch|c1e4fd089c317f41|ea0a3280c45817ae|1b56fcad8b0f2922|1726064958|bucket=open-rvfcast-data*region=us-east-1*key=_targets/aggregated_data_rsa_34327510*endpoint=TlVMTA*version=|t19755.8889066061s||27572|qs|aws|vector|aggregated_data_rsa||56.413||
@@ -554,7 +554,7 @@ ecmwf_forecasts_transformed_upload_aws_s3_f77cea8f|branch|6e170a6bc685cec2|af110
 ecmwf_forecasts_transformed_upload_aws_s3_fe9ab7e6|branch|6e170a6bc685cec2|af1104937d66021a|d17be2bde46638f3|1048328926|bucket=open-rvfcast-data*region=NULL*key=_targets/ecmwf_forecasts_transformed_upload_aws_s3_fe9ab7e6*endpoint=TlVMTA*version=|t19661.0328043273s||34|qs|aws|vector|ecmwf_forecasts_transformed_upload_aws_s3||146.633||
 elevation_directory_dataset|stem|707b9f535de2b985|36b8986f351764ad|3d3d9feae01275db|-1939550309|bucket=open-rvfcast-data*region=us-east-1*key=_targets/elevation_directory_dataset*endpoint=TlVMTA*version=|t19920.7241538229s||54|qs|aws|vector|||0.001||
 elevation_directory_raw|stem|6de45bc98e62fe5a|43d984583322c2a0|3d3d9feae01275db|-1529505470|bucket=open-rvfcast-data*region=us-east-1*key=_targets/elevation_directory_raw*endpoint=TlVMTA*version=|t19920.7240788535s||46|qs|aws|vector|||0.002||
-elevation_downloaded|stem|0f7af5732eb7c6a0|5532e9bcd7843c33|161f165ebe9e09cd|881307834|data/elevation/srtm_africa.tif|t19900.8442125982s||2.22507359325774e-308|file|local|vector|||0.026||Path exists and overwrite is FALSE
+elevation_downloaded|stem|0f7af5732eb7c6a0|5532e9bcd7843c33|161f165ebe9e09cd|881307834|data/elevation/srtm_africa.tif|t19900.8442125982s||2.22507385824817e-308|file|local|vector|||0.026||Path exists and overwrite is FALSE
 elevation_preprocessed|stem|e09f5fc8886199e9|562e72e8a93b7b9e|309b5f824e95836f|-449770024|data/elevation_dataset/africa_elevation.parquet|t19924.6655856792s|436096d7609465b1|1491699|file|local|vector|||25.122||
 env_file|object|5e2c4c2bf6df65f0|||||||||||||||
 f|object|6298f8b06e6691ad|||||||||||||||
@@ -6576,6 +6576,7 @@ transform_raster|function|36d05efe86c6af40|||||||||||||||
 transform_sentinel_ndvi|function|e49736ed5f60a205|||||||||||||||
 user_rprof|object|4960cb8e62564fd8|||||||||||||||
 validate_forecasts_anomalies|function|8c8914d0aedc19ea|||||||||||||||
+wahis_outbreak_history|stem||22549f08c6464154|20166aaae35b8bf3|1258407482||t19924.6721777995s||0|qs|aws|vector|||0.565|no nonmissing arguments to min returning Inf. no nonmissing arguments to min returning Inf. no nonmissing arguments to max returning Inf. no nonmissing arguments to max returning Inf|error in evaluating the argument x in selecting a method for function rowSums object beta_dist not found
 wahis_rvf_controls_preprocessed|stem|4fe28bd9012b5468|f69b42b2b71db9e6|e9d102bc275b63a3|-891979186|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_rvf_controls_preprocessed*endpoint=TlVMTA*version=|t19671.7281849312s||132807|qs|aws|vector|||0.92|1m22mThere was 1 warning in mutate.1m22m36mℹ39m In argument iso_code  countrycodecountrycodecountry, origin   country.name, destination  iso3c.Caused by warning33m39m Some values were not matched unambiguously ceuta, dominican rep., guadaloupe, melilla. 1m22mThere was 1 warning in mutate.1m22m36mℹ39m In argument continent  countrycodecountrycodecountry, origin   country.name, destination  continent.Caused by warning33m39m Some values were not matched unambiguously ceuta, dominican rep., guadaloupe, melilla|
 wahis_rvf_controls_raw|stem|f26f36ee3a979b39|e4495f4a0c0cba3b|e8439aeec79e7204|-31127431|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_rvf_controls_raw*endpoint=TlVMTA*version=|t19671.720703493s||726918|qs|aws|vector|||44.775||
 wahis_rvf_outbreaks_preprocessed|stem|9e69846ad130ea8d|3ea98184b5887c93|c76bf3f372b7e7b2|2127878318|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_rvf_outbreaks_preprocessed*endpoint=TlVMTA*version=|t19671.7082309806s||155766|qs|aws|vector|||0.078||

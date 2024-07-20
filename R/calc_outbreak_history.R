@@ -35,7 +35,7 @@ calc_outbreak_history <- function(wahis_rvf_outbreaks_preprocessed,
                                   continent_raster_template,
                                   continent_polygon,
                                   country_polygons,
-                                  beta_dist = .01,
+                                  beta_dist = 0.01,
                                   beta_time = 0.5,
                                   beta_cases = 1,
                                   current_date = Sys.time() - years(2),
@@ -43,6 +43,7 @@ calc_outbreak_history <- function(wahis_rvf_outbreaks_preprocessed,
                                   max_years = 10,
                                   recent = 1/6) {
 
+  # NCL LEFT OFF HERE.
   recent_outbreaks <- wahis_rvf_outbreaks_preprocessed |> 
     mutate(end_date = pmin(current_date, coalesce(outbreak_end_date, outbreak_start_date), na.rm = T),
            years_since = as.numeric(as.duration(current_date - end_date), "years"),
