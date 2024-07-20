@@ -5,33 +5,34 @@
 #' @title
 #' @param 
 #' @return
-#' @author Whitney Bagge
+#' @author Whitney Bagge, Nathan Layman
 #' @export
 library(paws)
-get_elevation<- function(elevation_directory_raw, overwrite=FALSE) {
+get_elevation<- function(output_dir, continent_raster_template) {
   
-  existing_files <- list.files(elevation_directory_raw)
+  # Create directory if it does not yet exist
+  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   
-  download_filename <- tools::file_path_sans_ext(existing_files)
+  template <- terra::unwrap(continent_raster_template)
+  sf_use_s2(FALSE)
   
-  save_filename <- paste0(download_filename, ".tif")
-  
-  message(paste0("Downloading ", download_filename))
-  
-  if(save_filename %in% existing_files & !overwrite) {
-    message("file already exists, skipping download")
-    return(file.path(elevation_directory_raw, save_filename)) # skip if file exists
-  }  
-  
-  s3_svc <- s3(config = list(region = "af-south-1",  credentials = list(anonymous = TRUE)))
-  # Download the file directly to disk in the current working directory
-  s3_svc$download_file(
-    Bucket = "deafrica-input-datasets",
-    Key = "srtm_dem/srtm_africa.tif",
-    Filename = "data/elevation/srtm_africa.tif"
-  )
+  CopernicusDEM::aoi_geom_save_tif_matches(sf_or_file = sf::st_as_sfc(sf::st_bbox(template)),
+                                           dir_save_tifs = output_dir,
+                                           resolution = 90,
+                                           crs_value = 4326,
+                                           threads = parallel::detectCores(),
+                                           verbose = TRUE)
 
+  # Read big raster into memory
+  elevation_rast <- terra::rast(filename)
   
-  return(elevation_directory_raw)
+  # Save as compressed raster
+  terra::writeRaster(gdal=c("COMPRESS=LZW")
+                     
+  # Clean up big uncompressed raster to save hard drive space
+  unlink(filename)
+  
+  # Return path to compressed raster
+  return(filename)
   
 }

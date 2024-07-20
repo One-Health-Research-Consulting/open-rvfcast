@@ -58,14 +58,41 @@ static_targets <- tar_plan(
   tar_target(soil_preprocessed, 
              preprocess_soil(soil_directory_dataset, soil_directory_raw, continent_raster_template, soil_downloaded)),
   
-  # SLOPE and ASPECT -------------------------------------------------
-  tar_target(slope_aspect_directory_raw, 
-             create_data_directory(directory_path = "data/slope_aspect")),
-  tar_target(slope_aspect_directory_dataset, 
-             create_data_directory(directory_path = "data/slope_aspect_dataset")),
-  tar_target(slope_aspect_downloaded, get_slope_aspect(slope_aspect_directory_dataset, slope_aspect_directory_raw, continent_raster_template),
+  # ASPECT -------------------------------------------------
+  tar_target(aspect_urls, c("aspect_zero" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClN_30as.rar",
+                            "aspect_fortyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClE_30as.rar", 
+                            "aspect_onethirtyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClS_30as.rar",
+                            "aspect_twotwentyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClW_30as.rar",
+                            "aspect_undef" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClU_30as.rar")),
+  
+  tar_target(aspect_preprocessed, get_remote_rasters(urls = aspect_urls, 
+                                                     output_dir = "data/aspect_dataset",
+                                                     output_filename = "aspect.parquet",
+                                                     raster_template = continent_raster_template,
+                                                     aggregate_method = "which.max", # What is the dominant aspect for each point?
+                                                     resample_method = "mode"), # What is the domminant aspect at the scale of the template raster?
     format = "file", 
     repository = "local"),
+  
+  # SLOPE -------------------------------------------------
+  tar_target(slope_urls, c("slope_zero" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl1_30as.rar",
+                           "slope_pointfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl2_30as.rar",
+                           "slope_two" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl3_30as.rar",
+                           "slope_five" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl4_30as.rar",
+                           "slope_ten" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl5_30as.rar",
+                           "slope_fifteen" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl6_30as.rar",
+                           "slope_thirty" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl7_30as.rar",
+                           "slope_fortyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl8_30as.rar")),
+  
+  # Slope is the fraction of cells
+  tar_target(slope_preprocessed, get_remote_rasters(urls = slope_urls, 
+                                                    output_dir = "data/slope_dataset",
+                                                    output_filename = "slope.parquet",
+                                                    raster_template = continent_raster_template,
+                                                    aggregate_method = "which.max", # What is the dominant slope for each point?
+                                                    resample_method = "mode"), # What is the domminant slope at the scale of the template raster?
+             format = "file", 
+             repository = "local"),
  
    # Gridded Livestock of the world -----------------------------------------------------------
   tar_target(glw_directory_raw, 
@@ -82,7 +109,7 @@ static_targets <- tar_plan(
 # ELEVATION -----------------------------------------------------------
 tar_target(elevation_directory_raw, 
            create_data_directory(directory_path = "data/elevation")),
-tar_target(elevation_downloaded, get_elevation(elevation_directory_raw, overwrite = FALSE),
+tar_target(elevation_downloaded, get_elevation(elevation_directory_raw, continent_raster_template, overwrite = FALSE),
   format = "file", 
   repository = "local"),
 tar_target(elevation_directory_dataset, 
