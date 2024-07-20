@@ -126,8 +126,6 @@ tar_target(landcover_preprocessed,
                               raster_template = continent_raster_template),
            format = "file", 
            repository = "local"),
-
-
 )
 
 

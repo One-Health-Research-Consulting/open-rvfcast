@@ -1,5 +1,5 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|e60e22eacf4aeb0d|||||||||||||||
+.Random.seed|object|2e87ff9a053636ed|||||||||||||||
 aggregate_augmented_data_by_adm|function|0ba2d0669462f71c|||||||||||||||
 aggregated_data_rsa|pattern|6dbb43f34bc42ac8|ea0a3280c45817ae||-1696630435||||137860|qs|aws|vector||aggregated_data_rsa_94f732f8*aggregated_data_rsa_5e501efa*aggregated_data_rsa_34327510*aggregated_data_rsa_40e9884c*aggregated_data_rsa_5ababfa3|288.617||
 aggregated_data_rsa_34327510|branch|c1e4fd089c317f41|ea0a3280c45817ae|1b56fcad8b0f2922|1726064958|bucket=open-rvfcast-data*region=us-east-1*key=_targets/aggregated_data_rsa_34327510*endpoint=TlVMTA*version=|t19755.8889066061s||27572|qs|aws|vector|aggregated_data_rsa||56.413||
@@ -554,8 +554,8 @@ ecmwf_forecasts_transformed_upload_aws_s3_f77cea8f|branch|6e170a6bc685cec2|af110
 ecmwf_forecasts_transformed_upload_aws_s3_fe9ab7e6|branch|6e170a6bc685cec2|af1104937d66021a|d17be2bde46638f3|1048328926|bucket=open-rvfcast-data*region=NULL*key=_targets/ecmwf_forecasts_transformed_upload_aws_s3_fe9ab7e6*endpoint=TlVMTA*version=|t19661.0328043273s||34|qs|aws|vector|ecmwf_forecasts_transformed_upload_aws_s3||146.633||
 elevation_directory_dataset|stem|707b9f535de2b985|36b8986f351764ad|3d3d9feae01275db|-1939550309|bucket=open-rvfcast-data*region=us-east-1*key=_targets/elevation_directory_dataset*endpoint=TlVMTA*version=|t19920.7241538229s||54|qs|aws|vector|||0.001||
 elevation_directory_raw|stem|6de45bc98e62fe5a|43d984583322c2a0|3d3d9feae01275db|-1529505470|bucket=open-rvfcast-data*region=us-east-1*key=_targets/elevation_directory_raw*endpoint=TlVMTA*version=|t19920.7240788535s||46|qs|aws|vector|||0.002||
-elevation_downloaded|stem|0f7af5732eb7c6a0|5532e9bcd7843c33|161f165ebe9e09cd|881307834|data/elevation/srtm_africa.tif|t19900.8442125982s||2.22505688254164e-308|file|local|vector|||0.026||Path exists and overwrite is FALSE
-elevation_preprocessed|stem|e09f5fc8886199e9|41a249f0486dcfba|f611c49b2e065bc4|-449770024|data/elevation_dataset/africa_elevation.parquet|t19924.6304703577s|436096d7609465b1|1491699|file|local|vector|||20.353||
+elevation_downloaded|stem|0f7af5732eb7c6a0|5532e9bcd7843c33|161f165ebe9e09cd|881307834|data/elevation/srtm_africa.tif|t19900.8442125982s||2.22507359325774e-308|file|local|vector|||0.026||Path exists and overwrite is FALSE
+elevation_preprocessed|stem|e09f5fc8886199e9|562e72e8a93b7b9e|309b5f824e95836f|-449770024|data/elevation_dataset/africa_elevation.parquet|t19924.6655856792s|436096d7609465b1|1491699|file|local|vector|||25.122||
 env_file|object|5e2c4c2bf6df65f0|||||||||||||||
 f|object|6298f8b06e6691ad|||||||||||||||
 filter_augmented_data|function|ed3fa76da2ee8f6f|||||||||||||||
@@ -2272,8 +2272,10 @@ forecasts_validate_directory|stem|316bbb9f1c700453|c3e4b2e8448616d5|3d3d9feae012
 get_bioclim_data|function|b19d9f8efc5a9b82|||||||||||||||
 get_country_bounding_boxes|function|82b21d03b36ce8fe|||||||||||||||
 get_elevation|function|8ade129c4b6565d6|||||||||||||||
+get_elevation_data|function|8ade129c4b6565d6|||||||||||||||
 get_glw|function|c56e9ad7b5763189|||||||||||||||
 get_glw_data|function|e0d1d91328785495|||||||||||||||
+get_landcover_data|function|8681bf57efa0be95|||||||||||||||
 get_modis_ndvi_api_parameters|function|c30ed04e0978b176|||||||||||||||
 get_modis_ndvi_bundle|function|1f38d28bad794ce7|||||||||||||||
 get_modis_ndvi_bundle_request|function|1f38d28bad794ce7|||||||||||||||
@@ -2293,6 +2295,7 @@ glw_downloaded|stem|ff4116be3fbcc8d6|6bd485496d54fed5|783f2acb37f9482a|283169108
 glw_preprocessed|stem|62eb55ce05dad1c4|64e8f6f8df3634d3|c0cc48505727d769|1918602810|bucket=open-rvfcast-data*region=us-east-1*key=_targets/glw_preprocessed*endpoint=TlVMTA*version=|t19923.8620111647s||39|qs|aws|vector|||1.372||
 join_dynamic_anomalies|function|de1a6dab05fa2379|||||||||||||||
 lag_intervals|stem|f4c9e8a4d588925c|6b4f81cd41a7b83e|a3dad144c40657ed|1055089432|bucket=open-rvfcast-data*region=NULL*key=_targets/lag_intervals*endpoint=TlVMTA*version=|t19615.7794897048s||55|qs|aws|vector|||0||
+landcover_preprocessed|stem|98373a1787c0a711|10266b2035a00f52|0e5344e232e9cb9c|-1211865051|data/landcover_dataset/landcover.parquet|t19924.6615664181s|33f226d1c10eb3d8|9197398|file|local|vector|||234.682||
 lead_intervals|stem|aab13460c8099242|a51b26cedde2c396|a3dad144c40657ed|-701347992|bucket=open-rvfcast-data*region=NULL*key=_targets/lead_intervals*endpoint=TlVMTA*version=|t19661.6592285323s||71|qs|aws|vector|||0||
 load_env|function|42a81bad129e774f|||||||||||||||
 make_africa_outbreak_scale_map|function|1cf69dae8f3f7f78|||||||||||||||
@@ -6556,9 +6559,9 @@ slope_urls|stem|14d8a3be0310e266|1540bb73e79a302b|a3dad144c40657ed|2106821496|bu
 soil_directory_dataset|stem|5367f73442caebca|6b87e3cd8dc09f31|3d3d9feae01275db|1696455129|bucket=open-rvfcast-data*region=us-east-1*key=_targets/soil_directory_dataset*endpoint=TlVMTA*version=|t19920.7241232166s||49|qs|aws|vector|||0.002||
 soil_directory_raw|stem|6d0bef71eae7763c|7be6d1311e8674de|3d3d9feae01275db|781979019|bucket=open-rvfcast-data*region=us-east-1*key=_targets/soil_directory_raw*endpoint=TlVMTA*version=|t19920.7240877431s||40|qs|aws|vector|||0.002||
 soil_download|function|371f9065fa1611a3|||||||||||||||
-soil_downloaded|stem|678485c3217017dc|73e8f917a50d005c|bc396cd8e73e5cc4|-1047214501|data/soil|t19920.7441717959s|4fa881245fd93336|320|file|local|vector|||14.281||
+soil_downloaded|stem|678485c3217017dc|73e8f917a50d005c|bc396cd8e73e5cc4|-1047214501|data/soil|t19924.6697374158s|16c3e5058e068190|1955832235|file|local|vector|||26.92||
 soil_preprocessed|stem|5367f73442caebca|7eacd6654f0fbf4a|d0ba406f5d022c00|1256321187|bucket=open-rvfcast-data*region=us-east-1*key=_targets/soil_preprocessed*endpoint=TlVMTA*version=|t19924.1920359525s||49|qs|aws|vector|||1.708|set.cats setting categories like this is deprecated use a twocolumn data.frame instead. set.cats setting categories like this is deprecated use a twocolumn data.frame instead|
-static_targets|object|9b0f09cc6837cca2|||||||||||||||
+static_targets|object|e95f223d6ac4b8ae|||||||||||||||
 submit_modis_ndvi_bundle_request|function|70d5dcdcf3510fa0|||||||||||||||
 submit_modis_ndvi_request|function|e6d950c0c17bd8cd|||||||||||||||
 submit_modis_ndvi_task_request|function|a97a6292a38c2323|||||||||||||||
