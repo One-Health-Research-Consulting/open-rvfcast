@@ -46,7 +46,6 @@ static_targets <- tar_plan(
   # modis ndvi = 0.01
   tar_target(rsa_polygon, rgeoboundaries::geoboundaries("South Africa", "adm2")),
   
-
   # SOIL -----------------------------------------------------------
   tar_target(soil_directory_raw, 
              create_data_directory(directory_path = "data/soil")),
@@ -84,7 +83,6 @@ static_targets <- tar_plan(
                            "slope_thirty" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl7_30as.rar",
                            "slope_fortyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl8_30as.rar")),
   
-  # Slope is the fraction of cells
   tar_target(slope_preprocessed, get_remote_rasters(urls = slope_urls, 
                                                     output_dir = "data/slope_dataset",
                                                     output_filename = "slope.parquet",
@@ -105,24 +103,34 @@ static_targets <- tar_plan(
   tar_target(glw_preprocessed, 
              preprocess_glw_data(glw_directory_dataset, glw_directory_raw, glw_downloaded, continent_raster_template)),
 
-
 # ELEVATION -----------------------------------------------------------
-tar_target(elevation_directory_raw, 
-           create_data_directory(directory_path = "data/elevation")),
-tar_target(elevation_downloaded, get_elevation(elevation_directory_raw, continent_raster_template, overwrite = FALSE),
-  format = "file", 
-  repository = "local"),
-tar_target(elevation_directory_dataset, 
-           create_data_directory(directory_path = "data/elevation_dataset")),
 tar_target(elevation_preprocessed, 
-           process_elevation(elevation_directory_dataset, elevation_downloaded, elevation_directory_raw, continent_raster_template)),
+           get_elevation_data(output_dir = "data/elevation_dataset", 
+                              output_filename = "africa_elevation.parquet",
+                              raster_template = continent_raster_template),
+           format = "file", 
+           repository = "local"),
 
-# Any missing static layers?
-# bioclim
-# forest cover
-#
+# BIOCLIM -----------------------------------------------------------
+tar_target(bioclim_preprocessed,
+           get_bioclim_data(output_dir = "data/bioclim_dataset", 
+                            output_filename = "bioclim.parquet",
+                            raster_template = continent_raster_template),
+           format = "file", 
+           repository = "local"),
+
+# LANDCOVER -----------------------------------------------------------
+tar_target(landcover_preprocessed,
+           get_landcover_data(output_dir = "data/landcover_dataset", 
+                              output_filename = "landcover.parquet",
+                              raster_template = continent_raster_template),
+           format = "file", 
+           repository = "local"),
+
 
 )
+
+
 # Dynamic Data Download -----------------------------------------------------------
 dynamic_targets <- tar_plan(
   

@@ -9,7 +9,10 @@
 #' @export
 library(DBI)
 library(RSQLite)
-preprocess_soil <- function(soil_directory_dataset, soil_directory_raw, continent_raster_template, soil_downloaded) {
+preprocess_soil <- function(soil_directory_dataset, 
+                            soil_directory_raw, 
+                            continent_raster_template,
+                            soil_downloaded) {
 
     #read in the raster file
 
@@ -86,6 +89,7 @@ preprocess_soil <- function(soil_directory_dataset, soil_directory_raw, continen
                       texture = as.numeric(records$TEXTURE_USDA))
   
   #classify the raster (transformed_raster) using the matrix of values - TEXTURE CLASS
+  # CLASIFFY DOESN'T SEEM TO BE WORKING LEFT OFF HERE
   hwsd.zhnj.texture <- classify(transformed_raster, rcl.matrix.texture)
   hwsd.zhnj.texture <- as.factor(hwsd.zhnj.texture)
   levels(hwsd.zhnj.texture) <- levels(records$TEXTURE_USDA)
