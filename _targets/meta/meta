@@ -1,5 +1,5 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|6fd5f048f6d30a34|||||||||||||||
+.Random.seed|object|4971c7f76f053625|||||||||||||||
 aggregate_augmented_data_by_adm|function|0ba2d0669462f71c|||||||||||||||
 aggregated_data_rsa|pattern|6dbb43f34bc42ac8|ea0a3280c45817ae||-1696630435||||137860|qs|aws|vector||aggregated_data_rsa_94f732f8*aggregated_data_rsa_5e501efa*aggregated_data_rsa_34327510*aggregated_data_rsa_40e9884c*aggregated_data_rsa_5ababfa3|288.617||
 aggregated_data_rsa_34327510|branch|c1e4fd089c317f41|ea0a3280c45817ae|1b56fcad8b0f2922|1726064958|bucket=open-rvfcast-data*region=us-east-1*key=_targets/aggregated_data_rsa_34327510*endpoint=TlVMTA*version=|t19755.8889066061s||27572|qs|aws|vector|aggregated_data_rsa||56.413||
@@ -481,7 +481,7 @@ download_modis_ndvi1|function|84be97854223222b|||||||||||||||
 download_nasa_recorded_weather|function|6a773d3a570df8e3|||||||||||||||
 download_nasa_weather|function|7833150f49a20c75|||||||||||||||
 download_sentinel_ndvi|function|03e5942d01ac5cc7|||||||||||||||
-dynamic_targets|object|2e56e507a676ad34|||||||||||||||
+dynamic_targets|object|80595ed5b6e7c89b|||||||||||||||
 ecmwf_forecasts_api_parameters|stem|e2f32218fa634195|0bdeb27065a5c91c|37ee5a84ea2c3af5|2047345647|bucket=open-rvfcast-data*region=NULL*key=_targets/ecmwf_forecasts_api_parameters*endpoint=TlVMTA*version=|t19594.5957909587s||4621|qs|aws|vector|||0.035||
 ecmwf_forecasts_downloaded|pattern|0b179198488b1353|950aed4902a96366||411166749||||5721883200|file|local|vector||ecmwf_forecasts_downloaded_436aae04*ecmwf_forecasts_downloaded_7c5c6691*ecmwf_forecasts_downloaded_a9ce1318*ecmwf_forecasts_downloaded_e7e5ad03*ecmwf_forecasts_downloaded_5c905023*ecmwf_forecasts_downloaded_1d3cec98*ecmwf_forecasts_downloaded_8f12c76b*ecmwf_forecasts_downloaded_7cda2402*ecmwf_forecasts_downloaded_ca4f42e3*ecmwf_forecasts_downloaded_f0947441*ecmwf_forecasts_downloaded_770518a3*ecmwf_forecasts_downloaded_f7878af2*ecmwf_forecasts_downloaded_e0a730a8*ecmwf_forecasts_downloaded_4afff85a*ecmwf_forecasts_downloaded_a6bfb7dd*ecmwf_forecasts_downloaded_6161fb50*ecmwf_forecasts_downloaded_eb1974f7*ecmwf_forecasts_downloaded_dde75b5d*ecmwf_forecasts_downloaded_6ce35942*ecmwf_forecasts_downloaded_60ef7e91*ecmwf_forecasts_downloaded_7f96f0da|0.018||
 ecmwf_forecasts_downloaded_1d3cec98|branch|c6e598dac99401d7|67d4b3431b1345d6|5d50ccd68c4a4319|873901600|data/ecmwf_forecasts_raw/ecmwf_seasonal_forecast_sys5_2007.grib|t19642.6492724265s|492bce0b7868c1a6|225720000|file|local|vector|ecmwf_forecasts_downloaded||0||
@@ -554,7 +554,7 @@ ecmwf_forecasts_transformed_upload_aws_s3_f77cea8f|branch|6e170a6bc685cec2|af110
 ecmwf_forecasts_transformed_upload_aws_s3_fe9ab7e6|branch|6e170a6bc685cec2|af1104937d66021a|d17be2bde46638f3|1048328926|bucket=open-rvfcast-data*region=NULL*key=_targets/ecmwf_forecasts_transformed_upload_aws_s3_fe9ab7e6*endpoint=TlVMTA*version=|t19661.0328043273s||34|qs|aws|vector|ecmwf_forecasts_transformed_upload_aws_s3||146.633||
 elevation_directory_dataset|stem|707b9f535de2b985|36b8986f351764ad|3d3d9feae01275db|-1939550309|bucket=open-rvfcast-data*region=us-east-1*key=_targets/elevation_directory_dataset*endpoint=TlVMTA*version=|t19920.7241538229s||54|qs|aws|vector|||0.001||
 elevation_directory_raw|stem|6de45bc98e62fe5a|43d984583322c2a0|3d3d9feae01275db|-1529505470|bucket=open-rvfcast-data*region=us-east-1*key=_targets/elevation_directory_raw*endpoint=TlVMTA*version=|t19920.7240788535s||46|qs|aws|vector|||0.002||
-elevation_downloaded|stem|0f7af5732eb7c6a0|5532e9bcd7843c33|161f165ebe9e09cd|881307834|data/elevation/srtm_africa.tif|t19900.8442125982s||2.22507385824817e-308|file|local|vector|||0.026||Path exists and overwrite is FALSE
+elevation_downloaded|stem|0f7af5732eb7c6a0|5532e9bcd7843c33|161f165ebe9e09cd|881307834|data/elevation/srtm_africa.tif|t19900.8442125982s||2.22507385850619e-308|file|local|vector|||0.026||Path exists and overwrite is FALSE
 elevation_preprocessed|stem|e09f5fc8886199e9|562e72e8a93b7b9e|309b5f824e95836f|-449770024|data/elevation_dataset/africa_elevation.parquet|t19924.6655856792s|436096d7609465b1|1491699|file|local|vector|||25.122||
 env_file|object|5e2c4c2bf6df65f0|||||||||||||||
 f|object|6298f8b06e6691ad|||||||||||||||
@@ -6561,7 +6561,7 @@ soil_directory_raw|stem|6d0bef71eae7763c|7be6d1311e8674de|3d3d9feae01275db|78197
 soil_download|function|371f9065fa1611a3|||||||||||||||
 soil_downloaded|stem|678485c3217017dc|73e8f917a50d005c|bc396cd8e73e5cc4|-1047214501|data/soil|t19924.6697374158s|16c3e5058e068190|1955832235|file|local|vector|||26.92||
 soil_preprocessed|stem|5367f73442caebca|7eacd6654f0fbf4a|d0ba406f5d022c00|1256321187|bucket=open-rvfcast-data*region=us-east-1*key=_targets/soil_preprocessed*endpoint=TlVMTA*version=|t19924.1920359525s||49|qs|aws|vector|||1.708|set.cats setting categories like this is deprecated use a twocolumn data.frame instead. set.cats setting categories like this is deprecated use a twocolumn data.frame instead|
-static_targets|object|e95f223d6ac4b8ae|||||||||||||||
+static_targets|object|05fff04421b3d34d|||||||||||||||
 submit_modis_ndvi_bundle_request|function|70d5dcdcf3510fa0|||||||||||||||
 submit_modis_ndvi_request|function|e6d950c0c17bd8cd|||||||||||||||
 submit_modis_ndvi_task_request|function|a97a6292a38c2323|||||||||||||||

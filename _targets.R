@@ -46,6 +46,19 @@ static_targets <- tar_plan(
   # modis ndvi = 0.01
   tar_target(rsa_polygon, rgeoboundaries::geoboundaries("South Africa", "adm2")),
   
+  
+  # OUTBREAK HISTORY -----------------------------------------------------------
+  tar_target(wahis_outbreak_history, calc_outbreak_history(wahis_rvf_outbreaks_preprocessed,
+                                                           continent_raster_template,
+                                                           continent_polygon,
+                                                           country_polygons)),
+  
+  tar_target(wahis_daily_outbreak_history, get_daily_outbreak_history(wahis_rvf_outbreaks_preprocessed,
+                                                                      continent_raster_template,
+                                                                      continent_polygon,
+                                                                      country_polygons)),
+  
+  
   # SOIL -----------------------------------------------------------
   tar_target(soil_directory_raw, 
              create_data_directory(directory_path = "data/soil")),
@@ -136,11 +149,6 @@ dynamic_targets <- tar_plan(
   tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()),
   tar_target(wahis_rvf_outbreaks_preprocessed, 
              preprocess_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw)),
-  
-  tar_target(wahis_outbreak_history, calc_outbreak_history(wahis_rvf_outbreaks_preprocessed,
-                                                           continent_raster_template,
-                                                           continent_polygon,
-                                                           country_polygons)),
   
   tar_target(wahis_rvf_controls_raw, get_wahis_rvf_controls_raw()),
   tar_target(wahis_rvf_controls_preprocessed, 
