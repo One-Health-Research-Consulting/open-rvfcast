@@ -181,7 +181,10 @@ get_outbreak_history_animation <- function(input_files,
                                            output_dir = "outputs",
                                            output_filename = "outbreak_history_2007.gif",
                                            layers = NULL,
+                                           title = NULL,
                                            ...) {
+  
+  title <- paste(title, '{current_frame}') |> stringr::str_squish()
   
   # Create directory if it does not yet exist
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
@@ -198,14 +201,15 @@ get_outbreak_history_animation <- function(input_files,
     mutate(date = as.Date(date),
            display_date = format(date, "%B %Y"))
   
-  # Left off here:
-  # labs(title = '{gsub(pattern = "[0-9]+-", replacement = "", closest_state)}')
   p <- ggplot(df_long, aes(x=x, y=y, fill=value)) +
     geom_raster() +
-    scale_fill_viridis_c(limits=c(min(df_long$value, na.rm=T), max(df_long$value, na.rm=T))) +
-    labs(title = '{current_frame}', x = "Longitude", y = "Latitude", fill = "Weight") +
+    scale_fill_viridis_c(limits=c(min(df_long$value, na.rm=T), 
+                                  max(df_long$value, na.rm=T)),
+                         trans = scales::sqrt_trans()) +
+    labs(title = title, x = "Longitude", y = "Latitude", fill = "Weight\n") +
     theme_minimal() +
-    theme(text=element_text(size = 14))
+    theme(text=element_text(size = 14),
+          legend.title = element_text(vjust = 3))
   
   # I can't get anim_save to work on my mac. Switching to ImageMagick rather than bother fixing it
   # gifs save and render fine but can't be opened once saved. I tried re-installing gifski

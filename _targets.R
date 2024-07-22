@@ -165,11 +165,13 @@ dynamic_targets <- tar_plan(
   tar_target(wahis_outbreak_history_recent_animation, get_outbreak_history_animation(input_files = c("data/outbreak_history_dataset/outbreak_history_recent_2007.tif"),
                                                                                      output_dir = "outputs",
                                                                                      output_filename = "outbreak_history_recent_2007.gif",
+                                                                                     title = "Recent Outbreak History",
                                                                                      wahis_outbreak_history)), # Just included to enforce dependency with wahis_outbreak_history
 
   tar_target(wahis_outbreak_history_old_animation, get_outbreak_history_animation(input_files = c("data/outbreak_history_dataset/outbreak_history_old_2007.tif"),
                                                                                   output_dir = "outputs",
                                                                                   output_filename = "outbreak_history_old_2007.gif",
+                                                                                  title = "Old Outbreak History",
                                                                                   wahis_outbreak_history)), # Just included to enforce dependency with wahis_outbreak_history
   
   # SENTINEL NDVI -----------------------------------------------------------
