@@ -46,19 +46,6 @@ static_targets <- tar_plan(
   # modis ndvi = 0.01
   tar_target(rsa_polygon, rgeoboundaries::geoboundaries("South Africa", "adm2")),
   
-  
-  # OUTBREAK HISTORY -----------------------------------------------------------
-  tar_target(wahis_outbreak_history, calc_outbreak_history(wahis_rvf_outbreaks_preprocessed,
-                                                           continent_raster_template,
-                                                           continent_polygon,
-                                                           country_polygons)),
-  
-  tar_target(wahis_daily_outbreak_history, get_daily_outbreak_history(wahis_rvf_outbreaks_preprocessed,
-                                                                      continent_raster_template,
-                                                                      continent_polygon,
-                                                                      country_polygons)),
-  
-  
   # SOIL -----------------------------------------------------------
   tar_target(soil_directory_raw, 
              create_data_directory(directory_path = "data/soil")),
@@ -154,7 +141,37 @@ dynamic_targets <- tar_plan(
   tar_target(wahis_rvf_controls_preprocessed, 
              preprocess_wahis_rvf_controls(wahis_rvf_controls_raw)),
 
+  # OUTBREAK HISTORY -----------------------------------------------------------
+  tar_target(wahis_outbreak_dates, tibble(date = seq(from = min(coalesce(wahis_rvf_outbreaks_preprocessed$outbreak_end_date, wahis_rvf_outbreaks_preprocessed$outbreak_start_date), na.rm = T),
+                                                     to = max(coalesce(wahis_rvf_outbreaks_preprocessed$outbreak_end_date, wahis_rvf_outbreaks_preprocessed$outbreak_start_date), na.rm = T),
+                                                     by = "day"),
+                                          year = year(date),
+                                          month = month(date)) |>
+               group_by(year) |>
+               tar_group(),
+             iteration = "group"),
+  
+  # Map over year batch over day otherwise too many branches.
+  tar_target(wahis_outbreak_history, get_daily_outbreak_history(dates_df = wahis_outbreak_dates,
+                                                                wahis_rvf_outbreaks_preprocessed,
+                                                                continent_raster_template,
+                                                                continent_polygon,
+                                                                country_polygons),
+             head(wahis_outbreak_dates, 1),
+             iteration = "vector",
+             format = "file", 
+             repository = "local"),
+  
+  tar_target(wahis_outbreak_history_recent_animation, get_outbreak_history_animation(input_files = c("data/outbreak_history_dataset/outbreak_history_recent_2007.tif"),
+                                                                                     output_dir = "outputs",
+                                                                                     output_filename = "outbreak_history_recent_2007.gif",
+                                                                                     wahis_outbreak_history)), # Just included to enforce dependency with wahis_outbreak_history
 
+  tar_target(wahis_outbreak_history_old_animation, get_outbreak_history_animation(input_files = c("data/outbreak_history_dataset/outbreak_history_old_2007.tif"),
+                                                                                  output_dir = "outputs",
+                                                                                  output_filename = "outbreak_history_old_2007.gif",
+                                                                                  wahis_outbreak_history)), # Just included to enforce dependency with wahis_outbreak_history
+  
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
   # 10 day period

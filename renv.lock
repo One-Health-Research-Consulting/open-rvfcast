@@ -208,21 +208,6 @@
       ],
       "Hash": "50c838a310445e954bc13f26f26a6ecf"
     },
-    "atcursor": {
-      "Package": "atcursor",
-      "Version": "0.0.2",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteUsername": "milesmcbain",
-      "RemoteRepo": "atcursor",
-      "RemoteRef": "main",
-      "RemoteSha": "52445666e612650cfa787814c3b195eaa1012ab8",
-      "Requirements": [
-        "rstudioapi"
-      ],
-      "Hash": "76819a2c49cf4b16ae1e40e89bd92709"
-    },
     "aws.s3": {
       "Package": "aws.s3",
       "Version": "0.3.21",
@@ -856,30 +841,6 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "38ec653c2613bed60052ba3787bd8a2c"
-    },
-    "fnmate": {
-      "Package": "fnmate",
-      "Version": "0.0.6",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteUsername": "milesmcbain",
-      "RemoteRepo": "fnmate",
-      "RemoteRef": "master",
-      "RemoteSha": "18a4c00536e0deafeb6b3f91e48b53b641f47e6a",
-      "Requirements": [
-        "R",
-        "clipr",
-        "gert",
-        "glue",
-        "magrittr",
-        "purrr",
-        "readr",
-        "rlang",
-        "rstudioapi",
-        "utils"
-      ],
-      "Hash": "7e61b0c24031d40d347cab51e90a3ca3"
     },
     "fontawesome": {
       "Package": "fontawesome",
@@ -1618,6 +1579,18 @@
         "timechange"
       ],
       "Hash": "e25f18436e3efd42c7c590a1c4c15390"
+    },
+    "magick": {
+      "Package": "magick",
+      "Version": "2.8.4",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "Rcpp",
+        "curl",
+        "magrittr"
+      ],
+      "Hash": "63adf42f6fa0fca09999a328e1ae8204"
     },
     "magrittr": {
       "Package": "magrittr",
@@ -2473,16 +2446,6 @@
       "Repository": "CRAN",
       "Hash": "3606bb09e0914edd4fc8313b500dcd5e"
     },
-    "sourcetools": {
-      "Package": "sourcetools",
-      "Version": "0.1.7-1",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "R"
-      ],
-      "Hash": "5f5a7629f956619d519205ec475fe647"
-    },
     "sp": {
       "Package": "sp",
       "Version": "2.0-0",
@@ -2645,32 +2608,6 @@
         "systemfonts"
       ],
       "Hash": "1ab6223d3670fac7143202cb6a2d43d5"
-    },
-    "tflow": {
-      "Package": "tflow",
-      "Version": "0.3.10",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteUsername": "MilesMcBain",
-      "RemoteRepo": "tflow",
-      "RemoteRef": "master",
-      "RemoteSha": "889afee6c16fdd8ef3cba9484999caf5944eab47",
-      "Remotes": "milesmcbain/fnmate, milesmcbain/capsule, milesmcbain/atcursor",
-      "Requirements": [
-        "R",
-        "atcursor",
-        "cli",
-        "fnmate",
-        "fs",
-        "glue",
-        "readr",
-        "rstudioapi",
-        "sourcetools",
-        "usethis",
-        "yaml"
-      ],
-      "Hash": "6c0ab6363b3b572655542e8aea99696a"
     },
     "tibble": {
       "Package": "tibble",

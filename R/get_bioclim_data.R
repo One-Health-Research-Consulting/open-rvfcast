@@ -12,6 +12,9 @@ get_bioclim_data <- function(output_dir,
                              output_filename, 
                              raster_template) {
   
+  # Create directory if it does not yet exist
+  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+  
   template <- terra::unwrap(raster_template)
   bioclim_data <- geodata::worldclim_global(var = "bio", res = 2.5, path = output_dir)
   
