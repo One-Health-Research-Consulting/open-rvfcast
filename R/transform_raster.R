@@ -1,14 +1,29 @@
-transform_raster <- function(raw_raster, template) {
+#' Reproject, resample, crop, and normalize a raster to template
+#'
+#' @param raw_raster 
+#' @param template 
+#' @param method 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+transform_raster <- function(raw_raster, 
+                             template, 
+                             method = "cubicspline") {
   
-  if(!identical(crs(raw_raster), crs(template))) {
-    raw_raster <- terra::project(raw_raster, template)
+  norm_rast <- raw_raster
+  if(!identical(crs(norm_rast), crs(template))) {
+    norm_rast <- terra::project(raw_raster, template)
   }
-  if(!identical(origin(raw_raster), origin(template)) ||
-     !identical(res(raw_raster), res(template))) {
-    raw_raster <- terra::resample(raw_raster, template, method = "cubicspline")
+  if(!identical(origin(norm_rast), origin(template)) ||
+     !identical(res(norm_rast), res(template))) {
+    norm_rast <- terra::resample(norm_rast, template, method = method) 
   } 
   
-  return(raw_raster)
+  norm_rast <- crop(norm_rast, template)
+  
+  return(norm_rast)
   
 }
 

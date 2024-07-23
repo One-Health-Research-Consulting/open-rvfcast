@@ -44,9 +44,90 @@ static_targets <- tar_plan(
   # ecmwf = 1; 
   # sentinel ndvi = 0.01
   # modis ndvi = 0.01
-  tar_target(rsa_polygon, rgeoboundaries::geoboundaries("South Africa", "adm2"))
+  tar_target(rsa_polygon, rgeoboundaries::geoboundaries("South Africa", "adm2")),
   
+  # SOIL -----------------------------------------------------------
+  tar_target(soil_directory_raw, 
+             create_data_directory(directory_path = "data/soil")),
+  tar_target(soil_downloaded, soil_download(soil_directory_raw),
+             format = "file", 
+             repository = "local"),
+  tar_target(soil_directory_dataset, 
+             create_data_directory(directory_path = "data/soil_dataset")),
+  tar_target(soil_preprocessed, 
+             preprocess_soil(soil_directory_dataset, soil_directory_raw, continent_raster_template, soil_downloaded)),
+  
+  # ASPECT -------------------------------------------------
+  tar_target(aspect_urls, c("aspect_zero" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClN_30as.rar",
+                            "aspect_fortyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClE_30as.rar", 
+                            "aspect_onethirtyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClS_30as.rar",
+                            "aspect_twotwentyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClW_30as.rar",
+                            "aspect_undef" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClU_30as.rar")),
+  
+  tar_target(aspect_preprocessed, get_remote_rasters(urls = aspect_urls, 
+                                                     output_dir = "data/aspect_dataset",
+                                                     output_filename = "aspect.parquet",
+                                                     raster_template = continent_raster_template,
+                                                     aggregate_method = "which.max", # What is the dominant aspect for each point?
+                                                     resample_method = "mode"), # What is the domminant aspect at the scale of the template raster?
+    format = "file", 
+    repository = "local"),
+  
+  # SLOPE -------------------------------------------------
+  tar_target(slope_urls, c("slope_zero" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl1_30as.rar",
+                           "slope_pointfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl2_30as.rar",
+                           "slope_two" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl3_30as.rar",
+                           "slope_five" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl4_30as.rar",
+                           "slope_ten" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl5_30as.rar",
+                           "slope_fifteen" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl6_30as.rar",
+                           "slope_thirty" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl7_30as.rar",
+                           "slope_fortyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl8_30as.rar")),
+  
+  tar_target(slope_preprocessed, get_remote_rasters(urls = slope_urls, 
+                                                    output_dir = "data/slope_dataset",
+                                                    output_filename = "slope.parquet",
+                                                    raster_template = continent_raster_template,
+                                                    aggregate_method = "which.max", # What is the dominant slope for each point?
+                                                    resample_method = "mode"), # What is the domminant slope at the scale of the template raster?
+             format = "file", 
+             repository = "local"),
+ 
+   # Gridded Livestock of the world -----------------------------------------------------------
+  tar_target(glw_directory_raw, 
+             create_data_directory(directory_path = "data/glw")),
+  tar_target(glw_downloaded, get_glw_data(glw_directory_raw),
+             format = "file", 
+             repository = "local"),
+  tar_target(glw_directory_dataset, 
+             create_data_directory(directory_path = "data/glw_dataset")),
+  tar_target(glw_preprocessed, 
+             preprocess_glw_data(glw_directory_dataset, glw_directory_raw, glw_downloaded, continent_raster_template)),
+
+# ELEVATION -----------------------------------------------------------
+tar_target(elevation_preprocessed, 
+           get_elevation_data(output_dir = "data/elevation_dataset", 
+                              output_filename = "africa_elevation.parquet",
+                              raster_template = continent_raster_template),
+           format = "file", 
+           repository = "local"),
+
+# BIOCLIM -----------------------------------------------------------
+tar_target(bioclim_preprocessed,
+           get_bioclim_data(output_dir = "data/bioclim_dataset", 
+                            output_filename = "bioclim.parquet",
+                            raster_template = continent_raster_template),
+           format = "file", 
+           repository = "local"),
+
+# LANDCOVER -----------------------------------------------------------
+tar_target(landcover_preprocessed,
+           get_landcover_data(output_dir = "data/landcover_dataset", 
+                              output_filename = "landcover.parquet",
+                              raster_template = continent_raster_template),
+           format = "file", 
+           repository = "local"),
 )
+
 
 # Dynamic Data Download -----------------------------------------------------------
 dynamic_targets <- tar_plan(
@@ -59,6 +140,39 @@ dynamic_targets <- tar_plan(
   tar_target(wahis_rvf_controls_raw, get_wahis_rvf_controls_raw()),
   tar_target(wahis_rvf_controls_preprocessed, 
              preprocess_wahis_rvf_controls(wahis_rvf_controls_raw)),
+
+  # OUTBREAK HISTORY -----------------------------------------------------------
+  tar_target(wahis_outbreak_dates, tibble(date = seq(from = min(coalesce(wahis_rvf_outbreaks_preprocessed$outbreak_end_date, wahis_rvf_outbreaks_preprocessed$outbreak_start_date), na.rm = T),
+                                                     to = max(coalesce(wahis_rvf_outbreaks_preprocessed$outbreak_end_date, wahis_rvf_outbreaks_preprocessed$outbreak_start_date), na.rm = T),
+                                                     by = "day"),
+                                          year = year(date),
+                                          month = month(date)) |>
+               group_by(year) |>
+               tar_group(),
+             iteration = "group"),
+  
+  # Map over year batch over day otherwise too many branches.
+  tar_target(wahis_outbreak_history, get_daily_outbreak_history(dates_df = wahis_outbreak_dates,
+                                                                wahis_rvf_outbreaks_preprocessed,
+                                                                continent_raster_template,
+                                                                continent_polygon,
+                                                                country_polygons),
+             head(wahis_outbreak_dates, 1),
+             iteration = "vector",
+             format = "file", 
+             repository = "local"),
+  
+  tar_target(wahis_outbreak_history_recent_animation, get_outbreak_history_animation(input_files = c("data/outbreak_history_dataset/outbreak_history_recent_2007.tif"),
+                                                                                     output_dir = "outputs",
+                                                                                     output_filename = "outbreak_history_recent_2007.gif",
+                                                                                     title = "Recent Outbreak History",
+                                                                                     wahis_outbreak_history)), # Just included to enforce dependency with wahis_outbreak_history
+
+  tar_target(wahis_outbreak_history_old_animation, get_outbreak_history_animation(input_files = c("data/outbreak_history_dataset/outbreak_history_old_2007.tif"),
+                                                                                  output_dir = "outputs",
+                                                                                  output_filename = "outbreak_history_old_2007.gif",
+                                                                                  title = "Old Outbreak History",
+                                                                                  wahis_outbreak_history)), # Just included to enforce dependency with wahis_outbreak_history
   
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
@@ -304,7 +418,21 @@ dynamic_targets <- tar_plan(
                                 show_progress = TRUE),
              pattern = ecmwf_forecasts_transformed,
              cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data 
+
   
+
+  # # cache locally
+  # # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
+  # # Format file here means if we delete or change the local cache it will force a re-download.
+  # tar_target(nasa_recorded_weather_local, {suppressWarnings(dir.create(here::here("data/nasa_parquets"), recursive = TRUE))
+  #   cache_aws_branched_target(tmp_path = tar_read(nasa_recorded_weather_download),
+  #                             ext = ".gz.parquet") 
+  # },
+  # repository = "local", 
+  # format = "file"
+  # ),
+
+
 )
 
 # Data Processing -----------------------------------------------------------

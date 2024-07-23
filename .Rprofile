@@ -16,9 +16,6 @@ if(!nzchar(Sys.getenv("TAR_PROJECT"))) {
     Sys.setenv(TAR_PROJECT = "main")
   }
 }
-if(interactive()){
-  message(paste("targets project is", Sys.getenv("TAR_PROJECT")))
-}
 
 # Set options for renv convenience
 options(
@@ -53,4 +50,10 @@ if(requireNamespace("conflicted", quietly = TRUE)) {
   conflicted::conflict_prefer("select", "dplyr", quiet = TRUE)
   conflicted::conflict_prefer("set_names", "magrittr", quiet = TRUE)
   conflicted::conflict_prefer("View", "utils", quiet = TRUE)
+}
+
+if(interactive()){
+  message(paste("targets project is", Sys.getenv("TAR_PROJECT")))
+  require(targets)
+  require(tidyverse)
 }

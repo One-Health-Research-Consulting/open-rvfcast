@@ -1,0 +1,166 @@
+---
+title: "openRVF pipeline notes"
+author: "Nathan Layman"
+date: "`r Sys.Date()`"
+output: html_document
+---
+```{r mermaid_script, echo=FALSE, message = FALSE, results='asis'}
+if(knitr::pandoc_to("html")) {
+  cat('<script src="https://unpkg.com/mermaid@10/dist/mermaid.min.js"></script>')
+}
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+h <- here::here
+```
+
+## Project pipeline
+
+```{r mermaid, echo=FALSE, message = FALSE, results='asis'}
+mer <- targets::tar_mermaid(targets_only = TRUE, 
+                            outdated = FALSE,
+                            legend = FALSE, 
+                            color = FALSE,
+                            script = h("_targets.R"))
+
+if(knitr::pandoc_to("html")) {
+  cat('<pre><div class="mermaid">', mer, '</div></pre>', sep = "\n")
+} else {
+  cat(
+  "```mermaid",
+  mer[1],
+  #'Objects([""Objects""]) --- Functions>""Functions""]',
+  'subgraph Project Workflow',
+  mer[3:length(mer)],
+  'linkStyle 0 stroke-width:0px;',
+  "```",
+  sep = "\n")
+}
+
+```
+
+<details>
+<summary> Error: Error installing package 'nanonext': 
+</summary>
+<br>
+
+Error:
+```
+* installing *source* package ‘nanonext’ ...
+** package ‘nanonext’ successfully unpacked and MD5 sums checked
+** using staged installation
+No existing 'libmbedtls' >= 2.5 found
+Detecting 'cmake'...
+Required 'cmake' not found
+ERROR: configuration failed for package ‘nanonext’
+* removing ‘/Users/nathanlayman/Documents/Academia/EHA/Projects/open-rvfcast/renv/staging/1/nanonext’
+install of package 'nanonext' failed [error code 1]
+```
+
+Fix:
+```
+brew instal cmake
+```
+</details>
+
+<details>
+<summary> Error target readme: argument "store" is missing, with no default
+</summary>
+<br>
+
+Error:
+```
+Error:
+! Error running targets::tar_make()
+  Error messages: targets::tar_meta(fields = error, complete_only = TRUE)
+  Debugging guide: https://books.ropensci.org/targets/debugging.html
+  How to ask for help: https://books.ropensci.org/targets/help.html
+  Last error: argument "store" is missing, with no default
+```
+
+Fix:
+```
+Add store argument to tar_mermaid call in readme. Update targets to use here() for every file call. Change tar_mermaid to 
+
+mer <- targets::tar_mermaid(targets_only = TRUE, 
+                            outdated = FALSE,
+                            legend = FALSE, 
+                            color = FALSE,
+                            script = h("_targets.R"))
+                            
+```    
+
+</details>
+<details>
+<summary> Error target modis_ndvi_bundle_request: no applicable method for 'filter' applied to an object of class "list"
+</summary>
+<br>
+Error:
+```
+✖ error target modis_ndvi_bundle_request
+▶ end pipeline [2.272 hours]
+Warning messages:
+1: [readValues] raster has no values 
+2: 1 targets produced warnings. Run targets::tar_meta(fields = warnings, complete_only = TRUE) for the messages. 
+Error:
+! Error running targets::tar_make()
+  Error messages: targets::tar_meta(fields = error, complete_only = TRUE)
+  Debugging guide: https://books.ropensci.org/targets/debugging.html
+  How to ask for help: https://books.ropensci.org/targets/help.html
+  Last error: no applicable method for 'filter' applied to an object of class "list"
+```
+Fix:
+```
+Modis authentication token is expired. Renew token by forcing modis_ndvi_token target to re-run.
+```
+</details>
+
+</details>
+<details>
+<summary> Error target sentinel_ndvi_downloaded: Failed to connect to catalogue.dataspace.copernicus.eu port 80 after 15 ms: Couldn't connect to serve
+</summary>
+<br>
+
+Error:
+```
+x errored branch sentinel_ndvi_downloaded_5cfced28d04857ef
+x errored pipeline [2.254 minutes]
+Warning messages:
+1: There was 1 warning in `mutate()`.
+ℹ In argument: `iso_code = countrycode::countrycode(country, origin =
+  "country.name", destination = "iso3c")`.
+Caused by warning:
+! Some values were not matched unambiguously: ceuta, dominican (rep.), melilla 
+2: There was 1 warning in `mutate()`.
+ℹ In argument: `continent = countrycode::countrycode(country, origin =
+  "country.name", destination = "continent")`.
+Caused by warning:
+! Some values were not matched unambiguously: ceuta, dominican (rep.), melilla 
+3: [readValues] raster has no values 
+4: 2 targets produced warnings. Run targets::tar_meta(fields = warnings, complete_only = TRUE) for the messages. 
+Error:
+! Error running targets::tar_make()
+Error messages: targets::tar_meta(fields = error, complete_only = TRUE)
+Debugging guide: https://books.ropensci.org/targets/debugging.html
+How to ask for help: https://books.ropensci.org/targets/help.html
+Last error message:
+    Failed to connect to catalogue.dataspace.copernicus.eu port 80 after 15 ms: Couldn't connect to server
+Last error traceback:
+    download_sentinel_ndvi(sentinel_ndvi_api_parameters, download_directory ...
+    GET(url, add_headers(Authorization = paste("Bearer", content(auth)$acces...
+    request_perform(req, hu$handle$handle)
+    request_fetch(req$output, req$url, handle)
+    request_fetch.write_disk(req$output, req$url, handle)
+    curl::curl_fetch_disk(url, x$path, handle = handle)
+    .handleSimpleError(function (condition)  {     state$error <- build_mess...
+    h(simpleError(msg, call))
+```
+
+Fix:
+```
+Firewalls sometimes block outbound access over port 80 for `http`. Change URL to use `https`.
+There was also some authentication problems due to curl forwarding the GET request to the new
+address (which happens to be https already). Updated new address to:
+https://download.dataspace.copernicus.eu/odata/v1/Products
+```
