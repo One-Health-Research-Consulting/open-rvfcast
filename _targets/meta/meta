@@ -1,5 +1,5 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-.Random.seed|object|6d8266a53c698223|||||||||||||||
+.Random.seed|object|214b22db05576363|||||||||||||||
 aggregate_augmented_data_by_adm|function|0ba2d0669462f71c|||||||||||||||
 aggregated_data_rsa|pattern|6dbb43f34bc42ac8|ea0a3280c45817ae||-1696630435||||137860|qs|aws|vector||aggregated_data_rsa_94f732f8*aggregated_data_rsa_5e501efa*aggregated_data_rsa_34327510*aggregated_data_rsa_40e9884c*aggregated_data_rsa_5ababfa3|288.617||
 aggregated_data_rsa_34327510|branch|c1e4fd089c317f41|ea0a3280c45817ae|1b56fcad8b0f2922|1726064958|bucket=open-rvfcast-data*region=us-east-1*key=_targets/aggregated_data_rsa_34327510*endpoint=TlVMTA*version=|t19755.8889066061s||27572|qs|aws|vector|aggregated_data_rsa||56.413||
@@ -443,7 +443,7 @@ augmented_data_rsa_fe899acf|branch|0226f41a6223ab99|e34b3be3b303277e|0de1cf59847
 augmented_data_rsa_feb1b830|branch|4ff2ba553efa663a|e34b3be3b303277e|f0a3cacbb7dbfdb4|1077197804|bucket=open-rvfcast-data*region=us-east-1*key=_targets/augmented_data_rsa_feb1b830*endpoint=TlVMTA*version=|t19755.8512676687s||97|qs|aws|vector|augmented_data_rsa||1.99||
 aws_bucket|object|d9cf2c5ff7cc1be4|||||||||||||||
 aws_s3_upload_single_type|function|6d277b68ccbb67a2|||||||||||||||
-bioclim_preprocessed|stem|1b1a48600ccae883|5f41665e5cc07c28|b47b73e50af4bc33|1289283391|data/bioclim_dataset/bioclim.parquet|t19924.6244828159s|70d824b00d5241b0|24881359|file|local|vector|||47.599||
+bioclim_preprocessed|stem|1b1a48600ccae883|5f41665e5cc07c28|f18aeee5346c4b65|1289283391|data/bioclim_dataset/bioclim.parquet|t19926.8606447956s|70d824b00d5241b0|24881359|file|local|vector|||60.777||
 cache_aws_branched_target|function|6e2abfa4969de1bf|||||||||||||||
 calc_daily_outbreak_history|function|b822309d11aabbee|||||||||||||||
 calc_outbreak_history|function|7d453979a781a661|||||||||||||||
@@ -2283,7 +2283,7 @@ get_modis_ndvi_bundle_request|function|1f38d28bad794ce7|||||||||||||||
 get_modis_ndvi_token|function|f7872f64690bfba2|||||||||||||||
 get_nasa_weather_coordinates|function|2c23f9e4d93cd8ca|||||||||||||||
 get_outbreak_distance_weights|function|bc71b957d270831b|||||||||||||||
-get_outbreak_history_animation|function|b1b87c3bb8e459f9|||||||||||||||
+get_outbreak_history_animation|function|42aa877256b88906|||||||||||||||
 get_remote_rasters|function|c6bd71392c25ea39|||||||||||||||
 get_sentinel_ndvi_api_parameters|function|ec6ebe60c7637311|||||||||||||||
 get_slope_aspect|function|75cb506723f09d43|||||||||||||||
@@ -6561,7 +6561,7 @@ slope_urls|stem|14d8a3be0310e266|1540bb73e79a302b|a3dad144c40657ed|2106821496|bu
 soil_directory_dataset|stem|5367f73442caebca|6b87e3cd8dc09f31|3d3d9feae01275db|1696455129|bucket=open-rvfcast-data*region=us-east-1*key=_targets/soil_directory_dataset*endpoint=TlVMTA*version=|t19920.7241232166s||49|qs|aws|vector|||0.002||
 soil_directory_raw|stem|6d0bef71eae7763c|7be6d1311e8674de|3d3d9feae01275db|781979019|bucket=open-rvfcast-data*region=us-east-1*key=_targets/soil_directory_raw*endpoint=TlVMTA*version=|t19920.7240877431s||40|qs|aws|vector|||0.002||
 soil_download|function|371f9065fa1611a3|||||||||||||||
-soil_downloaded|stem|678485c3217017dc|73e8f917a50d005c|bc396cd8e73e5cc4|-1047214501|data/soil|t19924.6697374158s|16c3e5058e068190|1955832235|file|local|vector|||26.92||
+soil_downloaded|stem|678485c3217017dc|73e8f917a50d005c|bc396cd8e73e5cc4|-1047214501|data/soil|t19924.6674025604s|4fa881245fd93336|320|file|local|vector|||26.92||
 soil_preprocessed|stem|5367f73442caebca|7eacd6654f0fbf4a|d0ba406f5d022c00|1256321187|bucket=open-rvfcast-data*region=us-east-1*key=_targets/soil_preprocessed*endpoint=TlVMTA*version=|t19924.1920359525s||49|qs|aws|vector|||1.708|set.cats setting categories like this is deprecated use a twocolumn data.frame instead. set.cats setting categories like this is deprecated use a twocolumn data.frame instead|
 static_targets|object|e95f223d6ac4b8ae|||||||||||||||
 submit_modis_ndvi_bundle_request|function|70d5dcdcf3510fa0|||||||||||||||
@@ -6806,8 +6806,8 @@ wahis_outbreak_history_fcd6d185|branch|b88e6240d28513fb|65b6525b7c403a06|accb6f6
 wahis_outbreak_history_fd128807|branch|4168fac836d005d6|65b6525b7c403a06|19939a4f2b49b921|781902798|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_outbreak_history_fd128807*endpoint=TlVMTA*version=|t19925.9327095399s||8284553|qs|aws|vector|wahis_outbreak_history||15.239||
 wahis_outbreak_history_fe021e4b|branch|4168fac836d005d6|65b6525b7c403a06|d46ea74a9b26013e|-1215013185|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_outbreak_history_fe021e4b*endpoint=TlVMTA*version=|t19925.9070917744s||8284553|qs|aws|vector|wahis_outbreak_history||5.83||
 wahis_outbreak_history_ff7eb2b2|branch|4168fac836d005d6|65b6525b7c403a06|0bb20d45f2f125c3|1813413153|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_outbreak_history_ff7eb2b2*endpoint=TlVMTA*version=|t19925.9173032358s||8284553|qs|aws|vector|wahis_outbreak_history||9.572||
-wahis_outbreak_history_old_animation|stem|4265a9f25b3cffbd|e68dcd8da8af2fa5|8511306371f76e10|2100039105|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_outbreak_history_old_animation*endpoint=TlVMTA*version=|t19926.8097474534s||61|qs|aws|vector|||1306.76||
-wahis_outbreak_history_recent_animation|stem|4c20ebf409128512|7f5f56212cb9e84d|42c10564b8a4cb75|714352032|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_outbreak_history_recent_animation*endpoint=TlVMTA*version=|t19926.8531041549s||65|qs|aws|vector|||1524.575||
+wahis_outbreak_history_old_animation|stem|4265a9f25b3cffbd|e68dcd8da8af2fa5|35c71146ed50e240|2100039105|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_outbreak_history_old_animation*endpoint=TlVMTA*version=|t19927.1309017271s||61|qs|aws|vector|||1594.898||
+wahis_outbreak_history_recent_animation|stem|4c20ebf409128512|7f5f56212cb9e84d|35c71146ed50e240|714352032|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_outbreak_history_recent_animation*endpoint=TlVMTA*version=|t19927.1092282959s||65|qs|aws|vector|||1357.299||
 wahis_rvf_controls_preprocessed|stem|4fe28bd9012b5468|f69b42b2b71db9e6|e9d102bc275b63a3|-891979186|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_rvf_controls_preprocessed*endpoint=TlVMTA*version=|t19671.7281849312s||132807|qs|aws|vector|||0.92|1m22mThere was 1 warning in mutate.1m22m36mℹ39m In argument iso_code  countrycodecountrycodecountry, origin   country.name, destination  iso3c.Caused by warning33m39m Some values were not matched unambiguously ceuta, dominican rep., guadaloupe, melilla. 1m22mThere was 1 warning in mutate.1m22m36mℹ39m In argument continent  countrycodecountrycodecountry, origin   country.name, destination  continent.Caused by warning33m39m Some values were not matched unambiguously ceuta, dominican rep., guadaloupe, melilla|
 wahis_rvf_controls_raw|stem|f26f36ee3a979b39|e4495f4a0c0cba3b|e8439aeec79e7204|-31127431|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_rvf_controls_raw*endpoint=TlVMTA*version=|t19671.720703493s||726918|qs|aws|vector|||44.775||
 wahis_rvf_outbreaks_preprocessed|stem|9e69846ad130ea8d|3ea98184b5887c93|c76bf3f372b7e7b2|2127878318|bucket=open-rvfcast-data*region=us-east-1*key=_targets/wahis_rvf_outbreaks_preprocessed*endpoint=TlVMTA*version=|t19671.7082309806s||155766|qs|aws|vector|||0.078||

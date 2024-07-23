@@ -209,7 +209,7 @@ get_outbreak_history_animation <- function(input_files,
     labs(title = title, x = "Longitude", y = "Latitude", fill = "Weight\n") +
     theme_minimal() +
     theme(text=element_text(size = 14),
-          legend.title = element_text(vjust = 3))
+          legend.title = element_text(vjust = 0.05))
   
   # I can't get anim_save to work on my mac. Switching to ImageMagick rather than bother fixing it
   # gifs save and render fine but can't be opened once saved. I tried re-installing gifski
