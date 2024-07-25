@@ -128,6 +128,20 @@
       ],
       "Hash": "ae6cbbe1492f4de79c45fce06f967ce8"
     },
+    "RcppArmadillo": {
+      "Package": "RcppArmadillo",
+      "Version": "14.0.0-1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "Rcpp",
+        "methods",
+        "stats",
+        "utils"
+      ],
+      "Hash": "a711769be34214addf7805278b72d56b"
+    },
     "RcppEigen": {
       "Package": "RcppEigen",
       "Version": "0.3.3.9.3",
@@ -142,6 +156,17 @@
       ],
       "Hash": "1e035db628cefb315c571202d70202fe"
     },
+    "RcppGSL": {
+      "Package": "RcppGSL",
+      "Version": "0.3.13",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "Rcpp",
+        "stats"
+      ],
+      "Hash": "e8fc7310d256a7b6c4de8e57ab76c55d"
+    },
     "RcppParallel": {
       "Package": "RcppParallel",
       "Version": "5.1.7",
@@ -151,6 +176,36 @@
         "R"
       ],
       "Hash": "a45594a00f5dbb073d5ec9f48592a08a"
+    },
+    "RcppZiggurat": {
+      "Package": "RcppZiggurat",
+      "Version": "0.1.6",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "Rcpp",
+        "RcppGSL",
+        "graphics",
+        "parallel",
+        "stats",
+        "utils"
+      ],
+      "Hash": "75b4a36aeeed440ad03b996081190703"
+    },
+    "Rfast": {
+      "Package": "Rfast",
+      "Version": "2.1.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "Rcpp",
+        "RcppArmadillo",
+        "RcppParallel",
+        "RcppZiggurat"
+      ],
+      "Hash": "79e8394e1fa06a4ae954b70ca9b16e8f"
     },
     "archive": {
       "Package": "archive",
@@ -968,6 +1023,13 @@
       ],
       "Hash": "4d43570de08ab49ba86bb2ccb6fe117d"
     },
+    "geodist": {
+      "Package": "geodist",
+      "Version": "0.1.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "44be46e0ab530e07869976da2e85490d"
+    },
     "gert": {
       "Package": "gert",
       "Version": "2.0.0",
@@ -1004,29 +1066,6 @@
         "R"
       ],
       "Hash": "ceb49d19444b9b3acfce8ee34e23e2f5"
-    },
-    "gganimate": {
-      "Package": "gganimate",
-      "Version": "1.0.9",
-      "Source": "Repository",
-      "Repository": "RSPM",
-      "Requirements": [
-        "cli",
-        "ggplot2",
-        "glue",
-        "grDevices",
-        "grid",
-        "lifecycle",
-        "progress",
-        "rlang",
-        "scales",
-        "stringi",
-        "transformr",
-        "tweenr",
-        "utils",
-        "vctrs"
-      ],
-      "Hash": "c6e8a7ff1b78529309cb2186ec1e3d38"
     },
     "ggforce": {
       "Package": "ggforce",
@@ -1113,6 +1152,13 @@
         "rlang"
       ],
       "Hash": "03533b1c875028233598f848fda44c4c"
+    },
+    "gifski": {
+      "Package": "gifski",
+      "Version": "1.12.0-2",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "94ea43ec9e47684c20810e9272605425"
     },
     "gitcreds": {
       "Package": "gitcreds",
@@ -1560,13 +1606,6 @@
       ],
       "Hash": "4fbd3679ec8ee169ba28d4b1ea7d0e8f"
     },
-    "lpSolve": {
-      "Package": "lpSolve",
-      "Version": "5.6.20",
-      "Source": "Repository",
-      "Repository": "RSPM",
-      "Hash": "2801c8082e89ed84cc0dbe43de850d31"
-    },
     "lubridate": {
       "Package": "lubridate",
       "Version": "1.9.2",
@@ -1579,18 +1618,6 @@
         "timechange"
       ],
       "Hash": "e25f18436e3efd42c7c590a1c4c15390"
-    },
-    "magick": {
-      "Package": "magick",
-      "Version": "2.8.4",
-      "Source": "Repository",
-      "Repository": "RSPM",
-      "Requirements": [
-        "Rcpp",
-        "curl",
-        "magrittr"
-      ],
-      "Hash": "63adf42f6fa0fca09999a328e1ae8204"
     },
     "magrittr": {
       "Package": "magrittr",
@@ -2727,21 +2754,6 @@
         "xfun"
       ],
       "Hash": "5ac22900ae0f386e54f1c307eca7d843"
-    },
-    "transformr": {
-      "Package": "transformr",
-      "Version": "0.1.5",
-      "Source": "Repository",
-      "Repository": "RSPM",
-      "Requirements": [
-        "cpp11",
-        "lpSolve",
-        "rlang",
-        "sf",
-        "tweenr",
-        "vctrs"
-      ],
-      "Hash": "584eda9966ed571b3adc75e338116147"
     },
     "triebeard": {
       "Package": "triebeard",

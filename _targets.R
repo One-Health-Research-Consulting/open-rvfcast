@@ -151,29 +151,40 @@ dynamic_targets <- tar_plan(
                tar_group(),
              iteration = "group"),
   
-  # Map over year batch over day otherwise too many branches.
+  tar_target(wahis_outbreaks, wahis_rvf_outbreaks_preprocessed |> 
+               mutate(end_date = coalesce(outbreak_end_date, outbreak_start_date), na.rm = T) |>
+               select(cases, end_date, latitude, longitude) |>
+               distinct() |>
+               arrange(end_date) |>
+               mutate(outbreak_id = 1:n())),
+  
+  tar_target(wahis_raster_template, terra::rast(terra::ext(continent_polygon), resolution = 0.1, vals = 1) |>
+               terra::crop(terra::vect(continent_polygon$geometry), mask = TRUE) |> 
+               terra::wrap()),
+  
+  tar_target(wahis_distance_matrix, get_outbreak_distance_matrix(wahis_outbreaks, wahis_raster_template)),
+  
+  # Dynamic branch over year batch over day otherwise too many branches.
   tar_target(wahis_outbreak_history, get_daily_outbreak_history(dates_df = wahis_outbreak_dates,
-                                                                wahis_rvf_outbreaks_preprocessed,
-                                                                continent_raster_template,
-                                                                continent_polygon,
-                                                                country_polygons),
-             head(wahis_outbreak_dates, 1),
+                                                                wahis_outbreaks,
+                                                                wahis_distance_matrix,
+                                                                wahis_raster_template,
+                                                                output_dir = "data/outbreak_history_dataset",
+                                                                output_filename = "outbreak_history.tif",
+                                                                save_parquet = T,
+                                                                beta_time = 0.5,
+                                                                max_years = 10,
+                                                                recent = 3/12),
+             map(wahis_outbreak_dates),
              iteration = "vector",
              format = "file", 
              repository = "local"),
   
-  tar_target(wahis_outbreak_history_recent_animation, get_outbreak_history_animation(input_files = c("data/outbreak_history_dataset/outbreak_history_recent_2007.tif"),
-                                                                                     output_dir = "outputs",
-                                                                                     output_filename = "outbreak_history_recent_2007.gif",
-                                                                                     title = "Recent Outbreak History",
-                                                                                     wahis_outbreak_history)), # Just included to enforce dependency with wahis_outbreak_history
+  # Takes raster files and makes animations from the layers
+  tar_target(wahis_outbreak_history_animations, map(wahis_outbreak_history, ~get_outbreak_history_animation(input_file = .x,
+                                                                               output_dir = "outputs")),
+             pattern = map(wahis_outbreak_history)), # Just included to enforce dependency with wahis_outbreak_history
 
-  tar_target(wahis_outbreak_history_old_animation, get_outbreak_history_animation(input_files = c("data/outbreak_history_dataset/outbreak_history_old_2007.tif"),
-                                                                                  output_dir = "outputs",
-                                                                                  output_filename = "outbreak_history_old_2007.gif",
-                                                                                  title = "Old Outbreak History",
-                                                                                  wahis_outbreak_history)), # Just included to enforce dependency with wahis_outbreak_history
-  
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
   # 10 day period
