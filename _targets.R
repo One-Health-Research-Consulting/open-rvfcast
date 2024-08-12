@@ -180,7 +180,10 @@ dynamic_targets <- tar_plan(
              format = "file", 
              repository = "local"),
   
-  # Takes raster files and makes animations from the layers
+  # Animate a SpatRaster stack where each layer is a date.
+  # gganimate took 20 minutes per file.
+  # just saving all the frames as separate pngs
+  # and combining with gifski took 50 minutes for all of them.
   tar_target(wahis_outbreak_history_animations, map(wahis_outbreak_history, ~get_outbreak_history_animation(input_file = .x,
                                                                                output_dir = "outputs")),
              pattern = map(wahis_outbreak_history)), # Just included to enforce dependency with wahis_outbreak_history
