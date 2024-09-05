@@ -55,6 +55,19 @@ cat(
 
 To run the pipeline, the user will need to adapt the `_targets.R` file to use their own object storage repository (we use AWS) and will need to supply keys in an `.env` file. 
 
+For handling gridded binary weather data, this pipeline uses the [ecCodes](https://confluence.ecmwf.int/display/ECC) package which can be installed on OSX using `homebrew`:
+
+```
+brew install eccodes
+```
+
+and on Ubuntu using apt-get
+
+```
+sudo apt update
+sudo apt install eccodes
+```
+
 EHA users: see the `stripts/` repository to be able to directly download data from AWS outside of the targets workflow. 
 
 Follow the links for more information about:

@@ -249,7 +249,12 @@ dynamic_targets <- tar_plan(
   
   # get authorization token
   # this expires after 48 hours
-  tar_target(modis_ndvi_token, get_modis_ndvi_token()),
+  # using tar_change to re-run every 48 hours.
+  # tarchetypes::tar_change(name = modis_ndvi_token, print("test"), 1),
+  
+  tar_target(modis_ndvi_token, print("test")),
+                          # command = get_modis_ndvi_token(), 
+                          # change = floor(as.numeric(Sys.time()) / 3600 / 48)), # Re-run if 48 hours have
   
   # set modis ndvi dates
   tar_target(modis_ndvi_start_year, 2005),

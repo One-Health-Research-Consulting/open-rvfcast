@@ -24,6 +24,8 @@ transform_modis_ndvi <- function(modis_ndvi_downloaded_subset,
   save_filename <- glue::glue("transformed_modis_NDVI_{start_date}.gz.parquet")
   message(paste0("Transforming ", save_filename))
   
+  # MOD13A2.061__1_km_16_days_NDVI_doy2004353_aid0001.tif' not recognized as a supported file format
+  
   # Check if file already exists
   existing_files <- list.files(modis_ndvi_transformed_directory)
   if(save_filename %in% existing_files & !overwrite){
