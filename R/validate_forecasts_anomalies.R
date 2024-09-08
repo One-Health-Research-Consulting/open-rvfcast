@@ -90,7 +90,6 @@ validate_forecasts_anomalies <- function(forecasts_validate_directory,
              !!paste0("anomaly_precipitation_scaled_recorded_", end) := (lead_precipitation_mean - historical_precipitation_mean)/historical_precipitation_sd) |> 
       select(-starts_with("lead"), -starts_with("historical")) 
     
-    
     # Now calculate difference forecast v recorded 
    forecasts_anomalies |> 
      select(x, y, ends_with(as.character(end))) |> 
