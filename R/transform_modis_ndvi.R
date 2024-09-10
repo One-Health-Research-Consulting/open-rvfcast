@@ -42,7 +42,6 @@ transform_modis_ndvi <- function(modis_ndvi_token,
                         httr::write_disk(raw_file, overwrite = TRUE), httr::progress(), httr::add_headers(Authorization = modis_ndvi_token))
   
   
-  
   # Verify rast can open the saved raster file. If not return NULL
   error_safe_read_rast <- possibly(terra::rast, NULL)
   raw_raster = error_safe_read_rast(raw_file)

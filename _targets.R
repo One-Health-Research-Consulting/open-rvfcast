@@ -297,6 +297,9 @@ dynamic_targets <- tar_plan(
              repository = "local", # Repository local means it isn't stored on AWS
              cue = tar_cue(tar_cue_general)), 
   
+  # Next step put modis_ndvi_transformed files on AWS. Need someway to not overwrite if
+  # we know it's good on AWS. Delete bad files ect..
+  tar_target(put_modis_AWS, ) 
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
@@ -309,66 +312,76 @@ dynamic_targets <- tar_plan(
   tar_target(nasa_weather_transformed_directory, 
              create_data_directory(directory_path = "data/nasa_weather_transformed")),
   
-  # Not sure if this will work yet.
-  tar_target(fetch_nasa_weather_AWS, AWS_fetch_folder(nasa_weather_transformed_directory)),
-  
   # set branching for nasa download
   tar_target(nasa_weather_years, 2005:2023),
   tar_target(nasa_weather_variables, c("RH2M", "T2M", "PRECTOTCORR")),
   tar_target(nasa_weather_coordinates, get_nasa_weather_coordinates(country_bounding_boxes)),
   
-  #  download raw files
-  # In order to do the AWS thing I might have to 
-  # drop crossing and just branch on years.
-  tar_target(nasa_weather_downloaded,
-             download_nasa_weather(nasa_weather_coordinates,
+  # Not sure if this will work yet.
+  tar_target(fetch_nasa_weather_AWS, AWS_fetch_folder(nasa_weather_transformed_directory)),
+  
+  tar_target(nasa_weather_tramsformed,
+             transform_nasa_weather2(nasa_weather_coordinates,
                                    nasa_weather_years,
-                                   nasa_weather_variables,
-                                   download_directory = nasa_weather_raw_directory,
-                                   overwrite = FALSE),
-             pattern = crossing(nasa_weather_years, nasa_weather_coordinates),
+                                   continent_raster_template,
+                                   local_folder = "data/nasa_weather_transformed"),
+             pattern = map(nasa_weather_years),
              format = "file",
              repository = "local",
              cue = tar_cue(tar_cue_general)),
   
-  # save raw to AWS bucket
-  tar_target(nasa_weather_raw_upload_aws_s3,  {nasa_weather_downloaded;
-    aws_s3_upload_single_type(directory_path = nasa_weather_raw_directory,
-                              bucket =  aws_bucket,
-                              key = nasa_weather_raw_directory, 
-                              check = TRUE)}, 
-    cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
+  # #  download raw files
+  # # In order to do the AWS thing I might have to 
+  # # drop crossing and just branch on years.
+  # tar_target(nasa_weather_downloaded,
+  #            download_nasa_weather(nasa_weather_coordinates,
+  #                                  nasa_weather_years,
+  #                                  nasa_weather_variables,
+  #                                  download_directory = nasa_weather_raw_directory,
+  #                                  overwrite = FALSE),
+  #            pattern = crossing(nasa_weather_years, nasa_weather_coordinates),
+  #            format = "file",
+  #            repository = "local",
+  #            cue = tar_cue(tar_cue_general)),
   
-  # remove dupes due to having overlapping country bounding boxes
-  # save as arrow dataset, grouped by year
-  tar_target(nasa_weather_pre_transformed, preprocess_nasa_weather(nasa_weather_downloaded,
-                                                                   nasa_weather_pre_transformed_directory),
-             repository = "local",
-             cue = tar_cue(tar_cue_general)), 
+  # # save raw to AWS bucket
+  # tar_target(nasa_weather_raw_upload_aws_s3,  {nasa_weather_downloaded;
+  #   aws_s3_upload_single_type(directory_path = nasa_weather_raw_directory,
+  #                             bucket =  aws_bucket,
+  #                             key = nasa_weather_raw_directory, 
+  #                             check = TRUE)}, 
+  #   cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
   
+  # # remove dupes due to having overlapping country bounding boxes
+  # # save as arrow dataset, grouped by year
+  # tar_target(nasa_weather_pre_transformed, preprocess_nasa_weather(nasa_weather_downloaded,
+  #                                                                  nasa_weather_pre_transformed_directory),
+  #            repository = "local",
+  #            cue = tar_cue(tar_cue_general)), 
+  # 
   # project to the template and save as arrow dataset
   # TODO NAs outside of the continent
   # Why is this folder so big relative to pre-transformed and raw?
   # Because we're adding continent_raster_template to every value in the parquet.
-  tar_target(nasa_weather_transformed, 
-             transform_nasa_weather(nasa_weather_pre_transformed,
-                                    nasa_weather_transformed_directory, 
-                                    continent_raster_template,
-                                    overwrite = F),
-             pattern = nasa_weather_pre_transformed,
-             format = "file", 
-             repository = "local",
-             cue = tar_cue(tar_cue_general)),  
+  # tar_target(nasa_weather_transformed, 
+  #            transform_nasa_weather(nasa_weather_pre_transformed,
+  #                                   nasa_weather_transformed_directory, 
+  #                                   continent_raster_template,
+  #                                   overwrite = F),
+  #            pattern = nasa_weather_pre_transformed,
+  #            format = "file", 
+  #            repository = "local",
+  #            cue = tar_cue(tar_cue_general)),  
   
-  # save transformed to AWS bucket
-  tar_target(nasa_weather_transformed_upload_aws_s3,  
-             aws_s3_upload(path = nasa_weather_transformed,
-                           bucket =  aws_bucket,
-                           key = nasa_weather_transformed,
-                           check = TRUE), 
-             pattern = nasa_weather_transformed,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
-  
+  # # save transformed to AWS bucket
+  # tar_target(nasa_weather_transformed_upload_aws_s3,  
+  #            aws_s3_upload(path = nasa_weather_transformed,
+  #                          bucket =  aws_bucket,
+  #                          key = nasa_weather_transformed,
+  #                          check = TRUE), 
+  #            pattern = nasa_weather_transformed,
+  #            cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
+  # 
   # ECMWF Weather Forecast data -----------------------------------------------------------
   tar_target(ecmwf_forecasts_raw_directory, 
              create_data_directory(directory_path = "data/ecmwf_forecasts_raw")),
