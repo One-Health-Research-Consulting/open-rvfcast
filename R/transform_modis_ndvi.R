@@ -1,14 +1,19 @@
-#' .. content for \description{} (no empty lines) ..
+#' Transform and download MODIS NDVI data from NASA AppEEARS
 #'
-#' .. content for \details{} ..
-#'
-#' @title
-#' @param modis_ndvi_token
-#' @param modis_ndvi_bundle_request
-#' @param continent_raster_template
-#' @param local_folder
-#' @return
+#' This function downloads, transforms, and saves MODIS NDVI data from NASA's AppEEARS API.
+#' The function handles the conversion of the raw raster data into a standardized format
+#' (parquet file), aligning it with a continental raster template. If the transformed file
+#' already exists and can be read, it will return the existing file.
+#' 
 #' @author Nathan Layman
+#' 
+#' @param modis_ndvi_token Character. The authentication token required for the AppEEARS API.
+#' @param modis_ndvi_bundle_request List. Contains the `file_name`, `task_id`, and `file_id` from the AppEEARS bundle request for MODIS NDVI data.
+#' @param continent_raster_template Character. The file path to the template raster used for resampling the MODIS NDVI data.
+#' @param local_folder Character. The path to the local directory where both raw and transformed files are saved.
+#' 
+#' @return A list of successfully transformed files
+#' 
 #' @export
 transform_modis_ndvi <- function(modis_ndvi_token,
                                  modis_ndvi_bundle_request,

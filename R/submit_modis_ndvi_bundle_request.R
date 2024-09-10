@@ -14,11 +14,16 @@ submit_modis_ndvi_bundle_request <- function(modis_ndvi_token, modis_ndvi_task_i
 
   # Get sys time for the loop timeout
   sys_start_time <- Sys.time()
-
+  
+  # token <- paste("Bearer", fromJSON(token_response)$token)
+  # response <- GET("https://appeears.earthdatacloud.nasa.gov/api/task", add_headers(Authorization = modis_ndvi_token))
+  # task_response <- prettify(toJSON(content(response), auto_unbox = TRUE))
+  # task_response
+  
   # Function to check task status
   check_task_status <- function() {
-    task_response <- GET("https://appeears.earthdatacloud.nasa.gov/api/task", add_headers(Authorization = modis_ndvi_token))
-    task_response <- fromJSON(toJSON(content(task_response))) |>  filter(task_id == !!task_id)
+    task_response <- httr::GET("https://appeears.earthdatacloud.nasa.gov/api/task", httr::add_headers(Authorization = modis_ndvi_token))
+    task_response <- jsonlite::fromJSON(jsonlite::toJSON(httr::content(task_response))) |>  filter(task_id == !!task_id)
     task_status <- task_response |> pull(status) |> unlist()
     assertthat::assert_that(task_status %in% c("queued", "pending", "processing", "done"))
     return(task_status)
@@ -35,7 +40,7 @@ submit_modis_ndvi_bundle_request <- function(modis_ndvi_token, modis_ndvi_task_i
     # Check timeout
     elapsed_time <- difftime(Sys.time(), sys_start_time, units = "secs")
     if (task_status != "done" & elapsed_time >= timeout) {
-      message("timeout reached")
+      task_status <- NULL
       break
     }
 
@@ -44,6 +49,12 @@ submit_modis_ndvi_bundle_request <- function(modis_ndvi_token, modis_ndvi_task_i
       message("pausing 60 seconds before checking again")
       Sys.sleep(60)
     }
+  }
+  
+  # If timeout bail
+  if(is.null(task_status)) {
+    message("timeout reached")
+    return(tibble())
   }
 
   bundle_response <- GET(paste("https://appeears.earthdatacloud.nasa.gov/api/bundle/", task_id, sep = ""), add_headers(Authorization = modis_ndvi_token))

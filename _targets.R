@@ -249,11 +249,10 @@ dynamic_targets <- tar_plan(
   tar_target(modis_ndvi_transformed_directory, 
              create_data_directory(directory_path = "data/modis_ndvi_transformed")),
   
-  # get authorization token
-  # this expires after 48 hours
-  # using tar_change to re-run every 48 hours.
-  # tar_target(test_target0, "test"),
-  tarchetypes::tar_change(modis_ndvi_token, get_modis_ndvi_token(), floor(as.numeric(Sys.time()) / 3600 / 48)),
+  # This target reads in an Appears token from the .env file 
+  # and tests that it still works. It then requests a new token 
+  # and updates the .env file if it didn't work.
+  tar_target(modis_ndvi_token, get_modis_ndvi_token(), cue = tar_cue("always")),
 
   # set modis ndvi dates
   tar_target(modis_ndvi_start_year, 2005),
@@ -269,7 +268,9 @@ dynamic_targets <- tar_plan(
   # this function could be refactored to check time of modis_ndvi_task_request and pause for some time before submitting bundle request
   tar_target(modis_ndvi_bundle_request, submit_modis_ndvi_bundle_request(modis_ndvi_token, 
                                                                          modis_ndvi_task_id_continent, 
-                                                                         timeout = 1500) |> rowwise() |> tar_group(),
+                                                                         timeout = 1500) |> 
+               rowwise() |> 
+               tar_group(),
              iteration = "group"
   ),
   
@@ -278,13 +279,14 @@ dynamic_targets <- tar_plan(
   # Step 1. Download any transformed files from AWS (separate target). No hash or error checks
   # Step 2. Branch over bundle request
   # Step 3. Check if transformed file can be opened. If it can return filename
-  # Step 4. If it can't download fresh modis data
+  # Step 4. If it can't, download fresh modis data
   # Step 5. Check to see if modis data can be opened with rast(). If not return NULL.
   # Step 6. If it can be opened, transform and save as parquet. Return filename. Format = "file"
-  # Step 7. Check if parquet can be read. If it can be read upload to AWS (separate target). 
-  tar_target(fetch_modis_AWS, AWS_fetch_folder(modis_ndvi_transformed_directory)), # 1
+  # Step 7. Check if parquet can be read. If not return NULL
+  # Step 8. Clean up AWS and upload any missing files
+  tar_target(fetch_modis_AWS, AWS_fetch_folder(modis_ndvi_transformed_directory)),
  
-    # project to the template and save as parquets (these can now be queried for analysis)
+  # Project to the template and save as parquets (these can now be queried for analysis)
   # this maintains the branches, saves separate files split by date
   # TODO NAs outside of the continent
   tar_target(modis_ndvi_transformed, 
@@ -299,7 +301,8 @@ dynamic_targets <- tar_plan(
   
   # Next step put modis_ndvi_transformed files on AWS. Need someway to not overwrite if
   # we know it's good on AWS. Delete bad files ect..
-  tar_target(put_modis_AWS, ) 
+  tar_target(put_modis_AWS, AWS_put_files(modis_ndvi_transformed,
+                                          modis_ndvi_transformed_directory)),
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;

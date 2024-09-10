@@ -1,16 +1,20 @@
-#' .. content for \description{} (no empty lines) ..
+#' Transform and Download NASA Weather Data
 #'
-#' .. content for \details{} ..
+#' This function downloads weather data from NASA POWER for a given set of coordinates and year, transforms it
+#' based on a continent raster template, and saves the resulting dataset as a parquet file. It checks if the 
+#' transformed file already exists and avoids redundant data downloads and processing.
 #'
-#' @title
-#' @param modis_ndvi_token
-#' @param modis_ndvi_bundle_request
-#' @param continent_raster_template
-#' @param local_folder
-#' @return
 #' @author Nathan Layman
+#'
+#' @param nasa_weather_coordinates Dataframe. A dataframe containing columns of coordinates for the bounding box (x_min, y_min, x_max, y_max) to download weather data.
+#' @param nasa_weather_year Integer. The year for which to download and transform the weather data.
+#' @param continent_raster_template Character. The file path to the template raster used to resample and transform the weather data.
+#' @param local_folder Character. The directory where the transformed data will be saved.
+#'
+#' @return A list of transformed NASA weather data parquet files
+#' 
 #' @export
-transform_nasa_weather2 <- function(nasa_weather_coordinates,
+transform_nasa_weather <- function(nasa_weather_coordinates,
                                     nasa_weather_year,
                                     continent_raster_template,
                                     local_folder) {
