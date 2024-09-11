@@ -263,18 +263,26 @@ dynamic_targets <- tar_plan(
                                                                                     modis_ndvi_end_year,
                                                                                     modis_ndvi_token,
                                                                                     bbox_coords = continent_bounding_box)),
-  # check if the request is posted, then get bundle
-  # this uses a while loop to check every 30 seconds if the request is complete - it takes about 10 minutes
+  
+  tar_target(modis_ndvi_bundle_request_file, file.path(modis_ndvi_transformed_directory, "modis_ndvi_bundle_request.RDS")),
+  
+  # Check if the request is posted, then get bundle
+  # this uses a while loop to check every 30 seconds if the request is complete - it can take a long time
   # this function could be refactored to check time of modis_ndvi_task_request and pause for some time before submitting bundle request
+  # Instead of a loop just check the bundle request status once and move on.
+  # check on status of bundle request. If processing do nothing and move on 
+  # with the pipeline using the previous bundle request or error if one doesn't exist
+  # If it's done, read in bundle request file if it exists and write the 
+  # the bundle request to a file if it doesn't or the task_id doesn't match
   tar_target(modis_ndvi_bundle_request, submit_modis_ndvi_bundle_request(modis_ndvi_token, 
                                                                          modis_ndvi_task_id_continent, 
-                                                                         timeout = 1500) |> 
+                                                                         modis_ndvi_bundle_request_file) |> 
                rowwise() |> 
                tar_group(),
+             cue = tar_cue("always"),
              iteration = "group"
   ),
   
-
   # Plan for large data:
   # Step 1. Download any transformed files from AWS (separate target). No hash or error checks
   # Step 2. Branch over bundle request
