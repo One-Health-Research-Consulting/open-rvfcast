@@ -196,7 +196,7 @@ dynamic_targets <- tar_plan(
   tar_target(sentinel_ndvi_transformed_directory, 
              create_data_directory(directory_path = "data/sentinel_ndvi_transformed")),
   
-  tar_target(fetch_sentinel_ndvi_AWS, AWS_fetch_folder(sentinel_ndvi_transformed_directory)),
+  tar_target(get_sentinel_ndvi_AWS, AWS_get_folder(sentinel_ndvi_transformed_directory)),
   
   # get API parameters
   tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters()), 
@@ -292,7 +292,11 @@ dynamic_targets <- tar_plan(
   # Step 6. If it can be opened, transform and save as parquet. Return filename. Format = "file"
   # Step 7. Check if parquet can be read. If not return NULL
   # Step 8. Clean up AWS and upload any missing files
-  tar_target(fetch_modis_AWS, AWS_fetch_folder(modis_ndvi_transformed_directory)),
+  tar_target(modis_ndvi_transformed_get_AWS, AWS_get_folder(modis_ndvi_transformed_directory,
+                                                            modis_ndvi_token,
+                                                            modis_ndvi_bundle_request,
+                                                            continent_raster_template,
+                                                            modis_ndvi_transformed_directory)),
  
   # Project to the template and save as parquets (these can now be queried for analysis)
   # this maintains the branches, saves separate files split by date
@@ -309,8 +313,8 @@ dynamic_targets <- tar_plan(
   
   # Next step put modis_ndvi_transformed files on AWS. Need someway to not overwrite if
   # we know it's good on AWS. Delete bad files ect..
-  tar_target(put_modis_AWS, AWS_put_files(modis_ndvi_transformed,
-                                          modis_ndvi_transformed_directory)),
+  tar_target(modis_ndvi_transformed_put_AWS, AWS_put_files(modis_ndvi_transformed,
+                                                           modis_ndvi_transformed_directory)), # Dependency
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
@@ -329,77 +333,32 @@ dynamic_targets <- tar_plan(
   tar_target(nasa_weather_coordinates, get_nasa_weather_coordinates(country_bounding_boxes)),
   
   # Not sure if this will work yet.
-  tar_target(fetch_nasa_weather_AWS, AWS_fetch_folder(nasa_weather_transformed_directory)),
+  tar_target(nasa_weather_get_AWS, AWS_get_folder(nasa_weather_transformed_directory,
+                                                  nasa_weather_coordinates, # Dependency
+                                                  nasa_weather_years, # Dependency
+                                                  continent_raster_template)), # Dependency
   
-  tar_target(nasa_weather_tramsformed,
-             transform_nasa_weather2(nasa_weather_coordinates,
-                                   nasa_weather_years,
-                                   continent_raster_template,
-                                   local_folder = "data/nasa_weather_transformed"),
+  tar_target(nasa_weather_tramsformed, transform_nasa_weather(nasa_weather_coordinates,
+                                                              nasa_weather_years,
+                                                              continent_raster_template,
+                                                              local_folder = nasa_weather_transformed_directory),
              pattern = map(nasa_weather_years),
              format = "file",
              repository = "local",
              cue = tar_cue(tar_cue_general)),
   
-  # #  download raw files
-  # # In order to do the AWS thing I might have to 
-  # # drop crossing and just branch on years.
-  # tar_target(nasa_weather_downloaded,
-  #            download_nasa_weather(nasa_weather_coordinates,
-  #                                  nasa_weather_years,
-  #                                  nasa_weather_variables,
-  #                                  download_directory = nasa_weather_raw_directory,
-  #                                  overwrite = FALSE),
-  #            pattern = crossing(nasa_weather_years, nasa_weather_coordinates),
-  #            format = "file",
-  #            repository = "local",
-  #            cue = tar_cue(tar_cue_general)),
+  # Next step put modis_ndvi_transformed files on AWS. Need someway to not overwrite if
+  # we know it's good on AWS. Delete bad files ect..
+  tar_target(nasa_weather_tramsformed_put_AWS, AWS_put_files(nasa_weather_tramsformed,
+                                                             nasa_weather_transformed_directory)),
   
-  # # save raw to AWS bucket
-  # tar_target(nasa_weather_raw_upload_aws_s3,  {nasa_weather_downloaded;
-  #   aws_s3_upload_single_type(directory_path = nasa_weather_raw_directory,
-  #                             bucket =  aws_bucket,
-  #                             key = nasa_weather_raw_directory, 
-  #                             check = TRUE)}, 
-  #   cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
-  
-  # # remove dupes due to having overlapping country bounding boxes
-  # # save as arrow dataset, grouped by year
-  # tar_target(nasa_weather_pre_transformed, preprocess_nasa_weather(nasa_weather_downloaded,
-  #                                                                  nasa_weather_pre_transformed_directory),
-  #            repository = "local",
-  #            cue = tar_cue(tar_cue_general)), 
-  # 
-  # project to the template and save as arrow dataset
-  # TODO NAs outside of the continent
-  # Why is this folder so big relative to pre-transformed and raw?
-  # Because we're adding continent_raster_template to every value in the parquet.
-  # tar_target(nasa_weather_transformed, 
-  #            transform_nasa_weather(nasa_weather_pre_transformed,
-  #                                   nasa_weather_transformed_directory, 
-  #                                   continent_raster_template,
-  #                                   overwrite = F),
-  #            pattern = nasa_weather_pre_transformed,
-  #            format = "file", 
-  #            repository = "local",
-  #            cue = tar_cue(tar_cue_general)),  
-  
-  # # save transformed to AWS bucket
-  # tar_target(nasa_weather_transformed_upload_aws_s3,  
-  #            aws_s3_upload(path = nasa_weather_transformed,
-  #                          bucket =  aws_bucket,
-  #                          key = nasa_weather_transformed,
-  #                          check = TRUE), 
-  #            pattern = nasa_weather_transformed,
-  #            cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
-  # 
   # ECMWF Weather Forecast data -----------------------------------------------------------
   tar_target(ecmwf_forecasts_raw_directory, 
              create_data_directory(directory_path = "data/ecmwf_forecasts_raw")),
   tar_target(ecmwf_forecasts_transformed_directory, 
              create_data_directory(directory_path = "data/ecmwf_forecasts_transformed")),
   
-  tar_target(fetch_ecmwf_forecasts_AWS, AWS_fetch_folder(ecmwf_forecasts_transformed_directory)),
+  tar_target(get_ecmwf_forecasts_AWS, AWS_get_folder(ecmwf_forecasts_transformed_directory)),
   
   # set branching for ecmwf download
   tar_target(ecmwf_forecasts_api_parameters, set_ecmwf_api_parameter(years = 2005:2023,

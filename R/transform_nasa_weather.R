@@ -17,13 +17,14 @@
 transform_nasa_weather <- function(nasa_weather_coordinates,
                                    nasa_weather_year,
                                    continent_raster_template,
-                                   local_folder) {
+                                   local_folder,
+                                   ...) {
   
   # Extract start and end dates to make filename
   start <- paste0(nasa_weather_year, "-01-01")
   end <- paste0(nasa_weather_year, "-12-31")
   current_time <- Sys.Date()
-  if(nasa_weather_years == year(current_time)) end <- as.character(current_time-1)
+  if(nasa_weather_year == year(current_time)) end <- as.character(current_time-1)
   dates <- c(start, end)
   
   transformed_file <- file.path(local_folder, glue::glue("year={nasa_weather_year}/part-0.parquet"))

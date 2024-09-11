@@ -22,11 +22,11 @@
 #'   # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, and AWS_BUCKET_ID
 #'
 #'   # Download files from an S3 bucket folder to a local directory
-#'   downloaded_files <- AWS_fetch_folder("my/local/folder")
+#'   downloaded_files <- AWS_get_folder("my/local/folder")
 #' }
 #' 
 #' @export
-AWS_fetch_folder <- function(local_folder) {
+AWS_get_folder <- function(local_folder, ...) {
   
   # Check if AWS credentials and region are set in the environment
   if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
@@ -127,7 +127,8 @@ AWS_fetch_folder <- function(local_folder) {
 #'
 #' @export
 AWS_put_files <- function(transformed_file_list,
-                          local_folder) {
+                          local_folder,
+                          ...) {
   
   # Check if AWS credentials and region are set in the environment
   if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
@@ -182,7 +183,7 @@ AWS_put_files <- function(transformed_file_list,
         outcome <- c(outcome, glue::glue("Uploading {file} to AWS"))
         
         # Put the file on S3
-        s3_download <- s3$get_object(
+        s3_download <- s3$put_object(
           Bucket = Sys.getenv("AWS_BUCKET_ID"),
           Key = file)
         
