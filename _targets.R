@@ -347,14 +347,16 @@ dynamic_targets <- tar_plan(
   # Download ecmwf forecasts, project to the template 
   # and save as arrow dataset
   # TODO NAs outside of the continent
+  # NCL: Left of here. Bug with 2024
+  # In index 1.Caused by error in metadata_start_indexlengthgdalinfo_text NANaN argument"
   tar_target(ecmwf_forecasts_transformed, 
              transform_ecmwf_forecasts(ecmwf_forecasts_api_parameters,
                                        local_folder = ecmwf_forecasts_transformed_directory,
                                        continent_raster_template,
                                        n_workers = 2),
-             pattern = ecmwf_forecasts_api_parameters,
+             pattern = tail(ecmwf_forecasts_api_parameters, 1),
              error = "null",
-             format = "file",
+             # format = "file",
              repository = "local",
              cue = tar_cue(tar_cue_general)),
   

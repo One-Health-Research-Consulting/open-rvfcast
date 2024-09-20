@@ -263,34 +263,6 @@
       ],
       "Hash": "50c838a310445e954bc13f26f26a6ecf"
     },
-    "aws.s3": {
-      "Package": "aws.s3",
-      "Version": "0.3.21",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "aws.signature",
-        "base64enc",
-        "curl",
-        "digest",
-        "httr",
-        "tools",
-        "utils",
-        "xml2"
-      ],
-      "Hash": "a0b873f71741bba67e3bc128d8f09fe3"
-    },
-    "aws.signature": {
-      "Package": "aws.signature",
-      "Version": "0.6.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "base64enc",
-        "digest"
-      ],
-      "Hash": "0006bcef272aad12f78dd5a85fc7f4fc"
-    },
     "backports": {
       "Package": "backports",
       "Version": "1.4.1",
@@ -827,20 +799,18 @@
     },
     "ecmwfr": {
       "Package": "ecmwfr",
-      "Version": "1.5.0",
+      "Version": "2.0.0",
       "Source": "Repository",
-      "Repository": "CRAN",
+      "Repository": "RSPM",
       "Requirements": [
         "R",
         "R6",
-        "curl",
         "getPass",
         "httr",
         "keyring",
-        "memoise",
-        "uuid"
+        "memoise"
       ],
-      "Hash": "430f1182cec3383b10446c701bc0b277"
+      "Hash": "e71cf10e6459dcfe7ca75b277ad05c2d"
     },
     "ellipsis": {
       "Package": "ellipsis",
@@ -1400,28 +1370,6 @@
         "utils"
       ],
       "Hash": "0080607b4a1a7b28979aecef976d8bc2"
-    },
-    "janitor": {
-      "Package": "janitor",
-      "Version": "2.2.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "R",
-        "dplyr",
-        "hms",
-        "lifecycle",
-        "lubridate",
-        "magrittr",
-        "purrr",
-        "rlang",
-        "snakecase",
-        "stringi",
-        "stringr",
-        "tidyr",
-        "tidyselect"
-      ],
-      "Hash": "5baae149f1082f466df9d1442ba7aa65"
     },
     "jquerylib": {
       "Package": "jquerylib",
@@ -2030,20 +1978,6 @@
       ],
       "Hash": "5e3c5dc0b071b21fa128676560dbe94d"
     },
-    "raster": {
-      "Package": "raster",
-      "Version": "3.6-20",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "R",
-        "Rcpp",
-        "methods",
-        "sp",
-        "terra"
-      ],
-      "Hash": "ebebd9f0f203a129eb2da96470191b82"
-    },
     "readr": {
       "Package": "readr",
       "Version": "2.1.4",
@@ -2212,35 +2146,18 @@
     },
     "rnaturalearth": {
       "Package": "rnaturalearth",
-      "Version": "0.3.3",
+      "Version": "1.0.1",
       "Source": "Repository",
-      "Repository": "RSPM",
+      "Repository": "CRAN",
       "Requirements": [
         "R",
         "httr",
         "jsonlite",
         "sf",
-        "sp",
         "terra",
         "utils"
       ],
-      "Hash": "86411a59f5fc9534d8ea0c270d70cfa5"
-    },
-    "rnaturalearthhires": {
-      "Package": "rnaturalearthhires",
-      "Version": "0.2.1",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteUsername": "ropensci",
-      "RemoteRepo": "rnaturalearthhires",
-      "RemoteRef": "master",
-      "RemoteSha": "c3785a8c44738de6ae8f797080c0a337ebed929d",
-      "Requirements": [
-        "R",
-        "sp"
-      ],
-      "Hash": "4155ba306bfbf56962a271eb88e21fa8"
+      "Hash": "741166cab0fe76d8a5670d3ee459a2a4"
     },
     "rprojroot": {
       "Package": "rprojroot",
@@ -2251,27 +2168,6 @@
         "R"
       ],
       "Hash": "1de7ab598047a87bba48434ba35d497d"
-    },
-    "rstac": {
-      "Package": "rstac",
-      "Version": "0.9.2",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteRepo": "rstac",
-      "RemoteUsername": "OldLipe",
-      "RemoteRef": "b-0.9.1",
-      "RemoteSha": "8436c5fd065cb6f0e6347483ba72ceacac130dee",
-      "Requirements": [
-        "R",
-        "crayon",
-        "httr",
-        "jsonlite",
-        "lifecycle",
-        "magrittr",
-        "utils"
-      ],
-      "Hash": "870433e8693f5c735253af9cca056281"
     },
     "rstudioapi": {
       "Package": "rstudioapi",
@@ -2392,41 +2288,12 @@
       ],
       "Hash": "e2111252a76984ca50bf8d6314348681"
     },
-    "snakecase": {
-      "Package": "snakecase",
-      "Version": "0.11.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "R",
-        "stringi",
-        "stringr"
-      ],
-      "Hash": "4079070fc210c7901c0832a3aeab894f"
-    },
     "sodium": {
       "Package": "sodium",
       "Version": "1.2.1",
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "3606bb09e0914edd4fc8313b500dcd5e"
-    },
-    "sp": {
-      "Package": "sp",
-      "Version": "2.0-0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "R",
-        "grDevices",
-        "graphics",
-        "grid",
-        "lattice",
-        "methods",
-        "stats",
-        "utils"
-      ],
-      "Hash": "2551981e6f85d59c81652bf654d6c3ca"
     },
     "stringfish": {
       "Package": "stringfish",

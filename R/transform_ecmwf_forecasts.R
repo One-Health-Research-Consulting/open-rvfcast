@@ -30,77 +30,93 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   year <- ecmwf_forecasts_api_parameters$year
   month <- unlist(ecmwf_forecasts_api_parameters$month)
   
-  # Create an error safe way to test if the parquet file can be read, if it exists
-  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
   transformed_file <- file.path(local_folder, glue::glue("ecmwf_seasonal_forecast_sys{system}_{year}.gz.parquet"))
   
   # Check if transformed file already exists and can be loaded. 
-  # If so return file name and path unless it's the current year
-  if(!is.null(error_safe_read_parquet(transformed_file)) && year < year(Sys.time())) return(transformed_file)
+  # If so return file name and path **unless it's the current year**
+  # If it's the current year there might be more data than last time so
+  # re-run it.
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  if(!is.null(error_safe_read_parquet(transformed_file)) && year < year(Sys.time())) {
+    message(glue::glue("{transformed_file} is already present and can be read."))
+    return(transformed_file)
+  }
   
   # If the transformed file doesn't exist download what we need from ECMWF
-  # The metadata returned in grib formats sucks and requires an externam dependancy
-  # so download each piece separtatly. 
   raw_files <- expand.grid(product_type = unlist(ecmwf_forecasts_api_parameters$product_types), 
                            variable = unlist(ecmwf_forecasts_api_parameters$variables)) |>
     rowwise() |>
     mutate(raw_file = file.path(local_folder, glue::glue("ecmwf_seasonal_forecast_sys{system}_{year}_{product_type}_{variable}.grib")))
-
-  request_list <- purrr::pmap(raw_files, function(product_type, variable, raw_file) {
-
-    list(
-      originating_centre = "ecmwf",
-      system = system,
-      variable = variable, # This can't (easily) be extracted from terra::describe()
-      product_type = product_type,  # This can't be extracted from terra::describe()
-      year = year,
-      month = month,
-      leadtime_month = unlist(ecmwf_forecasts_api_parameters$leadtime_months), # This can be extracted from terra::describe()
-      area = round(unlist(ecmwf_forecasts_api_parameters$spatial_bounds), 1),  # This can be extracted from terra::describe()
-      format = "grib",
-      dataset_short_name = "seasonal-monthly-single-levels",
-      target = basename(raw_file)
-    )
-    
-  })
+  # return(terra::describe(raw_files$raw_file[1], options = "json"))
+  return(get_grib_metadata(raw_files$raw_file[1]))
   
-  ecmwfr::wf_set_key(user = Sys.getenv("ECMWF_USERID"), key = Sys.getenv("ECMWF_TOKEN"))
-  
-  # https://cds-beta.climate.copernicus.eu/datasets/seasonal-postprocessed-single-levels?tab=overview
-  ecmwf_files <- ecmwfr::wf_request_batch(request = request_list,
-                                          user = Sys.getenv("ECMWF_USERID"), 
-                                          workers = n_workers,
-                                          path = local_folder,
-                                          time_out = time_out,
-                                          total_timeout = length(request_list) * time_out/n_workers)
-  
-  # Verify that terra can open all the saved grib files. If not return NULL to try again next time
+  # Check if raw files are already present and can be opened
+  # If not re-download them all.
   error_safe_read_rast <- possibly(terra::rast, NULL)
-  raw_gribs = map(ecmwf_files, ~error_safe_read_rast(.x))
+  raw_gribs = map(raw_files$raw_file, ~error_safe_read_rast(.x))
   
-  # If not remove the files and stop
-  if(any(is.null(raw_gribs))) {
-    file.remove(raw_files$raw_file)
-    stop(glue::glue("At least one of the grib files could not be loaded after download."))
+  if(any(map_vec(raw_gribs, is.null))) {
+
+    request_list <- purrr::pmap(raw_files, function(product_type, variable, raw_file) {
+  
+      list(
+        originating_centre = "ecmwf",
+        system = system,
+        variable = variable, # This can't (easily) be extracted from terra::describe()
+        product_type = product_type,  # This can't be extracted from terra::describe()
+        year = year,
+        month = month,
+        leadtime_month = unlist(ecmwf_forecasts_api_parameters$leadtime_months), # This can be extracted from terra::describe()
+        area = round(unlist(ecmwf_forecasts_api_parameters$spatial_bounds), 1),  # This can be extracted from terra::describe()
+        format = "grib",
+        dataset_short_name = "seasonal-monthly-single-levels",
+        target = basename(raw_file)
+      )
+      
+    })
+    
+    ecmwfr::wf_set_key(user = Sys.getenv("ECMWF_USERID"), key = Sys.getenv("ECMWF_TOKEN"))
+    
+    # https://cds-beta.climate.copernicus.eu/datasets/seasonal-postprocessed-single-levels?tab=overview
+    ecmwfr::wf_request_batch(request = request_list,
+                             user = Sys.getenv("ECMWF_USERID"), 
+                             workers = n_workers,
+                             path = local_folder,
+                             time_out = time_out,
+                             total_timeout = length(request_list) * time_out/n_workers)
+  
+    # Verify that terra can open all the saved grib files. If not return NULL to try again next time
+    raw_gribs = map(raw_files$raw_file, ~error_safe_read_rast(.x))
+    
+    # If not remove the files and stop
+    if(any(map_vec(raw_gribs, is.null))) {
+      file.remove(raw_files$raw_file)
+      stop("At least one of the grib files could not be loaded after download.")
+    }
+    
+    message(glue::glue("ecmwf_seasonal_forecast_sys{system}_{year} raw files successfully downloaded."))
   }
   
-  meta <- pmap_dfr(raw_files, function(product_type, variable, raw_file) {
-    get_grib_metadata(raw_file) |>
+  return(get_grib_metadata(raw_files$raw_file[1]))
+  
+  meta <- map_dfr(1:length(raw_files), function(i) {
+    get_grib_metadata(raw_files$raw_file[i]) |>
     mutate(step_range = as.numeric(GRIB_FORECAST_SECONDS) / 3600, # forecast step in hours from seconds
            data_date = as.POSIXct(as.numeric(GRIB_REF_TIME), origin = "1970-01-01", tz = "UTC"), # Forecasting out from
            short_name = stringr::str_to_sentence(GRIB_ELEMENT),
            short_name = ifelse(grepl("Var228", short_name), "tprate", short_name),
-           data_type = product_type,
-           variable = variable,
+           data_type = raw_files$product_type[i],
+           variable = raw_files$variable[i],
            variable_id = as.character(glue::glue("{data_date}_step{step_range}_{data_type}_{short_name}"))) |>
       dplyr::select(data_date, step_range, data_type, variable, short_name, variable_id)
   })
+  
+  message(glue::glue("ecmwf_seasonal_forecast_sys{system}_{year} metadata successfully read."))
   
   raw_grib <- terra::rast(raw_files$raw_file)
   # Rename layers with the metadata names
   names(raw_grib) <- meta$variable_id
   
-  # NCL left off here!
   # Select only the means columns
   grib_subset <- terra::subset(raw_grib, which(str_detect(names(raw_grib), "mean"))) 
   
@@ -191,14 +207,14 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   # Create an error safe way to test if the parquet file can be read, if it exists
   error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
   
-  # Clean up grib files
-  file.remove(raw_files$raw_file)
-  
   # Test if transformed parquet file can be loaded. If not clean up and return NULL
   if(is.null(error_safe_read_parquet(transformed_file))) {
     file.remove(transformed_file)
-    return(NULL)
+    stop(glue::glue("{basename(transformed_file)} could not be read."))
   }
+  
+  # Clean up raw grib files
+  file.remove(raw_files$raw_file)
   
   return(transformed_file)
 }

@@ -2,7 +2,7 @@
 #'
 #' @author Nathan Layman
 #'
-#' @param file 
+#' @param raw_file 
 #'
 #' @return
 #' @export
@@ -10,7 +10,13 @@
 #' @examples
 get_grib_metadata <- function(raw_file) {
   
-  gdalinfo_text <- terra::describe(raw_file, options = "json")
+  # options = "json" works in targets but not during live testing
+  # I have no idea why I can't get it to work in the console.
+  # gdalinfo_text <- terra::describe(raw_file, options = "json") 
+  
+  gdalinfo_text <- terra::describe(raw_file) 
+  return(list(file = raw_file, 
+              text = gdalinfo_text))
   
   # Remove all text up to first BAND ^GEOGCRS
   metadata_start_index <- grep("^Band|^BAND", gdalinfo_text)[1]
