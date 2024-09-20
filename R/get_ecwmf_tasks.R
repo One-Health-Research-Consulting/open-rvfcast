@@ -44,28 +44,3 @@ clear_ecwmf_tasks <- function(url = "https://cds.climate.copernicus.eu/api/v2/ta
   request <- walk(tasks_to_clear, ~httr::DELETE(.x, httr::authenticate(Sys.getenv("ECMWF_USERID"), Sys.getenv("ECMWF_TOKEN"))))
 
 }
-
-submit_ecwmf_request <- function(request, 
-                                 url = "https://cds.climate.copernicus.eu/api/v2/tasks/") {
-  
- response <- httr::PUT(jsonlite::toJSON(request), httr::authenticate(Sys.getenv("ECMWF_USERID"), Sys.getenv("ECMWF_TOKEN")))
-  
-}
-response <- POST(
-  url = paste0(ecmwf_url, "/datasets/data/era5"),  # Update endpoint as needed
-  add_headers(
-    Authorization = paste("Bearer", api_key),
-    "Content-Type" = "application/json"
-  ),
-  body = toJSON(query),  # Convert the query to JSON format
-  encode = "json"  # Encode the body as JSON
-)
-
-# Check if the request was successful
-if (status_code(response) == 200) {
-  # Save the response content to the desired file
-  writeBin(content(response, "raw"), "output.nc")
-  cat("File saved successfully.\n")
-} else {
-  cat("Failed to fetch data. Status code:", status_code(response), "\n")
-}

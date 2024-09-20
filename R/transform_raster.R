@@ -13,15 +13,15 @@ transform_raster <- function(raw_raster,
                              method = "cubicspline") {
   
   norm_rast <- raw_raster
-  if(!identical(crs(norm_rast), crs(template))) {
+  if(!identical(terra::crs(norm_rast), terra::crs(template))) {
     norm_rast <- terra::project(raw_raster, template)
   }
-  if(!identical(origin(norm_rast), origin(template)) ||
-     !identical(res(norm_rast), res(template))) {
+  if(!identical(terra::origin(norm_rast), terra::origin(template)) ||
+     !identical(terra::res(norm_rast), terra::res(template))) {
     norm_rast <- terra::resample(norm_rast, template, method = method) 
   } 
   
-  norm_rast <- crop(norm_rast, template)
+  norm_rast <- terra::crop(norm_rast, template)
   
   return(norm_rast)
   

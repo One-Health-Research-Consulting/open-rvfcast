@@ -32,14 +32,11 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   
   # Create an error safe way to test if the parquet file can be read, if it exists
   error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
-  
-  transformed_file <- gsub("\\.grib", "\\.gz\\.parquet", raw_file)
+  transformed_file <- file.path(local_folder, glue::glue("ecmwf_seasonal_forecast_sys{system}_{year}.gz.parquet"))
   
   # Check if transformed file already exists and can be loaded. 
   # If so return file name and path unless it's the current year
   if(!is.null(error_safe_read_parquet(transformed_file)) && year < year(Sys.time())) return(transformed_file)
-  
-  # ensure local_folder ends in '/'
   
   # If the transformed file doesn't exist download what we need from ECMWF
   # The metadata returned in grib formats sucks and requires an externam dependancy
@@ -84,30 +81,28 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   # If not remove the files and stop
   if(any(is.null(raw_gribs))) {
     file.remove(raw_files$raw_file)
-    stop(glue::glue("At least one of the grib files for {raw_file} could not be loaded after download."))
+    stop(glue::glue("At least one of the grib files could not be loaded after download."))
   }
   
-  # Get associated metadata and remove non-df rows
-  grib_meta <- system(paste("grib_ls", raw_file), intern = TRUE)
-  remove <- c(1, (length(grib_meta)-2):length(grib_meta))
-  grib_meta <- grib_meta[-remove]
-  
-  # Almost got rid of grib_ls dependency but can't get data_type from gdalinfo.
-  # Though it looks like we're only using the mean?
-  grib_meta <- pmap_dfr(raw_files, function(product_type, variable, raw_file) {
+  meta <- pmap_dfr(raw_files, function(product_type, variable, raw_file) {
     get_grib_metadata(raw_file) |>
     mutate(step_range = as.numeric(GRIB_FORECAST_SECONDS) / 3600, # forecast step in hours from seconds
            data_date = as.POSIXct(as.numeric(GRIB_REF_TIME), origin = "1970-01-01", tz = "UTC"), # Forecasting out from
            short_name = stringr::str_to_sentence(GRIB_ELEMENT),
+           short_name = ifelse(grepl("Var228", short_name), "tprate", short_name),
            data_type = product_type,
            variable = variable,
            variable_id = as.character(glue::glue("{data_date}_step{step_range}_{data_type}_{short_name}"))) |>
       dplyr::select(data_date, step_range, data_type, variable, short_name, variable_id)
   })
   
-  raw_grib <- terra::rast(raw_gribs)
+  raw_grib <- terra::rast(raw_files$raw_file)
   # Rename layers with the metadata names
-  names(raw_grib) <- grib_meta$variable_id
+  names(raw_grib) <- meta$variable_id
+  
+  # NCL left off here!
+  # Select only the means columns
+  grib_subset <- terra::subset(raw_grib, which(str_detect(names(raw_grib), "mean"))) 
   
   # Units conversions
   # 2d = "2m_dewpoint_temperature" = 	2 metre dewpoint temperature K
@@ -117,14 +112,17 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   
   # Convert kelvin to celsius (note these columns are mislabeled as C)
   temp_cols <- which(str_ends(names(grib_subset), "2d|2t"))
-  grib_temp <- subset(grib_subset, temp_cols)
-  grib_temp <- app(grib_temp, function(i) i - 273.15)
+  grib_temp <- terra::subset(grib_subset, temp_cols)
+  grib_temp <- terra::app(grib_temp, function(i) i - 273.15)
   
   # Convert precipitation from m/second to mm/day
   precip_cols <- which(str_ends(names(grib_subset), "tprate"))
-  grib_precip <- subset(grib_subset, precip_cols)
-  grib_precip <- ifel(grib_precip < 0, 0, grib_precip) # some very small negative values
-  grib_precip <- app(grib_precip, function(i) i * 8.64e+7)
+  grib_precip <- terra::subset(grib_subset, precip_cols)
+  grib_precip <- terra::ifel(grib_precip < 0, 0, grib_precip) # some very small negative values
+  grib_precip <- terra::app(grib_precip, function(i) i * 8.64e+7)
+  
+  # Read in continent template raster
+  continent_raster_template <- terra::rast(continent_raster_template)
   
   # Calculate per-pixel mean for each unique combination, across all models
   # transform to template
@@ -143,7 +141,7 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   rel_humidity <- map2_dfc(dp_cols, t_cols, function(dp, t){
     dp <- grib_means[,dp]
     t <- grib_means[, t]
-    rh <- 100 * exp((17.625 * dp)/(243.04+dp))/exp((17.625 * t)/(243.04+t))
+    rh <- 100 * exp((17.625 * dp)/(243.04 + dp))/exp((17.625 * t)/(243.04 + t))
     assertthat::assert_that(all(rh <= 100 & rh >=0))
     return(rh)
   }) |> set_names(str_replace(dp_cols, "_2d", "_rh"))
@@ -188,7 +186,19 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
     ungroup()
 
   # Save as parquet 
-  write_parquet(grib_means, here::here(ecmwf_forecasts_transformed_directory, save_filename), compression = "gzip", compression_level = 5)
+  arrow::write_parquet(grib_means, transformed_file, compression = "gzip", compression_level = 5)
   
-  return(file.path(ecmwf_forecasts_transformed_directory, save_filename))
+  # Create an error safe way to test if the parquet file can be read, if it exists
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  
+  # Clean up grib files
+  file.remove(raw_files$raw_file)
+  
+  # Test if transformed parquet file can be loaded. If not clean up and return NULL
+  if(is.null(error_safe_read_parquet(transformed_file))) {
+    file.remove(transformed_file)
+    return(NULL)
+  }
+  
+  return(transformed_file)
 }
