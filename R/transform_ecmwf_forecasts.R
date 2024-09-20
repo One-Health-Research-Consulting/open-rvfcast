@@ -18,9 +18,7 @@
 #' @export
 transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
                                       local_folder = ecmwf_forecasts_transformed_directory,
-                                      continent_raster_template,
-                                      n_workers = 2,
-                                      time_out = 3600) {
+                                      continent_raster_template) {
   
   # Check that ecmwf_forecasts_api_parameters is only one row
   stopifnot(nrow(ecmwf_forecasts_api_parameters) == 1)
@@ -47,13 +45,11 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
                            variable = unlist(ecmwf_forecasts_api_parameters$variables)) |>
     rowwise() |>
     mutate(raw_file = file.path(local_folder, glue::glue("ecmwf_seasonal_forecast_sys{system}_{year}_{product_type}_{variable}.grib")))
-  # return(terra::describe(raw_files$raw_file[1], options = "json"))
-  return(get_grib_metadata(raw_files$raw_file[1]))
   
   # Check if raw files are already present and can be opened
   # If not re-download them all.
   error_safe_read_rast <- possibly(terra::rast, NULL)
-  raw_gribs = map(raw_files$raw_file, ~error_safe_read_rast(.x))
+  raw_gribs = map(raw_files$raw_file, ~error_safe_read_rast(.x)) |> suppressWarnings()
   
   if(any(map_vec(raw_gribs, is.null))) {
 
@@ -78,12 +74,12 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
     ecmwfr::wf_set_key(user = Sys.getenv("ECMWF_USERID"), key = Sys.getenv("ECMWF_TOKEN"))
     
     # https://cds-beta.climate.copernicus.eu/datasets/seasonal-postprocessed-single-levels?tab=overview
-    ecmwfr::wf_request_batch(request = request_list,
-                             user = Sys.getenv("ECMWF_USERID"), 
-                             workers = n_workers,
-                             path = local_folder,
-                             time_out = time_out,
-                             total_timeout = length(request_list) * time_out/n_workers)
+    purrr::walk(request_list, 
+                .progress = TRUE,
+                ~ecmwfr::wf_request(request = .x,
+                                 user = Sys.getenv("ECMWF_USERID"), 
+                                 path = local_folder,
+                                 verbose = F))
   
     # Verify that terra can open all the saved grib files. If not return NULL to try again next time
     raw_gribs = map(raw_files$raw_file, ~error_safe_read_rast(.x))
@@ -96,8 +92,6 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
     
     message(glue::glue("ecmwf_seasonal_forecast_sys{system}_{year} raw files successfully downloaded."))
   }
-  
-  return(get_grib_metadata(raw_files$raw_file[1]))
   
   meta <- map_dfr(1:length(raw_files), function(i) {
     get_grib_metadata(raw_files$raw_file[i]) |>
@@ -160,7 +154,9 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
     rh <- 100 * exp((17.625 * dp)/(243.04 + dp))/exp((17.625 * t)/(243.04 + t))
     assertthat::assert_that(all(rh <= 100 & rh >=0))
     return(rh)
-  }) |> set_names(str_replace(dp_cols, "_2d", "_rh"))
+  }) |> 
+    suppressMessages() |> 
+    set_names(str_replace(dp_cols, "_2d", "_rh"))
   
   # Remove dewpoint temperature and add relative humidity
   grib_means <- grib_means |> 

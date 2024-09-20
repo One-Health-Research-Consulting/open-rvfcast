@@ -12,11 +12,12 @@ get_grib_metadata <- function(raw_file) {
   
   # options = "json" works in targets but not during live testing
   # I have no idea why I can't get it to work in the console.
+  # It's a path problem linking terra to an old version of gdal.
+  # Since options="json" only works for newer gdal go with the 
+  # conservative option. Even though it would be super nice!
   # gdalinfo_text <- terra::describe(raw_file, options = "json") 
   
   gdalinfo_text <- terra::describe(raw_file) 
-  return(list(file = raw_file, 
-              text = gdalinfo_text))
   
   # Remove all text up to first BAND ^GEOGCRS
   metadata_start_index <- grep("^Band|^BAND", gdalinfo_text)[1]
