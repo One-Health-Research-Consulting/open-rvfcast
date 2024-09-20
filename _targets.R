@@ -244,36 +244,22 @@ dynamic_targets <- tar_plan(
   # 2005-present
   # this satellite will be retired soon, so we should use sentinel for present dates 
   # 16 day period
-  tar_target(modis_ndvi_raw_directory, 
-             create_data_directory(directory_path = "data/modis_ndvi_raw")),
   tar_target(modis_ndvi_transformed_directory, 
              create_data_directory(directory_path = "data/modis_ndvi_transformed")),
   
-  # This target reads in an Appears token from the .env file 
-  # and tests that it still works. It then requests a new token 
-  # and updates the .env file if it didn't work.
+  # This target reads in an Appears token from the .env file and tests that it 
+  # still works. It requests a new token and updates the .env file if not.
   tar_target(modis_ndvi_token, get_modis_ndvi_token(), cue = tar_cue("always")),
-
-  # set modis ndvi dates
-  tar_target(modis_ndvi_start_year, 2005),
-  tar_target(modis_ndvi_end_year, 2023),
   
   # set parameters and submit request for full continent
-  tar_target(modis_ndvi_task_id_continent, submit_modis_ndvi_task_request_continent(modis_ndvi_start_year,
-                                                                                    modis_ndvi_end_year,
+  tar_target(modis_ndvi_task_id_continent, submit_modis_ndvi_task_request_continent(modis_ndvi_start_year = 2005,
+                                                                                    modis_ndvi_end_year = 2023,
                                                                                     modis_ndvi_token,
                                                                                     bbox_coords = continent_bounding_box)),
   
   tar_target(modis_ndvi_bundle_request_file, file.path(modis_ndvi_transformed_directory, "modis_ndvi_bundle_request.RDS")),
   
-  # Check if the request is posted, then get bundle
-  # this uses a while loop to check every 30 seconds if the request is complete - it can take a long time
-  # this function could be refactored to check time of modis_ndvi_task_request and pause for some time before submitting bundle request
-  # Instead of a loop just check the bundle request status once and move on.
-  # check on status of bundle request. If processing do nothing and move on 
-  # with the pipeline using the previous bundle request or error if one doesn't exist
-  # If it's done, read in bundle request file if it exists and write the 
-  # the bundle request to a file if it doesn't or the task_id doesn't match
+  # Set up modis_ndvi data requests
   tar_target(modis_ndvi_bundle_request, submit_modis_ndvi_bundle_request(modis_ndvi_token, 
                                                                          modis_ndvi_task_id_continent, 
                                                                          modis_ndvi_bundle_request_file) |> 
@@ -283,23 +269,15 @@ dynamic_targets <- tar_plan(
              iteration = "group"
   ),
   
-  # Plan for large data:
-  # Step 1. Download any transformed files from AWS (separate target). No hash or error checks
-  # Step 2. Branch over bundle request
-  # Step 3. Check if transformed file can be opened. If it can return filename
-  # Step 4. If it can't, download fresh modis data
-  # Step 5. Check to see if modis data can be opened with rast(). If not return NULL.
-  # Step 6. If it can be opened, transform and save as parquet. Return filename. Format = "file"
-  # Step 7. Check if parquet can be read. If not return NULL
-  # Step 8. Clean up AWS and upload any missing files
+  # Check if modis_ndvi files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(modis_ndvi_transformed_get_AWS, AWS_get_folder(modis_ndvi_transformed_directory,
                                                             modis_ndvi_token,
                                                             modis_ndvi_bundle_request,
                                                             continent_raster_template,
                                                             modis_ndvi_transformed_directory)),
  
-  # Project to the template and save as parquets (these can now be queried for analysis)
-  # this maintains the branches, saves separate files split by date
+  # Download data, project to the template and save as parquets
   # TODO NAs outside of the continent
   tar_target(modis_ndvi_transformed, 
              transform_modis_ndvi(modis_ndvi_token, 
@@ -311,28 +289,24 @@ dynamic_targets <- tar_plan(
              repository = "local", # Repository local means it isn't stored on AWS
              cue = tar_cue(tar_cue_general)), 
   
-  # Next step put modis_ndvi_transformed files on AWS. Need someway to not overwrite if
-  # we know it's good on AWS. Delete bad files ect..
+  # Put modis_ndvi_transformed files on AWS
   tar_target(modis_ndvi_transformed_put_AWS, AWS_put_files(modis_ndvi_transformed,
-                                                           modis_ndvi_transformed_directory)), # Dependency
+                                                           modis_ndvi_transformed_directory)),
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
   # T2M             MERRA-2 Temperature at 2 Meters (C) ;
   # PRECTOTCORR     MERRA-2 Precipitation Corrected (mm/day)  
-  tar_target(nasa_weather_raw_directory, 
-             create_data_directory(directory_path = "data/nasa_weather_raw")),
-  tar_target(nasa_weather_pre_transformed_directory, 
-             create_data_directory(directory_path = "data/nasa_weather_pre_transformed")),
   tar_target(nasa_weather_transformed_directory, 
              create_data_directory(directory_path = "data/nasa_weather_transformed")),
   
-  # set branching for nasa download
+  # Set branching for nasa_weather download
   tar_target(nasa_weather_years, 2005:2023),
   tar_target(nasa_weather_variables, c("RH2M", "T2M", "PRECTOTCORR")),
   tar_target(nasa_weather_coordinates, get_nasa_weather_coordinates(country_bounding_boxes)),
   
-  # Not sure if this will work yet.
+  # Check if nasa_weather file already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(nasa_weather_get_AWS, AWS_get_folder(nasa_weather_transformed_directory,
                                                   nasa_weather_coordinates, # Dependency
                                                   nasa_weather_years, # Dependency
@@ -347,83 +321,47 @@ dynamic_targets <- tar_plan(
              repository = "local",
              cue = tar_cue(tar_cue_general)),
   
-  # Next step put modis_ndvi_transformed files on AWS. Need someway to not overwrite if
-  # we know it's good on AWS. Delete bad files ect..
-  tar_target(nasa_weather_tramsformed_put_AWS, AWS_put_files(nasa_weather_tramsformed,
-                                                             nasa_weather_transformed_directory)),
+  # Put nasa_weather files on AWS
+  tar_target(nasa_weather_tramsformed_put_AWS, AWS_put_files(modis_ndvi_transformed,
+                                                             modis_ndvi_transformed_directory)),
+  
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
-  tar_target(ecmwf_forecasts_raw_directory, 
-             create_data_directory(directory_path = "data/ecmwf_forecasts_raw")),
   tar_target(ecmwf_forecasts_transformed_directory, 
              create_data_directory(directory_path = "data/ecmwf_forecasts_transformed")),
   
-  tar_target(get_ecmwf_forecasts_AWS, AWS_get_folder(ecmwf_forecasts_transformed_directory)),
-  
   # set branching for ecmwf download
-  tar_target(ecmwf_forecasts_api_parameters, set_ecmwf_api_parameter(years = 2005:2023,
+  tar_target(ecmwf_forecasts_api_parameters, set_ecmwf_api_parameter(years = 2005:2024,
                                                                      bbox_coords = continent_bounding_box,
                                                                      variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
-                                                                     product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
+                                                                     # product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
+                                                                     product_types = c("monthly_mean"),
                                                                      leadtime_months = c("1", "2", "3", "4", "5", "6"))),
   
-  # download files
-  # This stochastically fails. Re-run a few times before debugging
-  tar_target(ecmwf_forecasts_downloaded,
-             download_ecmwf_forecasts(ecmwf_forecasts_api_parameters,
-                                      download_directory = ecmwf_forecasts_raw_directory,
-                                      overwrite = ecmwf_forecasts_api_parameters$year == year(Sys.time())), # Overwrite if current year to get current month.
+  # Check if ecmwf files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(get_ecmwf_forecasts_get_AWS, AWS_get_folder(ecmwf_forecasts_transformed_directory,
+                                                         ecmwf_forecasts_api_parameters, # Dependency
+                                                         continent_raster_template)), # Dependency
+  
+  # Download ecmwf forecasts, project to the template 
+  # and save as arrow dataset
+  # TODO NAs outside of the continent
+  tar_target(ecmwf_forecasts_transformed, 
+             transform_ecmwf_forecasts(ecmwf_forecasts_api_parameters,
+                                       local_folder = ecmwf_forecasts_transformed_directory,
+                                       continent_raster_template,
+                                       n_workers = 2),
              pattern = ecmwf_forecasts_api_parameters,
+             error = "null",
              format = "file",
              repository = "local",
              cue = tar_cue(tar_cue_general)),
   
-  # save raw to AWS bucket
-  tar_target(ecmwf_forecasts_raw_upload_aws_s3,  {ecmwf_forecasts_downloaded;
-    aws_s3_upload_single_type(directory_path = ecmwf_forecasts_raw_directory,
-                              bucket =  aws_bucket ,
-                              key = ecmwf_forecasts_raw_directory,
-                              check = TRUE)},
-    cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
-  
-  # project to the template and save as arrow dataset
-  # TODO NAs outside of the continent
-  tar_target(ecmwf_forecasts_transformed, 
-             transform_ecmwf_forecasts(ecmwf_forecasts_downloaded,
-                                       ecmwf_forecasts_transformed_directory, 
-                                       continent_raster_template,
-                                       n_workers = 2,
-                                       overwrite = FALSE),
-             pattern = ecmwf_forecasts_downloaded,
-             format = "file", 
-             repository = "local",
-             cue = tar_cue(tar_cue_general)),  
-  
-  # save transformed to AWS bucket
-  # using aws.s3::put_object for multipart functionality
-  tar_target(ecmwf_forecasts_transformed_upload_aws_s3, 
-             aws.s3::put_object(file = ecmwf_forecasts_transformed, 
-                                object = ecmwf_forecasts_transformed,
-                                bucket = aws_bucket, 
-                                multipart = TRUE,
-                                verbose = TRUE,
-                                show_progress = TRUE),
-             pattern = ecmwf_forecasts_transformed,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data 
-
-  
-
-  # # cache locally
-  # # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
-  # # Format file here means if we delete or change the local cache it will force a re-download.
-  # tar_target(nasa_recorded_weather_local, {suppressWarnings(dir.create(here::here("data/nasa_parquets"), recursive = TRUE))
-  #   cache_aws_branched_target(tmp_path = tar_read(nasa_recorded_weather_download),
-  #                             ext = ".gz.parquet") 
-  # },
-  # repository = "local", 
-  # format = "file"
-  # ),
-
+  # Next step put modis_ndvi_transformed files on AWS. Need someway to not overwrite if
+  # we know it's good on AWS. Delete bad files ect..
+  tar_target(ecmwf_forecasts_transformed_put_AWS, AWS_put_files(ecmwf_forecasts_transformed,
+                                                                ecmwf_forecasts_transformed_directory)),
 
 )
 

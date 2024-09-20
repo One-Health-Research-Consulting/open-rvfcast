@@ -4,7 +4,7 @@
 #' based on a continent raster template, and saves the resulting dataset as a parquet file. It checks if the 
 #' transformed file already exists and avoids redundant data downloads and processing.
 #'
-#' @author Nathan Layman
+#' @author Nathan Layman, Emma Mendelsohn
 #'
 #' @param nasa_weather_coordinates Dataframe. A dataframe containing columns of coordinates for the bounding box (x_min, y_min, x_max, y_max) to download weather data.
 #' @param nasa_weather_year Integer. The year for which to download and transform the weather data.

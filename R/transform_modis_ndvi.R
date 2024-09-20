@@ -5,7 +5,7 @@
 #' (parquet file), aligning it with a continental raster template. If the transformed file
 #' already exists and can be read, it will return the existing file.
 #' 
-#' @author Nathan Layman
+#' @author Nathan Layman, Emma Mendelsohn
 #' 
 #' @param modis_ndvi_token Character. The authentication token required for the AppEEARS API.
 #' @param modis_ndvi_bundle_request List. Contains the `file_name`, `task_id`, and `file_id` from the AppEEARS bundle request for MODIS NDVI data.
@@ -45,7 +45,6 @@ transform_modis_ndvi <- function(modis_ndvi_token,
   # Write the file to disk
   response <- httr::GET(paste("https://appeears.earthdatacloud.nasa.gov/api/bundle/", task_id, '/', file_id, sep = ""),
                         httr::write_disk(raw_file, overwrite = TRUE), httr::progress(), httr::add_headers(Authorization = modis_ndvi_token))
-  
   
   # Verify rast can open the saved raster file. If not return NULL
   error_safe_read_rast <- possibly(terra::rast, NULL)
