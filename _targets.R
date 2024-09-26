@@ -347,8 +347,6 @@ dynamic_targets <- tar_plan(
   # Download ecmwf forecasts, project to the template 
   # and save as arrow dataset
   # TODO NAs outside of the continent
-  # NCL: Left of here. Bug with 2024
-  # In index 1.Caused by error in metadata_start_indexlengthgdalinfo_text NANaN argument"
   tar_target(ecmwf_forecasts_transformed, 
              transform_ecmwf_forecasts(ecmwf_forecasts_api_parameters,
                                        local_folder = ecmwf_forecasts_transformed_directory,
@@ -359,8 +357,7 @@ dynamic_targets <- tar_plan(
              repository = "local",
              cue = tar_cue(tar_cue_general)),
   
-  # Next step put modis_ndvi_transformed files on AWS. Need someway to not overwrite if
-  # we know it's good on AWS. Delete bad files ect..
+  # Next step put modis_ndvi_transformed files on AWS.
   tar_target(ecmwf_forecasts_transformed_put_AWS, AWS_put_files(ecmwf_forecasts_transformed,
                                                                 ecmwf_forecasts_transformed_directory)),
 
@@ -380,31 +377,35 @@ data_targets <- tar_plan(
                filter(select_date) |> pull(date)
   ),
   
-  # recorded weather anomalies --------------------------------------------------
+  # Recorded weather anomalies --------------------------------------------------
   tar_target(weather_historical_means_directory, 
              create_data_directory(directory_path = "data/weather_historical_means")),
   
-  tar_target(weather_historical_means, calculate_weather_historical_means(nasa_weather_transformed, # enforce dependency
-                                                                          nasa_weather_transformed_directory,
+  # Check if weather_historical_means parquet files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(weather_historical_means_get_AWS, AWS_get_folder(weather_historical_means_directory,
+                                                            days_of_year, # Enforce dependency
+                                                            lag_intervals, # Enforce dependency
+                                                            lead_intervals, # Enforce dependency
+                                                            nasa_weather_transformed_directory, # Enforce dependency
+                                                            nasa_weather_transformed)), # Enforce dependency
+  
+  tar_target(weather_historical_means, calculate_weather_historical_means(nasa_weather_transformed_directory,
                                                                           weather_historical_means_directory,
                                                                           days_of_year,
                                                                           lag_intervals,
                                                                           lead_intervals,
-                                                                          overwrite = FALSE),
-             pattern = days_of_year,
+                                                                          overwrite = FALSE,
+                                                                          nasa_weather_transformed), # Enforce dependency
+             pattern = map(days_of_year),
              format = "file", 
              repository = "local",
              cue = tar_cue(tar_cue_general)),  
   
-  # save historical means to AWS bucket
-  tar_target(weather_historical_means_upload_aws_s3, 
-             aws_s3_upload(path = weather_historical_means,
-                           bucket =  aws_bucket,
-                           key = weather_historical_means, 
-                           check = TRUE), 
-             pattern = weather_historical_means,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
-  
+
+  # Next step put weather_historical_means files on AWS.
+  tar_target(weather_historical_means_put_AWS, AWS_put_files(weather_historical_means,
+                                                                weather_historical_means_directory)),
   
   tar_target(weather_anomalies_directory, 
              create_data_directory(directory_path = "data/weather_anomalies")),

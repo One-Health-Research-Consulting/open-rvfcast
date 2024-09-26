@@ -9,14 +9,15 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-calculate_weather_historical_means <- function(nasa_weather_transformed, # enforce dependency
-                                               nasa_weather_transformed_directory,
+calculate_weather_historical_means <- function(nasa_weather_transformed_directory,
                                                weather_historical_means_directory,
                                                days_of_year,
                                                lag_intervals,
                                                lead_intervals,
-                                               overwrite = FALSE) {
+                                               overwrite = FALSE,
+                                               nasa_weather_transformed) {
   
+  # Check that we're only working with one interval length.
   interval_length <- unique(c(diff(lag_intervals), diff(lead_intervals)))
   assertthat::are_equal(length(interval_length), 1)
   
@@ -26,21 +27,28 @@ calculate_weather_historical_means <- function(nasa_weather_transformed, # enfor
   dummy_date_start  <- ymd("20210101") + doy_start - 1
   dummy_date_end  <- dummy_date_start + interval_length - 1
   doy_end <- yday(dummy_date_end)
-      
+  
   doy_start_frmt <- str_pad(doy_start, width = 3, side = "left", pad = "0")
   doy_end_frmt <- str_pad(doy_end, width = 3, side = "left", pad = "0")
   
   save_filename <- glue::glue("historical_weather_mean_doy_{doy_start_frmt}_to_{doy_end_frmt}.gz.parquet")
   message(paste("calculating historical weather means and standard deviations for doy", doy_start_frmt, "to", doy_end_frmt))
   
+  # Create an error safe way to test if the parquet file can be read, if it exists
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+
+  # Check if the save_file already exists and can be loaded. If so return file name and path
+  if(!is.null(error_safe_read_parquet(save_filename))) return(save_filename)
+  
   # Check if file already exists
   existing_files <- list.files(weather_historical_means_directory)
   if(save_filename %in% existing_files & !overwrite) {
-    message("file already exists, skipping download")
+    message("file already exists and can be loaded, skipping calculation")
     return(file.path(weather_historical_means_directory, save_filename))
   }
+  
   # Open dataset to transformed data
-  weather_transformed_dataset <- open_dataset(nasa_weather_transformed_directory)
+  weather_transformed_dataset <- arrow::open_dataset(nasa_weather_transformed_directory)
   
   # Filter for relevant days of the year and calculate historical means and standard deviations
   doy_select <- yday(seq(dummy_date_start, dummy_date_end, by = "day"))
