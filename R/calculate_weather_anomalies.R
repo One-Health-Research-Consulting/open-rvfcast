@@ -2,19 +2,25 @@
 #'
 #' .. content for \details{} ..
 #'
+#' @param nasa_weather_transformed_directory 
+#' @param weather_historical_means 
+#' @param weather_anomalies_directory 
+#' @param model_dates_selected 
+#' @param lag_intervals 
+#' @param overwrite 
+#' @param ... 
+#'
 #' @title
-#' @param sentinel_ndvi_transformed
-#' @param nasa_weather_transformed
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-calculate_weather_anomalies <- function(nasa_weather_transformed,
-                                        nasa_weather_transformed_directory,
+calculate_weather_anomalies <- function(nasa_weather_transformed_directory,
                                         weather_historical_means,
                                         weather_anomalies_directory,
                                         model_dates_selected,
                                         lag_intervals,
-                                        overwrite = FALSE) {
+                                        overwrite = FALSE,
+                                        ...) {
   
   # Set filename
   date_selected <- model_dates_selected

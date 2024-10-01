@@ -7,6 +7,7 @@
 #' @author Nathan Layman
 #'
 #' @param local_folder Character. The path to the local folder where files should be downloaded and the AWS prefix
+#' @param ... 
 #'
 #' @return A list of files downloaded from AWS
 #' 
@@ -162,7 +163,7 @@ AWS_put_files <- function(transformed_file_list,
   }
   
   # Get files in local folder
-  local_folder_files <- list.files(path = local_folder, recursive = TRUE, full.names = TRUE)
+  local_folder_files <- list.files(path = local_folder, recursive = TRUE)
   
   # Collect outcomes
   outcome <- c()
@@ -183,10 +184,9 @@ AWS_put_files <- function(transformed_file_list,
         outcome <- c(outcome, glue::glue("Uploading {file} to AWS"))
         
         # Put the file on S3
-        s3_download <- s3$put_object(
+        s3_upload <- s3$put_object(
           Bucket = Sys.getenv("AWS_BUCKET_ID"),
-          Key = file)
-        
+          Key = file.path(local_folder, file))
       }
     } else {
       
@@ -200,6 +200,7 @@ AWS_put_files <- function(transformed_file_list,
         # Remove the file from AWS
         s3_download <- s3$delete_object(
           Bucket = Sys.getenv("AWS_BUCKET_ID"),
+          Prefix = local_folder,
           Key = file)
       }
     }

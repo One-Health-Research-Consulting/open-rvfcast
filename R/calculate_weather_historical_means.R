@@ -3,9 +3,15 @@
 #' .. content for \details{} ..
 #'
 #' @title
-#' @param nasa_weather_transformed
+#'
 #' @param nasa_weather_transformed_directory
+#' @param days_of_year 
+#' @param lag_intervals 
+#' @param lead_intervals 
+#' @param overwrite 
+#' @param ... 
 #' @param weather_historical_means_directory
+#'
 #' @return
 #' @author Emma Mendelsohn
 #' @export
@@ -15,7 +21,7 @@ calculate_weather_historical_means <- function(nasa_weather_transformed_director
                                                lag_intervals,
                                                lead_intervals,
                                                overwrite = FALSE,
-                                               nasa_weather_transformed) {
+                                               ...) {
   
   # Check that we're only working with one interval length.
   interval_length <- unique(c(diff(lag_intervals), diff(lead_intervals)))

@@ -10,6 +10,7 @@
 #' @param nasa_weather_year Integer. The year for which to download and transform the weather data.
 #' @param continent_raster_template Character. The file path to the template raster used to resample and transform the weather data.
 #' @param local_folder Character. The directory where the transformed data will be saved.
+#' @param ... 
 #'
 #' @return A list of transformed NASA weather data parquet files
 #' 
@@ -18,6 +19,7 @@ transform_nasa_weather <- function(nasa_weather_coordinates,
                                    nasa_weather_year,
                                    continent_raster_template,
                                    local_folder,
+                                   overwrite = FALSE,
                                    ...) {
   
   # Extract start and end dates to make filename
@@ -33,7 +35,10 @@ transform_nasa_weather <- function(nasa_weather_coordinates,
   error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
   
   # Check if transformed file already exists and can be loaded. If so return file name and path
-  if(!is.null(error_safe_read_parquet(transformed_file))) return(transformed_file)
+  if(!is.null(error_safe_read_parquet(transformed_file)) & !overwrite) {
+    message("file already exists and can be loaded, skipping download")
+    return(transformed_file)
+  }
   
   # If not extract the coordinates and prepare 
   # to re-download data from nasapower

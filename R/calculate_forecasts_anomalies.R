@@ -3,33 +3,36 @@
 #' .. content for \details{} ..
 #'
 #' @title
-#' @param ecmwf_forecasts_transformed
+#'
 #' @param ecmwf_forecasts_transformed_directory
 #' @param weather_historical_means
-#' @param forecast_anomalies_directory
-#' @param model_dates
 #' @param model_dates_selected
+#' @param forecasts_anomalies_directory 
+#' @param lead_intervals 
+#' @param ... 
 #' @param overwrite
+#'
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
-                                          ecmwf_forecasts_transformed_directory,
+calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed_directory,
                                           weather_historical_means,
                                           forecasts_anomalies_directory,
                                           model_dates_selected,
                                           lead_intervals,
-                                          overwrite = FALSE) {
+                                          overwrite = FALSE,
+                                          ...) {
   
   # Set filename
   date_selected <- model_dates_selected
   save_filename <- glue::glue("forecast_anomaly_{date_selected}.gz.parquet")
   message(paste0("Calculating forecast anomalies for ", date_selected))
   
-  # Check if file already exists
-  existing_files <- list.files(forecasts_anomalies_directory)
-  if(save_filename %in% existing_files & !overwrite) {
-    message("file already exists, skipping download")
+  # Check if file already exists and can be read
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  
+  if(!is.null(error_safe_read_parquet(file.path(forecasts_validate_directory, save_filename))) & !overwrite) {
+    message("file already exists and can be loaded, skipping download")
     return(file.path(forecasts_anomalies_directory, save_filename))
   }
   

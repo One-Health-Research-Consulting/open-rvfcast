@@ -18,7 +18,8 @@
 #' @export
 transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
                                       local_folder = ecmwf_forecasts_transformed_directory,
-                                      continent_raster_template) {
+                                      continent_raster_template,
+                                      ...) {
   
   # Check that ecmwf_forecasts_api_parameters is only one row
   stopifnot(nrow(ecmwf_forecasts_api_parameters) == 1)

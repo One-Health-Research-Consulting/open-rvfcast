@@ -17,24 +17,27 @@ validate_forecasts_anomalies <- function(forecasts_validate_directory,
                                          forecasts_anomalies,
                                          nasa_weather_transformed,
                                          weather_historical_means,
-                                         model_dates_selected, lead_intervals,
-                                         overwrite = FALSE) {
+                                         model_dates_selected, 
+                                         lead_intervals,
+                                         overwrite = FALSE,
+                                         ...) {
   
   # Set filename
   date_selected <- model_dates_selected
   save_filename <- glue::glue("forecast_validate_{date_selected}.gz.parquet")
   message(paste0("Validating forecast for ", date_selected))
   
-  # Check if file already exists
-  existing_files <- list.files(forecasts_validate_directory)
-  if(save_filename %in% existing_files & !overwrite) {
-    message("file already exists, skipping download")
+  # Check if file already exists and can be read
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  
+  if(!is.null(error_safe_read_parquet(file.path(forecasts_validate_directory, save_filename))) & !overwrite) {
+    message("file already exists and can be loaded, skipping download")
     return(file.path(forecasts_validate_directory, save_filename))
   }
   
   # Open dataset to forecast anomalies and weather data
-  forecasts_anomalies <- open_dataset(forecasts_anomalies) |> filter(date == date_selected)
-  nasa_weather_transformed <- open_dataset(nasa_weather_transformed)
+  forecasts_anomalies <- arrow::open_dataset(forecasts_anomalies) |> filter(date == date_selected)
+  nasa_weather_transformed <- arrow::open_dataset(nasa_weather_transformed)
   
   # Calculate weather anomalies for selected forecast dates, mapping over the lead intervals
   lead_intervals_start <- c(0 , lead_intervals[-length(lead_intervals)]) # 0 to include current day in forecast
@@ -69,7 +72,7 @@ validate_forecasts_anomalies <- function(forecasts_validate_directory,
     doy_end_frmt <- str_pad(doy_end, width = 3, side = "left", pad = "0")
     doy_range <- glue::glue("{doy_start_frmt}_to_{doy_end_frmt}")
     
-    historical_means <- read_parquet(weather_historical_means[str_detect(weather_historical_means, doy_range)]) 
+    historical_means <- arrow::read_parquet(weather_historical_means[str_detect(weather_historical_means, doy_range)]) 
     
     # get average for weather data over this period
     weather_means <- nasa_weather_transformed |> 
@@ -106,7 +109,7 @@ validate_forecasts_anomalies <- function(forecasts_validate_directory,
     relocate(date)
   
   # Save as parquet 
-  write_parquet(forecasts_validation, here::here(forecasts_validate_directory, save_filename), compression = "gzip", compression_level = 5)
+  arrow::write_parquet(forecasts_validation, here::here(forecasts_validate_directory, save_filename), compression = "gzip", compression_level = 5)
   
   return(file.path(forecasts_validate_directory, save_filename))
   

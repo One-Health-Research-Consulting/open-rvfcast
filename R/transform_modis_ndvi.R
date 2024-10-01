@@ -11,6 +11,7 @@
 #' @param modis_ndvi_bundle_request List. Contains the `file_name`, `task_id`, and `file_id` from the AppEEARS bundle request for MODIS NDVI data.
 #' @param continent_raster_template Character. The file path to the template raster used for resampling the MODIS NDVI data.
 #' @param local_folder Character. The path to the local directory where both raw and transformed files are saved.
+#' @param ... 
 #' 
 #' @return A list of successfully transformed files
 #' 
@@ -18,7 +19,8 @@
 transform_modis_ndvi <- function(modis_ndvi_token,
                                  modis_ndvi_bundle_request,
                                  continent_raster_template,
-                                 local_folder) {
+                                 local_folder,
+                                 ...) {
   
   # Figure out raw file name and path
   raw_file <- file.path(local_folder, basename(modis_ndvi_bundle_request$file_name))

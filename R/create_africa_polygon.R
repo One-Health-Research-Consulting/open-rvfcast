@@ -9,7 +9,7 @@
 #' @export
 create_africa_polygon <- function() {
 
- ne_countries(continent = "Africa", returnclass = "sf") |> 
+  rnaturalearth::ne_countries(continent = "Africa", returnclass = "sf") |> 
     select(featurecla, country = name, country_iso3c = sov_a3)
 
 }
