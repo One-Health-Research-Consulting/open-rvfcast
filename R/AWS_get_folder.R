@@ -131,6 +131,8 @@ AWS_put_files <- function(transformed_file_list,
                           local_folder,
                           ...) {
   
+  transformed_file_list <- basename(transformed_file_list)
+  
   # Check if AWS credentials and region are set in the environment
   if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
     msg <- paste(

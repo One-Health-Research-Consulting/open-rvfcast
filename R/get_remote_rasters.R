@@ -2,21 +2,34 @@
 #' @param urls 
 #' @param output_dir 
 #' @param output_filename 
-#' @param raster_template 
+#' @param continent_raster_template 
 #' @param aggregate_method 
 #' @param resample_method 
 get_remote_rasters <- function(urls, 
                                output_dir, 
                                output_filename, 
-                               raster_template,
+                               continent_raster_template,
                                aggregate_method = NULL,
-                               resample_method = NULL) {
+                               resample_method = NULL,
+                               overwrite = FALSE,
+                               ...) {
   
   # Create directory if it does not yet exist
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   
   # Unwrap terra raster
-  raster_template <- terra::unwrap(raster_template)
+  continent_raster_template <- terra::unwrap(continent_raster_template)
+  
+  # Set up safe way to read parquet files
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  
+  save_filename <- file.path(output_dir, output_filename)
+  
+  # Check if soil files exist and can be read and that we don't want to overwrite them.
+  if(!is.null(error_safe_read_parquet(save_filename)) & !overwrite) {
+    message(glue::glue("{output_filename} already exists and can be loaded, skipping download and processing"))
+    return(save_filename)
+  }
   
   # Test if parquet or not
   if(!grepl("(tif|tiff|nc|asc|parquet|pq|arrow)", tools::file_ext(output_filename))) stop("output filename is not .tif or .parquet")
@@ -40,7 +53,7 @@ get_remote_rasters <- function(urls,
     download.file(url = urls[i][[1]], rar_file, mode = "wb")
     
     # List the contents of the .rar archive
-    archive_contents <- archive(rar_file)
+    archive_contents <- archive::archive(rar_file)
     
     # Find the first raster file within the archive
     raster_file <- paste(output_dir, archive_contents$path[grep("\\.(tif|tiff|asc|grd|nc)$", archive_contents$path)][1], sep = "/")
@@ -58,8 +71,8 @@ get_remote_rasters <- function(urls,
     unpacked_raster <- terra::rast(raster_file)
   
     # Reproject and crop raster to template
-    unpacked_raster <- terra::project(unpacked_raster, raster_template)
-    unpacked_raster <- crop(unpacked_raster, raster_template)
+    unpacked_raster <- terra::project(unpacked_raster, continent_raster_template)
+    unpacked_raster <- terra::crop(unpacked_raster, continent_raster_template)
     
     # Set the raster layer name to the name associated with the url
     names(unpacked_raster) <- names(urls)[i]
@@ -83,16 +96,16 @@ get_remote_rasters <- function(urls,
   
   # Pre-process raster prior to normalization  
   # For example aggregate_method="which.max" identifies the layer with the highest value for each pixel
-  if(!is.null(aggregate_method)) combined_raster <- app(combined_raster, fun = aggregate_method, na.rm = TRUE)
+  if(!is.null(aggregate_method)) combined_raster <- terra::app(combined_raster, fun = aggregate_method, na.rm = TRUE)
   
   # Re-sample raster to match template
   # Can change behavior with 'method' argument.
   # 'Mode' is most common value within cell. 
   # The default is bilinear interpolation for continuous data
   if(is.null(resample_method)) {
-    combined_raster <- terra::resample(combined_raster, raster_template)  
+    combined_raster <- terra::resample(combined_raster, continent_raster_template)  
   } else {
-    combined_raster <- terra::resample(combined_raster, raster_template, method = resample_method)  
+    combined_raster <- terra::resample(combined_raster, continent_raster_template, method = resample_method)  
   }
   
   # Save as parquet if appropriate
@@ -109,5 +122,5 @@ get_remote_rasters <- function(urls,
   }
     
   # Return path to saved file
-  return(paste(output_dir, output_filename, sep = "/"))
+  return(save_filename)
 }

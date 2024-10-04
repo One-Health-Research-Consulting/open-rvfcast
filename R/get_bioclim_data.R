@@ -10,12 +10,27 @@
 #' @examples
 get_bioclim_data <- function(output_dir, 
                              output_filename, 
-                             raster_template) {
+                             continent_raster_template,
+                             overwrite = FALSE,
+                             ...) {
   
   # Create directory if it does not yet exist
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   
-  template <- terra::unwrap(raster_template)
+  template <- terra::unwrap(continent_raster_template)
+  
+  # Set up safe way to read parquet files
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  
+  # GLW filenames
+  bioclim_filename <- file.path(output_dir, output_filename)
+  
+  # Check if glw files exist and can be read and that we don't want to overwrite them.
+  if(!is.null(error_safe_read_parquet(bioclim_filename)) & !overwrite) {
+    message("preprocessed bioclim parquet file already exists and can be loaded, skipping download and processing")
+    return(bioclim_filename)
+  }
+  
   bioclim_data <- geodata::worldclim_global(var = "bio", res = 2.5, path = output_dir)
   
   bioclim_data <- transform_raster(bioclim_data, template)
@@ -34,22 +49,20 @@ get_bioclim_data <- function(output_dir,
   # Assign the new names to the layers
   names(bioclim_data) <- bioclim_names
   
-  filename = paste(output_dir, output_filename, sep = "/")
-  
-  if(grepl("\\.parquet", filename)) {
+  if(grepl("\\.parquet", bioclim_filename)) {
     # Convert to dataframe
     dat <- as.data.frame(bioclim_data, xy = TRUE) |> as_tibble()
     
     # Save as parquet 
-    arrow::write_parquet(dat, filename, compression = "gzip", compression_level = 5)
+    arrow::write_parquet(dat, bioclim_filename, compression = "gzip", compression_level = 5)
     
-    terra::writeRaster(bioclim_data, filename=gsub("parquet", "tif", filename), overwrite=T, gdal=c("COMPRESS=LZW"))
+    terra::writeRaster(bioclim_data, filename=gsub("parquet", "tif", bioclim_filename), overwrite=T, gdal=c("COMPRESS=LZW"))
     
   } else {
-    terra::writeRaster(bioclim_data, filename=filename, overwrite=T, gdal=c("COMPRESS=LZW"))
+    terra::writeRaster(bioclim_data, filename=bioclim_filename, overwrite=T, gdal=c("COMPRESS=LZW"))
   }
   
   unlink(paste(output_dir, "climate", sep = "/"), recursive=TRUE)
   
-  return(filename)
+  return(bioclim_filename)
 }

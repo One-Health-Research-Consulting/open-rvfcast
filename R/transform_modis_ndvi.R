@@ -20,6 +20,7 @@ transform_modis_ndvi <- function(modis_ndvi_token,
                                  modis_ndvi_bundle_request,
                                  continent_raster_template,
                                  local_folder,
+                                 overwrite = FALSE,
                                  ...) {
   
   # Figure out raw file name and path
@@ -36,7 +37,11 @@ transform_modis_ndvi <- function(modis_ndvi_token,
   error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
   
   # Check if transformed file already exists and can be loaded. If so return file name and path
-  if(!is.null(error_safe_read_parquet(transformed_file))) return(transformed_file)
+  # Check if glw files exist and can be read and that we don't want to overwrite them.
+  if(!is.null(error_safe_read_parquet(transformed_file)) & !overwrite) {
+    message("preprocessed modis ndvi parquet file already exists and can be loaded, skipping download and processing")
+    return(basename(transformed_file))
+  }
   
   # If not download temporary file
   message(paste0("Downloading ", raw_file))

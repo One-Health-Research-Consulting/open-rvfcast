@@ -39,8 +39,8 @@ static_targets <- tar_plan(
   
   tar_target(continent_polygon, create_africa_polygon()),
   tar_target(continent_bounding_box, sf::st_bbox(continent_polygon)),
-  tar_target(continent_raster_template,
-             wrap(terra::rast(ext(continent_polygon), resolution = 0.1))), 
+  tar_target(continent_raster_template, wrap(terra::rast(ext(continent_polygon), resolution = 0.1))), 
+  
   # nasa power resolution = 0.5; 
   # ecmwf = 1; 
   # sentinel ndvi = 0.01
@@ -48,20 +48,24 @@ static_targets <- tar_plan(
   tar_target(rsa_polygon, rgeoboundaries::geoboundaries("South Africa", "adm2")),
   
   # SOIL -----------------------------------------------------------
-  
-  tar_target(soil_directory_dataset, create_data_directory(directory_path = "data/soil_dataset")),
+  tar_target(soil_directory, create_data_directory(directory_path = "data/soil_dataset")),
   
   # Check if preprocessed soil data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
-  tar_target(soil_directory_AWS, AWS_get_folder(soil_directory_dataset,
-                                                continent_raster_template)), # Enforce Dependency
+  tar_target(soil_AWS, AWS_get_folder(soil_directory,
+                                      continent_raster_template), # Enforce Dependency
+             error = "null"), # Continue the pipeline even on error
   
-  tar_target(soil_preprocessed, preprocess_soil(soil_directory_dataset, 
+  tar_target(soil_preprocessed, preprocess_soil(soil_directory, 
                                                 continent_raster_template, 
-                                                overwrite = FALSE)),
+                                                overwrite = FALSE,
+                                                soil_AWS), # Enforce dependency
+             format = "file",
+             repository = "local"),
   
-  tar_target(soil_preprocessed_AWS_upload, AWS_put_files(soil_preprocessed,
-                                                         soil_directory_dataset)),
+  tar_target(soil_preprocessed_AWS_upload, AWS_put_files(soil_preprocessed, 
+                                                         aspect_directory),
+             error = "null"), # Continue the pipeline even on error
   
   # ASPECT -------------------------------------------------
   tar_target(aspect_urls, c("aspect_zero" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClN_30as.rar",
@@ -70,14 +74,28 @@ static_targets <- tar_plan(
                             "aspect_twotwentyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClW_30as.rar",
                             "aspect_undef" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClU_30as.rar")),
   
+  tar_target(aspect_directory, create_data_directory(directory_path = "data/aspect_dataset")),
+  
+  # Check if preprocessed aspect data already exists on AWS and can be loaded.
+  # If so download from AWS instead of primary source
+  tar_target(aspect_AWS, AWS_get_folder(aspect_directory,
+                                        continent_raster_template),
+             error = "null"), # Enforce Dependency
+  
   tar_target(aspect_preprocessed, get_remote_rasters(urls = aspect_urls, 
-                                                     output_dir = "data/aspect_dataset",
+                                                     output_dir = aspect_directory,
                                                      output_filename = "aspect.parquet",
-                                                     raster_template = continent_raster_template,
+                                                     continent_raster_template,
                                                      aggregate_method = "which.max", # What is the dominant aspect for each point?
-                                                     resample_method = "mode"), # What is the domminant aspect at the scale of the template raster?
-    format = "file", 
-    repository = "local"),
+                                                     resample_method = "mode", # What is the dominant aspect at the scale of the template raster?
+                                                     overwrite = FALSE,
+                                                     aspect_AWS), # Enforce dependency
+             format = "file",
+             repository = "local"),
+  
+  tar_target(aspect_preprocessed_AWS_upload, AWS_put_files(aspect_preprocessed,
+                                                           aspect_directory),
+             error = "null"), # Continue the pipeline even on error
   
   # SLOPE -------------------------------------------------
   tar_target(slope_urls, c("slope_zero" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl1_30as.rar",
@@ -89,49 +107,127 @@ static_targets <- tar_plan(
                            "slope_thirty" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl7_30as.rar",
                            "slope_fortyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl8_30as.rar")),
   
+  tar_target(slope_directory, create_data_directory(directory_path = "data/slope_dataset")),
+  
+  # Check if preprocessed slope data already exists on AWS and can be loaded.
+  # If so download from AWS instead of primary source
+  tar_target(slope_AWS, AWS_get_folder(aspect_directory,
+                                       continent_raster_template), # Enforce Dependency
+             error = "null"), # Continue the pipeline even on error
+  
   tar_target(slope_preprocessed, get_remote_rasters(urls = slope_urls, 
-                                                    output_dir = "data/slope_dataset",
+                                                    output_dir = slope_directory,
                                                     output_filename = "slope.parquet",
-                                                    raster_template = continent_raster_template,
+                                                    continent_raster_template,
                                                     aggregate_method = "which.max", # What is the dominant slope for each point?
-                                                    resample_method = "mode"), # What is the domminant slope at the scale of the template raster?
-             format = "file", 
+                                                    resample_method = "mode", # What is the dominant slope at the scale of the template raster?
+                                                    overwrite = FALSE,
+                                                    slope_AWS), # Enforce dependency
+             format = "file",
              repository = "local"),
+  
+  tar_target(slope_preprocessed_AWS_upload, AWS_put_files(slope_preprocessed,
+                                                          slope_directory),
+             error = "null"), # Continue the pipeline even on error
  
    # Gridded Livestock of the world -----------------------------------------------------------
-  tar_target(glw_directory_raw, 
-             create_data_directory(directory_path = "data/glw")),
-  tar_target(glw_downloaded, get_glw_data(glw_directory_raw),
-             format = "file", 
-             repository = "local"),
-  tar_target(glw_directory_dataset, 
+  tar_target(glw_urls, c("glw_cattle" = "https://dataverse.harvard.edu/api/access/datafile/6769710", 
+                         "glw_sheep" = "https://dataverse.harvard.edu/api/access/datafile/6769629",
+                         "glw_goats" = "https://dataverse.harvard.edu/api/access/datafile/6769692")),
+  
+  tar_target(glw_directory, 
              create_data_directory(directory_path = "data/glw_dataset")),
+  
+  # Check if preprocessed glw data already exists on AWS and can be loaded.
+  # If so download from AWS instead of primary source
+  tar_target(glw_AWS, AWS_get_folder(glw_directory,
+                                     continent_raster_template), # Enforce Dependency
+             error = "null"), # Continue the pipeline even on error
+  
   tar_target(glw_preprocessed, 
-             preprocess_glw_data(glw_directory_dataset, glw_directory_raw, glw_downloaded, continent_raster_template)),
+             preprocess_glw_data(glw_directory, 
+                                 glw_urls,
+                                 continent_raster_template,
+                                 overwrite = TRUE,
+                                 glw_AWS),
+             format = "file",
+             repository = "local"), # Enforce dependency
+  
+  tar_target(glw_preprocessed_AWS_upload, AWS_put_files(glw_preprocessed,
+                                                        glw_directory),
+             error = "null"), # Continue the pipeline even on error
 
 # ELEVATION -----------------------------------------------------------
+tar_target(elevation_directory, 
+           create_data_directory(directory_path = "data/elevation_dataset")),
+
+# Check if preprocessed elevation data already exists on AWS and can be loaded.
+# If so download from AWS instead of primary source
+tar_target(elevation_AWS, AWS_get_folder(elevation_directory,
+                                         continent_raster_template), # Enforce Dependency
+           error = "null"), # Continue the pipeline even on error
+
+# NCL NEEDS TO SAVE AS PARQUET
 tar_target(elevation_preprocessed, 
-           get_elevation_data(output_dir = "data/elevation_dataset", 
+           get_elevation_data(output_dir = elevation_directory, 
                               output_filename = "africa_elevation.parquet",
-                              raster_template = continent_raster_template),
-           format = "file", 
+                              continent_raster_template,
+                              overwrite = FALSE,
+                              elevation_AWS), # Enforce dependency
+           format = "file",
            repository = "local"),
+
+tar_target(elevation_preprocessed_AWS_upload, AWS_put_files(elevation_preprocessed,
+                                                            elevation_directory),
+           error = "null"), # Continue the pipeline even on error
 
 # BIOCLIM -----------------------------------------------------------
+tar_target(bioclim_directory, 
+           create_data_directory(directory_path = "data/bioclim_dataset")),
+
+# Check if preprocessed bioclim data already exists on AWS and can be loaded.
+# If so download from AWS instead of primary source
+tar_target(bioclim_AWS, AWS_get_folder(bioclim_directory,
+                                         continent_raster_template), # Enforce Dependency
+           error = "null"), # Continue the pipeline even on error
+
 tar_target(bioclim_preprocessed,
-           get_bioclim_data(output_dir = "data/bioclim_dataset", 
+           get_bioclim_data(output_dir = bioclim_directory, 
                             output_filename = "bioclim.parquet",
-                            raster_template = continent_raster_template),
-           format = "file", 
+                            continent_raster_template,
+                            overwrite = FALSE),
+           format = "file",
            repository = "local"),
 
+tar_target(bioclim_preprocessed_AWS_upload, AWS_put_files(bioclim_preprocessed,
+                                                          bioclim_directory),
+           error = "null"), # Continue the pipeline even on error
+
 # LANDCOVER -----------------------------------------------------------
+tar_target(landcover_types, c("trees", "grassland", "shrubs", "cropland", "built", "bare", "snow", "water", "wetland", "mangroves", "moss")),
+
+tar_target(landcover_directory, 
+           create_data_directory(directory_path = "data/landcover_dataset")),
+
+# Check if preprocessed bioclim data already exists on AWS and can be loaded.
+# If so download from AWS instead of primary source
+tar_target(landcover_AWS, AWS_get_folder(landcover_directory,
+                                         continent_raster_template), # Enforce Dependency
+           error = "null"), # Continue the pipeline even on error
+
 tar_target(landcover_preprocessed,
-           get_landcover_data(output_dir = "data/landcover_dataset", 
+           get_landcover_data(output_dir = landcover_directory, 
                               output_filename = "landcover.parquet",
-                              raster_template = continent_raster_template),
-           format = "file", 
+                              landcover_types,
+                              continent_raster_template,
+                              overwrite = FALSE,
+                              landcover_AWS), # Enforce Dependency
+           format = "file",
            repository = "local"),
+
+tar_target(landcover_preprocessed_AWS_upload, AWS_put_files(landcover_preprocessed,
+                                                            landcover_directory),
+           error = "null"), # Continue the pipeline even on error
 )
 
 
@@ -164,25 +260,39 @@ dynamic_targets <- tar_plan(
                arrange(end_date) |>
                mutate(outbreak_id = 1:n())),
   
-  tar_target(wahis_raster_template, terra::rast(terra::ext(continent_polygon), resolution = 0.1, vals = 1) |>
-               terra::crop(terra::vect(continent_polygon$geometry), mask = TRUE) |> 
-               terra::wrap()),
+  tar_target(wahis_raster_template, terra::rasterize(terra::vect(continent_polygon), # Take the boundary of Africa
+                                                     terra::rast(continent_polygon, # Mask against a raster filled with 1's
+                                                                 resolution = 0.1, # Set resolution
+                                                                 vals = 1)) |>
+               terra::wrap()), # Wrap to avoid problems with targets
   
   tar_target(wahis_distance_matrix, get_outbreak_distance_matrix(wahis_outbreaks, wahis_raster_template)),
+  
+  tar_target(wahis_outbreak_history_directory, 
+             create_data_directory(directory_path = "data/outbreak_history_dataset")),
+  
+  # Check if preprocessed wahis_outbreak_history data already exists on AWS and can be loaded.
+  # If so download from AWS instead of primary source
+  tar_target(wahis_outbreak_history_AWS, AWS_get_folder(wahis_outbreak_history_directory,
+                                                        wahis_outbreak_dates, # Enforce Dependency
+                                                        wahis_outbreaks, # Enforce Dependency
+                                                        wahis_distance_matrix, # Enforce Dependency
+                                                        wahis_raster_template), # Enforce Dependency
+             error = "null"), # Continue the pipeline even on error
   
   # Dynamic branch over year batch over day otherwise too many branches.
   tar_target(wahis_outbreak_history, get_daily_outbreak_history(dates_df = wahis_outbreak_dates,
                                                                 wahis_outbreaks,
                                                                 wahis_distance_matrix,
                                                                 wahis_raster_template,
-                                                                output_dir = "data/outbreak_history_dataset",
-                                                                output_filename = "outbreak_history.tif",
-                                                                save_parquet = T,
+                                                                output_dir = wahis_outbreak_history_directory,
+                                                                output_filename = "outbreak_history.parquet",
                                                                 beta_time = 0.5,
                                                                 max_years = 10,
-                                                                recent = 3/12),
-             map(wahis_outbreak_dates),
-             iteration = "vector",
+                                                                recent = 3/12,
+                                                                overwrite = FALSE,
+                                                                wahis_outbreak_history_AWS), # Enforce Dependency
+             pattern = map(wahis_outbreak_dates),
              format = "file", 
              repository = "local"),
   
@@ -190,6 +300,7 @@ dynamic_targets <- tar_plan(
   # gganimate took 20 minutes per file.
   # just saving all the frames as separate pngs
   # and combining with gifski took 50 minutes for all of them.
+  # get_outbreak_history_animation()
   tar_target(wahis_outbreak_history_animations, map(wahis_outbreak_history, ~get_outbreak_history_animation(input_file = .x,
                                                                                output_dir = "outputs")),
              pattern = map(wahis_outbreak_history)), # Just included to enforce dependency with wahis_outbreak_history
@@ -259,7 +370,6 @@ dynamic_targets <- tar_plan(
   
   # set parameters and submit request for full continent
   tar_target(modis_ndvi_task_id_continent, submit_modis_ndvi_task_request_continent(modis_ndvi_start_year = 2005,
-                                                                                    modis_ndvi_end_year = 2023,
                                                                                     modis_ndvi_token,
                                                                                     bbox_coords = continent_bounding_box)),
   
@@ -290,9 +400,9 @@ dynamic_targets <- tar_plan(
                                   modis_ndvi_bundle_request,
                                   continent_raster_template,
                                   modis_ndvi_transformed_directory,
+                                  overwrite = FALSE,
                                   modis_ndvi_transformed_AWS), # Enforce dependency
              pattern = modis_ndvi_bundle_request,
-             format = "file", 
              repository = "local", # Repository local means it isn't stored on AWS
              cue = tar_cue(tar_cue_general)), 
   

@@ -24,13 +24,12 @@ preprocess_soil <- function(soil_directory_dataset,
   soil_texture_file <- file.path(soil_directory_dataset, "soil_texture.parquet")
   soil_drainage_file <- file.path(soil_directory_dataset, "soil_drainage.parquet")
   
-  # Check if sile files exist and can be read and that we don't want to overwrite them.
+  # Check if soil files exist and can be read and that we don't want to overwrite them.
   if(!is.null(error_safe_read_parquet(soil_texture_file)) & 
      !is.null(error_safe_read_parquet(soil_drainage_file)) & 
      !overwrite) {
     message("preprocessed soil files already exist and can be loaded, skipping download and processing")
-    return(c(basename(soil_texture_file), 
-             basename(soil_drainage_file)))
+    return(c(soil_texture_file, soil_drainage_file))
   }
   
   # Download soil texture data and unzip
@@ -45,17 +44,17 @@ preprocess_soil <- function(soil_directory_dataset,
                 destfile = soil_drainage_raw_file)
    
   ###### SOIL TEXTURE ######
-  transformed_raster <- transform_raster(raw_raster = rast(file.path(soil_directory_dataset, "/HWSD2.bil")),
-                                         template = rast(continent_raster_template))
+  transformed_raster <- transform_raster(raw_raster = terra::rast(file.path(soil_directory_dataset, "/HWSD2.bil")),
+                                         template = terra::rast(continent_raster_template))
   
   # connect to database and extract values
   m <- dbDriver("SQLite")
-  con <- dbConnect(m, dbname="data/soil/soil_database.sqlite")
+  con <- dbConnect(m, dbname=soil_drainage_raw_file)
   dbListTables(con)
   
   #### extract map unit codes in bounded area (WINDOW_ZHNJ) to join with SQL databases###
   dbWriteTable(con, name="WINDOW_ZHNJ",
-               value=data.frame(hwsd2_smu = sort(unique(values(transformed_raster)))),
+               value=data.frame(hwsd2_smu = sort(unique(terra::values(transformed_raster)))),
                overwrite=TRUE)
   
   dbExecute(con, "drop table if exists ZHNJ_SMU") # to overwrite
@@ -88,8 +87,8 @@ preprocess_soil <- function(soil_directory_dataset,
   
   #classify the raster (transformed_raster) using the matrix of values - TEXTURE CLASS
   # CLASIFFY DOESN'T SEEM TO BE WORKING LEFT OFF HERE
-  hwsd.zhnj.texture <- classify(transformed_raster, rcl.matrix.texture)
-  hwsd.zhnj.texture <- as.factor(hwsd.zhnj.texture)
+  hwsd.zhnj.texture <- terra::classify(transformed_raster, rcl.matrix.texture)
+  hwsd.zhnj.texture <- terra::as.factor(hwsd.zhnj.texture)
   levels(hwsd.zhnj.texture) <- levels(records$TEXTURE_USDA)
   
   # Convert to dataframe
@@ -129,8 +128,8 @@ preprocess_soil <- function(soil_directory_dataset,
                       drainage = as.numeric(records$DRAINAGE))
   
   #classify the raster (transformed_raster) using the matrix of values - DRAINAGE
-  hwsd.zhnj.drainage <- classify(transformed_raster, rcl.matrix.drainage)
-  hwsd.zhnj.drainage <- as.factor(hwsd.zhnj.drainage)
+  hwsd.zhnj.drainage <- terra::classify(transformed_raster, rcl.matrix.drainage)
+  hwsd.zhnj.drainage <- terra::as.factor(hwsd.zhnj.drainage)
   levels(hwsd.zhnj.drainage) <- levels(records$DRAINAGE)
   
   # Convert to dataframe
@@ -159,6 +158,5 @@ preprocess_soil <- function(soil_directory_dataset,
   # Clean up all non-parquet files
   file.remove(grep("\\.parquet$", list.files(soil_directory_dataset, full.names = TRUE), value = TRUE, invert = TRUE))
   
-  return(c(basename(soil_texture_file), 
-           basename(soil_drainage_file)))
+  return(c(soil_texture_file, soil_drainage_file))
 }

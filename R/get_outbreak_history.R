@@ -5,19 +5,36 @@ get_daily_outbreak_history <- function(dates_df,
                                        wahis_distance_matrix,
                                        wahis_raster_template,
                                        output_dir = "data/outbreak_history_dataset",
-                                       output_filename = "outbreak_history.tif",
-                                       save_parquet = T,
+                                       output_filename = "outbreak_history.parquet",
                                        beta_time = 0.5,
                                        max_years = 10,
-                                       recent = 3/12) {
+                                       recent = 3/12,
+                                       overwrite = FALSE,
+                                       ...) {
   
-  if(!grepl("(tif|tiff|nc|asc)", tools::file_ext(output_filename))) stop("output_filename extension must be .tif, .tiff, .nc, or .asc!")
+  # Ensure only one year in dates provided
+  year <- unique(dates_df$year)
+  stopifnot(length(year) == 1)
   
   # Create directory if it does not yet exist
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   
+  # Unwrap raster template
   wahis_raster_template <- terra::unwrap(wahis_raster_template)
   
+  # Set up safe way to read parquet files
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  
+  # Check if output file already exists and can be loaded
+  outbreak_history_filename <- file.path(output_dir, glue::glue("{tools::file_path_sans_ext(output_filename)}_{year}.{tools::file_ext(output_filename)}"))
+  
+  # Check if outbreak_history file exist and can be read and that we don't want to overwrite them.
+  if(!is.null(error_safe_read_parquet(outbreak_history_filename)) & !overwrite & year != year(Sys.time())) {
+    message("preprocessed landcover parquet file already exists and can be loaded, skipping download and processing")
+    return(outbreak_history_filename)
+  }
+  
+  # This is the computationally intensive step get_outbreak_history()
   daily_outbreak_history <- map_dfr(dates_df$date, ~get_outbreak_history(date = .x,
                                                                          wahis_outbreaks,
                                                                          wahis_distance_matrix,
@@ -25,21 +42,23 @@ get_daily_outbreak_history <- function(dates_df,
                                                                          beta_time = beta_time,
                                                                          max_years = max_years,
                                                                          recent = recent))
-  
+
   daily_recent_outbreak_history <- terra::rast(daily_outbreak_history$recent_outbreaks_rast)
   daily_old_outbreak_history <- terra::rast(daily_outbreak_history$old_outbreaks_rast)
   
-  recent_output_filename <- paste0(output_dir, "/", tools::file_path_sans_ext(output_filename), "_recent_", dates_df$year[1], ".", tools::file_ext(output_filename))
-  recent <- as.data.frame(daily_recent_outbreak_history, xy = TRUE) |> as_tibble()
-  arrow::write_parquet(recent, paste0(tools::file_path_sans_ext(recent_output_filename), ".parquet"), compression = "gzip", compression_level = 5)
-  terra::writeRaster(daily_recent_outbreak_history, filename = recent_output_filename, overwrite=T, gdal=c("COMPRESS=LZW"))
+  recent_xy <- as.data.frame(daily_recent_outbreak_history, xy = TRUE) |> 
+    as_tibble() |> 
+    pivot_longer(-c(x,y), names_to = "date", values_to = "weight") |> 
+    mutate(time_frame = "recent")
   
-  old_output_filename <- paste0(output_dir, "/", tools::file_path_sans_ext(output_filename), "_old_", dates_df$year[1], ".", tools::file_ext(output_filename))
-  old <- as.data.frame(daily_old_outbreak_history, xy = TRUE) |> as_tibble()
-  arrow::write_parquet(old, paste0(tools::file_path_sans_ext(old_output_filename), ".parquet"), compression = "gzip", compression_level = 5)
-  terra::writeRaster(daily_old_outbreak_history, filename = old_output_filename, overwrite=T, gdal=c("COMPRESS=LZW"))
+  old_xy <- as.data.frame(daily_old_outbreak_history, xy = TRUE) |> 
+    as_tibble() |> 
+    pivot_longer(-c(x,y), names_to = "date", values_to = "weight") |> 
+    mutate(time_frame = "old")
   
-  c(recent_output_filename, old_output_filename)
+  arrow::write_parquet(bind_rows(recent_xy, old_xy), outbreak_history_filename, compression = "gzip", compression_level = 5)
+  
+  return(outbreak_history_filename)
   
 }
 
@@ -184,65 +203,82 @@ get_outbreak_history_animation <- function(input_file,
   
   message(paste("Animating", output_filename))
   
-  # Load the raster
-  outbreak_raster <- terra::rast(input_file)
+  # Load the data
+  outbreak_history <- arrow::read_parquet(input_file)
   
-  df <- as.data.frame(outbreak_raster, xy=TRUE)
+  # Identify limits (used to calibrate the color scale)
+  lims <- c(min(df$weight, na.rm=T), 
+            max(df$weight, na.rm=T))
   
-  lims <- c(min(select(df, c(-x, -y)), na.rm=T), 
-            max(select(df, c(-x, -y)), na.rm=T))
+  # Make animations for both recent and old outbreaks
+  outbreak_history |> 
+    group_by(time_frame) |> 
+    group_split() |>
+    map(function(df) {
+      
+      frames <- df |> group_by(date) |>
+      
+      # This function makes a png for each date which will then get stiched together
+      # into the animation. Saving each png is faster than trying to do everything
+      # in memory.
+      png_files <- parallel::mclapply(mc.cores = num_cores, 
+                                      frames, 
+                                      function(frame) plot_outbreak_history(frame,
+                                                                            tmp_dir = tmp_dir,
+                                                                            lims = lims)) |> 
+        unlist() |> sort()
+      
+      # Add in a delay at end before looping back to beginning. This is in frames not seconds
+      png_files <- c(png_files, rep(png_files |> tail(1), 50))
+      
+      # Render the animation
+      gif_file <- gifski::gifski(png_files, 
+                                 delay = 0.04,
+                                 gif_file = output_filename)
+      
+      # Clean up temporary files
+      unlink(tmp_dir, recursive = T)
+      
+      # Return the location of the rendered animation
+      output_filename
+    })
   
-  date_indices <- which(names(df) %in% setdiff(names(df), c("x", "y")))
-  coordinates <- df |> select(x,y)
   
-  title <- stringr::str_split(tools::file_path_sans_ext(basename(input_file)), "_")[[1]] |> 
-    head(-1) |> paste(collapse = " ") |> 
-    stringr::str_to_title()
-  
-  png_files <- parallel::mclapply(mc.cores = num_cores, 
-                     date_indices, 
-                     function(i) plot_outbreak_history(coordinates,
-                                                       weights = df[,i],
-                                                       date = names(df)[i],
-                                                       tmp_dir = tmp_dir,
-                                                       title = paste(title, names(df)[i]),
-                                                       lims = lims)) |> 
-    unlist() |> sort()
-  
-  # Add in a delay at end before looping back to beginning. This is in frames not seconds
-  png_files <- c(png_files, rep(png_files |> tail(1), 50))
-  
-  # Render the animation
-  gif_file <- gifski::gifski(png_files, 
-                             delay = 0.04,
-                             gif_file = output_filename)
-  
-  # Clean up temporary files
-  unlink(tmp_dir, recursive = T)
-  
-  # Return the location of the rendered animation
-  output_filename
+ 
 }
 
-plot_outbreak_history <- function(coordinates,
-                                  weights, 
-                                  date,
+#' Title
+#'
+#' @param frame 
+#' @param tmp_dir 
+#' @param write_frame 
+#' @param lims 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+plot_outbreak_history <- function(frame,
                                   tmp_dir,
-                                  title = NULL,
+                                  write_frame = TRUE,
                                   lims = NULL) {
   
-  filename <- paste0(tmp_dir, "/", date, ".png")
+  date <- frame$date |> unique() |> pluck(1)
+  time_frame <- frame$time_frame |> unique() |> pluck(1)
   
-  p <- ggplot(coordinates |> mutate(value = weights), aes(x=x, y=y, fill=value)) +
+  filename <- file.path(tmp_dir, glue::glue("{date}_{time_frame}.png"))
+  title <- glue::glue("Outbreak History: {date}")
+  
+  p <- ggplot(frame, aes(x=x, y=y, fill=weight)) +
     geom_raster() +
     scale_fill_viridis_c(limits = lims,
                          trans = scales::sqrt_trans()) +
     labs(title = title, x = "Longitude", y = "Latitude", fill = "Weight\n") +
     theme_minimal() +
-    theme(text=element_text(size = 18),
+    theme(text = element_text(size = 18),
           legend.title = element_text(vjust = 0.05)) 
   
-  if(!is.null(filename)) {
+  if(write_frame) {
     png(filename = filename, width = 600, height = 600)
     print(p)
     dev.off()

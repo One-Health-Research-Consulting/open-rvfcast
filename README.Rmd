@@ -53,7 +53,7 @@ cat(
 )
 ```
 
-To run the pipeline, the user will need to adapt the `_targets.R` file to use their own object storage repository (we use AWS) and will need to supply keys in an `.env` file. 
+Many of the computational steps can be time consuming and either depend on or produce large files. In order to speed up the pipeline, intermediate files can be stored on the cloud for rapid retrieval and portability between pipeline instances. We currently use an AWS [S3 bucket](https://aws.amazon.com/s3/) for this purpose. The pipeline will still run without access to cloud storage but the user can benefit from adapt the `_targets.R` file to use their own object storage repository. AWS access keys and bucket ID are stored in the `.env` file. 
 
 For handling gridded binary weather data, this pipeline uses the [ecCodes](https://confluence.ecmwf.int/display/ECC) package which can be installed on OSX using `homebrew`:
 
