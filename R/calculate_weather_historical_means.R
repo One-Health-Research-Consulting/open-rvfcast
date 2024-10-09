@@ -1,19 +1,31 @@
-#' .. content for \description{} (no empty lines) ..
+#' Calculate historical weather means
 #'
-#' .. content for \details{} ..
+#' This function calculates the historical weather means based on the given range of days and preprocessed NASA weather data
+#' and saves the result in the specified directory. It can also overwrite existing files if specified.
 #'
-#' @title
-#'
-#' @param nasa_weather_transformed_directory
-#' @param days_of_year 
-#' @param lag_intervals 
-#' @param lead_intervals 
-#' @param overwrite 
-#' @param ... 
-#' @param weather_historical_means_directory
-#'
-#' @return
 #' @author Emma Mendelsohn
+#'
+#' @param nasa_weather_transformed_directory Directory containing the transformed NASA weather data.
+#' @param weather_historical_means_directory Directory where the processed historical weather means will be saved.
+#' @param days_of_year Vector of days of the year for which to calculate the mean.
+#' @param lag_intervals Lag intervals which represent the range of days to calculate the lag. It should have the same length as lead_intervals.
+#' @param lead_intervals Lead intervals which represent the range of days to calculate the lead. It should have the same length as lag_intervals.
+#' @param overwrite Boolean flag indicating if existing files should be overwritten. Default is FALSE.
+#' @param ... Additional arguments not used by this function but included for generic function compatibility.
+#'
+#' @return String indicating the file path to the saved historical weather means.
+#'
+#' @note This function calculates the historical weather means based on various variables. 
+#' If a file already exists and the overwrite flag is FALSE, it returns the existing file.
+#'
+#' @examples
+#' calculate_weather_historical_means(nasa_weather_transformed_directory = './data',
+#'                    weather_historical_means_directory = 'weather_means',
+#'                    days_of_year = c(1:365),
+#'                    lag_intervals = c(1:10), 
+#'                    lead_intervals = c(11:20),
+#'                    overwrite = TRUE)
+#'
 #' @export
 calculate_weather_historical_means <- function(nasa_weather_transformed_directory,
                                                weather_historical_means_directory,

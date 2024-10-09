@@ -1,18 +1,37 @@
-#' .. content for \description{} (no empty lines) ..
+#' Validate Forecasts Anomalies
 #'
-#' .. content for \details{} ..
+#' The function 'validate_forecasts_anomalies' takes in several parameters including aggregated forecasts,
+#' processed NASA weather data, historical weather means, model dates, lead intervals and a boolean for overwriting
+#' existing files. It validates the anomaly forecasts based on the given parameters and saves the output to 
+#' a defined directory.
 #'
-#' @title
-#' @param forecasts_validate_directory
-#' @param forecasts_anomalies
-#' @param nasa_weather_transformed
-#' @param weather_historical_means
-#' @param model_dates_selected
-#' @param lead_intervals
-#' @param overwrite
-#' @return
 #' @author Emma Mendelsohn
-#' @export
+#'
+#' @param forecasts_validate_directory Directory where the validation results will be saved.
+#' @param forecasts_anomalies The dataset containing the aggregated weather anomaly forecasts.
+#' @param nasa_weather_transformed The processed NASA weather data.
+#' @param weather_historical_means The historical means of the weather variables to be used.
+#' @param model_dates_selected The dates selected for modelling.
+#' @param lead_intervals Time intervals for leading the forecast.
+#' @param overwrite A boolean indicating whether to overwrite existing validation files. Default is FALSE.
+#' @param ... Additional arguments not used by the function.
+#'
+#' @return A string containing the filepath to the saved validation results.
+#'
+#' @note The function validates the anomaly forecast by comparing the forecasted anomalies to the recorded ones based on 
+#' the provided lead intervals and updates the database with the results. If the validation file already exists, and overwrite is 
+#' set to FALSE, the filepath to the existing file is returned.
+#'
+#' @examples
+#' validate_forecasts_anomalies(forecasts_validate_directory='./forecasts/validate',
+#'                              forecasts_anomalies='forecasts_anomalies.parquet',
+#'                              nasa_weather_transformed='nasa_weather.parquet',
+#'                              weather_historical_means='weather_historical_means.parquet',
+#'                              model_dates_selected=as.Date('2007-01-01'),
+#'                              lead_intervals=c(0, 7, 14, 21),
+#'                              overwrite=FALSE)
+#'
+#' @expor
 validate_forecasts_anomalies <- function(forecasts_validate_directory,
                                          forecasts_anomalies,
                                          nasa_weather_transformed,

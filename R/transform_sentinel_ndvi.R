@@ -9,35 +9,49 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-transform_sentinel_ndvi <- function(sentinel_ndvi_downloaded,
+transform_sentinel_ndvi <- function(sentinel_ndvi_api_parameters,
                                     continent_raster_template,
                                     sentinel_ndvi_transformed_directory,
-                                    overwrite = FALSE) {
+                                    overwrite = FALSE,
+                                    ...) {
+  
+  # Create directory if it does not yet exist
+  dir.create(sentinel_ndvi_transformed_directory, recursive = TRUE, showWarnings = FALSE)
+  
+  template <- terra::unwrap(continent_raster_template)
+  
+  # Set up safe way to read parquet files
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  
+  raw_filename <- file.path(sentinel_ndvi_transformed_directory, sentinel_ndvi_api_parameters$properties$title)
   
   # Extract start and end dates from the raw downloaded file name
   # naming conventions
   # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-3-synergy/naming-conventions
-  filename <- basename(sentinel_ndvi_downloaded)
-  assertthat::are_equal(nchar(filename), 97)
-  start_date <- as.Date(str_sub(filename, 17, 24), format = "%Y%m%d")
-  end_date <- as.Date(str_sub(filename, 33, 40), format = "%Y%m%d")
+  filename_dates <- regmatches(basename(raw_filename), gregexpr("\\d{8}", basename(raw_filename))) |> 
+    unlist() |>
+    map_vec(~as.Date(.x, format = "%Y%m%d"))
+  start_date <- min(filename_dates)
+  end_date <- max(filename_dates)
   
-  # Set filename for saving
-  save_filename <- glue::glue("transformed_sentinel_NDVI_{start_date}_to_{end_date}.gz.parquet")
-  message(paste0("Transforming ", save_filename))
+  sentinel_ndvi_filename <- file.path(sentinel_ndvi_transformed_directory, glue::glue("transformed_sentinel_NDVI_{start_date}_to_{end_date}.gz.parquet"))
   
-  # Check if file already exists
-  existing_files <- list.files(sentinel_ndvi_transformed_directory)
-  if(save_filename %in% existing_files & !overwrite){
-    message("file already exists, skipping transform")
-    return(file.path(sentinel_ndvi_transformed_directory, save_filename))
+  # Check if glw files exist and can be read and that we don't want to overwrite them.
+  if(!is.null(error_safe_read_parquet(sentinel_ndvi_filename)) & !overwrite) {
+    message("transformed sentinel ndvi parquet file already exists and can be loaded, skipping download and processing")
+    return(sentinel_ndvi_filename)
   }
   
-  # Transform with template raster
+  # Download raw data
+  sentinel_ndvi_downloaded <- download_sentinel_ndvi(sentinel_ndvi_api_parameters, raw_filename)
+  
+  message(paste0("Transforming ", raw_filename))
+  
+  # Re-project to raster to template
   transformed_raster <- transform_raster(raw_raster = rast(sentinel_ndvi_downloaded),
                                          template = rast(continent_raster_template))
   
-  # Convert to dataframe
+  # Convert raster to dataframe
   dat_out <- as.data.frame(transformed_raster, xy = TRUE) |> 
     as_tibble() |> 
     rename(ndvi = NDVI) |> 
@@ -45,8 +59,10 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_downloaded,
            end_date = end_date)
   
   # Save as parquet 
-  write_parquet(dat_out, here::here(sentinel_ndvi_transformed_directory, save_filename), compression = "gzip", compression_level = 5)
+  arrow::write_parquet(dat_out, sentinel_ndvi_filename, compression = "gzip", compression_level = 5)
   
-  return(file.path(sentinel_ndvi_transformed_directory, save_filename))
+  # Clean up download file
+  unlink(sentinel_ndvi_downloaded)
   
+  return(sentinel_ndvi_filename)
 }

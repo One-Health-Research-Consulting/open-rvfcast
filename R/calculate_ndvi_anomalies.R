@@ -1,22 +1,38 @@
-#' .. content for \description{} (no empty lines) ..
+#' Calculate NDVI Anomalies
 #'
-#' .. content for \details{} ..
+#' This function calculates the NDVI (Normalized Difference Vegetation Index) anomalies for a specified date.
+#' The anomalies are calculated by comparing lagged, weighted daily NDVI values to historical means and standard deviations for overlapping days of the year.
+#' The function writes the anomalies into a GZ parquet file and returns its path.
 #'
-#' @title
-#' @param ndvi_date_lookup
-#' @param ndvi_historical_means
-#' @param ndvi_anomalies_directory
-#' @param model_dates
-#' @param model_dates_selected
-#' @param lag_intervals
-#' @param overwrite
-#' @return
 #' @author Emma Mendelsohn
+#'
+#' @param ndvi_date_lookup A data frame containing the filenames for each day along with their respective dates for retrieval.
+#' @param ndvi_historical_means A character vector of file paths to gz parquet files containing historical means for each grid cell and day of the year. 
+#' @param ndvi_anomalies_directory The directory to write the gz parquet file of anomalies.
+#' @param model_dates_selected Model dates selected.
+#' @param lag_intervals A numeric vector defining the start day for each lag period.
+#' @param overwrite A boolean indicating whether existing files in the directory for the specified date should be overwritten.
+#' @param ... Additional arguments not used by this function but included for generic function compatibility.
+#'
+#' @return A string containing the path to the gz parquet file written by this function.
+#'
+#' @note If a file already exists in the directory for the specified date and 'overwrite' is 'FALSE', this function will return the existing file path without performing any calculations.
+#'
+#' @examples
+#' calculate_ndvi_anomalies(ndvi_date_lookup=my_lookup,
+#'                          ndvi_historical_means=historical_means,
+#'                          ndvi_anomalies_directory='./anomalies',
+#'                          model_dates_selected=as.Date('2020-05-01'),
+#'                          lag_intervals=c(1, 7, 14, 21, 30),
+#'                          overwrite=TRUE)
+#'
 #' @export
-calculate_ndvi_anomalies <- function(ndvi_date_lookup, ndvi_historical_means,
+calculate_ndvi_anomalies <- function(ndvi_date_lookup, 
+                                     ndvi_historical_means,
                                      ndvi_anomalies_directory,
                                      model_dates_selected, lag_intervals,
-                                     overwrite = FALSE) {
+                                     overwrite = FALSE,
+                                     ...) {
   
   # Set filename
   date_selected <- model_dates_selected

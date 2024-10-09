@@ -1,3 +1,29 @@
+#' Retrieve and preprocess global land cover data
+#'
+#' The function 'get_landcover_data' downloads global land cover data, preprocesses it based on the provided types,
+#' and saves it as a Parquet file and a TIF file in the specified directory. If a file already exists at the target
+#' filepath and overwrite is set to FALSE, the existing file is returned without downloading and preprocessing the data.
+#'
+#' @author Nathan C. Layman
+#'
+#' @param output_dir Directory where the downloaded and preprocessed files will be saved. The directory is created if it doesn't exist.
+#' @param output_filename Filename for the output files.
+#' @param landcover_types Types of land cover data to retrieve. The data is downloaded according to these types.
+#' @param continent_raster_template Raster template to be used for land cover data transformation.
+#' @param overwrite Boolean option to indicate whether to overwrite existing files. Default is FALSE.
+#' @param ... Additional parameters not required by this function but included for compatibility with generic functions.
+#'
+#' @return A string containing the filepath to the preprocessed and stored Parquet file.
+#'
+#' @note If a file already exists at the target filepath and overwrite is FALSE, the existing file is returned without 
+#' downloading and preprocessing the data again.
+#'
+#' @examples
+#' get_landcover_data(output_dir = './data', output_filename = 'landcover.parquet',
+#'                    landcover_types = c('forest', 'urban', 'water'), 
+#'                    continent_raster_template = raster_template, overwrite = TRUE)
+#'
+#' @export
 get_landcover_data <- function(output_dir, 
                                output_filename, 
                                landcover_types,

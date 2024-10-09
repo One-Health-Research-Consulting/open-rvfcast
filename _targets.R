@@ -293,23 +293,45 @@ dynamic_targets <- tar_plan(
                                                                 overwrite = FALSE,
                                                                 wahis_outbreak_history_AWS), # Enforce Dependency
              pattern = map(wahis_outbreak_dates),
+             error = "null", # Keep going if error. It will be caught next time the pipeline is run.
+             
              format = "file", 
              repository = "local"),
+  
+  tar_target(wahis_outbreak_history_animations_directory, 
+             create_data_directory(directory_path = "outputs/wahis_outbreak_history_animations")),
+  
+  tar_target(wahis_outbreak_history_AWS_upload, AWS_put_files(wahis_outbreak_history,
+                                                              wahis_outbreak_history_animations_directory),
+             error = "null"), # Continue the pipeline even on error
+  
+  # Check if preprocessed wahis_outbreak_history data already exists on AWS and can be loaded.
+  # If so download from AWS instead of primary source
+  tar_target(wahis_outbreak_history_animations_AWS, AWS_get_folder(wahis_outbreak_history_animations_directory,
+                                                                   wahis_outbreak_history), # Enforce Dependency
+             error = "null"), # Continue the pipeline even on error
   
   # Animate a SpatRaster stack where each layer is a date.
   # gganimate took 20 minutes per file.
   # just saving all the frames as separate pngs
   # and combining with gifski took 50 minutes for all of them.
   # get_outbreak_history_animation()
-  tar_target(wahis_outbreak_history_animations, map(wahis_outbreak_history, ~get_outbreak_history_animation(input_file = .x,
-                                                                               output_dir = "outputs")),
-             pattern = map(wahis_outbreak_history)), # Just included to enforce dependency with wahis_outbreak_history
+  tar_target(wahis_outbreak_history_animations, get_outbreak_history_animation(wahis_outbreak_history,
+                                                                               wahis_outbreak_history_animations_directory), # Just included to enforce dependency with wahis_outbreak_history
+             pattern = map(wahis_outbreak_history),
+             error = "null",
+             format = "file",
+             repository = "local"), 
+  # 
+  # tar_target(wahis_outbreak_history_animations_AWS_upload, AWS_put_files(wahis_outbreak_history_animations,
+  #                                                                        wahis_outbreak_history_animations_directory),
+  #            error = "null"), # Continue the pipeline even on error
 
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
   # 10 day period
-  tar_target(sentinel_ndvi_raw_directory, 
-             create_data_directory(directory_path = "data/sentinel_ndvi_raw")),
+  # tar_target(sentinel_ndvi_raw_directory, 
+  #            create_data_directory(directory_path = "data/sentinel_ndvi_raw")),
   tar_target(sentinel_ndvi_transformed_directory, 
              create_data_directory(directory_path = "data/sentinel_ndvi_transformed")),
   
@@ -318,44 +340,21 @@ dynamic_targets <- tar_plan(
   # get API parameters
   tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters()), 
   
-  # download files from source (locally)
-  tar_target(sentinel_ndvi_downloaded, download_sentinel_ndvi(sentinel_ndvi_api_parameters,
-                                                              download_directory = sentinel_ndvi_raw_directory,
-                                                              overwrite = FALSE),
-             pattern = sentinel_ndvi_api_parameters, 
-             format = "file", 
-             repository = "local",
-             cue = tar_cue(tar_cue_general)),
-  
-  # save raw to AWS bucket
-  tar_target(sentinel_ndvi_raw_upload_aws_s3, {sentinel_ndvi_downloaded;
-    aws_s3_upload_single_type(directory_path = sentinel_ndvi_raw_directory,
-                              bucket =  aws_bucket ,
-                              key = sentinel_ndvi_raw_directory, 
-                              check = TRUE)}, 
-    cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
-  
-  # project to the template and save as parquets (these can now be queried for analysis)
-  # this maintains the branches, saves separate files split by date
-  # TODO NAs outside of the continent
   tar_target(sentinel_ndvi_transformed, 
-             transform_sentinel_ndvi(sentinel_ndvi_downloaded, 
+             transform_sentinel_ndvi(sentinel_ndvi_api_parameters, 
                                      continent_raster_template,
                                      sentinel_ndvi_transformed_directory,
-                                     overwrite = FALSE),
-             pattern = sentinel_ndvi_downloaded,
+                                     overwrite = FALSE,
+                                     get_sentinel_ndvi_AWS),
+             pattern = map(sentinel_ndvi_api_parameters),
+             error = "null", # Keep going if error. It will be caught next time the pipeline is run.
              format = "file", 
-             repository = "local",
-             cue = tar_cue(tar_cue_general)), 
+             repository = "local"),
   
-  # save transformed to AWS bucket
-  tar_target(sentinel_ndvi_transformed_upload_aws_s3, 
-             aws_s3_upload(path = sentinel_ndvi_transformed,
-                           bucket =  aws_bucket,
-                           key = sentinel_ndvi_transformed, 
-                           check = TRUE), 
-             pattern = sentinel_ndvi_transformed,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
+  tar_target(sentinel_ndvi_transformed_AWS_upload, AWS_put_files(sentinel_ndvi_transformed,
+                                                                 sentinel_ndvi_transformed_directory),
+             error = "null"), # Continue the pipeline even on error
+  
   
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
@@ -402,8 +401,10 @@ dynamic_targets <- tar_plan(
                                   modis_ndvi_transformed_directory,
                                   overwrite = FALSE,
                                   modis_ndvi_transformed_AWS), # Enforce dependency
-             pattern = modis_ndvi_bundle_request,
-             repository = "local", # Repository local means it isn't stored on AWS
+             pattern = map(modis_ndvi_bundle_request),
+             error = "null", # Keep going if error. It will be caught next time the pipeline is run.
+             format = "file",
+             repository = "local", # Repository local means it isn't stored on AWS just yet.
              cue = tar_cue(tar_cue_general)), 
   
   # Put modis_ndvi_transformed files on AWS
@@ -433,8 +434,10 @@ dynamic_targets <- tar_plan(
                                                               nasa_weather_years,
                                                               continent_raster_template,
                                                               local_folder = nasa_weather_transformed_directory,
+                                                              overwrite = FALSE,
                                                               nasa_weather_AWS), # Enforce Dependency
              pattern = map(nasa_weather_years),
+             error = "null",
              format = "file",
              repository = "local",
              cue = tar_cue(tar_cue_general)),
@@ -472,7 +475,7 @@ dynamic_targets <- tar_plan(
                                        get_ecmwf_forecasts_AWS), # Enforce Dependency
              pattern = map(ecmwf_forecasts_api_parameters),
              error = "null",
-             # format = "file",
+             format = "file",
              repository = "local",
              cue = tar_cue(tar_cue_general)),
   
@@ -517,6 +520,7 @@ data_targets <- tar_plan(
                                                                           nasa_weather_transformed, # Enforce dependency
                                                                           weather_historical_means_AWS), # Enforce dependency
              pattern = map(days_of_year),
+             error = "null",
              format = "file", 
              repository = "local",
              cue = tar_cue(tar_cue_general)),  
@@ -546,6 +550,7 @@ data_targets <- tar_plan(
                                                             nasa_weather_transformed, # Enforce dependency
                                                             weather_anomalies_AWS), # Enforce dependency
              pattern = model_dates_selected,
+             error = "null",
              format = "file", 
              repository = "local",
              cue = tar_cue(tar_cue_general)),  
@@ -576,6 +581,7 @@ data_targets <- tar_plan(
                                                                 ecmwf_forecasts_transformed,# Enforce dependency
                                                                 forecasts_anomalies_AWS), # Enforce dependency
              pattern = model_dates_selected,
+             error = "null",
              format = "file", 
              repository = "local",
              cue = tar_cue(tar_cue_general)), 
@@ -606,6 +612,7 @@ data_targets <- tar_plan(
                                                                         overwrite = FALSE,
                                                                         forecasts_anomalies_validate_AWS), # Enforce dependency
              pattern = map(model_dates_selected),
+             error = "null",
              format = "file",
              repository = "local",
              cue = tar_cue(tar_cue_general)), 
@@ -631,7 +638,8 @@ data_targets <- tar_plan(
                                                                     days_of_year,
                                                                     lag_intervals,
                                                                     overwrite = FALSE),
-             pattern = days_of_year,
+             pattern = map(days_of_year),
+             error = "null",
              format = "file", 
              repository = "local",
              cue = tar_cue(tar_cue_general)),  
@@ -655,7 +663,8 @@ data_targets <- tar_plan(
                                                       model_dates_selected,
                                                       lag_intervals,
                                                       overwrite = FALSE),
-             pattern = model_dates_selected,
+             pattern = map(model_dates_selected),
+             error = "null",
              format = "file", 
              repository = "local",
              cue = tar_cue(tar_cue_general)),  

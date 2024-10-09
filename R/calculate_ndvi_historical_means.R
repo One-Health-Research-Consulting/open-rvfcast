@@ -1,22 +1,32 @@
-#' .. content for \description{} (no empty lines) ..
+#' Calculate NDVI Historical Means
 #'
-#' .. content for \details{} ..
+#' This function calculates historical Normalized Difference Vegetation Index (NDVI) means and standard deviations for certain days of the year 
+#' for a given interval range. The results are saved in a specified directory as a parquet file with gzip compression.
 #'
-#' @title
-#' @param sentinel_ndvi_transformed
-#' @param sentinel_ndvi_transformed_directory
-#' @param modis_ndvi_transformed
-#' @param modis_ndvi_transformed_directory
-#' @param ndvi_date_lookup
-#' @param days_of_year
-#' @param overwrite
-#' @return
 #' @author Emma Mendelsohn
+#'
+#' @param ndvi_historical_means_directory Path to the directory where the output parquet files will be stored.
+#' @param ndvi_date_lookup Table containing NDVI data lookup information.
+#' @param days_of_year Days of the year for which the NDVI means are calculated (numeric vector, e.g. 1:365).
+#' @param lag_intervals Vector of lag intervals for which the NDVI means are calculated.
+#' @param overwrite Boolean flag indicating whether existing files should be overwritten. Default is FALSE.
+#' @param ... Additional arguments not used by this function but included for function compatibility.
+#'
+#' @return The string with path to the saved parquet file.
+#'
+#' @note If the output file already exists and the param overwrite is set to FALSE, the existing file is returned.
+#'
+#' @examples
+#' calculate_ndvi_historical_means(ndvi_historical_means_directory = './data', ndvi_date_lookup = lookup_table,
+#'                                 days_of_year = c(100:200), lag_intervals = c(30, 60, 90), overwrite = TRUE)
+#'
 #' @export
 calculate_ndvi_historical_means <- function(ndvi_historical_means_directory,
-                                            ndvi_date_lookup, days_of_year,
+                                            ndvi_date_lookup, 
+                                            days_of_year,
                                             lag_intervals,
-                                            overwrite = FALSE) {
+                                            overwrite = FALSE,
+                                            ...) {
   
   interval_length <- unique(diff(lag_intervals))
 

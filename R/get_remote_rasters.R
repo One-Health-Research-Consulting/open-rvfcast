@@ -1,10 +1,36 @@
-#' Function to process a list of urls pointint to rasters. Rasters must be transmitted as zip or rar files
-#' @param urls 
-#' @param output_dir 
-#' @param output_filename 
-#' @param continent_raster_template 
-#' @param aggregate_method 
-#' @param resample_method 
+#' @title get_remote_rasters
+#'
+#' @description Retrieves and processes remote raster data based on provided URLs.
+#'
+#' @author Nathan C. Layman
+#'
+#' @param urls A list of URLs where the raster data can be retrieved.
+#' @param output_dir The directory where the retrieved and processed raster data is saved.
+#' @param output_filename The filename of the output raster data file.
+#' @param continent_raster_template A template raster on which retrieved raster data is matched to.
+#' @param aggregate_method The method to aggregate the raster data. Default is NULL.
+#' @param resample_method The method to resample the raster data to match to the template raster. Default is NULL.
+#' @param overwrite A flag to indicate if existing files should be overwritten. Default is FALSE.
+#' @param ... Additional parameters not captured by the function parameters.
+#'
+#' @return The full path to the saved raster data file. 
+#'
+#' @note This function fails if the output filename extension is not .tif or .parquet. 
+#'
+#' @examples 
+#' # Define the URLs  
+#' urls <- list("http://example.com/raster1.tif", "http://example.com/raster2.tif") 
+#' 
+#' # Define the output directory 
+#' output_dir <- "./data" 
+#' 
+#' # Define the output filename
+#' output_filename <- "combined_raster.tif" 
+#'
+#' # Run the function
+#' get_remote_rasters(urls, output_dir, output_filename)
+#'
+#' @export
 get_remote_rasters <- function(urls, 
                                output_dir, 
                                output_filename, 

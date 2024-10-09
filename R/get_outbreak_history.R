@@ -1,5 +1,38 @@
-
-# This is going to be dynamic branching over list of dates. Then a target to convert to raster stacks, one for parquet, and one for animation
+#' Retrieve Daily Outbreak History
+#'
+#' This function computes the outbreak history of specific diseases on a daily basis based
+#' on the given dates. It ultimately returns the file path of the resulting dataset.
+#'
+#' @author Nathan C. Layman
+#'
+#' @param dates_df A dataframe of the dates for which the outbreak history is to be calculated
+#' @param wahis_outbreaks The outbreak naming convention
+#' @param wahis_distance_matrix The inter locality distance matrix
+#' @param wahis_raster_template The template for the raster mapping
+#' @param output_dir The directory where the final dataset will be outputted to, default is 'data/outbreak_history_dataset'.
+#' @param output_filename The name of the output file, default is 'outbreak_history.parquet'
+#' @param beta_time The rate of exponential decline to use for the kernel
+#' @param max_years The maximum number of years to consider for the decay function. Default is 10.
+#' @param recent The cutoff (in years) to distinguish recent from old outbreaks. Default is 3/12 (3 months).
+#' @param overwrite A boolean value indicating to overwrite the file if it already exists. Default is FALSE.
+#' @param ... Other ignored parameters for compatibility
+#'
+#' @return A string containing the filepath of the computed outbreak history file.
+#'
+#' @note This function computes the outbreak history for the specified dates and saves them
+#' into the specified directory. If a file already exists and overwrite parameter is set to
+#' FALSE, it simply returns the filepath of the existing file.
+#'
+#' @examples
+#' get_daily_outbreak_history(dates_df = dates,
+#'                            wahis_outbreaks = outbreaks,
+#'                            wahis_distance_matrix = distance_matrix,
+#'                            wahis_raster_template = raster_template,
+#'                            output_dir = './data',
+#'                            output_filename = 'outbreak_history.parquet',
+#'                            beta_time = 0.5, max_years = 10, recent = 3/12, overwrite = FALSE)
+#'
+#' @export
 get_daily_outbreak_history <- function(dates_df,
                                        wahis_outbreaks,
                                        wahis_distance_matrix,
@@ -62,20 +95,33 @@ get_daily_outbreak_history <- function(dates_df,
   
 }
 
-#' Get the outbreak history for a given day
+#' Extracting Outbreak History from WAHIS Data
 #'
-#' @param date 
-#' @param wahis_outbreaks 
-#' @param wahis_distance_matrix 
-#' @param wahis_raster_template 
-#' @param beta_time 
-#' @param max_years 
-#' @param recent 
+#' This function extracts outbreak history from World Animal Health Information System (WAHIS). 
+#' It uses the end_date of each outbreak, logarithm of the number of cases (if available), and exponential of the years since the end_date to weight the outbreak 
+#' and generate rasters for recent and old outbreaks based on the provided recent period.
 #'
-#' @return
-#' @export
+#' @author Nathan C. Layman
+#'
+#' @param date The reference date for extracting outbreak history.
+#' @param wahis_outbreaks A data frame of WAHIS outbreaks.
+#' @param wahis_distance_matrix The WAHIS spatial distance matrix.
+#' @param wahis_raster_template A raster template.
+#' @param beta_time Exponential decay rate for time weighting of outbreaks, default is 0.5.
+#' @param max_years Maximum years to consider an outbreak old, default is 10 years.
+#' @param recent Period (in years) to consider an outbreak recent, default is 1/6 year i.e., approx. 2 months.
+#'
+#' @return A tibble containing the date, and raster stacks for recent and old outbreaks.
+#'
+#' @note This function transforms outbreak history into a spatial-temporal data that can be analyzed with other covariates.
 #'
 #' @examples
+#' get_outbreak_history(date = "2018-01-01", wahis_outbreaks = wahis_outbreaks,
+#'                      wahis_distance_matrix = wahis_distance_matrix,
+#'                      wahis_raster_template = wahis_raster_template,
+#'                      beta_time = 0.5, max_years = 10, recent = 2/12)
+#'
+#' @export
 get_outbreak_history <- function(date,
                                  wahis_outbreaks, 
                                  wahis_distance_matrix,
@@ -104,17 +150,29 @@ get_outbreak_history <- function(date,
          old_outbreaks_rast = list(old_outbreaks))
 }
 
-#' Combining time and distance weights.
-#' Optimized for speed.
+#' Combine Outbreaks, Distance Matrix and Raster Template 
 #'
-#' @param outbreaks 
-#' @param wahis_distance_matrix 
-#' @param wahis_raster_template 
+#' This function combines the outbreaks, the corresponding distance matrix and raster template. It computes the weights
+#' based on the outbreak time and updates the raster template with these computed weights. If no outbreaks are provided, 
+#' it returns the raster template without any modifications.
 #'
-#' @return
-#' @export
+#' @author Nathan C. Layman
+#'
+#' @param outbreaks A dataset of outbreaks. 
+#' @param wahis_distance_matrix A distance matrix corresponding to the outbreaks.
+#' @param wahis_raster_template The raster template which is to be updated based on the weights.
+#'
+#' @return The updated raster template with newly calculated weights. If no outbreaks are given, it returns the unmodified raster template.
+#'
+#' @note This function computes the weights using the outbreak time and the distance matrix. After computing the weights,
+#' it updates the raster template with these weights. If no outbreaks are given, it simply returns the raster template with no modifications.
 #'
 #' @examples
+#' combine_weights(outbreaks = outbreak_db,
+#'                 wahis_distance_matrix = distance_matrix,
+#'                 wahis_raster_template = raster_template)
+#'
+#' @export
 combine_weights <- function(outbreaks, 
                             wahis_distance_matrix, 
                             wahis_raster_template) {
@@ -139,158 +197,3 @@ combine_weights <- function(outbreaks,
   
   wahis_raster_template
 }
-
-#' Calculate a matrix of spatial distance weights between every outbreak 
-#' and every cell in the raster template within a given distance
-#'
-#' @param wahis_outbreaks 
-#' @param wahis_raster_template 
-#' @param within_km 
-#' @param beta_dist 
-#'
-#' @return
-#' @export
-#'
-#' @examples
-get_outbreak_distance_matrix <- function(wahis_outbreaks, wahis_raster_template, within_km = 500, beta_dist = 0.01) {
-  
-  wahis_raster_template <- wahis_raster_template |> terra::unwrap()
-  
-  xy <- as.data.frame(wahis_raster_template, xy = TRUE) |> select(y, x) |> rename(longitude = x, latitude = y)
-  
-  # For each outbreak origin identify the distance to every other point in Africa within `within_km` km
-  dist_mat <- geodist::geodist(xy, wahis_outbreaks |> arrange(outbreak_id), measure = "vincenty") # Good enough for our purposes and _much_ faster than s2
-  
-  # Drop all distances greater than within_km
-  # Not sure why we need to do this given choice of beta_dist
-  dist_mat[dist_mat > (within_km * 1000)] <- NA
-  
-  # Calculate a weighting factor based on distance. Note we haven't included log10 cases yet.
-  # This is negative exponential decay - points closer to the origin will be 1 and those farther
-  # away will be closer to zero mediated by beta_dist.
-  dist_mat <- exp(-beta_dist*dist_mat/1000)
-  
-  # Facilitate matrix math later
-  dist_mat[is.na(dist_mat)] <- 0
-  
-  dist_mat
-}
-
-#' Animate a stacked SpatRaster file
-#'
-#' @param input_files 
-#' @param output_dir 
-#' @param output_filename 
-#' @param layers 
-#' @param title 
-#' @param ... 
-#'
-#' @return
-#' @export
-#'
-#' @examples
-get_outbreak_history_animation <- function(input_file,
-                                           output_dir = "outputs",
-                                           num_cores = 1,
-                                           ...) {
-  
-  output_basename = tools::file_path_sans_ext(basename(input_file))
-  output_filename = paste0(output_dir, "/", output_basename, ".gif")
-  
-  # Create temporary directory if it does not yet exist
-  tmp_dir <- paste(output_dir, output_basename, sep = "/")
-  dir.create(tmp_dir, recursive = TRUE, showWarnings = FALSE)
-  
-  message(paste("Animating", output_filename))
-  
-  # Load the data
-  outbreak_history <- arrow::read_parquet(input_file)
-  
-  # Identify limits (used to calibrate the color scale)
-  lims <- c(min(df$weight, na.rm=T), 
-            max(df$weight, na.rm=T))
-  
-  # Make animations for both recent and old outbreaks
-  outbreak_history |> 
-    group_by(time_frame) |> 
-    group_split() |>
-    map(function(df) {
-      
-      frames <- df |> group_by(date) |>
-      
-      # This function makes a png for each date which will then get stiched together
-      # into the animation. Saving each png is faster than trying to do everything
-      # in memory.
-      png_files <- parallel::mclapply(mc.cores = num_cores, 
-                                      frames, 
-                                      function(frame) plot_outbreak_history(frame,
-                                                                            tmp_dir = tmp_dir,
-                                                                            lims = lims)) |> 
-        unlist() |> sort()
-      
-      # Add in a delay at end before looping back to beginning. This is in frames not seconds
-      png_files <- c(png_files, rep(png_files |> tail(1), 50))
-      
-      # Render the animation
-      gif_file <- gifski::gifski(png_files, 
-                                 delay = 0.04,
-                                 gif_file = output_filename)
-      
-      # Clean up temporary files
-      unlink(tmp_dir, recursive = T)
-      
-      # Return the location of the rendered animation
-      output_filename
-    })
-  
-  
- 
-}
-
-#' Title
-#'
-#' @param frame 
-#' @param tmp_dir 
-#' @param write_frame 
-#' @param lims 
-#'
-#' @return
-#' @export
-#'
-#' @examples
-plot_outbreak_history <- function(frame,
-                                  tmp_dir,
-                                  write_frame = TRUE,
-                                  lims = NULL) {
-  
-  date <- frame$date |> unique() |> pluck(1)
-  time_frame <- frame$time_frame |> unique() |> pluck(1)
-  
-  filename <- file.path(tmp_dir, glue::glue("{date}_{time_frame}.png"))
-  title <- glue::glue("Outbreak History: {date}")
-  
-  p <- ggplot(frame, aes(x=x, y=y, fill=weight)) +
-    geom_raster() +
-    scale_fill_viridis_c(limits = lims,
-                         trans = scales::sqrt_trans()) +
-    labs(title = title, x = "Longitude", y = "Latitude", fill = "Weight\n") +
-    theme_minimal() +
-    theme(text = element_text(size = 18),
-          legend.title = element_text(vjust = 0.05)) 
-  
-  if(write_frame) {
-    png(filename = filename, width = 600, height = 600)
-    print(p)
-    dev.off()
-    return(filename)
-  }
-
-  p
-}
-
-# test <- get_daily_outbreak_history(dates = dates,
-#                                    wahis_rvf_outbreaks_preprocessed = wahis_rvf_outbreaks_preprocessed,
-#                                    continent_raster_template = continent_raster_template,
-#                                    continent_polygon = continent_polygon)
-# 
-# get_outbreak_history_animation(daily_old_outbreak_history)

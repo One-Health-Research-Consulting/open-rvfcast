@@ -1,13 +1,30 @@
-#' Title
+#' Retrieve and preprocess global elevation data
 #'
-#' @param output_dir 
-#' @param output_filename 
-#' @param raster_template 
+#' This function downloads global elevation data, transforms it, and saves it as an optimized Parquet file
+#' and a TIF file in the specified directory. If a file already exists at the target filepath and overwrite
+#' is FALSE, the existing file is returned.
 #'
-#' @return
-#' @export
+#' @author Nathan C. Layman
+#'
+#' @param output_dir Directory where the processed files will be saved. This directory is created if it doesn't exist.
+#' @param output_filename Desired filename for the processed file.
+#' @param continent_raster_template Template to be used for terra raster operations.
+#' @param overwrite Boolean flag indicating whether existing processed files should be overwritten. Default is FALSE.
+#' @param ... Additional arguments not used by this function but included for generic function compatibility.
+#'
+#' @return A string containing the filepath to the processed file.
+#'
+#' @note This function creates a new directory, downloads elevation data, processes and saves results
+#' as parquet and tif files in the specified directory. If a file already exists at the target filepath and
+#' overwrite is FALSE, the existing file is returned.
 #'
 #' @examples
+#' get_elevation_data(output_dir = './data',
+#'                    output_filename = 'elevation.parquet',
+#'                    continent_raster_template = raster_template,
+#'                    overwrite = TRUE)
+#'
+#' @export
 get_elevation_data <- function(output_dir, 
                                output_filename, 
                                continent_raster_template,

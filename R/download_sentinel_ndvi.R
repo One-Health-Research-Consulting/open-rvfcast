@@ -1,52 +1,60 @@
-#' .. content for \description{} (no empty lines) ..
+#' Download and Preprocess Sentinel NDVI Data
 #'
-#' .. content for \details{} ..
+#' The function downloads Sentinel NDVI data from the Copernicus Data Space 
+#' using credentials from environment variables. The data is then extracted,
+#' renamed, saved to disk, and the initial download is removed.
 #'
-#' @title
-#' @param sentinel_ndvi_api_parameters
-#' @return
 #' @author Emma Mendelsohn
+#'
+#' @param sentinel_ndvi_api_parameters A list containing the id of the product 
+#' from the Copernicus Data Space that needs to be downloaded 
+#' @param raw_filename The name of the raw file to be downloaded
+#'
+#' @return The function returns the filepath to '.nc' file containing the 
+#' Sentinel NDVI data
+#'
+#' @note This function requires the "COPERNICUS_USERNAME" and "COPERNICUS_PASSWORD" 
+#' to be defined in your system's environment variables
+#'
+#' @examples
+#' download_sentinel_ndvi(sentinel_ndvi_api_parameters = list(id = "example_product_id"), 
+#'                        raw_filename = "tempfile.zip")
+#'
 #' @export
-download_sentinel_ndvi <- function(sentinel_ndvi_api_parameters, download_directory,  overwrite = FALSE) {
+download_sentinel_ndvi <- function(sentinel_ndvi_api_parameters, 
+                                   raw_filename) {
   
-  existing_files <- list.files(download_directory)
+  product_id <- sentinel_ndvi_api_parameters$id
+  message(paste0("Downloading ", raw_filename))
   
-  id <- sentinel_ndvi_api_parameters$id
-  download_filename <- tools::file_path_sans_ext(sentinel_ndvi_api_parameters$properties$title)
-  
-  # extract info based on naming conventions 
-  # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-3-synergy/naming-conventions
-  start_date <- str_extract(download_filename, "(\\d{8}T\\d{6})")
-  end_date <- str_extract(download_filename, "(?<=_)(\\d{8}T\\d{6})(?=_\\w{6}_)")
- 
-  save_filename <- paste0(download_filename, ".nc")
-  
-  message(paste0("Downloading ", download_filename))
-  
-  if(save_filename %in% existing_files & !overwrite) {
-    message("file already exists, skipping download")
-    return(file.path(download_directory, save_filename)) # skip if file exists
-  }  
-  
-  # auth
-  auth <- POST("https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token", 
+  auth <- httr::POST("https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token", 
                    body = list(
                      grant_type = "password",
                      username = Sys.getenv("COPERNICUS_USERNAME"),
-                     password =  Sys.getenv("COPERNICUS_PASSWORD"),
-                     client_id = "cdse-public"
-                   ), 
+                     password = Sys.getenv("COPERNICUS_PASSWORD"),
+                     client_id = "cdse-public"), 
                    encode = "form")
   
-  url <- glue::glue("http://catalogue.dataspace.copernicus.eu/odata/v1/Products({id})/$value")
-  file <- here::here(download_directory, glue::glue("{download_filename}.zip"))
-  response <- GET(url, add_headers(Authorization =  paste("Bearer", content(auth)$access_token)),
-                  write_disk(file, overwrite = TRUE))
-  unzip(file, files = paste0(download_filename, c(".SEN3/NDVI.nc")), exdir= download_directory)
-  file.remove(file)
-  file.rename(here::here(download_directory, paste0(download_filename, ".SEN3/NDVI.nc")), 
-              here::here(download_directory, save_filename))
-  file.remove(here::here(download_directory, paste0(download_filename, ".SEN3")))
-  return(file.path(download_directory, save_filename))
+  url <- glue::glue('https://zipper.dataspace.copernicus.eu/odata/v1/Products({product_id})/$value')
+  
+  response <- httr::GET(url, httr::add_headers(Authorization = paste("Bearer", httr::content(auth)$access_token)),
+                  httr::write_disk(raw_filename, overwrite = TRUE))
+  
+  # Remove old nc file if it exists
+  file.remove(paste0(tools::file_path_sans_ext(raw_filename), ".nc"))
+  
+  # Unzip the new download and rename
+  unzip(raw_filename, 
+        files = paste0(basename(raw_filename),"/NDVI.nc"), 
+        junkpaths = TRUE, # Ditch archive folder structure
+        overwrite = TRUE,
+        exdir = dirname(raw_filename)) |>
+    file.rename(paste0(tools::file_path_sans_ext(raw_filename), ".nc"))
+  
+  # Clean up archive
+  file.remove(raw_filename)
+  
+  # Return path to .nc file
+  return(paste0(tools::file_path_sans_ext(raw_filename), ".nc"))
 }
 

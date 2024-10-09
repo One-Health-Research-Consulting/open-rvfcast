@@ -1,19 +1,32 @@
-#' .. content for \description{} (no empty lines) ..
+#' Calculate and Save Anomalies from Forecast Data
 #'
-#' .. content for \details{} ..
+#' This function takes transformed ECMWF forecast and historical weather mean data, 
+#' calculates anomalies, and saves them in a specified directory. If the file already exists and `overwrite` is FALSE,
+#' the existing file's path is returned. Otherwise, the existing file is overwritten.
 #'
-#' @title
-#'
-#' @param ecmwf_forecasts_transformed_directory
-#' @param weather_historical_means
-#' @param model_dates_selected
-#' @param forecasts_anomalies_directory 
-#' @param lead_intervals 
-#' @param ... 
-#' @param overwrite
-#'
-#' @return
 #' @author Emma Mendelsohn
+#'
+#' @param ecmwf_forecasts_transformed_directory Directory containing the transformed forecasts.
+#' @param weather_historical_means Filepath to the historical weather means data.
+#' @param forecasts_anomalies_directory Directory in which to save the anomalies data.
+#' @param model_dates_selected Dates for models that have been selected.
+#' @param lead_intervals Lead times for forecasts, which will determine the interval over which anomalies are averaged.
+#' @param overwrite Boolean flag indicating whether existing file should be overwritten. Default is FALSE.
+#' @param ... Additional unused arguments for future extensibility and function compatibility.
+#'
+#' @return A string containing the filepath to the anomalies data.
+#'
+#' @note The returned path either points to an existing file (when overwrite is FALSE and the file already exists) 
+#' or to a newly created file with calculated anomalies (when overwrite is TRUE or the file didn't exist).
+#'
+#' @examples
+#' calculate_forecasts_anomalies(ecmwf_forecasts_transformed_directory = './forecasts',
+#'                               weather_historical_means='./historical_means.parquet',
+#' forecast_anomalies_directory = './anomalies',
+#' model_dates_selected = as.Date('2000-01-01'),
+#' lead_intervals = c(1, 10),
+#' overwrite = TRUE)
+#'
 #' @export
 calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed_directory,
                                           weather_historical_means,

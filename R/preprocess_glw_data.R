@@ -1,18 +1,32 @@
-#' .. content for \description{} (no empty lines) ..
+#' Preprocess GLW Data
 #'
-#' .. content for \details{} ..
+#' This function performs preprocessing tasks on glw datasets.
 #'
-#' @title
-#' @param bounding_boxes
-#' @return
-#' @author Whitney Bagge
-#' @export
+#' @author Nathan C. Layman
+#'
+#' @param glw_directory_dataset Directory containing GLW datasets. This directory is created if it doesn't exist.
+#' @param glw_urls URLs of the GLW datasets to download.
+#' @param continent_raster_template Template to be used for terra raster operations.
+#' @param overwrite Boolean flag indicating whether existing preprocessed files should be overwritten. Default is FALSE.
+#' @param ... Additional parameters not used by this function but included for generic function compatibility.
 #' 
-preprocess_glw_data<- function(glw_directory_dataset, 
-                               glw_urls, 
-                               continent_raster_template,
-                               overwrite = FALSE,
-                               ...) {
+#' @return A character vector of filepaths to the preprocessed GLW dataset files.
+#'
+#' @note This function creates a new directory, downloads datasets, processes data and saves results
+#'       as parquet files in the specified directory.
+#'
+#' @example 
+#' preprocess_glw_data(glw_directory_dataset = "./data",
+#'                     glw_urls = c("http://example.com/dataset1", "http://example.com/dataset2"),
+#'                     continent_raster_template = raster_template,
+#'                     overwrite = TRUE)
+#'
+#' @export
+preprocess_glw_data <- function(glw_directory_dataset, 
+                                glw_urls, 
+                                continent_raster_template,
+                                overwrite = FALSE,
+                                ...) {
   
   # Create directory if it does not yet exist
   dir.create(glw_directory_dataset, recursive = TRUE, showWarnings = FALSE)
