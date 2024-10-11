@@ -63,7 +63,7 @@ get_daily_outbreak_history <- function(dates_df,
   
   # Check if outbreak_history file exist and can be read and that we don't want to overwrite them.
   if(!is.null(error_safe_read_parquet(outbreak_history_filename)) & !overwrite & year != year(Sys.time())) {
-    message("preprocessed landcover parquet file already exists and can be loaded, skipping download and processing")
+    message("preprocessed outbreak history parquet file already exists and can be loaded, skipping download and processing")
     return(outbreak_history_filename)
   }
   

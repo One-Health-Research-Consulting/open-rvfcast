@@ -11,13 +11,11 @@
 #' @author Emma Mendelsohn
 #' @export
 create_ndvi_date_lookup <- function(sentinel_ndvi_transformed,
-                                    sentinel_ndvi_transformed_directory,
-                                    modis_ndvi_transformed,
-                                    modis_ndvi_transformed_directory) {
+                                    modis_ndvi_transformed) {
   
   # Connect to Sentinel and Modis datasets
-  sentinel_dataset <- arrow::open_dataset(list.files(sentinel_ndvi_transformed_directory, pattern = "*.parquet", full.names = TRUE)) 
-  modis_dataset <- arrow::open_dataset(list.files(modis_ndvi_transformed_directory, pattern = "*.parquet", full.names = TRUE)) 
+  sentinel_dataset <- arrow::open_dataset(sentinel_ndvi_transformed) 
+  modis_dataset <- arrow::open_dataset(modis_ndvi_transformed) 
   
   # Sentinel dates handling -------------------------------------------------
   

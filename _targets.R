@@ -294,7 +294,6 @@ dynamic_targets <- tar_plan(
                                                                 wahis_outbreak_history_AWS), # Enforce Dependency
              pattern = map(wahis_outbreak_dates),
              error = "null", # Keep going if error. It will be caught next time the pipeline is run.
-             
              format = "file", 
              repository = "local"),
   
@@ -320,12 +319,11 @@ dynamic_targets <- tar_plan(
                                                                                wahis_outbreak_history_animations_directory), # Just included to enforce dependency with wahis_outbreak_history
              pattern = map(wahis_outbreak_history),
              error = "null",
-             format = "file",
              repository = "local"), 
-  # 
-  # tar_target(wahis_outbreak_history_animations_AWS_upload, AWS_put_files(wahis_outbreak_history_animations,
-  #                                                                        wahis_outbreak_history_animations_directory),
-  #            error = "null"), # Continue the pipeline even on error
+
+  tar_target(wahis_outbreak_history_animations_AWS_upload, AWS_put_files(wahis_outbreak_history_animations,
+                                                                         wahis_outbreak_history_animations_directory),
+             error = "null"), # Continue the pipeline even on error
 
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
@@ -378,11 +376,8 @@ dynamic_targets <- tar_plan(
   tar_target(modis_ndvi_bundle_request, submit_modis_ndvi_bundle_request(modis_ndvi_token, 
                                                                          modis_ndvi_task_id_continent, 
                                                                          modis_ndvi_bundle_request_file) |> 
-               rowwise() |> 
-               tar_group(),
-             cue = tar_cue("always"),
-             iteration = "group"
-  ),
+               filter(grepl("NDVI", file_name)),
+             cue = tar_cue("always")),
   
   # Check if modis_ndvi files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
@@ -623,12 +618,8 @@ data_targets <- tar_plan(
 
   
   # ndvi anomalies --------------------------------------------------
-  tar_target(ndvi_date_lookup, 
-             create_ndvi_date_lookup(sentinel_ndvi_transformed,
-                                     sentinel_ndvi_transformed_directory,
-                                     modis_ndvi_transformed,
-                                     modis_ndvi_transformed_directory)),
-  
+  tar_target(ndvi_date_lookup, create_ndvi_date_lookup(sentinel_ndvi_transformed,
+                                                       modis_ndvi_transformed)),
   
   tar_target(ndvi_historical_means_directory, 
              create_data_directory(directory_path = "data/ndvi_historical_means")),

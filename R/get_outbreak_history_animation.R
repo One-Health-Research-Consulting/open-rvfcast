@@ -25,6 +25,7 @@
 get_outbreak_history_animation <- function(wahis_outbreak_history,
                                            wahis_outbreak_history_animations_directory,
                                            num_cores = 1,
+                                           overwrite = FALSE,
                                            ...) {
   
   output_basename = tools::file_path_sans_ext(basename(wahis_outbreak_history))
@@ -35,29 +36,36 @@ get_outbreak_history_animation <- function(wahis_outbreak_history,
   # Fastest way to use parquet files is to do as many opperations before collect or pull
   min_weight <- outbreak_history_dataset |>
     summarise(min_weight = min(weight, na.rm = TRUE)) |>
-    pull(min_weight)
+    pull(min_weight, as_vector = TRUE)
   
   max_weight <- outbreak_history_dataset |>
     summarise(max_weight = max(weight, na.rm = TRUE)) |>
-    pull(max_weight)
+    pull(max_weight, as_vector = TRUE)
   
   # Identify limits (used to calibrate the color scale)
   lims <- c(min_weight, max_weight)
   
   # Keep as much as possible out of memory and on disk. Arrow permits fast access.
-  time_frames <- outbreak_history_dataset |> select(time_frame) |> distinct() |> pull(time_frame)
+  time_frames <- outbreak_history_dataset |> select(time_frame) |> distinct() |> pull(time_frame, as_vector = TRUE)
+  
+  # Create temporary directory if it does not yet exist
+  tmp_dir <- paste(wahis_outbreak_history_animations_directory, output_basename, sep = "/")
+  dir.create(tmp_dir, recursive = TRUE, showWarnings = FALSE)
   
   # Make animations for both recent and old outbreaks
-  map(time_frames, function(tf) {
+  output_files <- map(time_frames, function(tf) {
       
-    output_filename = file.path(wahis_outbreak_history_animations_directory, glue::glue("{output_basename}_{tf}.gif"))
-    message(paste("Animating", basename(output_filename)))
+    output_filename = file.path(wahis_outbreak_history_animations_directory, glue::glue("{basename(output_basename)}_{tf}.gif"))
     
-    dates <- outbreak_history_dataset |> filter(time_frame == tf) |> select(date) |> distinct() |> pull(date)
-
-    # Create temporary directory if it does not yet exist
-    tmp_dir <- paste(wahis_outbreak_history_animations_directory, output_basename, sep = "/")
-    dir.create(tmp_dir, recursive = TRUE, showWarnings = FALSE)
+    # Check if outbreak_history file exist and can be read and that we don't want to overwrite them.
+    if(file.exists(output_filename) & !overwrite) {
+      message(glue::glue("{basename(output_filename)} already exists. Skipping."))
+      return(output_filename)
+    }
+    
+    message(paste("Animating", basename(output_filename))) 
+    
+    dates <- outbreak_history_dataset |> filter(time_frame == tf) |> select(date) |> distinct() |> pull(date, as_vector = TRUE)
     
     # This function makes a png for each date which will then get stiched together
     # into the animation. Saving each png is faster than trying to do everything
@@ -67,9 +75,10 @@ get_outbreak_history_animation <- function(wahis_outbreak_history,
                                     function(d) plot_outbreak_history(outbreak_history_dataset |> 
                                                                         filter(date == d) |>
                                                                         filter(time_frame == tf) |>
-                                                                           collect(),
-                                                                         tmp_dir = tmp_dir,
-                                                                         lims = lims)) |> 
+                                                                        collect(),
+                                                                      tmp_dir = tmp_dir,
+                                                                      write_frame = TRUE,
+                                                                      lims = lims)) |> 
       unlist() |> sort()
     
     # Add in a delay at end before looping back to beginning. This is in frames not seconds
@@ -81,12 +90,17 @@ get_outbreak_history_animation <- function(wahis_outbreak_history,
                                gif_file = output_filename)
     
     # Clean up temporary files
-    unlink(tmp_dir, recursive = T)
+    file.remove(png_files)
     
     # Return the location of the rendered animation
     output_filename
     }
   )
+  
+  # Clean up temporary files
+  unlink(tmp_dir, recursive = T)
+  
+  return(output_files)
 }
 
 #' Plot Outbreak History
