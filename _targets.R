@@ -709,13 +709,20 @@ model_targets <- tar_plan(
   tar_target(augmented_data_rsa_directory, 
              create_data_directory(directory_path = "data/augmented_data_rsa")),
   
-  # tar_target(aggregated_data_rsa,
-  #            aggregate_augmented_data_by_adm(augmented_data, 
-  #                                            rsa_polygon, 
-  #                                            model_dates_selected),
-  #            pattern = model_dates_selected,
-  #            cue = tar_cue("thorough")
-  # ),
+  # Check if combined_anomalies parquet files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(augmented_data_rsa_AWS, AWS_get_folder(combined_anomalies_directory,
+                                                    weather_anomalies, # Enforce dependency
+                                                    ndvi_anomalies, # Enforce dependency
+                                                    model_dates_selected)), # Enforce dependency
+  
+  tar_target(aggregated_data_rsa,
+             aggregate_augmented_data_by_adm(augmented_data,
+                                             rsa_polygon,
+                                             model_dates_selected),
+             pattern = model_dates_selected,
+             cue = tar_cue("thorough")
+  ),
   
   # tar_target(rsa_polygon_spatial_weights, rsa_polygon |> 
   #              mutate(area = st_area(rsa_polygon)) |> 
@@ -724,13 +731,14 @@ model_targets <- tar_plan(
   
   # # Switch to parquet based to save memory. Arrow left joins automatically.
   # tar_target(model_data,
-  #            left_join(aggregated_data_rsa, 
-  #                      rvf_outbreaks, 
-  #                      by = join_by(date, shapeName)) |>  
-  #              mutate(outbreak_30 = factor(replace_na(outbreak_30, FALSE))) |> 
-  #              left_join(rsa_polygon_spatial_weights, by = "shapeName") |> 
+  #            left_join(aggregated_data_rsa,
+  #                      rvf_outbreaks,
+  #                      by = join_by(date, shapeName)) |>
+  #              mutate(outbreak_30 = factor(replace_na(outbreak_30, FALSE))) |>
+  #              left_join(rsa_polygon_spatial_weights, by = "shapeName") |>
   #              mutate(area = as.numeric(area))
   # ),
+  
   # 
   # # Splitting --------------------------------------------------
   # # Initial train and test (ie holdout)
