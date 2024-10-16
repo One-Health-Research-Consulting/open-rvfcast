@@ -624,71 +624,81 @@ data_targets <- tar_plan(
   tar_target(ndvi_historical_means_directory, 
              create_data_directory(directory_path = "data/ndvi_historical_means")),
   
+  # Check if weather_historical_means parquet files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(ndvi_historical_means_AWS, AWS_get_folder(ndvi_historical_means_directory,
+                                                       ndvi_date_lookup, # Enforce dependency
+                                                       days_of_year, # Enforce dependency
+                                                       lag_intervals)), # Enforce dependency
+  
   tar_target(ndvi_historical_means, calculate_ndvi_historical_means(ndvi_historical_means_directory,
                                                                     ndvi_date_lookup,
                                                                     days_of_year,
                                                                     lag_intervals,
-                                                                    overwrite = FALSE),
+                                                                    overwrite = FALSE,
+                                                                    ndvi_historical_means_AWS), # Enforce dependency
              pattern = map(days_of_year),
              error = "null",
              format = "file", 
              repository = "local",
              cue = tar_cue(tar_cue_general)),  
   
-  # save historical means to AWS bucket
-  tar_target(ndvi_historical_means_upload_aws_s3, 
-             aws_s3_upload(path = ndvi_historical_means,
-                           bucket =  aws_bucket,
-                           key = ndvi_historical_means, 
-                           check = TRUE), 
-             pattern = ndvi_historical_means,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
+  # Next step put ndvi_historical_means files on AWS.
+  tar_target(ndvi_historical_means_AWS_upload, AWS_put_files(ndvi_historical_means,
+                                                             ndvi_historical_means_directory)),
   
   
   tar_target(ndvi_anomalies_directory, 
              create_data_directory(directory_path = "data/ndvi_anomalies")),
+  
+  # Check if ndvi_anomalies_AWS parquet files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(ndvi_anomalies_AWS, AWS_get_folder(ndvi_anomalies_directory,
+                                                ndvi_date_lookup, # Enforce dependency
+                                                ndvi_historical_means, # Enforce dependency
+                                                model_dates_selected, # Enforce dependency
+                                                lag_intervals)), # Enforce dependency
   
   tar_target(ndvi_anomalies, calculate_ndvi_anomalies(ndvi_date_lookup,
                                                       ndvi_historical_means,
                                                       ndvi_anomalies_directory,
                                                       model_dates_selected,
                                                       lag_intervals,
-                                                      overwrite = FALSE),
+                                                      overwrite = TRUE,
+                                                      ndvi_anomalies_AWS), # Enforce dependency
              pattern = map(model_dates_selected),
              error = "null",
              format = "file", 
              repository = "local",
              cue = tar_cue(tar_cue_general)),  
   
+  # Next step put ndvi_historical_means files on AWS.
+  tar_target(ndvi_anomalies_AWS_upload, AWS_put_files(ndvi_anomalies,
+                                                      ndvi_anomalies_directory)),
   
-  # save anomalies to AWS bucket
-  tar_target(ndvi_anomalies_upload_aws_s3, 
-             aws_s3_upload(path = ndvi_anomalies,
-                           bucket =  aws_bucket,
-                           key = ndvi_anomalies, 
-                           check = TRUE), 
-             pattern = ndvi_anomalies,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
   
-  # all anomalies --------------------------------------------------
-  tar_target(augmented_data_directory, 
-             create_data_directory(directory_path = "data/augmented_data")),
+  # Combine all anomalies --------------------------------------------------
+  tar_target(combined_anomalies_directory, 
+             create_data_directory(directory_path = "data/combined_anomolies")),
   
-  tar_target(augmented_data, 
-             augment_data(weather_anomalies, 
-                          forecasts_anomalies, 
-                          ndvi_anomalies, 
-                          augmented_data_directory),
+  # Check if combined_anomalies parquet files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(combined_anomalies_AWS, AWS_get_folder(combined_anomalies_directory,
+                                                    weather_anomalies, # Enforce dependency
+                                                    ndvi_anomalies, # Enforce dependency
+                                                    model_dates_selected)), # Enforce dependency
+  
+  tar_target(combined_anomalies, combine_anomolies(weather_anomalies,
+                                                   forecasts_anomalies,
+                                                   ndvi_anomalies,
+                                                   combined_anomalies_directory,
+                                                   combined_anomalies_AWS),
              format = "file", 
-             repository = "local",
-             cue = tar_cue(tar_cue_general)),  
+             repository = "local"), # Enforce dependency
   
-  tar_target(augmented_data_upload_aws_s3,
-             aws_s3_upload(path = augmented_data,
-                           bucket =  aws_bucket,
-                           key = augmented_data,
-                           check = TRUE),
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
+  # Next step put combined_anomalies files on AWS.
+  tar_target(combined_anomalies_AWS_upload, AWS_put_files(combined_anomalies,
+                                                          combined_anomalies_directory)),
   
 )
 
@@ -699,12 +709,120 @@ model_targets <- tar_plan(
   tar_target(augmented_data_rsa_directory, 
              create_data_directory(directory_path = "data/augmented_data_rsa")),
   
-  tar_target(aggregated_data_rsa,
-             aggregate_augmented_data_by_adm(augmented_data, 
-                                             rsa_polygon, 
-                                             model_dates_selected),
-             pattern = model_dates_selected
-  ),
+  # tar_target(aggregated_data_rsa,
+  #            aggregate_augmented_data_by_adm(augmented_data, 
+  #                                            rsa_polygon, 
+  #                                            model_dates_selected),
+  #            pattern = model_dates_selected,
+  #            cue = tar_cue("thorough")
+  # ),
+  
+  # tar_target(rsa_polygon_spatial_weights, rsa_polygon |> 
+  #              mutate(area = st_area(rsa_polygon)) |> 
+  #              as_tibble() |> 
+  #              select(shapeName, area)),
+  
+  # # Switch to parquet based to save memory. Arrow left joins automatically.
+  # tar_target(model_data,
+  #            left_join(aggregated_data_rsa, 
+  #                      rvf_outbreaks, 
+  #                      by = join_by(date, shapeName)) |>  
+  #              mutate(outbreak_30 = factor(replace_na(outbreak_30, FALSE))) |> 
+  #              left_join(rsa_polygon_spatial_weights, by = "shapeName") |> 
+  #              mutate(area = as.numeric(area))
+  # ),
+  # 
+  # # Splitting --------------------------------------------------
+  # # Initial train and test (ie holdout)
+  # tar_target(split_prop, nrow(model_data[model_data$date <= "2017-12-31",])/nrow(model_data)),
+  # tar_target(model_data_split, initial_time_split(model_data, prop = split_prop)), 
+  # tar_target(training_data, training(model_data_split)),
+  # tar_target(holdout_data, testing(model_data_split)),
+  # 
+  # # formula/recipe 
+  # tar_target(rec, model_recipe(training_data)),
+  # tar_target(rec_juiced, juice(prep(rec))),
+  # 
+  # # xgboost settings
+  # tar_target(base_score, sum(training_data$outbreak_30==TRUE)/nrow(training_data)),
+  # tar_target(interaction_constraints, '[[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], [15]]'), # area is the 16th col in rec_juiced
+  # tar_target(monotone_constraints, c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)), # enforce positive relationship for area
+  # 
+  # # tuning
+  # tar_target(spec, model_specs(base_score, interaction_constraints, monotone_constraints)),
+  # tar_target(grid, model_grid(training_data)),
+  # 
+  # # workflow
+  # tar_target(wf, workflows::workflow(rec, spec)),
+  # 
+  # # splits
+  # tar_target(rolling_n, n_distinct(model_data$shapeName)),
+  # tar_target(splits, rolling_origin(training_data, 
+  #                                   initial = rolling_n, 
+  #                                   assess = rolling_n, 
+  #                                   skip = rolling_n - 1)),
+  # 
+  # # tuning
+  # tar_target(tuned, model_tune(wf, splits, grid)),
+  
+  # final model
+  # tar_target(final, {
+  #   final_wf <- finalize_workflow(
+  #     wf,
+  #     tuned[5,]
+  #   )
+  #   
+  #   library(DALEX)
+  #   library(ceterisParibus)
+  #   
+  #   # DALEX Explainer
+  #   tuned_model <- final_wf |> fit(training_data)
+  #   tuned_model_xg <- extract_fit_parsnip(tuned_model)
+  #   training_data_mx <- extract_mold(tuned_model)$predictors %>%
+  #     as.matrix()
+  #   
+  #   y <- extract_mold(tuned_model)$outcomes %>%
+  #     mutate(outbreak_30 = as.integer(outbreak_30 == "1")) %>%
+  #     pull(outbreak_30)
+  #   
+  #   explainer <- DALEX::explain(
+  #     model = tuned_model_xg,
+  #     data = training_data_mx,
+  #     y = y,
+  #     predict_function = predict_raw,
+  #     label = "RVF-EWS",
+  #     verbose = TRUE
+  #   )
+  #   
+  #   # CP plots
+  #   predictors <- extract_mold(tuned_model)$predictors |> colnames()
+  #   holdout_small <- as.data.frame(select_sample(training_data, 20)) |> 
+  #     select(all_of(predictors), outbreak_30) |> 
+  #     mutate(area = as.numeric(area)) |> 
+  #     mutate(outbreak_30 = as.integer(outbreak_30 == "1"))
+  # 
+  #   
+  #   
+  # 
+  #   cPplot <- ceterisParibus::ceteris_paribus(explainer, 
+  #                                             observation = holdout_small |> select(-outbreak_30),
+  #                                             y = holdout_small |>  pull(outbreak_30)#,
+  #                                             #variables = "area"
+  #                                             )
+  #   plot(cPplot)+
+  #     ceteris_paribus_layer(cPplot, show_rugs = TRUE)
+  #   
+  #   
+  # }),
+  
+  
+  
+  #TODO fit final model
+  #TODO test that interaction constraints worked - a) extract model object b) cp - 
+  # need the conditional effect - area is x, y is effect, should not change when you change other stuff
+  # ceteris parabus plots - should be parallel - points can differ but profile should be the same - expectation is that it is linear if doing it on area
+  
+  
   
 )
 
@@ -730,7 +848,8 @@ test_targets <- tar_plan(
 
 # Documentation -----------------------------------------------------------
 documentation_targets <- tar_plan(
-  tar_render(readme, path = "README.Rmd")
+  # tar_target(readme, rmarkdown::render("README.Rmd"))
+  tar_render(readme, path = here::here("README.Rmd"))
 )
 
 

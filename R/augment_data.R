@@ -1,16 +1,38 @@
-#' @title
-#' @param weather_anomalies
-#' @param forecasts_anomalies
-#' @param ndvi_anomalies
-#' @param augmented_data_directory 
-#' @return
+#' Augment Weather Data
+#'
+#' This function collects data from three different sources, checks for missing values,
+#' combines them into a single dataset, and saves the augmented data as a partitioned dataset
+#' in parquet format to a specified directory.
+#'
 #' @author Emma Mendelsohn
+#'
+#' @param weather_anomalies File path to the weather anomalies dataset.
+#' @param forecasts_anomalies File path to the forecasts anomalies dataset.
+#' @param ndvi_anomalies File path to the NDVI anomalies dataset.
+#' @param augmented_data_directory Directory where the augmented data will be saved in parquet format.
+#'
+#' @return A string containing the file path to the directory where the augmented data is saved.
+#'
+#' @note This function performs a left join of the three datasets on the date, x, and y variables. 
+#' Any NA values in the 'date', 'x', and 'y' columns of the dataset will be dropped. The function 
+#' saves the resulting dataset in the specified directory using hive partitioning by date.
+#'
+#' @examples
+#' augment_data(weather_anomalies = 'path/to/weather_data',
+#'              forecasts_anomalies = 'path/to/forecast_data',
+#'              ndvi_anomalies = 'path/to/ndvi_data',
+#'              augmented_data_directory = 'path/to/save/augmented_data')
+#'
 #' @export
-augment_data <- function(weather_anomalies, forecasts_anomalies,
-                         ndvi_anomalies, augmented_data_directory) {
-  
+augment_data <- function(weather_anomalies, 
+                         forecasts_anomalies,
+                         ndvi_anomalies, 
+                         augmented_data_directory,
+                         overwrite = FALSE,
+                         ...) {
 
-  message("Load datasets into memory")
+  # Figure out how to do all this OUT of memory.
+  message("Loading datasets into memory")
   weather <- arrow::open_dataset(weather_anomalies) |> dplyr::collect() 
   forecasts <- arrow::open_dataset(forecasts_anomalies) |> dplyr::collect() 
   ndvi <- arrow::open_dataset(ndvi_anomalies) |> dplyr::collect()

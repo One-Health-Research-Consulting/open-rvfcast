@@ -40,15 +40,18 @@ calculate_ndvi_historical_means <- function(ndvi_historical_means_directory,
   doy_start_frmt <- str_pad(doy_start, width = 3, side = "left", pad = "0")
   doy_end_frmt <- str_pad(doy_end, width = 3, side = "left", pad = "0")
   
-  save_filename <- glue::glue("historical_ndvi_mean_doy_{doy_start_frmt}_to_{doy_end_frmt}.gz.parquet")
-  message(paste("calculating historical ndvi means and standard deviations for doy", doy_start_frmt, "to", doy_end_frmt))
+  ndvi_historical_means_filename <- file.path(ndvi_historical_means_directory, glue::glue("historical_ndvi_mean_doy_{doy_start_frmt}_to_{doy_end_frmt}.gz.parquet"))
   
-  # Check if file already exists
-  existing_files <- list.files(ndvi_historical_means_directory)
-  if(save_filename %in% existing_files & !overwrite) {
-    message("file already exists, skipping download")
-    return(file.path(ndvi_historical_means_directory, save_filename))
+  # Set up safe way to read parquet files
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  
+  # Check if outbreak_history file exist and can be read and that we don't want to overwrite them.
+  if(!is.null(error_safe_read_parquet(ndvi_historical_means_filename)) & !overwrite) {
+    message(glue::glue("{basename(ndvi_historical_means_filename)} already exists and can be loaded, skipping download and processing."))
+    return(ndvi_historical_means_filename)
   }
+  
+  message(glue::glue("processing {ndvi_historical_means_filename}"))
   
   # Get for relevant days of the year
   doy_select <- yday(seq(dummy_date_start, dummy_date_end, by = "day"))
@@ -79,8 +82,8 @@ calculate_ndvi_historical_means <- function(ndvi_historical_means_directory,
   historical_means <- left_join(historical_means, historical_sds)
   
   # Save as parquet 
-  write_parquet(historical_means, here::here(ndvi_historical_means_directory, save_filename), compression = "gzip", compression_level = 5)
+  write_parquet(historical_means, ndvi_historical_means_filename, compression = "gzip", compression_level = 5)
   
-  return(file.path(ndvi_historical_means_directory, save_filename))
+  return(ndvi_historical_means_filename)
   
 }
