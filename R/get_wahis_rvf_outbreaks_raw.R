@@ -1,11 +1,18 @@
-#' .. content for \description{} (no empty lines) ..
+#' Retrieve WAHIS Rift Valley Fever Outbreaks Data
 #'
-#' .. content for \details{} ..
+#' This function downloads and filters the WAHIS Rift Valley Fever outbreaks data from 
+#' the provided source and returns a filtered dataframe. 
 #'
-#' @title
-
-#' @return
 #' @author Emma Mendelsohn
+#'
+#' @return A dataframe containing the filtered WAHIS Rift Valley Fever outbreaks data.
+#'
+#' @note This function performs no input arguments. It directly downloads and 
+#' filter the dataset for "rift valley fever" outbreaks.
+#'
+#' @examples
+#' get_wahis_rvf_outbreaks_raw()
+#'
 #' @export
 get_wahis_rvf_outbreaks_raw <- function() {
   

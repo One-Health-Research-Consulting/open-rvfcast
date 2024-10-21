@@ -1,35 +1,51 @@
-#' .. content for \description{} (no empty lines) ..
+#' Calculate and Save Anomalies from Forecast Data
 #'
-#' .. content for \details{} ..
+#' This function takes transformed ECMWF forecast and historical weather mean data, 
+#' calculates anomalies, and saves them in a specified directory. If the file already exists and `overwrite` is FALSE,
+#' the existing file's path is returned. Otherwise, the existing file is overwritten.
 #'
-#' @title
-#' @param ecmwf_forecasts_transformed
-#' @param ecmwf_forecasts_transformed_directory
-#' @param weather_historical_means
-#' @param forecast_anomalies_directory
-#' @param model_dates
-#' @param model_dates_selected
-#' @param overwrite
-#' @return
 #' @author Emma Mendelsohn
+#'
+#' @param ecmwf_forecasts_transformed_directory Directory containing the transformed forecasts.
+#' @param weather_historical_means Filepath to the historical weather means data.
+#' @param forecasts_anomalies_directory Directory in which to save the anomalies data.
+#' @param model_dates_selected Dates for models that have been selected.
+#' @param lead_intervals Lead times for forecasts, which will determine the interval over which anomalies are averaged.
+#' @param overwrite Boolean flag indicating whether existing file should be overwritten. Default is FALSE.
+#' @param ... Additional unused arguments for future extensibility and function compatibility.
+#'
+#' @return A string containing the filepath to the anomalies data.
+#'
+#' @note The returned path either points to an existing file (when overwrite is FALSE and the file already exists) 
+#' or to a newly created file with calculated anomalies (when overwrite is TRUE or the file didn't exist).
+#'
+#' @examples
+#' calculate_forecasts_anomalies(ecmwf_forecasts_transformed_directory = './forecasts',
+#'                               weather_historical_means='./historical_means.parquet',
+#' forecast_anomalies_directory = './anomalies',
+#' model_dates_selected = as.Date('2000-01-01'),
+#' lead_intervals = c(1, 10),
+#' overwrite = TRUE)
+#'
 #' @export
-calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
-                                          ecmwf_forecasts_transformed_directory,
+calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed_directory,
                                           weather_historical_means,
                                           forecasts_anomalies_directory,
                                           model_dates_selected,
                                           lead_intervals,
-                                          overwrite = FALSE) {
+                                          overwrite = FALSE,
+                                          ...) {
   
   # Set filename
   date_selected <- model_dates_selected
   save_filename <- glue::glue("forecast_anomaly_{date_selected}.gz.parquet")
   message(paste0("Calculating forecast anomalies for ", date_selected))
   
-  # Check if file already exists
-  existing_files <- list.files(forecasts_anomalies_directory)
-  if(save_filename %in% existing_files & !overwrite) {
-    message("file already exists, skipping download")
+  # Check if file already exists and can be read
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  
+  if(!is.null(error_safe_read_parquet(file.path(forecasts_validate_directory, save_filename))) & !overwrite) {
+    message("file already exists and can be loaded, skipping download")
     return(file.path(forecasts_anomalies_directory, save_filename))
   }
   

@@ -8,7 +8,7 @@
 #' @author Whitney Bagge
 #' @export
 #' 
-get_glw_data <- function(glw_directory_raw) {
+get_glw_data <- function(glw_directory_dataset) {
   
   options(timeout=200)
   
@@ -28,6 +28,4 @@ get_glw_data <- function(glw_directory_raw) {
 
   return(glw_directory_raw)
 
-  
-  
 }

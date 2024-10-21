@@ -9,8 +9,8 @@
 #' @author Emma Mendelsohn
 #' @export
 aggregate_augmented_data_by_adm <- function(augmented_data, 
-                                  rsa_polygon, 
-                                  model_dates_selected) {
+                                            rsa_polygon, 
+                                            model_dates_selected) {
   
   r <- arrow::read_parquet(glue::glue("{augmented_data}/date={model_dates_selected}/part-0.parquet")) |> 
     rast() 

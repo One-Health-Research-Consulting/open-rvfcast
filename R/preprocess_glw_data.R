@@ -1,37 +1,67 @@
-#' .. content for \description{} (no empty lines) ..
+#' Preprocess GLW Data
 #'
-#' .. content for \details{} ..
+#' This function performs preprocessing tasks on glw datasets.
 #'
-#' @title
-#' @param bounding_boxes
-#' @return
-#' @author Whitney Bagge
-#' @export
+#' @author Nathan C. Layman
+#'
+#' @param glw_directory_dataset Directory containing GLW datasets. This directory is created if it doesn't exist.
+#' @param glw_urls URLs of the GLW datasets to download.
+#' @param continent_raster_template Template to be used for terra raster operations.
+#' @param overwrite Boolean flag indicating whether existing preprocessed files should be overwritten. Default is FALSE.
+#' @param ... Additional parameters not used by this function but included for generic function compatibility.
 #' 
-library(raster)
-library(terra)
-preprocess_glw_data<- function(glw_directory_dataset, glw_directory_raw, glw_downloaded, continent_raster_template) {
+#' @return A character vector of filepaths to the preprocessed GLW dataset files.
+#'
+#' @note This function creates a new directory, downloads datasets, processes data and saves results
+#'       as parquet files in the specified directory.
+#'
+#' @example 
+#' preprocess_glw_data(glw_directory_dataset = "./data",
+#'                     glw_urls = c("http://example.com/dataset1", "http://example.com/dataset2"),
+#'                     continent_raster_template = raster_template,
+#'                     overwrite = TRUE)
+#'
+#' @export
+preprocess_glw_data <- function(glw_directory_dataset, 
+                                glw_urls, 
+                                continent_raster_template,
+                                overwrite = FALSE,
+                                ...) {
   
-  transformed_raster_cat <- transform_raster(raw_raster = rast(paste0(glw_downloaded, "/url_cattle.tif")),
-                                             template = rast(continent_raster_template))
-  transformed_raster_sh <- transform_raster(raw_raster = rast(paste0(glw_downloaded, "/url_sheep.tif")),
-                                            template = rast(continent_raster_template))
-  transformed_raster_go <- transform_raster(raw_raster = rast(paste0(glw_downloaded, "/url_goats.tif")),
-                                            template = rast(continent_raster_template))
+  # Create directory if it does not yet exist
+  dir.create(glw_directory_dataset, recursive = TRUE, showWarnings = FALSE)
   
-  # Convert to dataframe
-  dat_out_cat<- as.data.frame(transformed_raster_cat, xy = TRUE) |> 
-    as_tibble() 
-  dat_out_sh<- as.data.frame(transformed_raster_sh, xy = TRUE) |> 
-    as_tibble() 
-  dat_out_go<- as.data.frame(transformed_raster_go, xy = TRUE) |> 
-    as_tibble() 
+  # Unwrap terra raster
+  continent_raster_template <- terra::unwrap(continent_raster_template)
   
-  # Save as parquet 
-  write_parquet(dat_out_cat,"data/glw_dataset/glw_cattle", compression = "gzip", compression_level = 5)
-  write_parquet(dat_out_sh, "data/glw_dataset/glw_sheep", compression = "gzip", compression_level = 5)
-  write_parquet(dat_out_go, "data/glw_dataset/glw_goats", compression = "gzip", compression_level = 5)
+  # Set up safe way to read parquet files
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
   
+  # GLW filenames
+  glw_filenames <- file.path(glw_directory_dataset, paste0(names(glw_urls), ".parquet"))
   
-  return(glw_directory_raw)
+  # Check if glw files exist and can be read and that we don't want to overwrite them.
+  if(!is.null(error_safe_read_parquet(glw_filenames)) & !overwrite) {
+    message("preprocessed glw parquet file already exists and can be loaded, skipping download and processing")
+    return(glw_filenames)
+  }
+  
+  # Raw filenames
+  glw_filenames_raw <- file.path(glw_directory_dataset, paste0(names(glw_urls), ".tif"))
+  
+  # Download raw rasters
+  map2(glw_urls, glw_filenames_raw, ~download.file(url=.x, destfile=.y))
+  
+  # Transform rasters
+  transformed_rasters <- map(glw_filenames_raw, ~transform_raster(raw_raster = terra::rast(.x),
+                                                                  template = continent_raster_template) |>
+                               as.data.frame(xy = TRUE) |> 
+                               as_tibble())
+
+  map2(transformed_rasters, glw_filenames, ~arrow::write_parquet(.x, .y, compression = "gzip", compression_level = 5))
+  
+  # Clean up tif files
+  file.remove(glw_filenames_raw)
+  
+  return(glw_filenames)
 }

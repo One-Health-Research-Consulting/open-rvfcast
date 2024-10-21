@@ -1,22 +1,32 @@
-#' .. content for \description{} (no empty lines) ..
+#' Calculate NDVI Historical Means
 #'
-#' .. content for \details{} ..
+#' This function calculates historical Normalized Difference Vegetation Index (NDVI) means and standard deviations for certain days of the year 
+#' for a given interval range. The results are saved in a specified directory as a parquet file with gzip compression.
 #'
-#' @title
-#' @param sentinel_ndvi_transformed
-#' @param sentinel_ndvi_transformed_directory
-#' @param modis_ndvi_transformed
-#' @param modis_ndvi_transformed_directory
-#' @param ndvi_date_lookup
-#' @param days_of_year
-#' @param overwrite
-#' @return
 #' @author Emma Mendelsohn
+#'
+#' @param ndvi_historical_means_directory Path to the directory where the output parquet files will be stored.
+#' @param ndvi_date_lookup Table containing NDVI data lookup information.
+#' @param days_of_year Days of the year for which the NDVI means are calculated (numeric vector, e.g. 1:365).
+#' @param lag_intervals Vector of lag intervals for which the NDVI means are calculated.
+#' @param overwrite Boolean flag indicating whether existing files should be overwritten. Default is FALSE.
+#' @param ... Additional arguments not used by this function but included for function compatibility.
+#'
+#' @return The string with path to the saved parquet file.
+#'
+#' @note If the output file already exists and the param overwrite is set to FALSE, the existing file is returned.
+#'
+#' @examples
+#' calculate_ndvi_historical_means(ndvi_historical_means_directory = './data', ndvi_date_lookup = lookup_table,
+#'                                 days_of_year = c(100:200), lag_intervals = c(30, 60, 90), overwrite = TRUE)
+#'
 #' @export
 calculate_ndvi_historical_means <- function(ndvi_historical_means_directory,
-                                            ndvi_date_lookup, days_of_year,
+                                            ndvi_date_lookup, 
+                                            days_of_year,
                                             lag_intervals,
-                                            overwrite = FALSE) {
+                                            overwrite = FALSE,
+                                            ...) {
   
   interval_length <- unique(diff(lag_intervals))
 
@@ -30,15 +40,18 @@ calculate_ndvi_historical_means <- function(ndvi_historical_means_directory,
   doy_start_frmt <- str_pad(doy_start, width = 3, side = "left", pad = "0")
   doy_end_frmt <- str_pad(doy_end, width = 3, side = "left", pad = "0")
   
-  save_filename <- glue::glue("historical_ndvi_mean_doy_{doy_start_frmt}_to_{doy_end_frmt}.gz.parquet")
-  message(paste("calculating historical ndvi means and standard deviations for doy", doy_start_frmt, "to", doy_end_frmt))
+  ndvi_historical_means_filename <- file.path(ndvi_historical_means_directory, glue::glue("historical_ndvi_mean_doy_{doy_start_frmt}_to_{doy_end_frmt}.gz.parquet"))
   
-  # Check if file already exists
-  existing_files <- list.files(ndvi_historical_means_directory)
-  if(save_filename %in% existing_files & !overwrite) {
-    message("file already exists, skipping download")
-    return(file.path(ndvi_historical_means_directory, save_filename))
+  # Set up safe way to read parquet files
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  
+  # Check if outbreak_history file exist and can be read and that we don't want to overwrite them.
+  if(!is.null(error_safe_read_parquet(ndvi_historical_means_filename)) & !overwrite) {
+    message(glue::glue("{basename(ndvi_historical_means_filename)} already exists and can be loaded, skipping download and processing."))
+    return(ndvi_historical_means_filename)
   }
+  
+  message(glue::glue("processing {ndvi_historical_means_filename}"))
   
   # Get for relevant days of the year
   doy_select <- yday(seq(dummy_date_start, dummy_date_end, by = "day"))
@@ -69,8 +82,8 @@ calculate_ndvi_historical_means <- function(ndvi_historical_means_directory,
   historical_means <- left_join(historical_means, historical_sds)
   
   # Save as parquet 
-  write_parquet(historical_means, here::here(ndvi_historical_means_directory, save_filename), compression = "gzip", compression_level = 5)
+  write_parquet(historical_means, ndvi_historical_means_filename, compression = "gzip", compression_level = 5)
   
-  return(file.path(ndvi_historical_means_directory, save_filename))
+  return(ndvi_historical_means_filename)
   
 }

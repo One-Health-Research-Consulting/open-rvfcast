@@ -1,20 +1,40 @@
-#' .. content for \description{} (no empty lines) ..
+#' Calculate weather anomalies based on historical data
 #'
-#' .. content for \details{} ..
+#' This function calculates weather anomalies using data from NASA's servers. The anomalies are calculated for each specified date
+#' using the weather historical means. Calculated anomalies are saved at a specified location and also returned by the function.
 #'
-#' @title
-#' @param sentinel_ndvi_transformed
-#' @param nasa_weather_transformed
-#' @return
 #' @author Emma Mendelsohn
+#'
+#' @param nasa_weather_transformed_directory The directory where the transformed NASA weather data is located.
+#' @param weather_historical_means The historical weather averages used to calculate the weather anomalies.
+#' @param weather_anomalies_directory The directory where the calculated weather anomalies will be stored.
+#' @param model_dates_selected The dates for which the weather anomalies will be calculated.
+#' @param lag_intervals The intervals used to calculate the lags in the weather data.
+#' @param overwrite A flag indicating whether existing anomaly files should be overwritten. Defaults to FALSE.
+#' @param ... Additional arguments not used by this function but included for generic method compatibility.
+#'
+#' @return A string containing the filepath to the file containing the calculated weather anomalies.
+#'
+#' @note This function calculates weather anomalies using NASA data and historical means. If a file containing anomalies for a
+#' specified date already exists and the overwrite flag is set to TRUE, the existing file will be overwritten.
+#' Otherwise, the existing file will be returned.
+#'
+#' @examples
+#' calculate_weather_anomalies(nasa_weather_transformed_directory = './data/nasa',
+#'                             weather_historical_means = './data/historical_means',
+#'                             weather_anomalies_directory = './data/anomalies',
+#'                             model_dates_selected = as.Date('2020-01-01'),
+#'                             lag_intervals = c(1, 3, 7),
+#'                             overwrite = TRUE)
+#'
 #' @export
-calculate_weather_anomalies <- function(nasa_weather_transformed,
-                                        nasa_weather_transformed_directory,
+calculate_weather_anomalies <- function(nasa_weather_transformed_directory,
                                         weather_historical_means,
                                         weather_anomalies_directory,
                                         model_dates_selected,
                                         lag_intervals,
-                                        overwrite = FALSE) {
+                                        overwrite = FALSE,
+                                        ...) {
   
   # Set filename
   date_selected <- model_dates_selected

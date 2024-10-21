@@ -42,7 +42,10 @@ download_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   
   wf_set_key(user = Sys.getenv("ECMWF_USERID"), key = Sys.getenv("ECMWF_TOKEN"), service = "cds")
   
-  safely(wf_request(user = Sys.getenv("ECMWF_USERID"), request = request, transfer = TRUE, path = download_directory))
+  wf_request(user = Sys.getenv("ECMWF_USERID"), 
+                    request = request, 
+                    transfer = TRUE, 
+                    path = download_directory)
   
   return(file.path(download_directory, filename))
 }

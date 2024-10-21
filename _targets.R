@@ -23,6 +23,7 @@ tar_cue_general = "thorough" # CAUTION changing this to never means targets can 
 tar_cue_upload_aws = "thorough"  # CAUTION changing this to never means targets can miss changes to the code. Use only for developing.
 
 # Static Data Download ----------------------------------------------------
+# These data sources don't change with time. 
 static_targets <- tar_plan(
   
   # Define country bounding boxes and years to set up download ----------------------------------------------------
@@ -38,8 +39,8 @@ static_targets <- tar_plan(
   
   tar_target(continent_polygon, create_africa_polygon()),
   tar_target(continent_bounding_box, sf::st_bbox(continent_polygon)),
-  tar_target(continent_raster_template,
-             wrap(terra::rast(ext(continent_polygon), resolution = 0.1))), 
+  tar_target(continent_raster_template, wrap(terra::rast(ext(continent_polygon), resolution = 0.1))), 
+  
   # nasa power resolution = 0.5; 
   # ecmwf = 1; 
   # sentinel ndvi = 0.01
@@ -47,15 +48,24 @@ static_targets <- tar_plan(
   tar_target(rsa_polygon, rgeoboundaries::geoboundaries("South Africa", "adm2")),
   
   # SOIL -----------------------------------------------------------
-  tar_target(soil_directory_raw, 
-             create_data_directory(directory_path = "data/soil")),
-  tar_target(soil_downloaded, soil_download(soil_directory_raw),
-             format = "file", 
+  tar_target(soil_directory, create_data_directory(directory_path = "data/soil_dataset")),
+  
+  # Check if preprocessed soil data already exists on AWS and can be loaded.
+  # If so download from AWS instead of primary source
+  tar_target(soil_AWS, AWS_get_folder(soil_directory,
+                                      continent_raster_template), # Enforce Dependency
+             error = "null"), # Continue the pipeline even on error
+  
+  tar_target(soil_preprocessed, preprocess_soil(soil_directory, 
+                                                continent_raster_template, 
+                                                overwrite = FALSE,
+                                                soil_AWS), # Enforce dependency
+             format = "file",
              repository = "local"),
-  tar_target(soil_directory_dataset, 
-             create_data_directory(directory_path = "data/soil_dataset")),
-  tar_target(soil_preprocessed, 
-             preprocess_soil(soil_directory_dataset, soil_directory_raw, continent_raster_template, soil_downloaded)),
+  
+  tar_target(soil_preprocessed_AWS_upload, AWS_put_files(soil_preprocessed, 
+                                                         aspect_directory),
+             error = "null"), # Continue the pipeline even on error
   
   # ASPECT -------------------------------------------------
   tar_target(aspect_urls, c("aspect_zero" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClN_30as.rar",
@@ -64,14 +74,28 @@ static_targets <- tar_plan(
                             "aspect_twotwentyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClW_30as.rar",
                             "aspect_undef" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClU_30as.rar")),
   
+  tar_target(aspect_directory, create_data_directory(directory_path = "data/aspect_dataset")),
+  
+  # Check if preprocessed aspect data already exists on AWS and can be loaded.
+  # If so download from AWS instead of primary source
+  tar_target(aspect_AWS, AWS_get_folder(aspect_directory,
+                                        continent_raster_template),
+             error = "null"), # Enforce Dependency
+  
   tar_target(aspect_preprocessed, get_remote_rasters(urls = aspect_urls, 
-                                                     output_dir = "data/aspect_dataset",
+                                                     output_dir = aspect_directory,
                                                      output_filename = "aspect.parquet",
-                                                     raster_template = continent_raster_template,
+                                                     continent_raster_template,
                                                      aggregate_method = "which.max", # What is the dominant aspect for each point?
-                                                     resample_method = "mode"), # What is the domminant aspect at the scale of the template raster?
-    format = "file", 
-    repository = "local"),
+                                                     resample_method = "mode", # What is the dominant aspect at the scale of the template raster?
+                                                     overwrite = FALSE,
+                                                     aspect_AWS), # Enforce dependency
+             format = "file",
+             repository = "local"),
+  
+  tar_target(aspect_preprocessed_AWS_upload, AWS_put_files(aspect_preprocessed,
+                                                           aspect_directory),
+             error = "null"), # Continue the pipeline even on error
   
   # SLOPE -------------------------------------------------
   tar_target(slope_urls, c("slope_zero" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl1_30as.rar",
@@ -83,49 +107,127 @@ static_targets <- tar_plan(
                            "slope_thirty" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl7_30as.rar",
                            "slope_fortyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl8_30as.rar")),
   
+  tar_target(slope_directory, create_data_directory(directory_path = "data/slope_dataset")),
+  
+  # Check if preprocessed slope data already exists on AWS and can be loaded.
+  # If so download from AWS instead of primary source
+  tar_target(slope_AWS, AWS_get_folder(aspect_directory,
+                                       continent_raster_template), # Enforce Dependency
+             error = "null"), # Continue the pipeline even on error
+  
   tar_target(slope_preprocessed, get_remote_rasters(urls = slope_urls, 
-                                                    output_dir = "data/slope_dataset",
+                                                    output_dir = slope_directory,
                                                     output_filename = "slope.parquet",
-                                                    raster_template = continent_raster_template,
+                                                    continent_raster_template,
                                                     aggregate_method = "which.max", # What is the dominant slope for each point?
-                                                    resample_method = "mode"), # What is the domminant slope at the scale of the template raster?
-             format = "file", 
+                                                    resample_method = "mode", # What is the dominant slope at the scale of the template raster?
+                                                    overwrite = FALSE,
+                                                    slope_AWS), # Enforce dependency
+             format = "file",
              repository = "local"),
+  
+  tar_target(slope_preprocessed_AWS_upload, AWS_put_files(slope_preprocessed,
+                                                          slope_directory),
+             error = "null"), # Continue the pipeline even on error
  
    # Gridded Livestock of the world -----------------------------------------------------------
-  tar_target(glw_directory_raw, 
-             create_data_directory(directory_path = "data/glw")),
-  tar_target(glw_downloaded, get_glw_data(glw_directory_raw),
-             format = "file", 
-             repository = "local"),
-  tar_target(glw_directory_dataset, 
+  tar_target(glw_urls, c("glw_cattle" = "https://dataverse.harvard.edu/api/access/datafile/6769710", 
+                         "glw_sheep" = "https://dataverse.harvard.edu/api/access/datafile/6769629",
+                         "glw_goats" = "https://dataverse.harvard.edu/api/access/datafile/6769692")),
+  
+  tar_target(glw_directory, 
              create_data_directory(directory_path = "data/glw_dataset")),
+  
+  # Check if preprocessed glw data already exists on AWS and can be loaded.
+  # If so download from AWS instead of primary source
+  tar_target(glw_AWS, AWS_get_folder(glw_directory,
+                                     continent_raster_template), # Enforce Dependency
+             error = "null"), # Continue the pipeline even on error
+  
   tar_target(glw_preprocessed, 
-             preprocess_glw_data(glw_directory_dataset, glw_directory_raw, glw_downloaded, continent_raster_template)),
+             preprocess_glw_data(glw_directory, 
+                                 glw_urls,
+                                 continent_raster_template,
+                                 overwrite = TRUE,
+                                 glw_AWS),
+             format = "file",
+             repository = "local"), # Enforce dependency
+  
+  tar_target(glw_preprocessed_AWS_upload, AWS_put_files(glw_preprocessed,
+                                                        glw_directory),
+             error = "null"), # Continue the pipeline even on error
 
 # ELEVATION -----------------------------------------------------------
+tar_target(elevation_directory, 
+           create_data_directory(directory_path = "data/elevation_dataset")),
+
+# Check if preprocessed elevation data already exists on AWS and can be loaded.
+# If so download from AWS instead of primary source
+tar_target(elevation_AWS, AWS_get_folder(elevation_directory,
+                                         continent_raster_template), # Enforce Dependency
+           error = "null"), # Continue the pipeline even on error
+
+# NCL NEEDS TO SAVE AS PARQUET
 tar_target(elevation_preprocessed, 
-           get_elevation_data(output_dir = "data/elevation_dataset", 
+           get_elevation_data(output_dir = elevation_directory, 
                               output_filename = "africa_elevation.parquet",
-                              raster_template = continent_raster_template),
-           format = "file", 
+                              continent_raster_template,
+                              overwrite = FALSE,
+                              elevation_AWS), # Enforce dependency
+           format = "file",
            repository = "local"),
+
+tar_target(elevation_preprocessed_AWS_upload, AWS_put_files(elevation_preprocessed,
+                                                            elevation_directory),
+           error = "null"), # Continue the pipeline even on error
 
 # BIOCLIM -----------------------------------------------------------
+tar_target(bioclim_directory, 
+           create_data_directory(directory_path = "data/bioclim_dataset")),
+
+# Check if preprocessed bioclim data already exists on AWS and can be loaded.
+# If so download from AWS instead of primary source
+tar_target(bioclim_AWS, AWS_get_folder(bioclim_directory,
+                                         continent_raster_template), # Enforce Dependency
+           error = "null"), # Continue the pipeline even on error
+
 tar_target(bioclim_preprocessed,
-           get_bioclim_data(output_dir = "data/bioclim_dataset", 
+           get_bioclim_data(output_dir = bioclim_directory, 
                             output_filename = "bioclim.parquet",
-                            raster_template = continent_raster_template),
-           format = "file", 
+                            continent_raster_template,
+                            overwrite = FALSE),
+           format = "file",
            repository = "local"),
 
+tar_target(bioclim_preprocessed_AWS_upload, AWS_put_files(bioclim_preprocessed,
+                                                          bioclim_directory),
+           error = "null"), # Continue the pipeline even on error
+
 # LANDCOVER -----------------------------------------------------------
+tar_target(landcover_types, c("trees", "grassland", "shrubs", "cropland", "built", "bare", "snow", "water", "wetland", "mangroves", "moss")),
+
+tar_target(landcover_directory, 
+           create_data_directory(directory_path = "data/landcover_dataset")),
+
+# Check if preprocessed bioclim data already exists on AWS and can be loaded.
+# If so download from AWS instead of primary source
+tar_target(landcover_AWS, AWS_get_folder(landcover_directory,
+                                         continent_raster_template), # Enforce Dependency
+           error = "null"), # Continue the pipeline even on error
+
 tar_target(landcover_preprocessed,
-           get_landcover_data(output_dir = "data/landcover_dataset", 
+           get_landcover_data(output_dir = landcover_directory, 
                               output_filename = "landcover.parquet",
-                              raster_template = continent_raster_template),
-           format = "file", 
+                              landcover_types,
+                              continent_raster_template,
+                              overwrite = FALSE,
+                              landcover_AWS), # Enforce Dependency
+           format = "file",
            repository = "local"),
+
+tar_target(landcover_preprocessed_AWS_upload, AWS_put_files(landcover_preprocessed,
+                                                            landcover_directory),
+           error = "null"), # Continue the pipeline even on error
 )
 
 
@@ -158,291 +260,223 @@ dynamic_targets <- tar_plan(
                arrange(end_date) |>
                mutate(outbreak_id = 1:n())),
   
-  tar_target(wahis_raster_template, terra::rast(terra::ext(continent_polygon), resolution = 0.1, vals = 1) |>
-               terra::crop(terra::vect(continent_polygon$geometry), mask = TRUE) |> 
-               terra::wrap()),
+  tar_target(wahis_raster_template, terra::rasterize(terra::vect(continent_polygon), # Take the boundary of Africa
+                                                     terra::rast(continent_polygon, # Mask against a raster filled with 1's
+                                                                 resolution = 0.1, # Set resolution
+                                                                 vals = 1)) |>
+               terra::wrap()), # Wrap to avoid problems with targets
   
   tar_target(wahis_distance_matrix, get_outbreak_distance_matrix(wahis_outbreaks, wahis_raster_template)),
+  
+  tar_target(wahis_outbreak_history_directory, 
+             create_data_directory(directory_path = "data/outbreak_history_dataset")),
+  
+  # Check if preprocessed wahis_outbreak_history data already exists on AWS and can be loaded.
+  # If so download from AWS instead of primary source
+  tar_target(wahis_outbreak_history_AWS, AWS_get_folder(wahis_outbreak_history_directory,
+                                                        wahis_outbreak_dates, # Enforce Dependency
+                                                        wahis_outbreaks, # Enforce Dependency
+                                                        wahis_distance_matrix, # Enforce Dependency
+                                                        wahis_raster_template), # Enforce Dependency
+             error = "null"), # Continue the pipeline even on error
   
   # Dynamic branch over year batch over day otherwise too many branches.
   tar_target(wahis_outbreak_history, get_daily_outbreak_history(dates_df = wahis_outbreak_dates,
                                                                 wahis_outbreaks,
                                                                 wahis_distance_matrix,
                                                                 wahis_raster_template,
-                                                                output_dir = "data/outbreak_history_dataset",
-                                                                output_filename = "outbreak_history.tif",
-                                                                save_parquet = T,
+                                                                output_dir = wahis_outbreak_history_directory,
+                                                                output_filename = "outbreak_history.parquet",
                                                                 beta_time = 0.5,
                                                                 max_years = 10,
-                                                                recent = 3/12),
-             map(wahis_outbreak_dates),
-             iteration = "vector",
+                                                                recent = 3/12,
+                                                                overwrite = FALSE,
+                                                                wahis_outbreak_history_AWS), # Enforce Dependency
+             pattern = map(wahis_outbreak_dates),
+             error = "null", # Keep going if error. It will be caught next time the pipeline is run.
              format = "file", 
              repository = "local"),
   
-  # Takes raster files and makes animations from the layers
-  tar_target(wahis_outbreak_history_animations, map(wahis_outbreak_history, ~get_outbreak_history_animation(input_file = .x,
-                                                                               output_dir = "outputs")),
-             pattern = map(wahis_outbreak_history)), # Just included to enforce dependency with wahis_outbreak_history
+  tar_target(wahis_outbreak_history_animations_directory, 
+             create_data_directory(directory_path = "outputs/wahis_outbreak_history_animations")),
+  
+  tar_target(wahis_outbreak_history_AWS_upload, AWS_put_files(wahis_outbreak_history,
+                                                              wahis_outbreak_history_animations_directory),
+             error = "null"), # Continue the pipeline even on error
+  
+  # Check if preprocessed wahis_outbreak_history data already exists on AWS and can be loaded.
+  # If so download from AWS instead of primary source
+  tar_target(wahis_outbreak_history_animations_AWS, AWS_get_folder(wahis_outbreak_history_animations_directory,
+                                                                   wahis_outbreak_history), # Enforce Dependency
+             error = "null"), # Continue the pipeline even on error
+  
+  # Animate a SpatRaster stack where each layer is a date.
+  # gganimate took 20 minutes per file.
+  # just saving all the frames as separate pngs
+  # and combining with gifski took 50 minutes for all of them.
+  # get_outbreak_history_animation()
+  tar_target(wahis_outbreak_history_animations, get_outbreak_history_animation(wahis_outbreak_history,
+                                                                               wahis_outbreak_history_animations_directory), # Just included to enforce dependency with wahis_outbreak_history
+             pattern = map(wahis_outbreak_history),
+             error = "null",
+             repository = "local"), 
+
+  tar_target(wahis_outbreak_history_animations_AWS_upload, AWS_put_files(wahis_outbreak_history_animations,
+                                                                         wahis_outbreak_history_animations_directory),
+             error = "null"), # Continue the pipeline even on error
 
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
   # 10 day period
-  tar_target(sentinel_ndvi_raw_directory, 
-             create_data_directory(directory_path = "data/sentinel_ndvi_raw")),
+  # tar_target(sentinel_ndvi_raw_directory, 
+  #            create_data_directory(directory_path = "data/sentinel_ndvi_raw")),
   tar_target(sentinel_ndvi_transformed_directory, 
              create_data_directory(directory_path = "data/sentinel_ndvi_transformed")),
+  
+  tar_target(get_sentinel_ndvi_AWS, AWS_get_folder(sentinel_ndvi_transformed_directory)),
   
   # get API parameters
   tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters()), 
   
-  # download files from source (locally)
-  tar_target(sentinel_ndvi_downloaded, download_sentinel_ndvi(sentinel_ndvi_api_parameters,
-                                                              download_directory = sentinel_ndvi_raw_directory,
-                                                              overwrite = FALSE),
-             pattern = sentinel_ndvi_api_parameters, 
-             format = "file", 
-             repository = "local",
-             cue = tar_cue(tar_cue_general)),
-  
-  # save raw to AWS bucket
-  tar_target(sentinel_ndvi_raw_upload_aws_s3, {sentinel_ndvi_downloaded;
-    aws_s3_upload_single_type(directory_path = sentinel_ndvi_raw_directory,
-                              bucket =  aws_bucket ,
-                              key = sentinel_ndvi_raw_directory, 
-                              check = TRUE)}, 
-    cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
-  
-  # project to the template and save as parquets (these can now be queried for analysis)
-  # this maintains the branches, saves separate files split by date
-  # TODO NAs outside of the continent
   tar_target(sentinel_ndvi_transformed, 
-             transform_sentinel_ndvi(sentinel_ndvi_downloaded, 
+             transform_sentinel_ndvi(sentinel_ndvi_api_parameters, 
                                      continent_raster_template,
                                      sentinel_ndvi_transformed_directory,
-                                     overwrite = FALSE),
-             pattern = sentinel_ndvi_downloaded,
+                                     overwrite = FALSE,
+                                     get_sentinel_ndvi_AWS),
+             pattern = map(sentinel_ndvi_api_parameters),
+             error = "null", # Keep going if error. It will be caught next time the pipeline is run.
              format = "file", 
-             repository = "local",
-             cue = tar_cue(tar_cue_general)), 
+             repository = "local"),
   
-  # save transformed to AWS bucket
-  tar_target(sentinel_ndvi_transformed_upload_aws_s3, 
-             aws_s3_upload(path = sentinel_ndvi_transformed,
-                           bucket =  aws_bucket,
-                           key = sentinel_ndvi_transformed, 
-                           check = TRUE), 
-             pattern = sentinel_ndvi_transformed,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
+  tar_target(sentinel_ndvi_transformed_AWS_upload, AWS_put_files(sentinel_ndvi_transformed,
+                                                                 sentinel_ndvi_transformed_directory),
+             error = "null"), # Continue the pipeline even on error
+  
   
   # MODIS NDVI -----------------------------------------------------------
   # 2005-present
   # this satellite will be retired soon, so we should use sentinel for present dates 
   # 16 day period
-  tar_target(modis_ndvi_raw_directory, 
-             create_data_directory(directory_path = "data/modis_ndvi_raw")),
   tar_target(modis_ndvi_transformed_directory, 
              create_data_directory(directory_path = "data/modis_ndvi_transformed")),
   
-  # get authorization token
-  # this expires after 48 hours
-  tar_target(modis_ndvi_token, get_modis_ndvi_token()),
-  
-  # set modis ndvi dates
-  tar_target(modis_ndvi_start_year, 2005),
-  tar_target(modis_ndvi_end_year, 2023),
+  # This target reads in an Appears token from the .env file and tests that it 
+  # still works. It requests a new token and updates the .env file if not.
+  tar_target(modis_ndvi_token, get_modis_ndvi_token(), cue = tar_cue("always")),
   
   # set parameters and submit request for full continent
-  tar_target(modis_ndvi_task_id_continent, submit_modis_ndvi_task_request_continent(modis_ndvi_start_year,
-                                                                                    modis_ndvi_end_year,
+  tar_target(modis_ndvi_task_id_continent, submit_modis_ndvi_task_request_continent(modis_ndvi_start_year = 2005,
                                                                                     modis_ndvi_token,
                                                                                     bbox_coords = continent_bounding_box)),
-  # check if the request is posted, then get bundle
-  # this uses a while loop to check every 30 seconds if the request is complete - it takes about 10 minutes
-  # this function could be refactored to check time of modis_ndvi_task_request and pause for some time before submitting bundle request
+  
+  tar_target(modis_ndvi_bundle_request_file, file.path(modis_ndvi_transformed_directory, "modis_ndvi_bundle_request.RDS")),
+  
+  # Set up modis_ndvi data requests
   tar_target(modis_ndvi_bundle_request, submit_modis_ndvi_bundle_request(modis_ndvi_token, 
                                                                          modis_ndvi_task_id_continent, 
-                                                                         timeout = 1500) |> rowwise() |> tar_group(),
-             iteration = "group"
-  ),
+                                                                         modis_ndvi_bundle_request_file) |> 
+               filter(grepl("NDVI", file_name)),
+             cue = tar_cue("always")),
   
-  # download files from source (locally)
-  tar_target(modis_ndvi_downloaded, download_modis_ndvi(modis_ndvi_token,
+  # Check if modis_ndvi files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(modis_ndvi_transformed_AWS, AWS_get_folder(modis_ndvi_transformed_directory,
+                                                        modis_ndvi_token,
                                                         modis_ndvi_bundle_request,
-                                                        download_directory = modis_ndvi_raw_directory,
-                                                        overwrite = FALSE),
-             pattern = modis_ndvi_bundle_request, 
-             format = "file", 
-             repository = "local",
-             cue = tar_cue(tar_cue_general)),
-  
-  # save raw to AWS bucket
-  tar_target(modis_ndvi_raw_upload_aws_s3, {modis_ndvi_downloaded;
-    aws_s3_upload_single_type(directory_path = modis_ndvi_raw_directory,
-                              bucket =  aws_bucket ,
-                              key = modis_ndvi_raw_directory, 
-                              check = TRUE)}, 
-    cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
-  
-  # remove the "quality" files
-  tar_target(modis_ndvi_downloaded_subset, modis_ndvi_downloaded[str_detect(basename(modis_ndvi_downloaded), "NDVI")]),
-  
-  # project to the template and save as parquets (these can now be queried for analysis)
-  # this maintains the branches, saves separate files split by date
+                                                        continent_raster_template,
+                                                        modis_ndvi_transformed_directory)),
+ 
+  # Download data, project to the template and save as parquets
   # TODO NAs outside of the continent
   tar_target(modis_ndvi_transformed, 
-             transform_modis_ndvi(modis_ndvi_downloaded_subset, 
+             transform_modis_ndvi(modis_ndvi_token, 
+                                  modis_ndvi_bundle_request,
                                   continent_raster_template,
                                   modis_ndvi_transformed_directory,
-                                  overwrite = FALSE),
-             pattern = modis_ndvi_downloaded_subset,
-             format = "file", 
-             repository = "local",
+                                  overwrite = FALSE,
+                                  modis_ndvi_transformed_AWS), # Enforce dependency
+             pattern = map(modis_ndvi_bundle_request),
+             error = "null", # Keep going if error. It will be caught next time the pipeline is run.
+             format = "file",
+             repository = "local", # Repository local means it isn't stored on AWS just yet.
              cue = tar_cue(tar_cue_general)), 
   
-  # save transformed to AWS bucket
-  tar_target(modis_ndvi_transformed_upload_aws_s3,
-             aws_s3_upload(path = modis_ndvi_transformed,
-                           bucket =  aws_bucket,
-                           key = modis_ndvi_transformed, 
-                           check = TRUE), 
-             pattern = modis_ndvi_transformed,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data 
+  # Put modis_ndvi_transformed files on AWS
+  tar_target(modis_ndvi_transformed_AWS_upload, AWS_put_files(modis_ndvi_transformed,
+                                                              modis_ndvi_transformed_directory)),
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
   # T2M             MERRA-2 Temperature at 2 Meters (C) ;
   # PRECTOTCORR     MERRA-2 Precipitation Corrected (mm/day)  
-  tar_target(nasa_weather_raw_directory, 
-             create_data_directory(directory_path = "data/nasa_weather_raw")),
-  tar_target(nasa_weather_pre_transformed_directory, 
-             create_data_directory(directory_path = "data/nasa_weather_pre_transformed")),
   tar_target(nasa_weather_transformed_directory, 
              create_data_directory(directory_path = "data/nasa_weather_transformed")),
   
-  # set branching for nasa download
+  # Set branching for nasa_weather download
   tar_target(nasa_weather_years, 2005:2023),
   tar_target(nasa_weather_variables, c("RH2M", "T2M", "PRECTOTCORR")),
   tar_target(nasa_weather_coordinates, get_nasa_weather_coordinates(country_bounding_boxes)),
   
-  #  download raw files
-  tar_target(nasa_weather_downloaded,
-             download_nasa_weather(nasa_weather_coordinates,
-                                   nasa_weather_years,
-                                   nasa_weather_variables,
-                                   download_directory = nasa_weather_raw_directory,
-                                   overwrite = FALSE),
-             pattern = crossing(nasa_weather_years, nasa_weather_coordinates),
+  # Check if nasa_weather file already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(nasa_weather_AWS, AWS_get_folder(nasa_weather_transformed_directory,
+                                              nasa_weather_coordinates, # Enforce Dependency
+                                              nasa_weather_years, # Enforce Dependency
+                                              continent_raster_template)), # Enforce Dependency
+  
+  tar_target(nasa_weather_transformed, transform_nasa_weather(nasa_weather_coordinates,
+                                                              nasa_weather_years,
+                                                              continent_raster_template,
+                                                              local_folder = nasa_weather_transformed_directory,
+                                                              overwrite = FALSE,
+                                                              nasa_weather_AWS), # Enforce Dependency
+             pattern = map(nasa_weather_years),
+             error = "null",
              format = "file",
              repository = "local",
              cue = tar_cue(tar_cue_general)),
   
-  # save raw to AWS bucket
-  tar_target(nasa_weather_raw_upload_aws_s3,  {nasa_weather_downloaded;
-    aws_s3_upload_single_type(directory_path = nasa_weather_raw_directory,
-                              bucket =  aws_bucket,
-                              key = nasa_weather_raw_directory, 
-                              check = TRUE)}, 
-    cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
+  # Put nasa_weather files on AWS
+  tar_target(nasa_weather_transformed_AWS_upload, AWS_put_files(modis_ndvi_transformed,
+                                                                modis_ndvi_transformed_directory)),
   
-  
-  # remove dupes due to having overlapping country bounding boxes
-  # save as arrow dataset, grouped by year
-  tar_target(nasa_weather_pre_transformed, preprocess_nasa_weather(nasa_weather_downloaded,
-                                                                   nasa_weather_pre_transformed_directory),
-             repository = "local",
-             cue = tar_cue(tar_cue_general)), 
-  
-  # project to the template and save as arrow dataset
-  # TODO NAs outside of the continent
-  tar_target(nasa_weather_transformed, 
-             transform_nasa_weather(nasa_weather_pre_transformed,
-                                    nasa_weather_transformed_directory, 
-                                    continent_raster_template,
-                                    overwrite = FALSE),
-             pattern = nasa_weather_pre_transformed,
-             format = "file", 
-             repository = "local",
-             cue = tar_cue(tar_cue_general)),  
-  
-  # save transformed to AWS bucket
-  tar_target(nasa_weather_transformed_upload_aws_s3,  
-             aws_s3_upload(path = nasa_weather_transformed,
-                           bucket =  aws_bucket,
-                           key = nasa_weather_transformed,
-                           check = TRUE), 
-             pattern = nasa_weather_transformed,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
-  tar_target(ecmwf_forecasts_raw_directory, 
-             create_data_directory(directory_path = "data/ecmwf_forecasts_raw")),
   tar_target(ecmwf_forecasts_transformed_directory, 
              create_data_directory(directory_path = "data/ecmwf_forecasts_transformed")),
   
   # set branching for ecmwf download
-  tar_target(ecmwf_forecasts_api_parameters, set_ecmwf_api_parameter(years = 2005:2023,
+  tar_target(ecmwf_forecasts_api_parameters, set_ecmwf_api_parameter(years = 2005:2024,
                                                                      bbox_coords = continent_bounding_box,
                                                                      variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
-                                                                     product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
+                                                                     # product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
+                                                                     product_types = c("monthly_mean"),
                                                                      leadtime_months = c("1", "2", "3", "4", "5", "6"))),
   
-  #  download files
-  tar_target(ecmwf_forecasts_downloaded,
-             download_ecmwf_forecasts(ecmwf_forecasts_api_parameters,
-                                      download_directory = ecmwf_forecasts_raw_directory,
-                                      overwrite = FALSE),
-             pattern = ecmwf_forecasts_api_parameters,
+  # Check if ecmwf files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(get_ecmwf_forecasts_AWS, AWS_get_folder(ecmwf_forecasts_transformed_directory,
+                                                     ecmwf_forecasts_api_parameters, # Enforce Dependency
+                                                     continent_raster_template)), # Enforce Dependency
+  
+  # Download ecmwf forecasts, project to the template 
+  # and save as arrow dataset
+  # TODO NAs outside of the continent
+  tar_target(ecmwf_forecasts_transformed, 
+             transform_ecmwf_forecasts(ecmwf_forecasts_api_parameters,
+                                       local_folder = ecmwf_forecasts_transformed_directory,
+                                       continent_raster_template,
+                                       get_ecmwf_forecasts_AWS), # Enforce Dependency
+             pattern = map(ecmwf_forecasts_api_parameters),
+             error = "null",
              format = "file",
              repository = "local",
              cue = tar_cue(tar_cue_general)),
   
-  # save raw to AWS bucket
-  tar_target(ecmwf_forecasts_raw_upload_aws_s3,  {ecmwf_forecasts_downloaded;
-    aws_s3_upload_single_type(directory_path = ecmwf_forecasts_raw_directory,
-                              bucket =  aws_bucket ,
-                              key = ecmwf_forecasts_raw_directory,
-                              check = TRUE)},
-    cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
-  
-  # project to the template and save as arrow dataset
-  # TODO NAs outside of the continent
-  tar_target(ecmwf_forecasts_transformed, 
-             transform_ecmwf_forecasts(ecmwf_forecasts_downloaded,
-                                       ecmwf_forecasts_transformed_directory, 
-                                       continent_raster_template,
-                                       n_workers = 2,
-                                       overwrite = FALSE),
-             pattern = ecmwf_forecasts_downloaded,
-             format = "file", 
-             repository = "local",
-             cue = tar_cue(tar_cue_general)),  
-  
-  # save transformed to AWS bucket
-  # using aws.s3::put_object for multipart functionality
-  tar_target(ecmwf_forecasts_transformed_upload_aws_s3, 
-             aws.s3::put_object(file = ecmwf_forecasts_transformed, 
-                                object = ecmwf_forecasts_transformed,
-                                bucket = aws_bucket, 
-                                multipart = TRUE,
-                                verbose = TRUE,
-                                show_progress = TRUE),
-             pattern = ecmwf_forecasts_transformed,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data 
-
-  
-
-  # # cache locally
-  # # Note the tar_read. When using AWS this does not read into R but instead initiates a download of the file into the scratch folder for later processing.
-  # # Format file here means if we delete or change the local cache it will force a re-download.
-  # tar_target(nasa_recorded_weather_local, {suppressWarnings(dir.create(here::here("data/nasa_parquets"), recursive = TRUE))
-  #   cache_aws_branched_target(tmp_path = tar_read(nasa_recorded_weather_download),
-  #                             ext = ".gz.parquet") 
-  # },
-  # repository = "local", 
-  # format = "file"
-  # ),
-
+  # Next step put modis_ndvi_transformed files on AWS.
+  tar_target(ecmwf_forecasts_transformed_AWS_upload, AWS_put_files(ecmwf_forecasts_transformed,
+                                                                   ecmwf_forecasts_transformed_directory)),
 
 )
 
@@ -460,87 +494,109 @@ data_targets <- tar_plan(
                filter(select_date) |> pull(date)
   ),
   
-  # recorded weather anomalies --------------------------------------------------
+  # Recorded weather anomalies --------------------------------------------------
   tar_target(weather_historical_means_directory, 
              create_data_directory(directory_path = "data/weather_historical_means")),
   
-  tar_target(weather_historical_means, calculate_weather_historical_means(nasa_weather_transformed, # enforce dependency
-                                                                          nasa_weather_transformed_directory,
+  # Check if weather_historical_means parquet files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(weather_historical_means_AWS, AWS_get_folder(weather_historical_means_directory,
+                                                          days_of_year, # Enforce dependency
+                                                          lag_intervals, # Enforce dependency
+                                                          lead_intervals, # Enforce dependency
+                                                          nasa_weather_transformed)), # Enforce dependency
+  
+  tar_target(weather_historical_means, calculate_weather_historical_means(nasa_weather_transformed_directory,
                                                                           weather_historical_means_directory,
                                                                           days_of_year,
                                                                           lag_intervals,
                                                                           lead_intervals,
-                                                                          overwrite = FALSE),
-             pattern = days_of_year,
+                                                                          overwrite = FALSE,
+                                                                          nasa_weather_transformed, # Enforce dependency
+                                                                          weather_historical_means_AWS), # Enforce dependency
+             pattern = map(days_of_year),
+             error = "null",
              format = "file", 
              repository = "local",
              cue = tar_cue(tar_cue_general)),  
   
-  # save historical means to AWS bucket
-  tar_target(weather_historical_means_upload_aws_s3, 
-             aws_s3_upload(path = weather_historical_means,
-                           bucket =  aws_bucket,
-                           key = weather_historical_means, 
-                           check = TRUE), 
-             pattern = weather_historical_means,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
-  
+
+  # Next step put weather_historical_means files on AWS.
+  tar_target(weather_historical_means_AWS_upload, AWS_put_files(weather_historical_means,
+                                                                weather_historical_means_directory)),
   
   tar_target(weather_anomalies_directory, 
              create_data_directory(directory_path = "data/weather_anomalies")),
   
-  tar_target(weather_anomalies, calculate_weather_anomalies(nasa_weather_transformed,
-                                                            nasa_weather_transformed_directory,
+  # Check if weather_historical_means parquet files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(weather_anomalies_AWS, AWS_get_folder(weather_anomalies_directory,
+                                                   weather_historical_means, # Enforce dependency
+                                                   model_dates_selected, # Enforce dependency
+                                                   lag_intervals, # Enforce dependency
+                                                   nasa_weather_transformed)), # Enforce dependency
+             
+  tar_target(weather_anomalies, calculate_weather_anomalies(nasa_weather_transformed_directory,
                                                             weather_historical_means,
                                                             weather_anomalies_directory,
                                                             model_dates_selected,
                                                             lag_intervals,
-                                                            overwrite = TRUE),
+                                                            overwrite = TRUE,
+                                                            nasa_weather_transformed, # Enforce dependency
+                                                            weather_anomalies_AWS), # Enforce dependency
              pattern = model_dates_selected,
+             error = "null",
              format = "file", 
              repository = "local",
              cue = tar_cue(tar_cue_general)),  
   
-  # save anomalies to AWS bucket
-  tar_target(weather_anomalies_upload_aws_s3, 
-             aws_s3_upload(path = weather_anomalies,
-                           bucket =  aws_bucket,
-                           key = weather_anomalies, 
-                           check = TRUE), 
-             pattern = weather_anomalies,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
+  # Next step put weather_historical_means files on AWS.
+  tar_target(weather_anomalies_AWS_upload, AWS_put_files(weather_anomalies,
+                                                         weather_anomalies_directory)),
   
   
   # forecast weather anomalies ----------------------------------------------------------------------
   tar_target(forecasts_anomalies_directory, 
              create_data_directory(directory_path = "data/forecast_anomalies")),
   
-  tar_target(forecasts_anomalies, calculate_forecasts_anomalies(ecmwf_forecasts_transformed,
-                                                                ecmwf_forecasts_transformed_directory,
+  # Check if weather_historical_means parquet files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(forecasts_anomalies_AWS, AWS_get_folder(forecasts_anomalies_directory,
+                                                     weather_historical_means, # Enforce dependency
+                                                     model_dates_selected, # Enforce dependency
+                                                     lead_intervals, # Enforce dependency
+                                                     ecmwf_forecasts_transformed)), # Enforce dependency
+  
+  tar_target(forecasts_anomalies, calculate_forecasts_anomalies(ecmwf_forecasts_transformed_directory,
                                                                 weather_historical_means,
                                                                 forecasts_anomalies_directory,
                                                                 model_dates_selected,
                                                                 lead_intervals,
-                                                                overwrite = FALSE),
+                                                                overwrite = FALSE,
+                                                                ecmwf_forecasts_transformed,# Enforce dependency
+                                                                forecasts_anomalies_AWS), # Enforce dependency
              pattern = model_dates_selected,
+             error = "null",
              format = "file", 
              repository = "local",
              cue = tar_cue(tar_cue_general)), 
   
-  
-  
-  # save anomalies to AWS bucket
-  tar_target(forecasts_anomalies_upload_aws_s3, 
-             aws_s3_upload(path = forecasts_anomalies,
-                           bucket =  aws_bucket,
-                           key = forecasts_anomalies, 
-                           check = TRUE), 
-             pattern = forecasts_anomalies,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
+  # Next step put weather_historical_means files on AWS.
+  tar_target(forecasts_anomalies_AWS_upload, AWS_put_files(forecasts_anomalies,
+                                                      forecasts_anomalies_directory)),
   
   # compare forecast anomalies to actual data
   tar_target(forecasts_validate_directory, 
              create_data_directory(directory_path = "data/forecast_validation")),
+  
+  # Check if weather_historical_means parquet files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(forecasts_anomalies_validate_AWS, AWS_get_folder(forecasts_validate_directory,
+                                                              forecasts_anomalies, # Enforce dependency
+                                                              nasa_weather_transformed, # Enforce dependency
+                                                              weather_historical_means, # Enforce dependency
+                                                              model_dates_selected, # Enforce dependency
+                                                              lead_intervals)), # Enforce dependency
   
   tar_target(forecasts_anomalies_validate, validate_forecasts_anomalies(forecasts_validate_directory,
                                                                         forecasts_anomalies,
@@ -548,95 +604,101 @@ data_targets <- tar_plan(
                                                                         weather_historical_means,
                                                                         model_dates_selected,
                                                                         lead_intervals,
-                                                                        overwrite = FALSE),
-             pattern = model_dates_selected,
-             format = "file", 
+                                                                        overwrite = FALSE,
+                                                                        forecasts_anomalies_validate_AWS), # Enforce dependency
+             pattern = map(model_dates_selected),
+             error = "null",
+             format = "file",
              repository = "local",
              cue = tar_cue(tar_cue_general)), 
   
-  # save validation to AWS bucket
-  tar_target(forecasts_anomalies_validate_upload_aws_s3, 
-             aws_s3_upload(path = forecasts_anomalies_validate,
-                           bucket =  aws_bucket,
-                           key = forecasts_anomalies_validate, 
-                           check = TRUE), 
-             pattern = forecasts_anomalies_validate,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
+  # Next step put forecasts_anomalies_validate files on AWS.
+  tar_target(forecasts_anomalies_validate_AWS_upload, AWS_put_files(forecasts_anomalies_validate,
+                                                                    forecasts_validate_directory)),
+
   
   # ndvi anomalies --------------------------------------------------
-  tar_target(ndvi_date_lookup, 
-             create_ndvi_date_lookup(sentinel_ndvi_transformed,
-                                     sentinel_ndvi_transformed_directory,
-                                     modis_ndvi_transformed,
-                                     modis_ndvi_transformed_directory)),
-  
+  tar_target(ndvi_date_lookup, create_ndvi_date_lookup(sentinel_ndvi_transformed,
+                                                       modis_ndvi_transformed)),
   
   tar_target(ndvi_historical_means_directory, 
              create_data_directory(directory_path = "data/ndvi_historical_means")),
+  
+  # Check if weather_historical_means parquet files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(ndvi_historical_means_AWS, AWS_get_folder(ndvi_historical_means_directory,
+                                                       ndvi_date_lookup, # Enforce dependency
+                                                       days_of_year, # Enforce dependency
+                                                       lag_intervals)), # Enforce dependency
   
   tar_target(ndvi_historical_means, calculate_ndvi_historical_means(ndvi_historical_means_directory,
                                                                     ndvi_date_lookup,
                                                                     days_of_year,
                                                                     lag_intervals,
-                                                                    overwrite = FALSE),
-             pattern = days_of_year,
+                                                                    overwrite = FALSE,
+                                                                    ndvi_historical_means_AWS), # Enforce dependency
+             pattern = map(days_of_year),
+             error = "null",
              format = "file", 
              repository = "local",
              cue = tar_cue(tar_cue_general)),  
   
-  # save historical means to AWS bucket
-  tar_target(ndvi_historical_means_upload_aws_s3, 
-             aws_s3_upload(path = ndvi_historical_means,
-                           bucket =  aws_bucket,
-                           key = ndvi_historical_means, 
-                           check = TRUE), 
-             pattern = ndvi_historical_means,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
+  # Next step put ndvi_historical_means files on AWS.
+  tar_target(ndvi_historical_means_AWS_upload, AWS_put_files(ndvi_historical_means,
+                                                             ndvi_historical_means_directory)),
   
   
   tar_target(ndvi_anomalies_directory, 
              create_data_directory(directory_path = "data/ndvi_anomalies")),
+  
+  # Check if ndvi_anomalies_AWS parquet files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(ndvi_anomalies_AWS, AWS_get_folder(ndvi_anomalies_directory,
+                                                ndvi_date_lookup, # Enforce dependency
+                                                ndvi_historical_means, # Enforce dependency
+                                                model_dates_selected, # Enforce dependency
+                                                lag_intervals)), # Enforce dependency
   
   tar_target(ndvi_anomalies, calculate_ndvi_anomalies(ndvi_date_lookup,
                                                       ndvi_historical_means,
                                                       ndvi_anomalies_directory,
                                                       model_dates_selected,
                                                       lag_intervals,
-                                                      overwrite = FALSE),
-             pattern = model_dates_selected,
+                                                      overwrite = TRUE,
+                                                      ndvi_anomalies_AWS), # Enforce dependency
+             pattern = map(model_dates_selected),
+             error = "null",
              format = "file", 
              repository = "local",
              cue = tar_cue(tar_cue_general)),  
   
+  # Next step put ndvi_historical_means files on AWS.
+  tar_target(ndvi_anomalies_AWS_upload, AWS_put_files(ndvi_anomalies,
+                                                      ndvi_anomalies_directory)),
   
-  # save anomalies to AWS bucket
-  tar_target(ndvi_anomalies_upload_aws_s3, 
-             aws_s3_upload(path = ndvi_anomalies,
-                           bucket =  aws_bucket,
-                           key = ndvi_anomalies, 
-                           check = TRUE), 
-             pattern = ndvi_anomalies,
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data  
   
-  # all anomalies --------------------------------------------------
-  tar_target(augmented_data_directory, 
-             create_data_directory(directory_path = "data/augmented_data")),
+  # Combine all anomalies --------------------------------------------------
+  tar_target(combined_anomalies_directory, 
+             create_data_directory(directory_path = "data/combined_anomolies")),
   
-  tar_target(augmented_data, 
-             augment_data(weather_anomalies, 
-                          forecasts_anomalies, 
-                          ndvi_anomalies, 
-                          augmented_data_directory),
+  # Check if combined_anomalies parquet files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(combined_anomalies_AWS, AWS_get_folder(combined_anomalies_directory,
+                                                    weather_anomalies, # Enforce dependency
+                                                    ndvi_anomalies, # Enforce dependency
+                                                    model_dates_selected)), # Enforce dependency
+  
+  tar_target(combined_anomalies, combine_anomolies(weather_anomalies,
+                                                   forecasts_anomalies,
+                                                   ndvi_anomalies,
+                                                   combined_anomalies_directory,
+                                                   combined_anomalies_AWS),
              format = "file", 
-             repository = "local",
-             cue = tar_cue(tar_cue_general)),  
+             repository = "local"), # Enforce dependency
   
-  tar_target(augmented_data_upload_aws_s3,
-             aws_s3_upload(path = augmented_data,
-                           bucket =  aws_bucket,
-                           key = augmented_data,
-                           check = TRUE),
-             cue = tar_cue(tar_cue_upload_aws)), # only run this if you need to upload new data
+  # Next step put combined_anomalies files on AWS.
+  tar_target(combined_anomalies_AWS_upload, AWS_put_files(combined_anomalies,
+                                                          combined_anomalies_directory)),
   
 )
 
@@ -647,12 +709,128 @@ model_targets <- tar_plan(
   tar_target(augmented_data_rsa_directory, 
              create_data_directory(directory_path = "data/augmented_data_rsa")),
   
+  # Check if combined_anomalies parquet files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(augmented_data_rsa_AWS, AWS_get_folder(combined_anomalies_directory,
+                                                    weather_anomalies, # Enforce dependency
+                                                    ndvi_anomalies, # Enforce dependency
+                                                    model_dates_selected)), # Enforce dependency
+  
   tar_target(aggregated_data_rsa,
-             aggregate_augmented_data_by_adm(augmented_data, 
-                                             rsa_polygon, 
+             aggregate_augmented_data_by_adm(augmented_data,
+                                             rsa_polygon,
                                              model_dates_selected),
-             pattern = model_dates_selected
+             pattern = model_dates_selected,
+             cue = tar_cue("thorough")
   ),
+  
+  # tar_target(rsa_polygon_spatial_weights, rsa_polygon |> 
+  #              mutate(area = st_area(rsa_polygon)) |> 
+  #              as_tibble() |> 
+  #              select(shapeName, area)),
+  
+  # # Switch to parquet based to save memory. Arrow left joins automatically.
+  # tar_target(model_data,
+  #            left_join(aggregated_data_rsa,
+  #                      rvf_outbreaks,
+  #                      by = join_by(date, shapeName)) |>
+  #              mutate(outbreak_30 = factor(replace_na(outbreak_30, FALSE))) |>
+  #              left_join(rsa_polygon_spatial_weights, by = "shapeName") |>
+  #              mutate(area = as.numeric(area))
+  # ),
+  
+  # 
+  # # Splitting --------------------------------------------------
+  # # Initial train and test (ie holdout)
+  # tar_target(split_prop, nrow(model_data[model_data$date <= "2017-12-31",])/nrow(model_data)),
+  # tar_target(model_data_split, initial_time_split(model_data, prop = split_prop)), 
+  # tar_target(training_data, training(model_data_split)),
+  # tar_target(holdout_data, testing(model_data_split)),
+  # 
+  # # formula/recipe 
+  # tar_target(rec, model_recipe(training_data)),
+  # tar_target(rec_juiced, juice(prep(rec))),
+  # 
+  # # xgboost settings
+  # tar_target(base_score, sum(training_data$outbreak_30==TRUE)/nrow(training_data)),
+  # tar_target(interaction_constraints, '[[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], [15]]'), # area is the 16th col in rec_juiced
+  # tar_target(monotone_constraints, c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)), # enforce positive relationship for area
+  # 
+  # # tuning
+  # tar_target(spec, model_specs(base_score, interaction_constraints, monotone_constraints)),
+  # tar_target(grid, model_grid(training_data)),
+  # 
+  # # workflow
+  # tar_target(wf, workflows::workflow(rec, spec)),
+  # 
+  # # splits
+  # tar_target(rolling_n, n_distinct(model_data$shapeName)),
+  # tar_target(splits, rolling_origin(training_data, 
+  #                                   initial = rolling_n, 
+  #                                   assess = rolling_n, 
+  #                                   skip = rolling_n - 1)),
+  # 
+  # # tuning
+  # tar_target(tuned, model_tune(wf, splits, grid)),
+  
+  # final model
+  # tar_target(final, {
+  #   final_wf <- finalize_workflow(
+  #     wf,
+  #     tuned[5,]
+  #   )
+  #   
+  #   library(DALEX)
+  #   library(ceterisParibus)
+  #   
+  #   # DALEX Explainer
+  #   tuned_model <- final_wf |> fit(training_data)
+  #   tuned_model_xg <- extract_fit_parsnip(tuned_model)
+  #   training_data_mx <- extract_mold(tuned_model)$predictors %>%
+  #     as.matrix()
+  #   
+  #   y <- extract_mold(tuned_model)$outcomes %>%
+  #     mutate(outbreak_30 = as.integer(outbreak_30 == "1")) %>%
+  #     pull(outbreak_30)
+  #   
+  #   explainer <- DALEX::explain(
+  #     model = tuned_model_xg,
+  #     data = training_data_mx,
+  #     y = y,
+  #     predict_function = predict_raw,
+  #     label = "RVF-EWS",
+  #     verbose = TRUE
+  #   )
+  #   
+  #   # CP plots
+  #   predictors <- extract_mold(tuned_model)$predictors |> colnames()
+  #   holdout_small <- as.data.frame(select_sample(training_data, 20)) |> 
+  #     select(all_of(predictors), outbreak_30) |> 
+  #     mutate(area = as.numeric(area)) |> 
+  #     mutate(outbreak_30 = as.integer(outbreak_30 == "1"))
+  # 
+  #   
+  #   
+  # 
+  #   cPplot <- ceterisParibus::ceteris_paribus(explainer, 
+  #                                             observation = holdout_small |> select(-outbreak_30),
+  #                                             y = holdout_small |>  pull(outbreak_30)#,
+  #                                             #variables = "area"
+  #                                             )
+  #   plot(cPplot)+
+  #     ceteris_paribus_layer(cPplot, show_rugs = TRUE)
+  #   
+  #   
+  # }),
+  
+  
+  
+  #TODO fit final model
+  #TODO test that interaction constraints worked - a) extract model object b) cp - 
+  # need the conditional effect - area is x, y is effect, should not change when you change other stuff
+  # ceteris parabus plots - should be parallel - points can differ but profile should be the same - expectation is that it is linear if doing it on area
+  
+  
   
 )
 
@@ -678,9 +856,18 @@ test_targets <- tar_plan(
 
 # Documentation -----------------------------------------------------------
 documentation_targets <- tar_plan(
-  tar_render(readme, path = "README.Rmd")
+  # tar_target(readme, rmarkdown::render("README.Rmd"))
+  tar_render(readme, path = here::here("README.Rmd"))
 )
 
 
 # List targets -----------------------------------------------------------------
-all_targets()
+# all_targets() doesn't work with tarchetypes like tar_change().
+list(static_targets,
+     dynamic_targets,
+     data_targets,
+     model_targets,
+     deploy_targets,
+     report_targets,
+     test_targets,
+     documentation_targets)
