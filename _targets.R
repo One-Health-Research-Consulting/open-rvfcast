@@ -243,7 +243,10 @@ dynamic_targets <- tar_plan(
   tar_target(wahis_rvf_controls_preprocessed, 
              preprocess_wahis_rvf_controls(wahis_rvf_controls_raw)),
 
-  # OUTBREAK HISTORY -----------------------------------------------------------
+  # WAHIS OUTBREAKS
+  tar_target(wahis_outbreaks_AWS, 
+             create_data_directory(directory_path = "data/wahis_outbreaks")),
+  
   tar_target(wahis_outbreak_dates, tibble(date = seq(from = min(coalesce(wahis_rvf_outbreaks_preprocessed$outbreak_end_date, wahis_rvf_outbreaks_preprocessed$outbreak_start_date), na.rm = T),
                                                      to = max(coalesce(wahis_rvf_outbreaks_preprocessed$outbreak_end_date, wahis_rvf_outbreaks_preprocessed$outbreak_start_date), na.rm = T),
                                                      by = "day"),
@@ -253,12 +256,17 @@ dynamic_targets <- tar_plan(
                tar_group(),
              iteration = "group"),
   
+  ## NCL: MAKE TO PARQUET FILE SO OPEN_DATASET WORKS LATER??
   tar_target(wahis_outbreaks, wahis_rvf_outbreaks_preprocessed |> 
                mutate(end_date = coalesce(outbreak_end_date, outbreak_start_date), na.rm = T) |>
                select(cases, end_date, latitude, longitude) |>
                distinct() |>
                arrange(end_date) |>
                mutate(outbreak_id = 1:n())),
+  
+  # OUTBREAK HISTORY -----------------------------------------------------------
+  tar_target(wahis_outbreak_history_directory, 
+             create_data_directory(directory_path = "data/outbreak_history_dataset")),
   
   tar_target(wahis_raster_template, terra::rasterize(terra::vect(continent_polygon), # Take the boundary of Africa
                                                      terra::rast(continent_polygon, # Mask against a raster filled with 1's
@@ -267,9 +275,6 @@ dynamic_targets <- tar_plan(
                terra::wrap()), # Wrap to avoid problems with targets
   
   tar_target(wahis_distance_matrix, get_outbreak_distance_matrix(wahis_outbreaks, wahis_raster_template)),
-  
-  tar_target(wahis_outbreak_history_directory, 
-             create_data_directory(directory_path = "data/outbreak_history_dataset")),
   
   # Check if preprocessed wahis_outbreak_history data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
@@ -676,29 +681,44 @@ data_targets <- tar_plan(
   tar_target(ndvi_anomalies_AWS_upload, AWS_put_files(ndvi_anomalies,
                                                       ndvi_anomalies_directory)),
   
+  # Combine all static and dynamic data layers by date
+  tar_target(augmented_data_directory, 
+             create_data_directory(directory_path = "data/augmented_data")),
   
-  # Combine all anomalies --------------------------------------------------
-  tar_target(combined_anomalies_directory, 
-             create_data_directory(directory_path = "data/combined_anomolies")),
+  # This is where we set up what predictive layers go into the model
+  # This doesn't need to be a list that's just for clarity it will
+  # all be unlisted.
+  tar_target(augmented_data_sources, list(outbreak_layers = wahis_outbreak_history,
+                                          static_layers = c(soil_preprocessed,
+                                                            aspect_preprocessed,
+                                                            slope_preprocessed,
+                                                            glw_preprocessed,
+                                                            elevation_preprocessed,
+                                                            bioclim_preprocessed,
+                                                            landcover_preprocessed),
+                                          dynamic_layers = c(weather_historical_means,
+                                                             weather_anomalies,
+                                                             ecmwf_forecasts_transformed,
+                                                             forecasts_anomalies,
+                                                             ndvi_historical_means,
+                                                             ndvi_anomalies)),
+             repository = "local"),
   
-  # Check if combined_anomalies parquet files already exists on AWS and can be loaded
+  # Check if ndvi_anomalies_AWS parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
-  tar_target(combined_anomalies_AWS, AWS_get_folder(combined_anomalies_directory,
-                                                    weather_anomalies, # Enforce dependency
-                                                    ndvi_anomalies, # Enforce dependency
-                                                    model_dates_selected)), # Enforce dependency
+  tar_target(augmented_data_AWS, AWS_get_folder(augmented_data_directory,
+                                                augmented_data_sources)), # Enforce dependency
   
-  tar_target(combined_anomalies, combine_anomolies(weather_anomalies,
-                                                   forecasts_anomalies,
-                                                   ndvi_anomalies,
-                                                   combined_anomalies_directory,
-                                                   combined_anomalies_AWS),
+  # Are we missing anything? Does ecmwf_forecasts_transformed serve as forecast_means?
+  tar_target(augmented_data, augment_data(augmented_data_sources, # A list of source files to join and hive partition by date
+                                          augmented_data_directory, 
+                                          augmented_data_AWS), # Enforce dependency
              format = "file", 
              repository = "local"), # Enforce dependency
   
   # Next step put combined_anomalies files on AWS.
-  tar_target(combined_anomalies_AWS_upload, AWS_put_files(combined_anomalies,
-                                                          combined_anomalies_directory)),
+  tar_target(augmented_data_AWS_upload, AWS_put_files(augmented_data,
+                                                      augmented_data_directory)),
   
 )
 
@@ -724,10 +744,10 @@ model_targets <- tar_plan(
              cue = tar_cue("thorough")
   ),
   
-  # tar_target(rsa_polygon_spatial_weights, rsa_polygon |> 
-  #              mutate(area = st_area(rsa_polygon)) |> 
-  #              as_tibble() |> 
-  #              select(shapeName, area)),
+  tar_target(rsa_polygon_spatial_weights, rsa_polygon |>
+               mutate(area = sf::st_area(rsa_polygon)) |>
+               as_tibble() |>
+               select(shapeName, area)),
   
   # # Switch to parquet based to save memory. Arrow left joins automatically.
   # tar_target(model_data,

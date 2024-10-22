@@ -1,101 +1,85 @@
-#' .. content for \description{} (no empty lines) ..
+#' Preprocess Soil Data
 #'
-#' .. content for \details{} ..
+#' This function downloads, processes and transforms soil dataset. If a preprocessed file 
+#' already exists in the specified directory and the overwrite argument is FALSE, 
+#' the function returns the filepath to the existing preprocessed file.
+#' 
+#' @author Nathan C. Layman & Whitney Bagge
 #'
-#' @title
-#' @param continent_polygon
-#' @return
-#' @author Whitney Bagge
+#' @param soil_directory_dataset Directory where the soil dataset and preprocessed files will be stored.
+#' @param continent_raster_template Template to be used for projecting the soil raster file.
+#' @param overwrite Boolean flag determining whether the processing should be done if a preprocessed file already exists. Default is FALSE.
+#' @param ... Additional arguments not used by this function but included for compatibility with generic functions
+#'
+#' @return A string containing the filepath to the preprocessed soil file.
+#'
+#' @note The process of downloading, transformation, and saving soil data includes downloading the HWSD2 ZIP file and its key from 
+#' online resources, unzipping the downloaded file, and performing various transformations (including raster projection and merging with the key) 
+#' before saving the processed file as 'soil_preprocessed.parquet'.
+#'
+#' @examples
+#' preprocess_soil(soil_directory_dataset = "./data",
+#'                 continent_raster_template = raster_template,
+#'                 overwrite = TRUE)
+#'
 #' @export
-library(DBI)
-library(RSQLite)
 preprocess_soil <- function(soil_directory_dataset, 
                             continent_raster_template,
                             overwrite = FALSE,
                             ...) {
 
-  # Unwrap continent_raster template
-  continent_raster_template <- terra::unwrap(continent_raster_template)
+  # Harmonized World Soil Database (HWSD2) https://gaez.fao.org/pages/hwsd
   
   # Set up safe way to read parquet files
   error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
   
   # Parquet filenames
-  soil_texture_file <- file.path(soil_directory_dataset, "soil_texture.parquet")
-  soil_drainage_file <- file.path(soil_directory_dataset, "soil_drainage.parquet")
+  soil_preprocessed_file <- file.path(soil_directory_dataset, "soil_preprocessed.parquet")
   
   # Check if soil files exist and can be read and that we don't want to overwrite them.
-  if(!is.null(error_safe_read_parquet(soil_texture_file)) & 
-     !is.null(error_safe_read_parquet(soil_drainage_file)) & 
+  if(!is.null(error_safe_read_parquet(soil_preprocessed_file)) & 
      !overwrite) {
-    message("preprocessed soil files already exist and can be loaded, skipping download and processing")
-    return(c(soil_texture_file, soil_drainage_file))
+    message("preprocessed soil file already exists and can be loaded, skipping download and processing")
+    return(soil_preprocessed_file)
   }
   
-  # Download soil texture data and unzip
-  soil_texture_raw_file <- file.path(soil_directory_dataset, "soil_raster.zip")
+  ###### DOWNLOAD HWSD2 DATA #######
+  
+  HWSD2_raw_file <- file.path(soil_directory_dataset, "HWSD2.zip")
   download.file(url="https://s3.eu-west-1.amazonaws.com/data.gaezdev.aws.fao.org/HWSD/HWSD2_RASTER.zip", 
-                destfile = soil_texture_raw_file)
-  unzip(soil_texture_raw_file, exdir = soil_directory_dataset)
+                destfile = HWSD2_raw_file)
+  unzip(HWSD2_raw_file, exdir = soil_directory_dataset)
   
-  # Download soil drainage data
-  soil_drainage_raw_file <- file.path(soil_directory_dataset, "soil_drainage.sqlite")
+  # Download HWSD2 SMU key
+  HWSD2_SMU_key_file <- file.path(soil_directory_dataset, "HWSD2_SMU_key.sqlite")
   download.file(url="https://www.isric.org/sites/default/files/HWSD2.sqlite", 
-                destfile = soil_drainage_raw_file)
-   
+                destfile = HWSD2_SMU_key_file)
+  
+  # Query the HWSD2_SMU table and convert it to a tibble
+  con <- RSQLite::dbConnect(RSQLite::SQLite(), dbname=HWSD2_SMU_key_file)
+  HWSD2_SMU_data <- tbl(con, "HWSD2_SMU") |> collect()
+  RSQLite::dbDisconnect(con)
+  
+  # Unwrap continent_raster template
+  continent_raster_template <- terra::unwrap(continent_raster_template)
+  
+  # Each pixel in the raster corresponds to a Soil Mapping Unit (SMU).
+  HWSD2_raster <- terra::rast(file.path(soil_directory_dataset, "/HWSD2.bil")) |> 
+    terra::project(continent_raster_template, method = "near", mask = T) |>
+    setNames("HWSD2_SMU_ID") |>
+    as.data.frame(xy = TRUE) |>
+    as_tibble()
+  
+  soil_preprocessed <- HWSD2_raster |> 
+    left_join(HWSD2_SMU_data |> select(HWSD2_SMU_ID, DRAINAGE, TEXTURE_USDA), by = join_by(HWSD2_SMU_ID)) |>
+    select(-HWSD2_SMU_ID) |>
+    rename(soil_drainage = DRAINAGE,
+           soil_texture = TEXTURE_USDA) |>
+    mutate(soil_drainage = as.factor(soil_drainage))
+  
   ###### SOIL TEXTURE ######
-  transformed_raster <- transform_raster(raw_raster = terra::rast(file.path(soil_directory_dataset, "/HWSD2.bil")),
-                                         template = terra::rast(continent_raster_template))
   
-  # connect to database and extract values
-  m <- dbDriver("SQLite")
-  con <- dbConnect(m, dbname=soil_drainage_raw_file)
-  dbListTables(con)
-  
-  #### extract map unit codes in bounded area (WINDOW_ZHNJ) to join with SQL databases###
-  dbWriteTable(con, name="WINDOW_ZHNJ",
-               value=data.frame(hwsd2_smu = sort(unique(terra::values(transformed_raster)))),
-               overwrite=TRUE)
-  
-  dbExecute(con, "drop table if exists ZHNJ_SMU") # to overwrite
-  
-  dbListTables(con)
-  
-  #creates a temp database that combines the map unit codes in the raster window to the desired variable
-  dbExecute(con,
-            "create TABLE ZHNJ_SMU AS select T.* from HWSD2_SMU as T
-              join WINDOW_ZHNJ as U
-              on T.HWSD2_SMU_ID=U.HWSD2_SMU
-              order by HWSD2_SMU_ID")
-  
-  #creates a dataframe "records" in R from SQL temp table created above
-  records <- dbGetQuery(con, "select * from ZHNJ_SMU")
-  
-  #remove the temp tables and database connection
-  dbRemoveTable(con, "WINDOW_ZHNJ")
-  dbRemoveTable(con, "ZHNJ_SMU")
-  dbDisconnect(con)
-  
-  #changes from character to factor for the raster
-  for (i in names(records)[c(2:5,7:13,16:17,19:23)]) {
-    eval(parse(text=paste0("records$",i," <- as.factor(records$",i,")")))
-  }
-
-  #create matrix of map unit ids and the variable of interest - TEXTURE CLASS
-  rcl.matrix.texture <- cbind(id = as.numeric(as.character(records$HWSD2_SMU_ID)),
-                      texture = as.numeric(records$TEXTURE_USDA))
-  
-  #classify the raster (transformed_raster) using the matrix of values - TEXTURE CLASS
-  # CLASIFFY DOESN'T SEEM TO BE WORKING LEFT OFF HERE
-  hwsd.zhnj.texture <- terra::classify(transformed_raster, rcl.matrix.texture)
-  hwsd.zhnj.texture <- terra::as.factor(hwsd.zhnj.texture)
-  levels(hwsd.zhnj.texture) <- levels(records$TEXTURE_USDA)
-  
-  # Convert to dataframe
-  soil_texture <- as.data.frame(hwsd.zhnj.texture, xy = TRUE) |> 
-    as_tibble() 
-  
-  # At this point:
+  # At this point
   # 1 - clay (heavy)
   # 2 - silty clay
   # 3 - clay
@@ -112,45 +96,53 @@ preprocess_soil <- function(soil_directory_dataset,
   
   # Re-code factor levels to collapse simplex. 
   # Figure out where key is for the units are in HWSD2
-  soil_texture$HWSD2 <- if_else(soil_texture$HWSD2=="5", "1", # clay (heavy) + clay loam
-                        if_else(soil_texture$HWSD2=="7", "2", # silty clay + silty loam aka
-                        if_else(soil_texture$HWSD2=="8", "3", # clay + sandy clay
-                        if_else(soil_texture$HWSD2=="9", "4", # silty clay loam
-                        if_else(soil_texture$HWSD2=="10", "5", # clay loam + sandy clay loam BUT SEE RULE 1!!!
-                        if_else(soil_texture$HWSD2=="11", "6", # silt sandy + loam
-                        if_else(soil_texture$HWSD2=="12", "7", "0"))))))) # loamy sand + silt loam
+  # NCL: This is confusing but keeping to match previous work
+  soil_preprocessed <- soil_preprocessed |> mutate(soil_texture = if_else(soil_texture == 5, 1, # clay (heavy) + clay loam
+                                                                          if_else(soil_texture == 7, 2, # silty clay + silty loam aka
+                                                                                  if_else(soil_texture == 8, 3, # clay + sandy clay
+                                                                                          if_else(soil_texture == 9, 4, # silty clay loam
+                                                                                                  if_else(soil_texture == 10, 5, # clay loam + sandy clay loam BUT SEE RULE 1!!!
+                                                                                                          if_else(soil_texture == 11, 6, # silt sandy + loam
+                                                                                                                  if_else(soil_texture == 12, 7, 0))))))) |>
+                                                     as.factor()) # loamy sand + silt loam
                                            
 
   ###### SOIL DRAINAGE ######
   
-  #create matrix of map unit ids and the variable of interest - DRAINAGE
-  rcl.matrix.drainage <- cbind(id = as.numeric(as.character(records$HWSD2_SMU_ID)),
-                      drainage = as.numeric(records$DRAINAGE))
+  # Soil drainage classes are based on the "Guidelines to estimation of 
+  # drainage classes based on soil type, texture, soil phase and terrain 
+  # slope" (FAO, 1995). In the HWSD, drainage classes represent reference 
+  # drainage conditions assuming flat terrain (i.e., 0.0 - 0.5% slope). 
   
-  #classify the raster (transformed_raster) using the matrix of values - DRAINAGE
-  hwsd.zhnj.drainage <- terra::classify(transformed_raster, rcl.matrix.drainage)
-  hwsd.zhnj.drainage <- terra::as.factor(hwsd.zhnj.drainage)
-  levels(hwsd.zhnj.drainage) <- levels(records$DRAINAGE)
+  # https://cteco.uconn.edu/guides/Soils_Drainage.htm
   
-  # Convert to dataframe
-  soil_drainage <- as.data.frame(hwsd.zhnj.drainage, xy = TRUE) |> 
-    as_tibble() 
-  
-  soil_drainage$HWSD2 <- if_else(soil_drainage$HWSD2=="MW", "4",
-              if_else(soil_drainage$HWSD2=="P", "6",
-              if_else(soil_drainage$HWSD2=="SE", "2",
-              if_else(soil_drainage$HWSD2=="VP", "7","0"))))
-  
-  soil_drainage$HWSD2 <- as.numeric(as.character(soil_drainage$HWSD2))
-  
+  # 1. Excessively drained: water is removed from the soil very rapidly 
+  #    Soils are commonly very coarse textured or rocky, shallow or on steep slopes
+  # 2. Somewhat excessively drained: water is removed from the soil rapidly. 
+  #    Soils are commonly sandy and very pervious  
+  # 3. Well drained: water is removed from the soil readily but not rapidly. 
+  #    Soils commonly retain optimum amounts of moisture, 
+  #    but wetness does not inhibit root growth for significant periods
+  # 4. Moderately well drained: Water is removed from the soil somewhat 
+  #    slowly during some periods of the year. For a short period, soils are 
+  #    wet within the rooting depth, they commonly have an almost impervious layer
+  # 5. Imperfectly drained: Water is removed slowly so that soil is wet at a shallow 
+  #    depth for significant periods. Soils commonly have an impervious layer, 
+  #    a high-water table, or additions of water by seepage
+  # 6. Poorly drained: Water is removed so slowly that soils are commonly wet at a 
+  #    shallow depth for considerable periods. Soils commonly have a shallow water 
+  #    table which is usually the result of an almost impervious layer, or seepage
+  # 7. Very poorly drained: Water is removed so slowly that the soils are wet at shallow 
+  #    depths for long periods. Soils have a very shallow water table and are commonly 
+  #    in level or depressed sites. 
+
+
   # Save soil data as parquet files
-  arrow::write_parquet(soil_texture,  soil_texture_file, compression = "gzip", compression_level = 5)
-  arrow::write_parquet(soil_drainage, soil_drainage_file, compression = "gzip", compression_level = 5)
+  arrow::write_parquet(soil_preprocessed, soil_preprocessed_file, compression = "gzip", compression_level = 5)
   
   # Test if soil parquet files can be loaded. If not clean up directory and return NULL
-  if(is.null(error_safe_read_parquet(soil_texture_file)) || 
-     is.null(error_safe_read_parquet(soil_drainage_file))) {
-    message("Preprocessed soil parquet files couldn't be read after processing. Cleaning up")
+  if(is.null(error_safe_read_parquet(soil_preprocessed_file))) {
+    message("Preprocessed soil parquet file couldn't be read after processing. Cleaning up")
     file.remove(list.files(soil_directory_dataset, full.names = TRUE))
     return(NULL)
   }
@@ -158,5 +150,5 @@ preprocess_soil <- function(soil_directory_dataset,
   # Clean up all non-parquet files
   file.remove(grep("\\.parquet$", list.files(soil_directory_dataset, full.names = TRUE), value = TRUE, invert = TRUE))
   
-  return(c(soil_texture_file, soil_drainage_file))
+  return(soil_preprocessed_file)
 }
