@@ -31,7 +31,7 @@ preprocess_soil <- function(soil_directory_dataset,
   # Harmonized World Soil Database (HWSD2) https://gaez.fao.org/pages/hwsd
   
   # Set up safe way to read parquet files
-  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
   
   # Parquet filenames
   soil_preprocessed_file <- file.path(soil_directory_dataset, "soil_preprocessed.parquet")

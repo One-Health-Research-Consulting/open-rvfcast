@@ -40,7 +40,7 @@ calculate_ndvi_anomalies <- function(ndvi_date_lookup,
   ndvi_anomalies_filename <- file.path(ndvi_anomalies_directory, glue::glue("ndvi_anomaly_{date_selected}.gz.parquet"))
   
   # Set up safe way to read parquet files
-  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
   
   # Check if outbreak_history file exist and can be read and that we don't want to overwrite them.
   if(!is.null(error_safe_read_parquet(ndvi_anomalies_filename)) & !overwrite) {

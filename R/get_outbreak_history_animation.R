@@ -28,6 +28,7 @@ get_outbreak_history_animation <- function(wahis_outbreak_history,
                                            overwrite = FALSE,
                                            ...) {
   
+  assertthat::are_equal(length(wahis_outbreak_history), 1)
   output_basename = tools::file_path_sans_ext(basename(wahis_outbreak_history))
   
   # Load the data

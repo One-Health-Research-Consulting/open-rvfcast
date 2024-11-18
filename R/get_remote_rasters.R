@@ -34,6 +34,7 @@ get_remote_rasters <- function(urls,
                                continent_raster_template,
                                aggregate_method = NULL,
                                resample_method = NULL,
+                               factorize = TRUE,
                                overwrite = FALSE,
                                ...) {
   
@@ -44,7 +45,7 @@ get_remote_rasters <- function(urls,
   continent_raster_template <- terra::unwrap(continent_raster_template)
   
   # Set up safe way to read parquet files
-  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
   
   save_filename <- file.path(output_dir, output_filename)
   
@@ -134,10 +135,10 @@ get_remote_rasters <- function(urls,
   # Save as parquet if appropriate
   if(grepl("(parquet|pq|arrow)", tools::file_ext(output_filename))) {
     
-    factor_raster <- classify(raster, data.frame(from = 1:5, to = factor(1:5)))
-    
     # Convert to dataframe
     dat <- as.data.frame(combined_raster, xy = TRUE) |> as_tibble()
+    
+    if(factorize) dat <- dat |> mutate(across(-c(x,y), ~as.factor(.x)))
     
     # Save as parquet 
     arrow::write_parquet(dat, here::here(output_dir, output_filename), compression = "gzip", compression_level = 5)

@@ -7,7 +7,7 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-get_modis_ndvi_token <- function() {
+get_modis_ndvi_token <- function(renew_token = as.logical(Sys.getenv("RENEW_APPEARS_TOKEN", unset = "FALSE"))) {
   
   token <- Sys.getenv("APPEEARS_TOKEN", unset = "")
   
@@ -15,7 +15,7 @@ get_modis_ndvi_token <- function() {
   test <- httr::GET("https://appeears.earthdatacloud.nasa.gov/api/task", httr::add_headers(Authorization = paste("Bearer", token)))
 
   # If it doesn't get a new one and update the .env file
-  if(test$status_code == 403) {
+  if(test$status_code == 403 | renew_token) {
     secret <- jsonlite::base64_enc(paste(Sys.getenv("APPEEARS_USERNAME"), Sys.getenv("APPEEARS_PASSWORD"), sep = ":")) #TODO make project auth
     token_response <- httr::POST("https://appeears.earthdatacloud.nasa.gov/api/login", 
                                  httr::add_headers("Authorization" = paste("Basic", gsub("\n", "", secret)),
@@ -24,6 +24,7 @@ get_modis_ndvi_token <- function() {
     token_response <- jsonlite::prettify(jsonlite::toJSON(httr::content(token_response), auto_unbox = TRUE))
     token <- jsonlite::fromJSON(token_response)$token
     update_env_key("APPEEARS_TOKEN", token)
+    message(glue::glue("AρρEEARS token renewed. New token: {token}"))
   }
   
   return(paste("Bearer", token))

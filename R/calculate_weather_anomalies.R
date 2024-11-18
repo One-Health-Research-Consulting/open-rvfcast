@@ -49,7 +49,7 @@ calculate_weather_anomalies <- function(nasa_weather_transformed_directory,
   }
   
   # Open dataset to transformed data
-  weather_transformed_dataset <- open_dataset(nasa_weather_transformed_directory)
+  weather_transformed_dataset <- arrow::open_dataset(nasa_weather_transformed_directory)
   
   # Get the lagged anomalies for selected dates, mapping over the lag intervals
   lag_intervals_start <- c(1 , 1+lag_intervals[-length(lag_intervals)]) # 1 to start with previous day

@@ -34,7 +34,7 @@ submit_modis_ndvi_bundle_request <- function(modis_ndvi_token,
       if(is.null(previous_bundle)) {
         stop(glue::glue("modis_ndvi bundle is {task_status} and no previous bundle has been recorded. \nRe-run pipeline later."))
       } else {
-        message(glue::glue("modis_ndvi bundle is {task_status}. Proceeding with {previous_bundle$task_id} bundle."))
+        message(glue::glue("Current modis_ndvi bundle request is {task_status}. Proceeding with previous bundle, task id: {previous_bundle$task_id}. \nRe-run later for to process results from current bundle request."))
         bundle_response <- previous_bundle
       }
     }
@@ -54,3 +54,38 @@ submit_modis_ndvi_bundle_request <- function(modis_ndvi_token,
   # Return bundle response files
   return(bundle_response_files)
 }
+
+get_current_task_status <- function(modis_ndvi_token) {
+  task_status <- httr::GET("https://appeears.earthdatacloud.nasa.gov/api/status", httr::add_headers(Authorization = modis_ndvi_token)) |>
+    httr::stop_for_status() |> 
+    httr::content() 
+  
+  task_status |> 
+    pluck(1) |> 
+    pluck("progress") |> 
+    pluck("details") |> 
+    bind_rows()
+}
+
+get_task_status_overview <- function(modis_ndvi_token) {
+  task_overview <- GET("https://appeears.earthdatacloud.nasa.gov/api/task", add_headers(Authorization = modis_ndvi_token)) |>
+    httr::stop_for_status() |>
+    httr::content() |>
+    map_dfr(~bind_cols(.x)) |>
+    suppressMessages()
+  
+  task_overview
+}
+
+delete_appears_task <- function(modis_ndvi_token, task_id) {
+  response <- httr::DELETE(paste("https://appeears.earthdatacloud.nasa.gov/api/task/", task_id, sep = ""), httr::add_headers(Authorization = modis_ndvi_token))
+  response$status_code
+}
+
+delete_crashed_tasks <- function(modis_ndvi_token) {
+  crashed_tasks <- get_task_status_overview(modis_ndvi_token) |> filter(crashed == TRUE) |> pull(task_id)
+  
+  map(crashed_tasks, ~delete_appears_task(modis_ndvi_token, .x))
+}
+
+

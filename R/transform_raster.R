@@ -1,28 +1,34 @@
-#' Transform a raster to match a template
+#' Transforms a Raster image to a specified template
 #'
-#' This function takes a raw raster, and transform it to have the same
-#' crs, resolution, and origin as the provided template.
-#' The transforming process is done using a provided method, defaults to "cubicspline"
+#' This function takes a raw_raster as input and transforms it into a norm_raster using a specified template and method.
+#' It handles differences in CRS, origin, and resolution between the raw_raster and the template raster.
 #'
 #' @author Nathan C. Layman
 #'
-#' @param raw_raster A raster to be transformed.
-#' @param template A template raster that the raw raster will match to.
-#' @param method A method used in the resampling process when the raw raster is transformed to match the template, 
-#' default is "cubicspline".
+#' @param raw_raster The raw Raster object to be transformed.
+#' @param template The template Raster object to be used as reference. If NULL, raw_raster will be returned as is.
+#' @param method The method to be used for resampling. Default is "cubicspline".
 #'
-#' @return A raster that has been transformed to match the template raster.
+#' @return A Raster object that has been transformed according to the given template and method.
 #'
-#' @note This function uses the `terra` R package for handling rasters.
+#' @note The non-matching CRS, origin and resolution between raw_raster and template Raster are handled in this function.
 #'
 #' @examples
-#' # assuming `r` is a raw raster, and `t` is template raster
-#' transformed_raster = transform_raster(r, t, method = "bilinear")
+#' transform_raster(raw_raster = raw_raster_object,
+#'                  template = template_raster_object,
+#'                  method = 'cubicspline')
 #'
 #' @export
 transform_raster <- function(raw_raster, 
-                             template, 
+                             template = NULL, 
                              method = "cubicspline") {
+  
+  template <- terra::unwrap(template)
+  
+  if(is.null(template)) {
+    message("returning raw raster")
+    return(raw_raster)
+  }
   
   norm_rast <- raw_raster
   if(!identical(terra::crs(norm_rast), terra::crs(template))) {

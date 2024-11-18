@@ -21,17 +21,12 @@ set_ecmwf_api_parameter <- function(years = 2005:2018,
                       "E" = unname(bbox_coords["xmax"]))
   
   # Up till last month.
-  dates <- seq.Date(ymd("2017-9-01"), floor_date(today() - months(1), "month"), by = "month")
+  # dates <- seq.Date(ymd("2017-9-01"), floor_date(today() - months(1), "month"), by = "month")
+  dates <- seq.Date(lubridate::ymd(min(years), truncated = 2L), floor_date(today() - months(1), "month"), by = "month")
 
-  seasonal_forecast_parameters <- tibble(year = year(dates), 
-                                         month = month(dates)) |>
-    filter(year > 2017 | month < 11) |> # 2017 is strange
-    mutate(system = case_when( # Case when is sequential. The first match wins
-      year > 2021 ~ 51,
-      year > 2017 ~ 5,
-      year >= 2017 ~ 4)) |>
-    group_by(system, year) |>
-    summarize(month = list(month), .groups = "drop") 
+  seasonal_forecast_parameters <- tibble(year = year(dates), month = month(dates))
+  
+  message(glue::glue("Preparing to fetch ecmwf {product_types}"))
   
   seasonal_forecast_parameters |>
     mutate(spatial_bounds = list(spatial_bounds)) |> 

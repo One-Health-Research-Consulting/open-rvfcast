@@ -56,7 +56,7 @@ get_daily_outbreak_history <- function(dates_df,
   wahis_raster_template <- terra::unwrap(wahis_raster_template)
   
   # Set up safe way to read parquet files
-  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
   
   # Check if output file already exists and can be loaded
   outbreak_history_filename <- file.path(output_dir, glue::glue("{tools::file_path_sans_ext(output_filename)}_{year}.{tools::file_ext(output_filename)}"))

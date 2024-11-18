@@ -47,7 +47,7 @@ validate_forecasts_anomalies <- function(forecasts_validate_directory,
   message(paste0("Validating forecast for ", date_selected))
   
   # Check if file already exists and can be read
-  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
   
   if(!is.null(error_safe_read_parquet(file.path(forecasts_validate_directory, save_filename))) & !overwrite) {
     message("file already exists and can be loaded, skipping download")
