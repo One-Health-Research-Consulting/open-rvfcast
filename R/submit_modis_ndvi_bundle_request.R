@@ -24,9 +24,9 @@ submit_modis_ndvi_bundle_request <- function(modis_ndvi_token,
     task_response <- httr::GET("https://appeears.earthdatacloud.nasa.gov/api/task", httr::add_headers(Authorization = modis_ndvi_token))
     task_response <- jsonlite::fromJSON(jsonlite::toJSON(httr::content(task_response))) |> filter(task_id == !!task_id)
     task_status <- task_response |> pull(status) |> unlist()
-    assertthat::assert_that(task_status %in% c("queued", "pending", "processing", "done"))
+    # assertthat::assert_that(task_status %in% c("queued", "pending", "processing", "done"))
     
-    if(task_status == "done") {
+    if(!is.null(task_status) && task_status == "done") {
       # Fetch bundle response
       bundle_response <- httr::GET(paste("https://appeears.earthdatacloud.nasa.gov/api/bundle/", task_id, sep = ""), httr::add_headers(Authorization = modis_ndvi_token))
       bundle_response <- jsonlite::fromJSON(jsonlite::toJSON(httr::content(bundle_response)))

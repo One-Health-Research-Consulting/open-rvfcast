@@ -265,6 +265,10 @@ dynamic_targets <- tar_plan(
                mutate(outbreak_id = 1:n())),
   
   # OUTBREAK HISTORY -----------------------------------------------------------
+  
+  # NOTE: next time make these format = "file" and have create_data_directory return 
+  # the path to the .gitkeep file. That way if it gets deleted the target automatically
+  # re-runs
   tar_target(wahis_outbreak_history_directory, 
              create_data_directory(directory_path = "data/outbreak_history_dataset")),
   
@@ -342,6 +346,7 @@ dynamic_targets <- tar_plan(
   # get API parameters
   tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters()), 
   
+  # MAX SESSION = 4! Can't parallel this one due to API restrictions
   tar_target(sentinel_ndvi_transformed, 
              transform_sentinel_ndvi(sentinel_ndvi_api_parameters, 
                                      continent_raster_template,
@@ -393,6 +398,7 @@ dynamic_targets <- tar_plan(
  
   # Download data, project to the template and save as parquets
   # TODO NAs outside of the continent
+  # Not Found HTTP 404 means the bundle request hasn't finished processing
   tar_target(modis_ndvi_transformed, 
              transform_modis_ndvi(modis_ndvi_token, 
                                   modis_ndvi_bundle_request,
