@@ -69,7 +69,7 @@ static_targets <- tar_plan(
              repository = "local"),
   
   tar_target(soil_preprocessed_AWS_upload, AWS_put_files(soil_preprocessed, 
-                                                         aspect_directory),
+                                                         soil_directory),
              error = "null"), # Continue the pipeline even on error
   
   # ASPECT -------------------------------------------------
