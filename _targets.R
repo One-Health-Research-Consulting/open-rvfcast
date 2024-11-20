@@ -58,7 +58,8 @@ static_targets <- tar_plan(
   # If so download from AWS instead of primary source
   tar_target(soil_AWS, AWS_get_folder(soil_directory,
                                       continent_raster_template), # Enforce Dependency
-             error = "null"), # Continue the pipeline even on error
+             error = "null",
+             cue = tar_cue("always")), # Continue the pipeline even on error
   
   tar_target(soil_preprocessed, preprocess_soil(soil_directory, 
                                                 continent_raster_template, 
