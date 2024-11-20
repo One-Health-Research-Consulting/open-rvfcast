@@ -21,22 +21,22 @@ if (Sys.getenv("NPROC", unset = "1") != "1") {
   )
 }
 
-# Use shared S3 cache if available.
-# See .Rprofile for switching cache targetsstore based on this
-# Also controls the location of updated parqet data sets
-if(nzchar(Sys.getenv("AWS_BUCKET_ID")) && Sys.getenv("TAR_PROJECT") != "sandbox") {
-  tar_option_set(
-    repository = "aws",
-    format = "qs",
-    resources = tar_resources(
-      aws = tar_resources_aws(
-        prefix = "_targets",
-        bucket = Sys.getenv("AWS_BUCKET_ID"),
-        region = Sys.getenv("AWS_REGION")
-      ),
-      qs = tar_resources_qs(preset = "fast")
-    ),
-    storage = "worker",
-    retrieval = "worker"
-  )
-}
+# # Use shared S3 cache if available.
+# # See .Rprofile for switching cache targetsstore based on this
+# # Also controls the location of updated parqet data sets
+# if(nzchar(Sys.getenv("AWS_BUCKET_ID")) && Sys.getenv("TAR_PROJECT") != "sandbox") {
+#   tar_option_set(
+#     repository = "aws",
+#     format = "qs",
+#     resources = tar_resources(
+#       aws = tar_resources_aws(
+#         prefix = "_targets",
+#         bucket = Sys.getenv("AWS_BUCKET_ID"),
+#         region = Sys.getenv("AWS_REGION")
+#       ),
+#       qs = tar_resources_qs(preset = "fast")
+#     ),
+#     storage = "worker",
+#     retrieval = "worker"
+#   )
+# }

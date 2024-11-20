@@ -394,12 +394,12 @@ dynamic_targets <- tar_plan(
                                                                                     modis_ndvi_token,
                                                                                     bbox_coords = sf::st_bbox(continent_polygon),
                                                                                     modis_ndvi_transformed_directory),
-             map(modis_task_end_dates),
+             pattern = map(modis_task_end_dates),
              cue = tar_cue("always")),
   
   # Set up modis_ndvi data requests
   tar_target(modis_ndvi_bundle_request, submit_modis_ndvi_bundle_request(modis_ndvi_token, modis_ndvi_task_id_continent),
-             map(modis_ndvi_task_id_continent)),
+             pattern = map(modis_ndvi_task_id_continent)),
   
   # Check if modis_ndvi files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
