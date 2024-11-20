@@ -52,10 +52,6 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
     return(save_filename)
   }
   
-  # Open dataset to transformed data
-  forecasts_transformed_dataset <- arrow::open_dataset(ecmwf_forecasts_transformed) |>
-    filter(base_date == floor_date(model_dates_selected, unit = "month"))
-
   # Notes:
   
   # 'Anomaly' is the scaled difference between the forecast mean and the historical mean.
@@ -77,7 +73,7 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
   # day then left join that in by month as well.
   
   forecasts_transformed_dataset <- arrow::open_dataset(ecmwf_forecasts_transformed) |>
-    filter(base_date == floor_date(model_dates_selected, unit = "month")) |> collect()
+    filter(base_date == floor_date(model_dates_selected, unit = "month"))
   
   historical_means <- arrow::open_dataset(weather_historical_means) 
   
@@ -89,17 +85,16 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
     message(glue::glue("Processing forecast interval {lead_interval_start}-{lead_interval_end} days out"))
     
     # Get a tibble of all the dates in the anomaly forecast range for the given lead interval
-    # and join in the historical weather mean data.
     model_dates <- tibble(date = seq(from = model_dates_selected + lead_interval_start, to = model_dates_selected + lead_interval_end - 1, by = 1)) |>
-      mutate(doy = lubridate::yday(date),        # Calculate day of year
+      mutate(doy = as.integer(lubridate::yday(date)),        # Calculate day of year
              month = month(date),                # Extract month
              year = year(date),                  # Extract year
              lead_interval_start = lead_interval_start,        # Store lead interval duration
-             lead_interval_end = lead_interval_end)      # Store lead interval duration
+             lead_interval_end = lead_interval_end)            # Store lead interval duration
     
     # Join historical means based on day of year (doy)
-    model_dates <- model_dates |>
-      left_join(historical_means |> filter(doy >= min(model_dates$doy)) |> filter(doy < max(model_dates$doy)) |> collect(), by = c("doy"))
+    model_dates <- historical_means |> filter(doy >= min(model_dates$doy)) |>
+      right_join(model_dates, by = c("doy"))
     
     # Join in forecast data based on x, y, month, and year. 
     # The historical data and forecast data _should_ have the same column 
@@ -131,11 +126,14 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
     # Clean up intermediate columns
     model_dates |> 
       mutate(date = model_dates_selected) |> 
-      select(x, y, date, 'lead_interval_start', 'lead_interval_end', starts_with("anomaly"))
+      select(x, y, date, 'lead_interval_start', 'lead_interval_end', starts_with("anomaly")) |>
+      collect()
   })
   
   # Write output to a parquet file
   arrow::write_parquet(forecasts_anomalies, save_filename, compression = "gzip", compression_level = 5)
+  
+  rm(forecasts_anomalies)
   
   return(save_filename)
   

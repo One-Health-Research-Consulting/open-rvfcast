@@ -31,11 +31,10 @@ transform_modis_ndvi <- function(modis_ndvi_token,
                                  ...) {
   
   # Figure out raw file name and path
-  raw_file <- file.path(modis_ndvi_transformed_directory, basename(modis_ndvi_bundle_request$file_name))
+  raw_file <- file.path(modis_ndvi_transformed_directory, basename(modis_ndvi_bundle_request$file_name[[1]]))
   
-  # Extract start and end dates from the raw downloaded file name
-  year_doy <- sub(".*doy(\\d+).*", "\\1", basename(raw_file))
-  start_date <- as.Date(year_doy, format = "%Y%j") # confirmed this is start date through manual download tests 
+  start_date <- modis_ndvi_bundle_request$start_date 
+  end_date <- modis_ndvi_bundle_request$end_date
   
   continent_raster_template <- terra::unwrap(continent_raster_template)
   
@@ -76,12 +75,15 @@ transform_modis_ndvi <- function(modis_ndvi_token,
   # If it can transform the rast then delete the raw file
   message(paste0("Transforming ", transformed_file))
   
+  # This implements the step function interpolation across the 16 day interval
   transformed_raster <- transform_raster(raw_raster = raw_raster,
                                          template = continent_raster_template) |>
     as.data.frame(transformed_raster, xy = TRUE) |> 
     as_tibble() |> 
     rename(ndvi = 3) |> 
-    mutate(date = start_date,
+    mutate(days_count = as.integer(end_date - start_date) + 1) |>
+    uncount(days_count, .id = "step") |> # This is a pretty cool trick. Very fast.
+    mutate(date = start_date + step - 1,
            doy = lubridate::yday(date),
            month = lubridate::month(date),
            year = lubridate::year(date),

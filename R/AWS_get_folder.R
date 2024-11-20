@@ -195,15 +195,14 @@ AWS_put_files <- function(transformed_file_list,
       # Remove the file from AWS if it's present in the folder and on AWS
       # but not in the list of successfully transformed files. This file is
       # not relevant to the pipeline
-      if(file %in% s3_files) {
+      if(file %in% basename(s3_files)) {
         
         outcome <- c(outcome, glue::glue("Cleaning up dangling file {file} from AWS"))
         
         # Remove the file from AWS
-        s3_download <- s3$delete_object(
+        s3_delete_receipt <- s3$delete_object(
           Bucket = Sys.getenv("AWS_BUCKET_ID"),
-          Prefix = local_folder,
-          Key = file)
+          Key = file.path(local_folder, file))
       }
     }
   }

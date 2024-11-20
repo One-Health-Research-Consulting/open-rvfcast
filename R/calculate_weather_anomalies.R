@@ -28,80 +28,59 @@
 #'                             overwrite = TRUE)
 #'
 #' @export
-calculate_weather_anomalies <- function(nasa_weather_transformed_directory,
+calculate_weather_anomalies <- function(nasa_weather_transformed,
                                         weather_historical_means,
                                         weather_anomalies_directory,
                                         model_dates_selected,
-                                        lag_intervals,
                                         overwrite = FALSE,
                                         ...) {
   
-  # Set filename
-  date_selected <- model_dates_selected
-  save_filename <- glue::glue("weather_anomaly_{date_selected}.gz.parquet")
-  message(paste0("Calculating weather anomalies for ", date_selected))
+  # Check that we're only working on one date at a time
+  stopifnot(length(model_dates_selected) == 1)
   
-  # Check if file already exists
-  existing_files <- list.files(weather_anomalies_directory)
-  if(save_filename %in% existing_files & !overwrite) {
-    message("file already exists, skipping download")
-    return(file.path(weather_anomalies_directory, save_filename))
+  # Set filename
+  save_filename <- file.path(weather_anomalies_directory, glue::glue("weather_anomaly_{model_dates_selected}.gz.parquet"))
+  message(paste0("Calculating weather anomalies for ", model_dates_selected))
+  
+  # Check if file already exists and can be read
+  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
+  
+  if(!is.null(error_safe_read_parquet(save_filename)) & !overwrite) {
+    message("file already exists and can be loaded, skipping download")
+    return(save_filename)
   }
   
   # Open dataset to transformed data
-  weather_transformed_dataset <- arrow::open_dataset(nasa_weather_transformed_directory)
+  weather_transformed_dataset <- arrow::open_dataset(nasa_weather_transformed) |> 
+    filter(date == model_dates_selected) |> collect()
   
-  # Get the lagged anomalies for selected dates, mapping over the lag intervals
-  lag_intervals_start <- c(1 , 1+lag_intervals[-length(lag_intervals)]) # 1 to start with previous day
-  lag_intervals_end <- lag_intervals # 30 days total including end day
+  # Open dataset to historical weather data
+  historical_means <- arrow::open_dataset(weather_historical_means) |> filter(doy == lubridate::yday(model_dates_selected)) |> collect()
   
-  anomalies <- map2(lag_intervals_start, lag_intervals_end, function(start, end){
-    
-    # get lag dates, removing doy 366
-    lag_dates <- seq(date_selected - end, date_selected - start, by = "day")
-    lag_doys <- yday(lag_dates)
-    if(366 %in% lag_doys){
-      lag_doys <- lag_doys[lag_doys!=366]
-      lag_doys <- c(head(lag_doys, 1) - 1, lag_doys)
-    }
-    
-    # Get historical means for lag period
-    doy_start <- head(lag_doys, 1)
-    doy_end <- tail(lag_doys, 1)
-    doy_start_frmt <- str_pad(doy_start, width = 3, side = "left", pad = "0")
-    doy_end_frmt <- str_pad(doy_end, width = 3, side = "left", pad = "0")
-    doy_range <- glue::glue("{doy_start_frmt}_to_{doy_end_frmt}")
-    
-    historical_means <- read_parquet(weather_historical_means[str_detect(weather_historical_means, doy_range)]) 
-    assertthat::assert_that(nrow(historical_means) > 0)
-    
-    # Lag: calculate mean by pixel for the lag days
-    lagged_means <- weather_transformed_dataset |> 
-      filter(date %in% lag_dates) |> 
-      group_by(x, y) |> 
-      summarize(lag_relative_humidity_mean = mean(relative_humidity),
-                lag_temperature_mean = mean(temperature),
-                lag_precipitation_mean = mean(precipitation)) |> 
-      ungroup() 
-    
-    # Join in historical means to calculate anomalies raw and scaled
-    full_join(lagged_means, historical_means, by = c("x", "y")) |> 
-      mutate(!!paste0("anomaly_relative_humidity_", end) := lag_relative_humidity_mean - historical_relative_humidity_mean,
-             !!paste0("anomaly_temperature_", end) := lag_temperature_mean  -  historical_temperature_mean,
-             !!paste0("anomaly_precipitation_", end) := lag_precipitation_mean - historical_precipitation_mean,
-             !!paste0("anomaly_relative_humidity_scaled_", end) := (lag_relative_humidity_mean - historical_relative_humidity_mean)/historical_relative_humidity_sd,
-             !!paste0("anomaly_temperature_scaled_", end) := (lag_temperature_mean  -  historical_temperature_mean)/historical_temperature_sd,
-             !!paste0("anomaly_precipitation_scaled_", end) := (lag_precipitation_mean - historical_precipitation_mean)/historical_precipitation_sd) |> 
-      select(-starts_with("lag"), -starts_with("historical"))
-  }) |> 
-    reduce(left_join, by = c("x", "y")) |> 
-    mutate(date = date_selected) |> 
-    relocate(date)
+  # Join the two datasets by day of year (doy)
+  weather_transformed_dataset <- left_join(weather_transformed_dataset, historical_means, by = c("x","y","doy"), suffix = c("", "_historical"))
+  
+  # Calculate temperature anomalies
+  weather_transformed_dataset <- weather_transformed_dataset |>
+    mutate(anomaly_temperature = temperature - temperature_historical,
+           anomaly_scaled_temperature = anomaly_temperature / temperature_sd)
+  
+  # Calculate precipitation anomalies
+  weather_transformed_dataset <- weather_transformed_dataset |>
+    mutate(anomaly_precipitation = precipitation - precipitation_historical,
+           anomaly_scaled_precipitation = anomaly_precipitation / precipitation_sd)
+  
+  # Calculate relative_humidity anomalies
+  weather_transformed_dataset <- weather_transformed_dataset |>
+    mutate(anomaly_relative_humidity = relative_humidity - relative_humidity_historical,
+           anomaly_scaled_relative_humidity = anomaly_relative_humidity / relative_humidity_sd)
+  
+  # Remove intermediate columns
+  weather_transformed_dataset <- weather_transformed_dataset |> 
+    select(x, y, date, starts_with("anomaly"))
   
   # Save as parquet 
-  write_parquet(anomalies, here::here(weather_anomalies_directory, save_filename), compression = "gzip", compression_level = 5)
+  arrow::write_parquet(weather_transformed_dataset, save_filename, compression = "gzip", compression_level = 5)
   
-  return(file.path(weather_anomalies_directory, save_filename))
-  
-  
+  return(save_filename)
 }

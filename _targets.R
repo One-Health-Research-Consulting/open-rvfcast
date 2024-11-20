@@ -204,7 +204,7 @@ tar_target(bioclim_preprocessed,
            format = "file",
            repository = "local"),
 
-tar_target(bioclim_preprocessed_AWS_upload, AWS_put_files(bioclim_preprocessed,
+tar_target(ta, AWS_put_files(bioclim_preprocessed,
                                                           bioclim_directory),
            error = "null"), # Continue the pipeline even on error
 
@@ -347,6 +347,9 @@ dynamic_targets <- tar_plan(
   tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters()), 
   
   # MAX SESSION = 4! Can't parallel this one due to API restrictions
+  # Sentinel data is weekly so we also expand out so every day has a value
+  # to make it easier to join in. This is a step function see modis NDVI for
+  # more details
   tar_target(sentinel_ndvi_transformed, 
              transform_sentinel_ndvi(sentinel_ndvi_api_parameters, 
                                      continent_raster_template,
@@ -373,19 +376,28 @@ dynamic_targets <- tar_plan(
   # still works. It requests a new token and updates the .env file if not.
   tar_target(modis_ndvi_token, get_modis_ndvi_token(), cue = tar_cue("always")),
   
-  # set parameters and submit request for full continent
-  tar_target(modis_ndvi_task_id_continent, submit_modis_ndvi_task_request_continent(modis_ndvi_start_year = 2005,
-                                                                                    modis_ndvi_token,
-                                                                                    bbox_coords = sf::st_bbox(continent_polygon))),
+  # The last day of every years we want to request ndvi data.
+  # Ordered by end date so that the current year will request new data ever new
+  # day the pipeline is run.
+  tar_target(modis_task_end_dates, c(seq(as.Date("2005-12-31"), Sys.Date(), by = "year"), Sys.Date()) |> unique()),
   
-  tar_target(modis_ndvi_bundle_request_file, file.path(modis_ndvi_transformed_directory, "modis_ndvi_bundle_request.RDS")),
+  # Set parameters and submit request for full continent
+  # Bundle requests take quite a while to finish processing depending on the size.
+  # Branching by year. This makes each task faster and lets us process new years without having
+  # to re-do previous years. It also ensures that tasks are processed in the order submitted.
+  # Set OVERWRITE_MODIS_NDVI to TRUE in the .env file to force re-download and processing of 
+  # previous years. The current year will always re-run regardless of this setting.
+  # If a year isn't complete (i.e there are missing days) it will re-run that year.
+  tar_target(modis_ndvi_task_id_continent, submit_modis_ndvi_task_request_continent(end_date = modis_task_end_dates,
+                                                                                    modis_ndvi_token,
+                                                                                    bbox_coords = sf::st_bbox(continent_polygon),
+                                                                                    modis_ndvi_transformed_directory),
+             map(modis_task_end_dates),
+             cue = tar_cue("always")),
   
   # Set up modis_ndvi data requests
-  tar_target(modis_ndvi_bundle_request, submit_modis_ndvi_bundle_request(modis_ndvi_token, 
-                                                                         modis_ndvi_task_id_continent, 
-                                                                         modis_ndvi_bundle_request_file) |> 
-               filter(grepl("NDVI", file_name)),
-             cue = tar_cue("always")),
+  tar_target(modis_ndvi_bundle_request, submit_modis_ndvi_bundle_request(modis_ndvi_token, modis_ndvi_task_id_continent),
+             map(modis_ndvi_task_id_continent)),
   
   # Check if modis_ndvi files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
@@ -395,22 +407,43 @@ dynamic_targets <- tar_plan(
                                                         continent_raster_template,
                                                         modis_ndvi_transformed_directory),
              error = "null"),
+  
+  # Collect branches from modis_ndvi_bundle_request and split into branches 
+  # where each branch is a batch of 10 requests
+  # MODIS NDVI refers to the highest Normalized Difference 
+  # Vegetation Index (NDVI) value recorded within a 16-day period.
+  # We're joining that to daily data. One approach would be spline based interpolation 
+  # but then it would be tough to figure out what to do with NDVI 
+  # when we go to forecast. Right now we're just using step function 
+  # interpolation where the NDVI value is constant for the entire 16-day period, 
+  # then it steps up or down to the next interval's NDVI value.
+  tarchetypes::tar_group_size(name = modis_ndvi_requests, 
+                              size = 10,
+                              command = modis_ndvi_bundle_request |>
+                                arrange(start_date) |>
+                                mutate(end_date = lead(start_date) - days(1),
+                                       end_date = case_when(
+                                         is.na(end_date) ~ start_date + 15,
+                                         TRUE ~ end_date
+                                       ),
+                                       interval = end_date - start_date, 10)),
  
   # Download data, project to the template and save as parquets
   # TODO NAs outside of the continent
   # Not Found HTTP 404 means the bundle request hasn't finished processing
+  # transform_modis_ndvi()
   tar_target(modis_ndvi_transformed, 
-             transform_modis_ndvi(modis_ndvi_token, 
-                                  modis_ndvi_bundle_request,
-                                  continent_raster_template,
-                                  modis_ndvi_transformed_directory,
-                                  overwrite = as.logical(Sys.getenv("OVERWRITE_MODIS_NDVI", unset = "FALSE")),
-                                  modis_ndvi_transformed_AWS), # Enforce dependency
-             pattern = map(modis_ndvi_bundle_request),
+             map_vec(1:nrow(modis_ndvi_requests), # This map is batching: multiple requests per branch
+                     ~transform_modis_ndvi(modis_ndvi_token, 
+                                           modis_ndvi_requests[.x,],
+                                           continent_raster_template,
+                                           modis_ndvi_transformed_directory,
+                                           overwrite = as.logical(Sys.getenv("OVERWRITE_MODIS_NDVI", unset = "FALSE")),
+                                           modis_ndvi_transformed_AWS)), # Enforce dependency
+             pattern = map(modis_ndvi_requests), # This map is branching: multiple branches per bundle
              format = "file",
              repository = "local",
-             error = "null",
-             cue = tar_cue("always")), # Repository local means it isn't stored on AWS just yet.
+             error = "null"), # Repository local means it isn't stored on AWS just yet.
 
   # Put modis_ndvi_transformed files on AWS
   tar_target(modis_ndvi_transformed_AWS_upload, AWS_put_files(modis_ndvi_transformed,
@@ -437,6 +470,7 @@ dynamic_targets <- tar_plan(
                                               continent_raster_template),
              error = "null"), # Enforce Dependency
   
+  # Process the weather data
   tar_target(nasa_weather_transformed, transform_nasa_weather(nasa_weather_coordinates,
                                                               nasa_weather_years,
                                                               nasa_weather_variables = c("RH2M", "T2M", "PRECTOTCORR"),
@@ -450,8 +484,8 @@ dynamic_targets <- tar_plan(
              repository = "local"),
   
   # Put nasa_weather files on AWS
-  tar_target(nasa_weather_transformed_AWS_upload, AWS_put_files(modis_ndvi_transformed,
-                                                                modis_ndvi_transformed_directory),
+  tar_target(nasa_weather_transformed_AWS_upload, AWS_put_files(nasa_weather_transformed,
+                                                                nasa_weather_transformed_directory),
              error = "null"),
   
   
@@ -499,18 +533,21 @@ dynamic_targets <- tar_plan(
 )
 
 # Data Processing -----------------------------------------------------------
-# Why were these dates selected?
+# Why are we subsetting here again?
 data_targets <- tar_plan(
   
   tar_target(lag_intervals, c(30, 60, 90)), 
   tar_target(lead_intervals, c(30, 60, 90, 120, 150)), 
   tar_target(days_of_year, 1:365),
+  
+  # NCL: This function produces a random sampling of n_per_month dates for every month
+  # in every year between start_year and end_year. If a new year is added, the 
+  # random draws for the previous years won't change unless the seed is updated. 
   tar_target(model_dates_selected, set_model_dates(start_year = 2005, 
-                                                   end_year = 2022, 
+                                                   end_year = lubridate::year(Sys.time()), 
                                                    n_per_month = 2, 
                                                    lag_intervals, 
-                                                   seed = 212) |> 
-               filter(select_date) |> pull(date)
+                                                   seed = 212)
   ),
   
   # Recorded weather anomalies --------------------------------------------------
@@ -547,15 +584,13 @@ data_targets <- tar_plan(
                                                    nasa_weather_transformed)), # Enforce dependency
   
   # Weather anomalies are deviations from the historical mean
-  tar_target(weather_anomalies, calculate_weather_anomalies(nasa_weather_transformed_directory,
+  tar_target(weather_anomalies, calculate_weather_anomalies(nasa_weather_transformed,
                                                             weather_historical_means,
                                                             weather_anomalies_directory,
                                                             model_dates_selected,
-                                                            lag_intervals,
                                                             overwrite = as.logical(Sys.getenv("OVERWRITE_WEATHER_ANOMALIES", unset = "FALSE")),
-                                                            nasa_weather_transformed, # Enforce dependency
                                                             weather_anomalies_AWS), # Enforce dependency
-             pattern = model_dates_selected,
+             pattern = map(model_dates_selected),
              error = "null",
              format = "file", 
              repository = "local"),  
@@ -605,43 +640,8 @@ data_targets <- tar_plan(
              repository = "local"), 
   
   # Next step put weather_historical_means files on AWS.
-  tar_target(forecasts_anomalies_AWS_upload, AWS_put_files(forecasts_anomalies,
-                                                      forecasts_anomalies_directory)),
-  
-  # compare forecast anomalies to actual data
-  tar_target(forecasts_validate_directory, 
-             create_data_directory(directory_path = "data/forecast_validation")),
-  
-  # Check if weather_historical_means parquet files already exists on AWS and can be loaded
-  # The only important one is the directory. The others are there to enforce dependencies.
-  tar_target(forecasts_anomalies_validate_AWS, AWS_get_folder(forecasts_validate_directory,
-                                                              forecasts_anomalies, # Enforce dependency
-                                                              nasa_weather_transformed, # Enforce dependency
-                                                              weather_historical_means, # Enforce dependency
-                                                              model_dates_selected, # Enforce dependency
-                                                              lead_intervals)), # Enforce dependency
-  
-  # tar_target(forecasts_anomalies_validate, validate_forecasts_anomalies(forecasts_validate_directory,
-  #                                                                       forecasts_anomalies,
-  #                                                                       nasa_weather_transformed,
-  #                                                                       weather_historical_means,
-  #                                                                       model_dates_selected,
-  #                                                                       lead_intervals,
-  #                                                                       overwrite = as.logical(Sys.getenv("OVERWRITE_DATA", unset = "FALSE")),
-  #                                                                       forecasts_anomalies_validate_AWS), # Enforce dependency
-  #            pattern = map(model_dates_selected),
-  #            error = "null",
-  #            format = "file",
-  #            repository = "local"), 
-  # 
-  # # Next step put forecasts_anomalies_validate files on AWS.
-  # tar_target(forecasts_anomalies_validate_AWS_upload, AWS_put_files(forecasts_anomalies_validate,
-  #                                                                   forecasts_validate_directory)),
-
-  
-  # ndvi anomalies --------------------------------------------------
-  # tar_target(ndvi_date_lookup, create_ndvi_date_lookup(sentinel_ndvi_transformed,
-  #                                                      modis_ndvi_transformed)),
+  tar_target(forecasts_anomalies_AWS_upload, AWS_put_files(forecasts_anomalies, 
+                                                           forecasts_anomalies_directory)),
   
   tar_target(ndvi_historical_means_directory, 
              create_data_directory(directory_path = "data/ndvi_historical_means")),
@@ -658,12 +658,7 @@ data_targets <- tar_plan(
                                                                     ndvi_historical_means_AWS), # Enforce dependency
              format = "file", 
              repository = "local"),  
-  
-  # tar_target(weather_historical_means, calculate_weather_historical_means(nasa_weather_transformed,
-  #                                                                         weather_historical_means_directory,
-  #                                                                         weather_historical_means_AWS), # Enforce dependency
-  #            format = "file", 
-  #            repository = "local"),  
+
   
   # Next step put ndvi_historical_means files on AWS.
   tar_target(ndvi_historical_means_AWS_upload, AWS_put_files(ndvi_historical_means,
@@ -675,7 +670,7 @@ data_targets <- tar_plan(
   
   # Check if ndvi_anomalies_AWS parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
-  tar_target(ndvi_anomalies_AWS, AWS_get_folder(ndvi_anomalies,
+  tar_target(ndvi_anomalies_AWS, AWS_get_folder(ndvi_anomalies_directory,
                                                 ndvi_historical_means, # Enforce dependency
                                                 model_dates_selected, # Enforce dependency
                                                 lag_intervals)), # Enforce dependency
@@ -685,7 +680,6 @@ data_targets <- tar_plan(
                                                       ndvi_historical_means,
                                                       ndvi_anomalies_directory,
                                                       model_dates_selected,
-                                                      lag_intervals,
                                                       overwrite = as.logical(Sys.getenv("OVERWRITE_NDVI_ANOMALIES", unset = "FALSE")),
                                                       ndvi_anomalies_AWS), # Enforce dependency
              pattern = map(model_dates_selected),
