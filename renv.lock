@@ -664,13 +664,13 @@
     },
     "curl": {
       "Package": "curl",
-      "Version": "6.0.0",
+      "Version": "6.0.1",
       "Source": "Repository",
       "Repository": "RSPM",
       "Requirements": [
         "R"
       ],
-      "Hash": "ff51697d9205fe715f29e7171e874c6e"
+      "Hash": "e8ba62486230951fcd2b881c5be23f96"
     },
     "data.table": {
       "Package": "data.table",
@@ -2786,7 +2786,7 @@
     },
     "withr": {
       "Package": "withr",
-      "Version": "3.0.1",
+      "Version": "3.0.2",
       "Source": "Repository",
       "Repository": "RSPM",
       "Requirements": [
@@ -2794,7 +2794,7 @@
         "grDevices",
         "graphics"
       ],
-      "Hash": "07909200e8bbe90426fbfeb73e1e27aa"
+      "Hash": "cc2d62c76458d425210d1eb1478b30b4"
     },
     "wk": {
       "Package": "wk",
