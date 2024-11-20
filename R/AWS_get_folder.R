@@ -71,6 +71,7 @@ AWS_get_folder <- function(local_folder, ...) {
   downloaded_files <- c()
   
   # Loop through S3 files and download if they don't exist locally
+  # NCL AND THAT THEY CAN BE OPENED!!
   for (file in s3_files) {
     
     # Check if file already exists locally
@@ -187,6 +188,7 @@ AWS_put_files <- function(transformed_file_list,
         
         # Put the file on S3
         s3_upload <- s3$put_object(
+          Body = file.path(local_folder, file),
           Bucket = Sys.getenv("AWS_BUCKET_ID"),
           Key = file.path(local_folder, file))
       }
@@ -195,7 +197,7 @@ AWS_put_files <- function(transformed_file_list,
       # Remove the file from AWS if it's present in the folder and on AWS
       # but not in the list of successfully transformed files. This file is
       # not relevant to the pipeline
-      if(file %in% basename(s3_files)) {
+      if(file.path(local_folder, file) %in% s3_files) {
         
         outcome <- c(outcome, glue::glue("Cleaning up dangling file {file} from AWS"))
         

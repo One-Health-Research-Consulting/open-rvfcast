@@ -70,7 +70,8 @@ static_targets <- tar_plan(
   
   tar_target(soil_preprocessed_AWS_upload, AWS_put_files(soil_preprocessed, 
                                                          soil_directory),
-             error = "null"), # Continue the pipeline even on error
+             error = "null",
+             cue = tar_cue("always")), # Continue the pipeline even on error
   
   # ASPECT -------------------------------------------------
   tar_target(aspect_urls, c("aspect_zero" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClN_30as.rar",
@@ -407,7 +408,8 @@ dynamic_targets <- tar_plan(
                                                         modis_ndvi_bundle_request,
                                                         continent_raster_template,
                                                         modis_ndvi_transformed_directory),
-             error = "null"),
+             error = "null",
+             cue = tar_cue("always")),
   
   # Collect branches from modis_ndvi_bundle_request and split into branches 
   # where each branch is a batch of 10 requests
@@ -447,9 +449,10 @@ dynamic_targets <- tar_plan(
              error = "null"), # Repository local means it isn't stored on AWS just yet.
 
   # Put modis_ndvi_transformed files on AWS
-  tar_target(modis_ndvi_transformed_AWS_upload, AWS_put_files(modis_ndvi_transformed,
-                                                              modis_ndvi_transformed_directory),
-             error = "null"),
+  tar_target(modis_ndvi_transformed_AWS_upload, AWS_put_files(transformed_file_list = modis_ndvi_transformed,
+                                                              local_folder = modis_ndvi_transformed_directory),
+             error = "null",
+             cue = tar_cue("always")),
   
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
