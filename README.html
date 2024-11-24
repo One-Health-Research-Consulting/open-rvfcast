@@ -642,240 +642,228 @@ below summarizes the steps. (The figure is generated using
 <code>mermaid.js</code> syntax and should display as a graph on GitHub.
 It can also be viewed by pasting the code into <a href="https://mermaid.live">https://mermaid.live</a>.)</li>
 </ul>
-<p>Warning messages: 1: package ‘rmarkdown’ was built under R version
-4.3.3 2: package ‘paws’ was built under R version 4.3.3 3: package
-‘terra’ was built under R version 4.3.3</p>
+<p>Warning messages: 1: package ‘targets’ was built under R version
+4.3.3 2: package ‘rmarkdown’ was built under R version 4.3.3 3: package
+‘paws’ was built under R version 4.3.3 4: package ‘terra’ was built
+under R version 4.3.3</p>
 <pre class="mermaid"><code>graph LR
 subgraph Project Workflow
   subgraph Graph
     direction LR
-    x5130788afbe32544[&quot;modis_ndvi_transformed&quot;]:::queued --&gt; xddb5620937cdbc01([&quot;nasa_weather_transformed_AWS_upload&quot;]):::queued
-    xdc843e2504e22144([&quot;modis_ndvi_transformed_directory&quot;]):::skipped --&gt; xddb5620937cdbc01([&quot;nasa_weather_transformed_AWS_upload&quot;]):::queued
+    x97fc33c6215703a3([&quot;rsa_polygon&quot;]):::completed --&gt; x8367f94bdb991b08([&quot;rsa_polygon_spatial_weights&quot;]):::queued
+    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x71c93c84792ad529([&quot;glw_AWS&quot;]):::queued
+    x5448b80c3909d641([&quot;glw_directory&quot;]):::completed --&gt; x71c93c84792ad529([&quot;glw_AWS&quot;]):::queued
+    x27dbf0f2484063f3[&quot;wahis_outbreak_history&quot;]:::queued --&gt; x2b50e7687b4412ab([&quot;wahis_outbreak_history_animations_AWS&quot;]):::queued
+    x338ce62055c4090f([&quot;wahis_outbreak_history_animations_directory&quot;]):::completed --&gt; x2b50e7687b4412ab([&quot;wahis_outbreak_history_animations_AWS&quot;]):::queued
+    x5130788afbe32544[&quot;modis_ndvi_transformed&quot;]:::queued --&gt; x42d785b9e0106385([&quot;ndvi_historical_means_AWS&quot;]):::queued
+    x7fef416d6ce259f3([&quot;ndvi_historical_means_directory&quot;]):::completed --&gt; x42d785b9e0106385([&quot;ndvi_historical_means_AWS&quot;]):::queued
+    xa4eb23442420052a[&quot;sentinel_ndvi_transformed&quot;]:::queued --&gt; x42d785b9e0106385([&quot;ndvi_historical_means_AWS&quot;]):::queued
+    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x4110b36142c7dd5b([&quot;soil_AWS&quot;]):::queued
+    x9c14f0532ee1f83c([&quot;soil_directory&quot;]):::completed --&gt; x4110b36142c7dd5b([&quot;soil_AWS&quot;]):::queued
+    x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued --&gt; x72d065c3b2ed1267([&quot;forecasts_anomalies_AWS_upload&quot;]):::queued
+    x8ff15aa322c64802([&quot;forecasts_anomalies_directory&quot;]):::completed --&gt; x72d065c3b2ed1267([&quot;forecasts_anomalies_AWS_upload&quot;]):::queued
+    xb06c08f4a8f21445([&quot;lag_intervals&quot;]):::completed --&gt; xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued
+    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x680370f9b58b9f6d([&quot;slope_preprocessed&quot;]):::queued
+    x890a8fc59a28f6b2([&quot;slope_AWS&quot;]):::queued --&gt; x680370f9b58b9f6d([&quot;slope_preprocessed&quot;]):::queued
+    x165085d61327782d([&quot;slope_directory&quot;]):::completed --&gt; x680370f9b58b9f6d([&quot;slope_preprocessed&quot;]):::queued
+    x1ef0d1881ff89dbd([&quot;slope_urls&quot;]):::completed --&gt; x680370f9b58b9f6d([&quot;slope_preprocessed&quot;]):::queued
+    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x82990a83bfa4db45([&quot;glw_preprocessed&quot;]):::queued
+    x71c93c84792ad529([&quot;glw_AWS&quot;]):::queued --&gt; x82990a83bfa4db45([&quot;glw_preprocessed&quot;]):::queued
+    x5448b80c3909d641([&quot;glw_directory&quot;]):::completed --&gt; x82990a83bfa4db45([&quot;glw_preprocessed&quot;]):::queued
+    x4d4a15b2f0f1851f([&quot;glw_urls&quot;]):::completed --&gt; x82990a83bfa4db45([&quot;glw_preprocessed&quot;]):::queued
+    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x32725338020380f8([&quot;get_ecmwf_forecasts_AWS&quot;]):::queued
+    x73599238bfebd1c5([&quot;ecmwf_forecasts_api_parameters&quot;]):::queued --&gt; x32725338020380f8([&quot;get_ecmwf_forecasts_AWS&quot;]):::queued
+    x16ce463b7b647c1e([&quot;ecmwf_forecasts_transformed_directory&quot;]):::completed --&gt; x32725338020380f8([&quot;get_ecmwf_forecasts_AWS&quot;]):::queued
+    x42a5375a64b48216([&quot;aspect_directory&quot;]):::completed --&gt; x049b29595ee19108([&quot;aspect_AWS&quot;]):::queued
+    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x049b29595ee19108([&quot;aspect_AWS&quot;]):::queued
+    x165085d61327782d([&quot;slope_directory&quot;]):::completed --&gt; x5aa9efa15ecd03d0([&quot;slope_preprocessed_AWS_upload&quot;]):::queued
+    x680370f9b58b9f6d([&quot;slope_preprocessed&quot;]):::queued --&gt; x5aa9efa15ecd03d0([&quot;slope_preprocessed_AWS_upload&quot;]):::queued
+    x6bae1f342f811d0b([&quot;wahis_rvf_controls_raw&quot;]):::completed --&gt; x2668bdb7843be979([&quot;wahis_rvf_controls_preprocessed&quot;]):::queued
     xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x3b5d33025a7856bb[&quot;ecmwf_forecasts_transformed&quot;]:::queued
     x73599238bfebd1c5([&quot;ecmwf_forecasts_api_parameters&quot;]):::queued --&gt; x3b5d33025a7856bb[&quot;ecmwf_forecasts_transformed&quot;]:::queued
-    x16ce463b7b647c1e([&quot;ecmwf_forecasts_transformed_directory&quot;]):::skipped --&gt; x3b5d33025a7856bb[&quot;ecmwf_forecasts_transformed&quot;]:::queued
+    x16ce463b7b647c1e([&quot;ecmwf_forecasts_transformed_directory&quot;]):::completed --&gt; x3b5d33025a7856bb[&quot;ecmwf_forecasts_transformed&quot;]:::queued
     x32725338020380f8([&quot;get_ecmwf_forecasts_AWS&quot;]):::queued --&gt; x3b5d33025a7856bb[&quot;ecmwf_forecasts_transformed&quot;]:::queued
-    x0381132b9136146c([&quot;elevation_directory&quot;]):::skipped --&gt; xd9f5e6274aef515b([&quot;elevation_preprocessed_AWS_upload&quot;]):::queued
-    x0dffb1605751d1b1([&quot;elevation_preprocessed&quot;]):::queued --&gt; xd9f5e6274aef515b([&quot;elevation_preprocessed_AWS_upload&quot;]):::queued
-    x24983cd244fff5db([&quot;modis_ndvi_bundle_request_file&quot;]):::queued --&gt; xcfc776190ac6b73c([&quot;modis_ndvi_bundle_request&quot;]):::queued
-    xa5bc51cd67d5e6c0([&quot;modis_ndvi_task_id_continent&quot;]):::queued --&gt; xcfc776190ac6b73c([&quot;modis_ndvi_bundle_request&quot;]):::queued
-    x3f3ba2f9e89a9591([&quot;modis_ndvi_token&quot;]):::completed --&gt; xcfc776190ac6b73c([&quot;modis_ndvi_bundle_request&quot;]):::queued
-    xe3c4533ec81ef618([&quot;continent_polygon&quot;]):::skipped --&gt; x39ef63e4c3553f78([&quot;wahis_raster_template&quot;]):::queued
-    xb06c08f4a8f21445([&quot;lag_intervals&quot;]):::skipped --&gt; x8d58a79e9d066b5d([&quot;ndvi_anomalies_AWS&quot;]):::queued
-    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; x8d58a79e9d066b5d([&quot;ndvi_anomalies_AWS&quot;]):::queued
-    xe2329877730e44b5([&quot;ndvi_anomalies_directory&quot;]):::skipped --&gt; x8d58a79e9d066b5d([&quot;ndvi_anomalies_AWS&quot;]):::queued
-    x92b237aaa434cba4([&quot;ndvi_date_lookup&quot;]):::queued --&gt; x8d58a79e9d066b5d([&quot;ndvi_anomalies_AWS&quot;]):::queued
-    x44345ceb9b3d4a81[&quot;ndvi_historical_means&quot;]:::queued --&gt; x8d58a79e9d066b5d([&quot;ndvi_anomalies_AWS&quot;]):::queued
-    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x4110b36142c7dd5b([&quot;soil_AWS&quot;]):::queued
-    x9c14f0532ee1f83c([&quot;soil_directory&quot;]):::skipped --&gt; x4110b36142c7dd5b([&quot;soil_AWS&quot;]):::queued
-    x3b5d33025a7856bb[&quot;ecmwf_forecasts_transformed&quot;]:::queued --&gt; x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued
-    x16ce463b7b647c1e([&quot;ecmwf_forecasts_transformed_directory&quot;]):::skipped --&gt; x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued
-    x259885b5bdbd7dfc([&quot;forecasts_anomalies_AWS&quot;]):::queued --&gt; x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued
-    x8ff15aa322c64802([&quot;forecasts_anomalies_directory&quot;]):::skipped --&gt; x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued
-    x021b0407fd88c849([&quot;lead_intervals&quot;]):::skipped --&gt; x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued
-    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued
-    xbd6b5d8fe3154d5a[&quot;weather_historical_means&quot;]:::queued --&gt; x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued
-    x1f222a4448edddc4([&quot;days_of_year&quot;]):::skipped --&gt; xbd6b5d8fe3154d5a[&quot;weather_historical_means&quot;]:::queued
-    xb06c08f4a8f21445([&quot;lag_intervals&quot;]):::skipped --&gt; xbd6b5d8fe3154d5a[&quot;weather_historical_means&quot;]:::queued
-    x021b0407fd88c849([&quot;lead_intervals&quot;]):::skipped --&gt; xbd6b5d8fe3154d5a[&quot;weather_historical_means&quot;]:::queued
-    x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued --&gt; xbd6b5d8fe3154d5a[&quot;weather_historical_means&quot;]:::queued
-    x711dc87df29f0a9c([&quot;nasa_weather_transformed_directory&quot;]):::skipped --&gt; xbd6b5d8fe3154d5a[&quot;weather_historical_means&quot;]:::queued
-    xce069f3121e32dfb([&quot;weather_historical_means_AWS&quot;]):::queued --&gt; xbd6b5d8fe3154d5a[&quot;weather_historical_means&quot;]:::queued
-    x4407a62768444c3e([&quot;weather_historical_means_directory&quot;]):::skipped --&gt; xbd6b5d8fe3154d5a[&quot;weather_historical_means&quot;]:::queued
+    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued
+    x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued --&gt; x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued
+    x0df1395319c2f010([&quot;weather_anomalies_AWS&quot;]):::queued --&gt; x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued
+    xf94f7486eed9869c([&quot;weather_anomalies_directory&quot;]):::completed --&gt; x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued
+    xbd6b5d8fe3154d5a([&quot;weather_historical_means&quot;]):::queued --&gt; x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued
+    xb06c08f4a8f21445([&quot;lag_intervals&quot;]):::completed --&gt; x0df1395319c2f010([&quot;weather_anomalies_AWS&quot;]):::queued
+    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; x0df1395319c2f010([&quot;weather_anomalies_AWS&quot;]):::queued
+    x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued --&gt; x0df1395319c2f010([&quot;weather_anomalies_AWS&quot;]):::queued
+    xf94f7486eed9869c([&quot;weather_anomalies_directory&quot;]):::completed --&gt; x0df1395319c2f010([&quot;weather_anomalies_AWS&quot;]):::queued
+    xbd6b5d8fe3154d5a([&quot;weather_historical_means&quot;]):::queued --&gt; x0df1395319c2f010([&quot;weather_anomalies_AWS&quot;]):::queued
     x049b29595ee19108([&quot;aspect_AWS&quot;]):::queued --&gt; x155e2f0b29a20e05([&quot;aspect_preprocessed&quot;]):::queued
-    x42a5375a64b48216([&quot;aspect_directory&quot;]):::skipped --&gt; x155e2f0b29a20e05([&quot;aspect_preprocessed&quot;]):::queued
-    x213d1d2657d00cd0([&quot;aspect_urls&quot;]):::skipped --&gt; x155e2f0b29a20e05([&quot;aspect_preprocessed&quot;]):::queued
+    x42a5375a64b48216([&quot;aspect_directory&quot;]):::completed --&gt; x155e2f0b29a20e05([&quot;aspect_preprocessed&quot;]):::queued
+    x213d1d2657d00cd0([&quot;aspect_urls&quot;]):::completed --&gt; x155e2f0b29a20e05([&quot;aspect_preprocessed&quot;]):::queued
     xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x155e2f0b29a20e05([&quot;aspect_preprocessed&quot;]):::queued
-    x1f222a4448edddc4([&quot;days_of_year&quot;]):::skipped --&gt; x44345ceb9b3d4a81[&quot;ndvi_historical_means&quot;]:::queued
-    xb06c08f4a8f21445([&quot;lag_intervals&quot;]):::skipped --&gt; x44345ceb9b3d4a81[&quot;ndvi_historical_means&quot;]:::queued
-    x92b237aaa434cba4([&quot;ndvi_date_lookup&quot;]):::queued --&gt; x44345ceb9b3d4a81[&quot;ndvi_historical_means&quot;]:::queued
-    x42d785b9e0106385([&quot;ndvi_historical_means_AWS&quot;]):::queued --&gt; x44345ceb9b3d4a81[&quot;ndvi_historical_means&quot;]:::queued
-    x7fef416d6ce259f3([&quot;ndvi_historical_means_directory&quot;]):::skipped --&gt; x44345ceb9b3d4a81[&quot;ndvi_historical_means&quot;]:::queued
-    xe8b8ca5535fe5f2a([&quot;bioclim_directory&quot;]):::skipped --&gt; xe2930fde1049416f([&quot;bioclim_AWS&quot;]):::queued
+    x27dbf0f2484063f3[&quot;wahis_outbreak_history&quot;]:::queued --&gt; x53890e32519c2cdc([&quot;wahis_outbreak_history_AWS_upload&quot;]):::queued
+    x338ce62055c4090f([&quot;wahis_outbreak_history_animations_directory&quot;]):::completed --&gt; x53890e32519c2cdc([&quot;wahis_outbreak_history_AWS_upload&quot;]):::queued
+    x659aa62eded9787b([&quot;wahis_outbreaks&quot;]):::queued --&gt; xa33032ce29b67c7f([&quot;wahis_distance_matrix&quot;]):::queued
+    x39ef63e4c3553f78([&quot;wahis_raster_template&quot;]):::queued --&gt; xa33032ce29b67c7f([&quot;wahis_distance_matrix&quot;]):::queued
+    x2b83f10567783884([&quot;wahis_rvf_outbreaks_preprocessed&quot;]):::queued --&gt; x50043477563454fd([&quot;wahis_outbreak_dates&quot;]):::queued
+    xe8b8ca5535fe5f2a([&quot;bioclim_directory&quot;]):::completed --&gt; xe2930fde1049416f([&quot;bioclim_AWS&quot;]):::queued
     xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; xe2930fde1049416f([&quot;bioclim_AWS&quot;]):::queued
-    xa33032ce29b67c7f([&quot;wahis_distance_matrix&quot;]):::queued --&gt; x200daf9f58e96ac5([&quot;wahis_outbreak_history_AWS&quot;]):::queued
-    x50043477563454fd([&quot;wahis_outbreak_dates&quot;]):::queued --&gt; x200daf9f58e96ac5([&quot;wahis_outbreak_history_AWS&quot;]):::queued
-    xcc02e30ec90a7edd([&quot;wahis_outbreak_history_directory&quot;]):::skipped --&gt; x200daf9f58e96ac5([&quot;wahis_outbreak_history_AWS&quot;]):::queued
-    x659aa62eded9787b([&quot;wahis_outbreaks&quot;]):::queued --&gt; x200daf9f58e96ac5([&quot;wahis_outbreak_history_AWS&quot;]):::queued
-    x39ef63e4c3553f78([&quot;wahis_raster_template&quot;]):::queued --&gt; x200daf9f58e96ac5([&quot;wahis_outbreak_history_AWS&quot;]):::queued
-    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x955e49f3e0c22510([&quot;landcover_AWS&quot;]):::queued
-    x8894af119fe2eaa1([&quot;landcover_directory&quot;]):::skipped --&gt; x955e49f3e0c22510([&quot;landcover_AWS&quot;]):::queued
-    x42a5375a64b48216([&quot;aspect_directory&quot;]):::skipped --&gt; x7039ba6fde7353f3([&quot;soil_preprocessed_AWS_upload&quot;]):::queued
-    xd70b16641fa1b4ef([&quot;soil_preprocessed&quot;]):::queued --&gt; x7039ba6fde7353f3([&quot;soil_preprocessed_AWS_upload&quot;]):::queued
-    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; xa4eb23442420052a[&quot;sentinel_ndvi_transformed&quot;]:::queued
-    xa9eddcdb0d1f1d02([&quot;get_sentinel_ndvi_AWS&quot;]):::queued --&gt; xa4eb23442420052a[&quot;sentinel_ndvi_transformed&quot;]:::queued
-    x6e1924e349d8e6e8([&quot;sentinel_ndvi_api_parameters&quot;]):::skipped --&gt; xa4eb23442420052a[&quot;sentinel_ndvi_transformed&quot;]:::queued
-    x3ea733d22e9c32e7([&quot;sentinel_ndvi_transformed_directory&quot;]):::skipped --&gt; xa4eb23442420052a[&quot;sentinel_ndvi_transformed&quot;]:::queued
-    xe3c4533ec81ef618([&quot;continent_polygon&quot;]):::skipped --&gt; xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued
-    x97fc33c6215703a3([&quot;rsa_polygon&quot;]):::skipped --&gt; x8367f94bdb991b08([&quot;rsa_polygon_spatial_weights&quot;]):::queued
-    x4847fdb918188b25([&quot;country_polygons&quot;]):::skipped --&gt; x53c4b2fb80542353([&quot;country_bounding_boxes&quot;]):::queued
-    xb06c08f4a8f21445([&quot;lag_intervals&quot;]):::skipped --&gt; xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued
-    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued
-    x8d58a79e9d066b5d([&quot;ndvi_anomalies_AWS&quot;]):::queued --&gt; xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued
-    xe2329877730e44b5([&quot;ndvi_anomalies_directory&quot;]):::skipped --&gt; xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued
-    x92b237aaa434cba4([&quot;ndvi_date_lookup&quot;]):::queued --&gt; xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued
-    x44345ceb9b3d4a81[&quot;ndvi_historical_means&quot;]:::queued --&gt; xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued
-    x3ea733d22e9c32e7([&quot;sentinel_ndvi_transformed_directory&quot;]):::skipped --&gt; xa9eddcdb0d1f1d02([&quot;get_sentinel_ndvi_AWS&quot;]):::queued
-    x53c4b2fb80542353([&quot;country_bounding_boxes&quot;]):::queued --&gt; xc54ffbea58c4afd9([&quot;nasa_weather_coordinates&quot;]):::queued
-    xa72a356ab8b0f2e4[&quot;forecasts_anomalies_validate&quot;]:::queued --&gt; x705cc9e765652376([&quot;forecasts_anomalies_validate_AWS_upload&quot;]):::queued
-    x309ea01959a83a5a([&quot;forecasts_validate_directory&quot;]):::skipped --&gt; x705cc9e765652376([&quot;forecasts_anomalies_validate_AWS_upload&quot;]):::queued
     xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x5130788afbe32544[&quot;modis_ndvi_transformed&quot;]:::queued
-    xcfc776190ac6b73c([&quot;modis_ndvi_bundle_request&quot;]):::queued --&gt; x5130788afbe32544[&quot;modis_ndvi_transformed&quot;]:::queued
+    xb64343d9bc0ef12e([&quot;modis_ndvi_requests&quot;]):::queued --&gt; x5130788afbe32544[&quot;modis_ndvi_transformed&quot;]:::queued
     x3f3ba2f9e89a9591([&quot;modis_ndvi_token&quot;]):::completed --&gt; x5130788afbe32544[&quot;modis_ndvi_transformed&quot;]:::queued
     xf36f13d6d1345340([&quot;modis_ndvi_transformed_AWS&quot;]):::queued --&gt; x5130788afbe32544[&quot;modis_ndvi_transformed&quot;]:::queued
     xdc843e2504e22144([&quot;modis_ndvi_transformed_directory&quot;]):::skipped --&gt; x5130788afbe32544[&quot;modis_ndvi_transformed&quot;]:::queued
-    x44345ceb9b3d4a81[&quot;ndvi_historical_means&quot;]:::queued --&gt; x1be60916d37ebe0f([&quot;ndvi_historical_means_AWS_upload&quot;]):::queued
-    x7fef416d6ce259f3([&quot;ndvi_historical_means_directory&quot;]):::skipped --&gt; x1be60916d37ebe0f([&quot;ndvi_historical_means_AWS_upload&quot;]):::queued
+    x9c9060069417a49a([&quot;wahis_rvf_outbreaks_raw&quot;]):::completed --&gt; x2b83f10567783884([&quot;wahis_rvf_outbreaks_preprocessed&quot;]):::queued
+    x2e80ddc3dafd7312([&quot;augmented_data_directory&quot;]):::completed --&gt; x67bf5d7b4af55c88([&quot;augmented_data_AWS&quot;]):::queued
+    x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued --&gt; x67bf5d7b4af55c88([&quot;augmented_data_AWS&quot;]):::queued
+    x27dbf0f2484063f3[&quot;wahis_outbreak_history&quot;]:::queued --&gt; x16e1cc582647deec[&quot;wahis_outbreak_history_animations&quot;]:::queued
+    x338ce62055c4090f([&quot;wahis_outbreak_history_animations_directory&quot;]):::completed --&gt; x16e1cc582647deec[&quot;wahis_outbreak_history_animations&quot;]:::queued
+    xa33032ce29b67c7f([&quot;wahis_distance_matrix&quot;]):::queued --&gt; x200daf9f58e96ac5([&quot;wahis_outbreak_history_AWS&quot;]):::queued
+    x50043477563454fd([&quot;wahis_outbreak_dates&quot;]):::queued --&gt; x200daf9f58e96ac5([&quot;wahis_outbreak_history_AWS&quot;]):::queued
+    xcc02e30ec90a7edd([&quot;wahis_outbreak_history_directory&quot;]):::completed --&gt; x200daf9f58e96ac5([&quot;wahis_outbreak_history_AWS&quot;]):::queued
+    x659aa62eded9787b([&quot;wahis_outbreaks&quot;]):::queued --&gt; x200daf9f58e96ac5([&quot;wahis_outbreak_history_AWS&quot;]):::queued
+    x39ef63e4c3553f78([&quot;wahis_raster_template&quot;]):::queued --&gt; x200daf9f58e96ac5([&quot;wahis_outbreak_history_AWS&quot;]):::queued
+    x16e1cc582647deec[&quot;wahis_outbreak_history_animations&quot;]:::queued --&gt; x3a8830b5def8250b([&quot;wahis_outbreak_history_animations_AWS_upload&quot;]):::queued
+    x338ce62055c4090f([&quot;wahis_outbreak_history_animations_directory&quot;]):::completed --&gt; x3a8830b5def8250b([&quot;wahis_outbreak_history_animations_AWS_upload&quot;]):::queued
+    x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued --&gt; xc567f473073bf453([&quot;weather_anomalies_AWS_upload&quot;]):::queued
+    xf94f7486eed9869c([&quot;weather_anomalies_directory&quot;]):::completed --&gt; xc567f473073bf453([&quot;weather_anomalies_AWS_upload&quot;]):::queued
     xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; xdecc37cc7e708cec([&quot;landcover_preprocessed&quot;]):::queued
     x955e49f3e0c22510([&quot;landcover_AWS&quot;]):::queued --&gt; xdecc37cc7e708cec([&quot;landcover_preprocessed&quot;]):::queued
-    x8894af119fe2eaa1([&quot;landcover_directory&quot;]):::skipped --&gt; xdecc37cc7e708cec([&quot;landcover_preprocessed&quot;]):::queued
-    x684d7fe78b0e841d([&quot;landcover_types&quot;]):::skipped --&gt; xdecc37cc7e708cec([&quot;landcover_preprocessed&quot;]):::queued
-    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x32725338020380f8([&quot;get_ecmwf_forecasts_AWS&quot;]):::queued
-    x73599238bfebd1c5([&quot;ecmwf_forecasts_api_parameters&quot;]):::queued --&gt; x32725338020380f8([&quot;get_ecmwf_forecasts_AWS&quot;]):::queued
-    x16ce463b7b647c1e([&quot;ecmwf_forecasts_transformed_directory&quot;]):::skipped --&gt; x32725338020380f8([&quot;get_ecmwf_forecasts_AWS&quot;]):::queued
-    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x0dffb1605751d1b1([&quot;elevation_preprocessed&quot;]):::queued
-    x98b1351d966647f6([&quot;elevation_AWS&quot;]):::queued --&gt; x0dffb1605751d1b1([&quot;elevation_preprocessed&quot;]):::queued
-    x0381132b9136146c([&quot;elevation_directory&quot;]):::skipped --&gt; x0dffb1605751d1b1([&quot;elevation_preprocessed&quot;]):::queued
-    x5130788afbe32544[&quot;modis_ndvi_transformed&quot;]:::queued --&gt; xe90a7836ba709288([&quot;modis_ndvi_transformed_AWS_upload&quot;]):::queued
-    xdc843e2504e22144([&quot;modis_ndvi_transformed_directory&quot;]):::skipped --&gt; xe90a7836ba709288([&quot;modis_ndvi_transformed_AWS_upload&quot;]):::queued
-    xb06c08f4a8f21445([&quot;lag_intervals&quot;]):::skipped --&gt; x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued
-    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued
-    x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued --&gt; x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued
-    x711dc87df29f0a9c([&quot;nasa_weather_transformed_directory&quot;]):::skipped --&gt; x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued
-    x0df1395319c2f010([&quot;weather_anomalies_AWS&quot;]):::queued --&gt; x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued
-    xf94f7486eed9869c([&quot;weather_anomalies_directory&quot;]):::skipped --&gt; x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued
-    xbd6b5d8fe3154d5a[&quot;weather_historical_means&quot;]:::queued --&gt; x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued
-    xe8b8ca5535fe5f2a([&quot;bioclim_directory&quot;]):::skipped --&gt; xe4be5b46895c0f8c([&quot;bioclim_preprocessed_AWS_upload&quot;]):::queued
-    x1c7b6e6a1c101e59([&quot;bioclim_preprocessed&quot;]):::queued --&gt; xe4be5b46895c0f8c([&quot;bioclim_preprocessed_AWS_upload&quot;]):::queued
-    x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued --&gt; xa72a356ab8b0f2e4[&quot;forecasts_anomalies_validate&quot;]:::queued
-    xcc18535b953bde28([&quot;forecasts_anomalies_validate_AWS&quot;]):::queued --&gt; xa72a356ab8b0f2e4[&quot;forecasts_anomalies_validate&quot;]:::queued
-    x309ea01959a83a5a([&quot;forecasts_validate_directory&quot;]):::skipped --&gt; xa72a356ab8b0f2e4[&quot;forecasts_anomalies_validate&quot;]:::queued
-    x021b0407fd88c849([&quot;lead_intervals&quot;]):::skipped --&gt; xa72a356ab8b0f2e4[&quot;forecasts_anomalies_validate&quot;]:::queued
-    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; xa72a356ab8b0f2e4[&quot;forecasts_anomalies_validate&quot;]:::queued
-    x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued --&gt; xa72a356ab8b0f2e4[&quot;forecasts_anomalies_validate&quot;]:::queued
-    xbd6b5d8fe3154d5a[&quot;weather_historical_means&quot;]:::queued --&gt; xa72a356ab8b0f2e4[&quot;forecasts_anomalies_validate&quot;]:::queued
-    x3b5d33025a7856bb[&quot;ecmwf_forecasts_transformed&quot;]:::queued --&gt; x259885b5bdbd7dfc([&quot;forecasts_anomalies_AWS&quot;]):::queued
-    x8ff15aa322c64802([&quot;forecasts_anomalies_directory&quot;]):::skipped --&gt; x259885b5bdbd7dfc([&quot;forecasts_anomalies_AWS&quot;]):::queued
-    x021b0407fd88c849([&quot;lead_intervals&quot;]):::skipped --&gt; x259885b5bdbd7dfc([&quot;forecasts_anomalies_AWS&quot;]):::queued
-    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; x259885b5bdbd7dfc([&quot;forecasts_anomalies_AWS&quot;]):::queued
-    xbd6b5d8fe3154d5a[&quot;weather_historical_means&quot;]:::queued --&gt; x259885b5bdbd7dfc([&quot;forecasts_anomalies_AWS&quot;]):::queued
-    x1f222a4448edddc4([&quot;days_of_year&quot;]):::skipped --&gt; xce069f3121e32dfb([&quot;weather_historical_means_AWS&quot;]):::queued
-    xb06c08f4a8f21445([&quot;lag_intervals&quot;]):::skipped --&gt; xce069f3121e32dfb([&quot;weather_historical_means_AWS&quot;]):::queued
-    x021b0407fd88c849([&quot;lead_intervals&quot;]):::skipped --&gt; xce069f3121e32dfb([&quot;weather_historical_means_AWS&quot;]):::queued
-    x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued --&gt; xce069f3121e32dfb([&quot;weather_historical_means_AWS&quot;]):::queued
-    x4407a62768444c3e([&quot;weather_historical_means_directory&quot;]):::skipped --&gt; xce069f3121e32dfb([&quot;weather_historical_means_AWS&quot;]):::queued
-    x6bae1f342f811d0b([&quot;wahis_rvf_controls_raw&quot;]):::skipped --&gt; x2668bdb7843be979([&quot;wahis_rvf_controls_preprocessed&quot;]):::queued
-    x165085d61327782d([&quot;slope_directory&quot;]):::skipped --&gt; x5aa9efa15ecd03d0([&quot;slope_preprocessed_AWS_upload&quot;]):::queued
-    x680370f9b58b9f6d([&quot;slope_preprocessed&quot;]):::queued --&gt; x5aa9efa15ecd03d0([&quot;slope_preprocessed_AWS_upload&quot;]):::queued
-    xdc843e2504e22144([&quot;modis_ndvi_transformed_directory&quot;]):::skipped --&gt; x24983cd244fff5db([&quot;modis_ndvi_bundle_request_file&quot;]):::queued
-    xb49d77ffc5b097ae([&quot;continent_bounding_box&quot;]):::queued --&gt; x73599238bfebd1c5([&quot;ecmwf_forecasts_api_parameters&quot;]):::queued
-    x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued --&gt; x72d065c3b2ed1267([&quot;forecasts_anomalies_AWS_upload&quot;]):::queued
-    x8ff15aa322c64802([&quot;forecasts_anomalies_directory&quot;]):::skipped --&gt; x72d065c3b2ed1267([&quot;forecasts_anomalies_AWS_upload&quot;]):::queued
-    xa4eb23442420052a[&quot;sentinel_ndvi_transformed&quot;]:::queued --&gt; x6db823df8cb78984([&quot;sentinel_ndvi_transformed_AWS_upload&quot;]):::queued
-    x3ea733d22e9c32e7([&quot;sentinel_ndvi_transformed_directory&quot;]):::skipped --&gt; x6db823df8cb78984([&quot;sentinel_ndvi_transformed_AWS_upload&quot;]):::queued
+    x8894af119fe2eaa1([&quot;landcover_directory&quot;]):::completed --&gt; xdecc37cc7e708cec([&quot;landcover_preprocessed&quot;]):::queued
+    x684d7fe78b0e841d([&quot;landcover_types&quot;]):::completed --&gt; xdecc37cc7e708cec([&quot;landcover_preprocessed&quot;]):::queued
+    xe8b8ca5535fe5f2a([&quot;bioclim_directory&quot;]):::completed --&gt; xb22e604d282eb0d4([&quot;ta&quot;]):::queued
+    x1c7b6e6a1c101e59([&quot;bioclim_preprocessed&quot;]):::queued --&gt; xb22e604d282eb0d4([&quot;ta&quot;]):::queued
+    x4847fdb918188b25([&quot;country_polygons&quot;]):::completed --&gt; x53c4b2fb80542353([&quot;country_bounding_boxes&quot;]):::queued
+    x3b5d33025a7856bb[&quot;ecmwf_forecasts_transformed&quot;]:::queued --&gt; xe017ffc3bafa162a([&quot;ecmwf_forecasts_transformed_AWS_upload&quot;]):::queued
+    x16ce463b7b647c1e([&quot;ecmwf_forecasts_transformed_directory&quot;]):::completed --&gt; xe017ffc3bafa162a([&quot;ecmwf_forecasts_transformed_AWS_upload&quot;]):::queued
+    x53c4b2fb80542353([&quot;country_bounding_boxes&quot;]):::queued --&gt; xc54ffbea58c4afd9([&quot;nasa_weather_coordinates&quot;]):::queued
     xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; xd70b16641fa1b4ef([&quot;soil_preprocessed&quot;]):::queued
     x4110b36142c7dd5b([&quot;soil_AWS&quot;]):::queued --&gt; xd70b16641fa1b4ef([&quot;soil_preprocessed&quot;]):::queued
-    x9c14f0532ee1f83c([&quot;soil_directory&quot;]):::skipped --&gt; xd70b16641fa1b4ef([&quot;soil_preprocessed&quot;]):::queued
-    xe8b8ca5535fe5f2a([&quot;bioclim_directory&quot;]):::skipped --&gt; x1c7b6e6a1c101e59([&quot;bioclim_preprocessed&quot;]):::queued
-    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x1c7b6e6a1c101e59([&quot;bioclim_preprocessed&quot;]):::queued
-    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x71c93c84792ad529([&quot;glw_AWS&quot;]):::queued
-    x5448b80c3909d641([&quot;glw_directory&quot;]):::skipped --&gt; x71c93c84792ad529([&quot;glw_AWS&quot;]):::queued
-    x42a5375a64b48216([&quot;aspect_directory&quot;]):::skipped --&gt; x890a8fc59a28f6b2([&quot;slope_AWS&quot;]):::queued
-    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x890a8fc59a28f6b2([&quot;slope_AWS&quot;]):::queued
-    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x680370f9b58b9f6d([&quot;slope_preprocessed&quot;]):::queued
-    x890a8fc59a28f6b2([&quot;slope_AWS&quot;]):::queued --&gt; x680370f9b58b9f6d([&quot;slope_preprocessed&quot;]):::queued
-    x165085d61327782d([&quot;slope_directory&quot;]):::skipped --&gt; x680370f9b58b9f6d([&quot;slope_preprocessed&quot;]):::queued
-    x1ef0d1881ff89dbd([&quot;slope_urls&quot;]):::skipped --&gt; x680370f9b58b9f6d([&quot;slope_preprocessed&quot;]):::queued
+    x9c14f0532ee1f83c([&quot;soil_directory&quot;]):::completed --&gt; xd70b16641fa1b4ef([&quot;soil_preprocessed&quot;]):::queued
+    xe3c4533ec81ef618([&quot;continent_polygon&quot;]):::skipped --&gt; x73599238bfebd1c5([&quot;ecmwf_forecasts_api_parameters&quot;]):::queued
+    x42a5375a64b48216([&quot;aspect_directory&quot;]):::completed --&gt; xfe5a910dc093a019([&quot;aspect_preprocessed_AWS_upload&quot;]):::queued
+    x155e2f0b29a20e05([&quot;aspect_preprocessed&quot;]):::queued --&gt; xfe5a910dc093a019([&quot;aspect_preprocessed_AWS_upload&quot;]):::queued
+    xe3c4533ec81ef618([&quot;continent_polygon&quot;]):::skipped --&gt; x39ef63e4c3553f78([&quot;wahis_raster_template&quot;]):::queued
     xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; xf36f13d6d1345340([&quot;modis_ndvi_transformed_AWS&quot;]):::queued
-    xcfc776190ac6b73c([&quot;modis_ndvi_bundle_request&quot;]):::queued --&gt; xf36f13d6d1345340([&quot;modis_ndvi_transformed_AWS&quot;]):::queued
+    xcfc776190ac6b73c[&quot;modis_ndvi_bundle_request&quot;]:::queued --&gt; xf36f13d6d1345340([&quot;modis_ndvi_transformed_AWS&quot;]):::queued
     x3f3ba2f9e89a9591([&quot;modis_ndvi_token&quot;]):::completed --&gt; xf36f13d6d1345340([&quot;modis_ndvi_transformed_AWS&quot;]):::queued
     xdc843e2504e22144([&quot;modis_ndvi_transformed_directory&quot;]):::skipped --&gt; xf36f13d6d1345340([&quot;modis_ndvi_transformed_AWS&quot;]):::queued
-    x2b83f10567783884([&quot;wahis_rvf_outbreaks_preprocessed&quot;]):::queued --&gt; x50043477563454fd([&quot;wahis_outbreak_dates&quot;]):::queued
+    x42a5375a64b48216([&quot;aspect_directory&quot;]):::completed --&gt; x890a8fc59a28f6b2([&quot;slope_AWS&quot;]):::queued
+    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x890a8fc59a28f6b2([&quot;slope_AWS&quot;]):::queued
+    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x955e49f3e0c22510([&quot;landcover_AWS&quot;]):::queued
+    x8894af119fe2eaa1([&quot;landcover_directory&quot;]):::completed --&gt; x955e49f3e0c22510([&quot;landcover_AWS&quot;]):::queued
+    xa4eb23442420052a[&quot;sentinel_ndvi_transformed&quot;]:::queued --&gt; x6db823df8cb78984([&quot;sentinel_ndvi_transformed_AWS_upload&quot;]):::queued
+    x3ea733d22e9c32e7([&quot;sentinel_ndvi_transformed_directory&quot;]):::completed --&gt; x6db823df8cb78984([&quot;sentinel_ndvi_transformed_AWS_upload&quot;]):::queued
+    x0381132b9136146c([&quot;elevation_directory&quot;]):::completed --&gt; xd9f5e6274aef515b([&quot;elevation_preprocessed_AWS_upload&quot;]):::queued
+    x0dffb1605751d1b1([&quot;elevation_preprocessed&quot;]):::queued --&gt; xd9f5e6274aef515b([&quot;elevation_preprocessed_AWS_upload&quot;]):::queued
+    x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued --&gt; xddb5620937cdbc01([&quot;nasa_weather_transformed_AWS_upload&quot;]):::queued
+    x711dc87df29f0a9c([&quot;nasa_weather_transformed_directory&quot;]):::completed --&gt; xddb5620937cdbc01([&quot;nasa_weather_transformed_AWS_upload&quot;]):::queued
+    x67bf5d7b4af55c88([&quot;augmented_data_AWS&quot;]):::queued --&gt; xcc8316047ac6de28([&quot;augmented_data&quot;]):::queued
+    x2e80ddc3dafd7312([&quot;augmented_data_directory&quot;]):::completed --&gt; xcc8316047ac6de28([&quot;augmented_data&quot;]):::queued
+    x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued --&gt; xcc8316047ac6de28([&quot;augmented_data&quot;]):::queued
+    x1f222a4448edddc4([&quot;days_of_year&quot;]):::completed --&gt; xce069f3121e32dfb([&quot;weather_historical_means_AWS&quot;]):::queued
+    xb06c08f4a8f21445([&quot;lag_intervals&quot;]):::completed --&gt; xce069f3121e32dfb([&quot;weather_historical_means_AWS&quot;]):::queued
+    x021b0407fd88c849([&quot;lead_intervals&quot;]):::completed --&gt; xce069f3121e32dfb([&quot;weather_historical_means_AWS&quot;]):::queued
+    x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued --&gt; xce069f3121e32dfb([&quot;weather_historical_means_AWS&quot;]):::queued
+    x4407a62768444c3e([&quot;weather_historical_means_directory&quot;]):::completed --&gt; xce069f3121e32dfb([&quot;weather_historical_means_AWS&quot;]):::queued
+    x44345ceb9b3d4a81([&quot;ndvi_historical_means&quot;]):::queued --&gt; x1be60916d37ebe0f([&quot;ndvi_historical_means_AWS_upload&quot;]):::queued
+    x7fef416d6ce259f3([&quot;ndvi_historical_means_directory&quot;]):::completed --&gt; x1be60916d37ebe0f([&quot;ndvi_historical_means_AWS_upload&quot;]):::queued
+    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued
+    x5130788afbe32544[&quot;modis_ndvi_transformed&quot;]:::queued --&gt; xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued
+    x8d58a79e9d066b5d([&quot;ndvi_anomalies_AWS&quot;]):::queued --&gt; xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued
+    xe2329877730e44b5([&quot;ndvi_anomalies_directory&quot;]):::completed --&gt; xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued
+    x44345ceb9b3d4a81([&quot;ndvi_historical_means&quot;]):::queued --&gt; xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued
+    xa4eb23442420052a[&quot;sentinel_ndvi_transformed&quot;]:::queued --&gt; xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued
+    x5130788afbe32544[&quot;modis_ndvi_transformed&quot;]:::queued --&gt; x44345ceb9b3d4a81([&quot;ndvi_historical_means&quot;]):::queued
+    x42d785b9e0106385([&quot;ndvi_historical_means_AWS&quot;]):::queued --&gt; x44345ceb9b3d4a81([&quot;ndvi_historical_means&quot;]):::queued
+    x7fef416d6ce259f3([&quot;ndvi_historical_means_directory&quot;]):::completed --&gt; x44345ceb9b3d4a81([&quot;ndvi_historical_means&quot;]):::queued
+    xa4eb23442420052a[&quot;sentinel_ndvi_transformed&quot;]:::queued --&gt; x44345ceb9b3d4a81([&quot;ndvi_historical_means&quot;]):::queued
+    xcfc776190ac6b73c[&quot;modis_ndvi_bundle_request&quot;]:::queued --&gt; xb64343d9bc0ef12e([&quot;modis_ndvi_requests&quot;]):::queued
+    xa5bc51cd67d5e6c0[&quot;modis_ndvi_task_id_continent&quot;]:::queued --&gt; xcfc776190ac6b73c[&quot;modis_ndvi_bundle_request&quot;]:::queued
+    x3f3ba2f9e89a9591([&quot;modis_ndvi_token&quot;]):::completed --&gt; xcfc776190ac6b73c[&quot;modis_ndvi_bundle_request&quot;]:::queued
+    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x0dffb1605751d1b1([&quot;elevation_preprocessed&quot;]):::queued
+    x98b1351d966647f6([&quot;elevation_AWS&quot;]):::queued --&gt; x0dffb1605751d1b1([&quot;elevation_preprocessed&quot;]):::queued
+    x0381132b9136146c([&quot;elevation_directory&quot;]):::completed --&gt; x0dffb1605751d1b1([&quot;elevation_preprocessed&quot;]):::queued
+    xe3c4533ec81ef618([&quot;continent_polygon&quot;]):::skipped --&gt; xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued
+    x3b5d33025a7856bb[&quot;ecmwf_forecasts_transformed&quot;]:::queued --&gt; x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued
+    x259885b5bdbd7dfc([&quot;forecasts_anomalies_AWS&quot;]):::queued --&gt; x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued
+    x8ff15aa322c64802([&quot;forecasts_anomalies_directory&quot;]):::completed --&gt; x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued
+    x021b0407fd88c849([&quot;lead_intervals&quot;]):::completed --&gt; x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued
+    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued
+    xbd6b5d8fe3154d5a([&quot;weather_historical_means&quot;]):::queued --&gt; x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued
+    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x98b1351d966647f6([&quot;elevation_AWS&quot;]):::queued
+    x0381132b9136146c([&quot;elevation_directory&quot;]):::completed --&gt; x98b1351d966647f6([&quot;elevation_AWS&quot;]):::queued
+    x5130788afbe32544[&quot;modis_ndvi_transformed&quot;]:::queued --&gt; xe90a7836ba709288([&quot;modis_ndvi_transformed_AWS_upload&quot;]):::queued
+    xdc843e2504e22144([&quot;modis_ndvi_transformed_directory&quot;]):::skipped --&gt; xe90a7836ba709288([&quot;modis_ndvi_transformed_AWS_upload&quot;]):::queued
+    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; xa4eb23442420052a[&quot;sentinel_ndvi_transformed&quot;]:::queued
+    xa9eddcdb0d1f1d02([&quot;get_sentinel_ndvi_AWS&quot;]):::queued --&gt; xa4eb23442420052a[&quot;sentinel_ndvi_transformed&quot;]:::queued
+    x6e1924e349d8e6e8([&quot;sentinel_ndvi_api_parameters&quot;]):::completed --&gt; xa4eb23442420052a[&quot;sentinel_ndvi_transformed&quot;]:::queued
+    x3ea733d22e9c32e7([&quot;sentinel_ndvi_transformed_directory&quot;]):::completed --&gt; xa4eb23442420052a[&quot;sentinel_ndvi_transformed&quot;]:::queued
+    x30a742f54b518a5f([&quot;augmented_data_rsa_directory&quot;]):::completed --&gt; x62efb3d9001cb58b([&quot;augmented_data_rsa_AWS&quot;]):::queued
+    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; x62efb3d9001cb58b([&quot;augmented_data_rsa_AWS&quot;]):::queued
+    xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued --&gt; x62efb3d9001cb58b([&quot;augmented_data_rsa_AWS&quot;]):::queued
+    x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued --&gt; x62efb3d9001cb58b([&quot;augmented_data_rsa_AWS&quot;]):::queued
+    xcc8316047ac6de28([&quot;augmented_data&quot;]):::queued --&gt; xcfd8f1e8f3ea9117[&quot;aggregated_data_rsa&quot;]:::queued
+    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; xcfd8f1e8f3ea9117[&quot;aggregated_data_rsa&quot;]:::queued
+    x97fc33c6215703a3([&quot;rsa_polygon&quot;]):::completed --&gt; xcfd8f1e8f3ea9117[&quot;aggregated_data_rsa&quot;]:::queued
     xa33032ce29b67c7f([&quot;wahis_distance_matrix&quot;]):::queued --&gt; x27dbf0f2484063f3[&quot;wahis_outbreak_history&quot;]:::queued
     x50043477563454fd([&quot;wahis_outbreak_dates&quot;]):::queued --&gt; x27dbf0f2484063f3[&quot;wahis_outbreak_history&quot;]:::queued
     x200daf9f58e96ac5([&quot;wahis_outbreak_history_AWS&quot;]):::queued --&gt; x27dbf0f2484063f3[&quot;wahis_outbreak_history&quot;]:::queued
-    xcc02e30ec90a7edd([&quot;wahis_outbreak_history_directory&quot;]):::skipped --&gt; x27dbf0f2484063f3[&quot;wahis_outbreak_history&quot;]:::queued
+    xcc02e30ec90a7edd([&quot;wahis_outbreak_history_directory&quot;]):::completed --&gt; x27dbf0f2484063f3[&quot;wahis_outbreak_history&quot;]:::queued
     x659aa62eded9787b([&quot;wahis_outbreaks&quot;]):::queued --&gt; x27dbf0f2484063f3[&quot;wahis_outbreak_history&quot;]:::queued
     x39ef63e4c3553f78([&quot;wahis_raster_template&quot;]):::queued --&gt; x27dbf0f2484063f3[&quot;wahis_outbreak_history&quot;]:::queued
-    xe3c4533ec81ef618([&quot;continent_polygon&quot;]):::skipped --&gt; xb49d77ffc5b097ae([&quot;continent_bounding_box&quot;]):::queued
-    x50d291d42ebde68c([&quot;combined_anomalies_directory&quot;]):::skipped --&gt; x439c9f5bc1e96cd5([&quot;combined_anomalies_AWS&quot;]):::queued
-    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; x439c9f5bc1e96cd5([&quot;combined_anomalies_AWS&quot;]):::queued
-    xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued --&gt; x439c9f5bc1e96cd5([&quot;combined_anomalies_AWS&quot;]):::queued
-    x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued --&gt; x439c9f5bc1e96cd5([&quot;combined_anomalies_AWS&quot;]):::queued
+    x2b83f10567783884([&quot;wahis_rvf_outbreaks_preprocessed&quot;]):::queued --&gt; x659aa62eded9787b([&quot;wahis_outbreaks&quot;]):::queued
+    x3b5d33025a7856bb[&quot;ecmwf_forecasts_transformed&quot;]:::queued --&gt; x259885b5bdbd7dfc([&quot;forecasts_anomalies_AWS&quot;]):::queued
+    x8ff15aa322c64802([&quot;forecasts_anomalies_directory&quot;]):::completed --&gt; x259885b5bdbd7dfc([&quot;forecasts_anomalies_AWS&quot;]):::queued
+    x021b0407fd88c849([&quot;lead_intervals&quot;]):::completed --&gt; x259885b5bdbd7dfc([&quot;forecasts_anomalies_AWS&quot;]):::queued
+    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; x259885b5bdbd7dfc([&quot;forecasts_anomalies_AWS&quot;]):::queued
+    xbd6b5d8fe3154d5a([&quot;weather_historical_means&quot;]):::queued --&gt; x259885b5bdbd7dfc([&quot;forecasts_anomalies_AWS&quot;]):::queued
+    x9c14f0532ee1f83c([&quot;soil_directory&quot;]):::completed --&gt; x7039ba6fde7353f3([&quot;soil_preprocessed_AWS_upload&quot;]):::queued
+    xd70b16641fa1b4ef([&quot;soil_preprocessed&quot;]):::queued --&gt; x7039ba6fde7353f3([&quot;soil_preprocessed_AWS_upload&quot;]):::queued
+    xe3c4533ec81ef618([&quot;continent_polygon&quot;]):::skipped --&gt; xa5bc51cd67d5e6c0[&quot;modis_ndvi_task_id_continent&quot;]:::queued
+    x3f3ba2f9e89a9591([&quot;modis_ndvi_token&quot;]):::completed --&gt; xa5bc51cd67d5e6c0[&quot;modis_ndvi_task_id_continent&quot;]:::queued
+    xdc843e2504e22144([&quot;modis_ndvi_transformed_directory&quot;]):::skipped --&gt; xa5bc51cd67d5e6c0[&quot;modis_ndvi_task_id_continent&quot;]:::queued
+    xb406dc4c2762194f([&quot;modis_task_end_dates&quot;]):::queued --&gt; xa5bc51cd67d5e6c0[&quot;modis_ndvi_task_id_continent&quot;]:::queued
+    x155e2f0b29a20e05([&quot;aspect_preprocessed&quot;]):::queued --&gt; x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued
+    x1c7b6e6a1c101e59([&quot;bioclim_preprocessed&quot;]):::queued --&gt; x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued
+    x3b5d33025a7856bb[&quot;ecmwf_forecasts_transformed&quot;]:::queued --&gt; x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued
+    x0dffb1605751d1b1([&quot;elevation_preprocessed&quot;]):::queued --&gt; x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued
+    x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued --&gt; x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued
+    x82990a83bfa4db45([&quot;glw_preprocessed&quot;]):::queued --&gt; x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued
+    xdecc37cc7e708cec([&quot;landcover_preprocessed&quot;]):::queued --&gt; x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued
+    xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued --&gt; x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued
+    x44345ceb9b3d4a81([&quot;ndvi_historical_means&quot;]):::queued --&gt; x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued
+    x680370f9b58b9f6d([&quot;slope_preprocessed&quot;]):::queued --&gt; x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued
+    xd70b16641fa1b4ef([&quot;soil_preprocessed&quot;]):::queued --&gt; x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued
+    x27dbf0f2484063f3[&quot;wahis_outbreak_history&quot;]:::queued --&gt; x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued
+    x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued --&gt; x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued
+    xbd6b5d8fe3154d5a([&quot;weather_historical_means&quot;]):::queued --&gt; x482d364fd551ff53([&quot;augmented_data_sources&quot;]):::queued
+    xb06c08f4a8f21445([&quot;lag_intervals&quot;]):::completed --&gt; x8d58a79e9d066b5d([&quot;ndvi_anomalies_AWS&quot;]):::queued
+    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; x8d58a79e9d066b5d([&quot;ndvi_anomalies_AWS&quot;]):::queued
+    xe2329877730e44b5([&quot;ndvi_anomalies_directory&quot;]):::completed --&gt; x8d58a79e9d066b5d([&quot;ndvi_anomalies_AWS&quot;]):::queued
+    x44345ceb9b3d4a81([&quot;ndvi_historical_means&quot;]):::queued --&gt; x8d58a79e9d066b5d([&quot;ndvi_anomalies_AWS&quot;]):::queued
+    x3ea733d22e9c32e7([&quot;sentinel_ndvi_transformed_directory&quot;]):::completed --&gt; xa9eddcdb0d1f1d02([&quot;get_sentinel_ndvi_AWS&quot;]):::queued
+    x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued --&gt; xbd6b5d8fe3154d5a([&quot;weather_historical_means&quot;]):::queued
+    xce069f3121e32dfb([&quot;weather_historical_means_AWS&quot;]):::queued --&gt; xbd6b5d8fe3154d5a([&quot;weather_historical_means&quot;]):::queued
+    x4407a62768444c3e([&quot;weather_historical_means_directory&quot;]):::completed --&gt; xbd6b5d8fe3154d5a([&quot;weather_historical_means&quot;]):::queued
     xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued --&gt; x144f59a0db036a4b([&quot;ndvi_anomalies_AWS_upload&quot;]):::queued
-    xe2329877730e44b5([&quot;ndvi_anomalies_directory&quot;]):::skipped --&gt; x144f59a0db036a4b([&quot;ndvi_anomalies_AWS_upload&quot;]):::queued
-    x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued --&gt; xcc18535b953bde28([&quot;forecasts_anomalies_validate_AWS&quot;]):::queued
-    x309ea01959a83a5a([&quot;forecasts_validate_directory&quot;]):::skipped --&gt; xcc18535b953bde28([&quot;forecasts_anomalies_validate_AWS&quot;]):::queued
-    x021b0407fd88c849([&quot;lead_intervals&quot;]):::skipped --&gt; xcc18535b953bde28([&quot;forecasts_anomalies_validate_AWS&quot;]):::queued
-    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; xcc18535b953bde28([&quot;forecasts_anomalies_validate_AWS&quot;]):::queued
-    x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued --&gt; xcc18535b953bde28([&quot;forecasts_anomalies_validate_AWS&quot;]):::queued
-    xbd6b5d8fe3154d5a[&quot;weather_historical_means&quot;]:::queued --&gt; xcc18535b953bde28([&quot;forecasts_anomalies_validate_AWS&quot;]):::queued
-    x27dbf0f2484063f3[&quot;wahis_outbreak_history&quot;]:::queued --&gt; x53890e32519c2cdc([&quot;wahis_outbreak_history_AWS_upload&quot;]):::queued
-    x338ce62055c4090f([&quot;wahis_outbreak_history_animations_directory&quot;]):::skipped --&gt; x53890e32519c2cdc([&quot;wahis_outbreak_history_AWS_upload&quot;]):::queued
+    xe2329877730e44b5([&quot;ndvi_anomalies_directory&quot;]):::completed --&gt; x144f59a0db036a4b([&quot;ndvi_anomalies_AWS_upload&quot;]):::queued
+    x8894af119fe2eaa1([&quot;landcover_directory&quot;]):::completed --&gt; xbc982b2f29054bd9([&quot;landcover_preprocessed_AWS_upload&quot;]):::queued
+    xdecc37cc7e708cec([&quot;landcover_preprocessed&quot;]):::queued --&gt; xbc982b2f29054bd9([&quot;landcover_preprocessed_AWS_upload&quot;]):::queued
     xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued
     x84fbc80b775022e1([&quot;nasa_weather_AWS&quot;]):::queued --&gt; x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued
     xc54ffbea58c4afd9([&quot;nasa_weather_coordinates&quot;]):::queued --&gt; x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued
-    x711dc87df29f0a9c([&quot;nasa_weather_transformed_directory&quot;]):::skipped --&gt; x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued
-    x0c2748f0f39a3907([&quot;nasa_weather_years&quot;]):::skipped --&gt; x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued
-    x3b5d33025a7856bb[&quot;ecmwf_forecasts_transformed&quot;]:::queued --&gt; xe017ffc3bafa162a([&quot;ecmwf_forecasts_transformed_AWS_upload&quot;]):::queued
-    x16ce463b7b647c1e([&quot;ecmwf_forecasts_transformed_directory&quot;]):::skipped --&gt; xe017ffc3bafa162a([&quot;ecmwf_forecasts_transformed_AWS_upload&quot;]):::queued
-    x2b83f10567783884([&quot;wahis_rvf_outbreaks_preprocessed&quot;]):::queued --&gt; x659aa62eded9787b([&quot;wahis_outbreaks&quot;]):::queued
-    xb49d77ffc5b097ae([&quot;continent_bounding_box&quot;]):::queued --&gt; xa5bc51cd67d5e6c0([&quot;modis_ndvi_task_id_continent&quot;]):::queued
-    x3f3ba2f9e89a9591([&quot;modis_ndvi_token&quot;]):::completed --&gt; xa5bc51cd67d5e6c0([&quot;modis_ndvi_task_id_continent&quot;]):::queued
-    x16e1cc582647deec[&quot;wahis_outbreak_history_animations&quot;]:::queued --&gt; x3a8830b5def8250b([&quot;wahis_outbreak_history_animations_AWS_upload&quot;]):::queued
-    x338ce62055c4090f([&quot;wahis_outbreak_history_animations_directory&quot;]):::skipped --&gt; x3a8830b5def8250b([&quot;wahis_outbreak_history_animations_AWS_upload&quot;]):::queued
-    x5448b80c3909d641([&quot;glw_directory&quot;]):::skipped --&gt; x01e625a4f1dd2c42([&quot;glw_preprocessed_AWS_upload&quot;]):::queued
-    x82990a83bfa4db45([&quot;glw_preprocessed&quot;]):::queued --&gt; x01e625a4f1dd2c42([&quot;glw_preprocessed_AWS_upload&quot;]):::queued
-    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; xcfd8f1e8f3ea9117[&quot;aggregated_data_rsa&quot;]:::queued
-    x97fc33c6215703a3([&quot;rsa_polygon&quot;]):::skipped --&gt; xcfd8f1e8f3ea9117[&quot;aggregated_data_rsa&quot;]:::queued
-    x1f222a4448edddc4([&quot;days_of_year&quot;]):::skipped --&gt; x42d785b9e0106385([&quot;ndvi_historical_means_AWS&quot;]):::queued
-    xb06c08f4a8f21445([&quot;lag_intervals&quot;]):::skipped --&gt; x42d785b9e0106385([&quot;ndvi_historical_means_AWS&quot;]):::queued
-    x92b237aaa434cba4([&quot;ndvi_date_lookup&quot;]):::queued --&gt; x42d785b9e0106385([&quot;ndvi_historical_means_AWS&quot;]):::queued
-    x7fef416d6ce259f3([&quot;ndvi_historical_means_directory&quot;]):::skipped --&gt; x42d785b9e0106385([&quot;ndvi_historical_means_AWS&quot;]):::queued
-    x5130788afbe32544[&quot;modis_ndvi_transformed&quot;]:::queued --&gt; x92b237aaa434cba4([&quot;ndvi_date_lookup&quot;]):::queued
-    xa4eb23442420052a[&quot;sentinel_ndvi_transformed&quot;]:::queued --&gt; x92b237aaa434cba4([&quot;ndvi_date_lookup&quot;]):::queued
-    x659aa62eded9787b([&quot;wahis_outbreaks&quot;]):::queued --&gt; xa33032ce29b67c7f([&quot;wahis_distance_matrix&quot;]):::queued
-    x39ef63e4c3553f78([&quot;wahis_raster_template&quot;]):::queued --&gt; xa33032ce29b67c7f([&quot;wahis_distance_matrix&quot;]):::queued
-    x27dbf0f2484063f3[&quot;wahis_outbreak_history&quot;]:::queued --&gt; x16e1cc582647deec[&quot;wahis_outbreak_history_animations&quot;]:::queued
-    x338ce62055c4090f([&quot;wahis_outbreak_history_animations_directory&quot;]):::skipped --&gt; x16e1cc582647deec[&quot;wahis_outbreak_history_animations&quot;]:::queued
-    x27dbf0f2484063f3[&quot;wahis_outbreak_history&quot;]:::queued --&gt; x2b50e7687b4412ab([&quot;wahis_outbreak_history_animations_AWS&quot;]):::queued
-    x338ce62055c4090f([&quot;wahis_outbreak_history_animations_directory&quot;]):::skipped --&gt; x2b50e7687b4412ab([&quot;wahis_outbreak_history_animations_AWS&quot;]):::queued
-    x8894af119fe2eaa1([&quot;landcover_directory&quot;]):::skipped --&gt; xbc982b2f29054bd9([&quot;landcover_preprocessed_AWS_upload&quot;]):::queued
-    xdecc37cc7e708cec([&quot;landcover_preprocessed&quot;]):::queued --&gt; xbc982b2f29054bd9([&quot;landcover_preprocessed_AWS_upload&quot;]):::queued
-    x42a5375a64b48216([&quot;aspect_directory&quot;]):::skipped --&gt; xfe5a910dc093a019([&quot;aspect_preprocessed_AWS_upload&quot;]):::queued
-    x155e2f0b29a20e05([&quot;aspect_preprocessed&quot;]):::queued --&gt; xfe5a910dc093a019([&quot;aspect_preprocessed_AWS_upload&quot;]):::queued
-    x439c9f5bc1e96cd5([&quot;combined_anomalies_AWS&quot;]):::queued --&gt; xfde5ff2681c50d89([&quot;combined_anomalies&quot;]):::queued
-    x50d291d42ebde68c([&quot;combined_anomalies_directory&quot;]):::skipped --&gt; xfde5ff2681c50d89([&quot;combined_anomalies&quot;]):::queued
-    x680f7450837c9229[&quot;forecasts_anomalies&quot;]:::queued --&gt; xfde5ff2681c50d89([&quot;combined_anomalies&quot;]):::queued
-    xf9b79e824823a870[&quot;ndvi_anomalies&quot;]:::queued --&gt; xfde5ff2681c50d89([&quot;combined_anomalies&quot;]):::queued
-    x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued --&gt; xfde5ff2681c50d89([&quot;combined_anomalies&quot;]):::queued
-    x42a5375a64b48216([&quot;aspect_directory&quot;]):::skipped --&gt; x049b29595ee19108([&quot;aspect_AWS&quot;]):::queued
-    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x049b29595ee19108([&quot;aspect_AWS&quot;]):::queued
-    x9c9060069417a49a([&quot;wahis_rvf_outbreaks_raw&quot;]):::skipped --&gt; x2b83f10567783884([&quot;wahis_rvf_outbreaks_preprocessed&quot;]):::queued
-    xfde5ff2681c50d89([&quot;combined_anomalies&quot;]):::queued --&gt; xba5d6169ff0233fa([&quot;combined_anomalies_AWS_upload&quot;]):::queued
-    x50d291d42ebde68c([&quot;combined_anomalies_directory&quot;]):::skipped --&gt; xba5d6169ff0233fa([&quot;combined_anomalies_AWS_upload&quot;]):::queued
-    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x82990a83bfa4db45([&quot;glw_preprocessed&quot;]):::queued
-    x71c93c84792ad529([&quot;glw_AWS&quot;]):::queued --&gt; x82990a83bfa4db45([&quot;glw_preprocessed&quot;]):::queued
-    x5448b80c3909d641([&quot;glw_directory&quot;]):::skipped --&gt; x82990a83bfa4db45([&quot;glw_preprocessed&quot;]):::queued
-    x4d4a15b2f0f1851f([&quot;glw_urls&quot;]):::skipped --&gt; x82990a83bfa4db45([&quot;glw_preprocessed&quot;]):::queued
-    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x98b1351d966647f6([&quot;elevation_AWS&quot;]):::queued
-    x0381132b9136146c([&quot;elevation_directory&quot;]):::skipped --&gt; x98b1351d966647f6([&quot;elevation_AWS&quot;]):::queued
-    xb06c08f4a8f21445([&quot;lag_intervals&quot;]):::skipped --&gt; xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued
-    x01b9e03cb52b7b05[&quot;weather_anomalies&quot;]:::queued --&gt; xc567f473073bf453([&quot;weather_anomalies_AWS_upload&quot;]):::queued
-    xf94f7486eed9869c([&quot;weather_anomalies_directory&quot;]):::skipped --&gt; xc567f473073bf453([&quot;weather_anomalies_AWS_upload&quot;]):::queued
-    xbd6b5d8fe3154d5a[&quot;weather_historical_means&quot;]:::queued --&gt; xf8b72b30842f6a3c([&quot;weather_historical_means_AWS_upload&quot;]):::queued
-    x4407a62768444c3e([&quot;weather_historical_means_directory&quot;]):::skipped --&gt; xf8b72b30842f6a3c([&quot;weather_historical_means_AWS_upload&quot;]):::queued
+    x711dc87df29f0a9c([&quot;nasa_weather_transformed_directory&quot;]):::completed --&gt; x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued
+    x0c2748f0f39a3907([&quot;nasa_weather_years&quot;]):::queued --&gt; x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued
+    xbd6b5d8fe3154d5a([&quot;weather_historical_means&quot;]):::queued --&gt; xf8b72b30842f6a3c([&quot;weather_historical_means_AWS_upload&quot;]):::queued
+    x4407a62768444c3e([&quot;weather_historical_means_directory&quot;]):::completed --&gt; xf8b72b30842f6a3c([&quot;weather_historical_means_AWS_upload&quot;]):::queued
     xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x84fbc80b775022e1([&quot;nasa_weather_AWS&quot;]):::queued
     xc54ffbea58c4afd9([&quot;nasa_weather_coordinates&quot;]):::queued --&gt; x84fbc80b775022e1([&quot;nasa_weather_AWS&quot;]):::queued
-    x711dc87df29f0a9c([&quot;nasa_weather_transformed_directory&quot;]):::skipped --&gt; x84fbc80b775022e1([&quot;nasa_weather_AWS&quot;]):::queued
-    x0c2748f0f39a3907([&quot;nasa_weather_years&quot;]):::skipped --&gt; x84fbc80b775022e1([&quot;nasa_weather_AWS&quot;]):::queued
-    xb06c08f4a8f21445([&quot;lag_intervals&quot;]):::skipped --&gt; x0df1395319c2f010([&quot;weather_anomalies_AWS&quot;]):::queued
-    xc61c34839fb8c873([&quot;model_dates_selected&quot;]):::queued --&gt; x0df1395319c2f010([&quot;weather_anomalies_AWS&quot;]):::queued
-    x0548e231345702f7[&quot;nasa_weather_transformed&quot;]:::queued --&gt; x0df1395319c2f010([&quot;weather_anomalies_AWS&quot;]):::queued
-    xf94f7486eed9869c([&quot;weather_anomalies_directory&quot;]):::skipped --&gt; x0df1395319c2f010([&quot;weather_anomalies_AWS&quot;]):::queued
-    xbd6b5d8fe3154d5a[&quot;weather_historical_means&quot;]:::queued --&gt; x0df1395319c2f010([&quot;weather_anomalies_AWS&quot;]):::queued
-    x30a742f54b518a5f([&quot;augmented_data_rsa_directory&quot;]):::skipped --&gt; x30a742f54b518a5f([&quot;augmented_data_rsa_directory&quot;]):::skipped
-    xdc94d22b863438a5([&quot;nasa_weather_variables&quot;]):::skipped --&gt; xdc94d22b863438a5([&quot;nasa_weather_variables&quot;]):::skipped
+    x711dc87df29f0a9c([&quot;nasa_weather_transformed_directory&quot;]):::completed --&gt; x84fbc80b775022e1([&quot;nasa_weather_AWS&quot;]):::queued
+    x0c2748f0f39a3907([&quot;nasa_weather_years&quot;]):::queued --&gt; x84fbc80b775022e1([&quot;nasa_weather_AWS&quot;]):::queued
+    xcc8316047ac6de28([&quot;augmented_data&quot;]):::queued --&gt; x3130c5a4e0174582([&quot;augmented_data_AWS_upload&quot;]):::queued
+    x2e80ddc3dafd7312([&quot;augmented_data_directory&quot;]):::completed --&gt; x3130c5a4e0174582([&quot;augmented_data_AWS_upload&quot;]):::queued
+    xe8b8ca5535fe5f2a([&quot;bioclim_directory&quot;]):::completed --&gt; x1c7b6e6a1c101e59([&quot;bioclim_preprocessed&quot;]):::queued
+    xba6244832b5285ba([&quot;continent_raster_template&quot;]):::queued --&gt; x1c7b6e6a1c101e59([&quot;bioclim_preprocessed&quot;]):::queued
+    x5448b80c3909d641([&quot;glw_directory&quot;]):::completed --&gt; x01e625a4f1dd2c42([&quot;glw_preprocessed_AWS_upload&quot;]):::queued
+    x82990a83bfa4db45([&quot;glw_preprocessed&quot;]):::queued --&gt; x01e625a4f1dd2c42([&quot;glw_preprocessed_AWS_upload&quot;]):::queued
+    xdc94d22b863438a5([&quot;nasa_weather_variables&quot;]):::queued --&gt; xdc94d22b863438a5([&quot;nasa_weather_variables&quot;]):::queued
   end
 linkStyle 0 stroke-width:0px;</code></pre>
 <p>Many of the computational steps can be time consuming and either

@@ -22,26 +22,40 @@
 #'
 #' @export
 download_sentinel_ndvi <- function(sentinel_ndvi_api_parameters, 
-                                   raw_filename) {
+                                   raw_filename,
+                                   sentinel_ndvi_token_file = "sentinel.token") {
   
   product_id <- sentinel_ndvi_api_parameters$id
   message(paste0("Downloading ", raw_filename))
   
-  auth <- httr::POST("https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token", 
-                   body = list(
-                     grant_type = "password",
-                     username = Sys.getenv("COPERNICUS_USERNAME"),
-                     password = Sys.getenv("COPERNICUS_PASSWORD"),
-                     client_id = "cdse-public"), 
-                   encode = "form")
+  # Read in sentinel token
+  sentinel_ndvi_token <- readLines(sentinel_ndvi_token_file)
   
   url <- glue::glue('https://zipper.dataspace.copernicus.eu/odata/v1/Products({product_id})/$value')
   
-  response <- httr::GET(url, httr::add_headers(Authorization = paste("Bearer", httr::content(auth)$access_token)),
-                  httr::write_disk(raw_filename, overwrite = TRUE))
+  i <- 0
+  response <- list()
+  response$status_code <- 401
+  
+  while(response$status_code != 200 && i < 6) {
+   response <- httr::GET(url, httr::add_headers(Authorization = paste("Bearer", sentinel_ndvi_token)),
+               httr::write_disk(raw_filename, overwrite = TRUE))
+   httr::message_for_status(response)
+   if(response$status_code == 401) {
+     get_sentinel_ndvi_token(filename = sentinel_ndvi_token_file)
+     sentinel_ndvi_token <- readLines(sentinel_ndvi_token_file)
+   }
+   Sys.sleep(ifelse(2^i>60, 60, 2^i))
+  }
+  
+  httr::stop_for_status(response)
   
   # Remove old nc file if it exists
-  file.remove(paste0(tools::file_path_sans_ext(raw_filename), ".nc"))
+  # Construct the file path of the .nc file
+  nc_file <- paste0(tools::file_path_sans_ext(raw_filename), ".nc")
+  if (file.exists(nc_file)) {
+    file.remove(nc_file)
+  }
   
   # Unzip the new download and rename
   unzip(raw_filename, 

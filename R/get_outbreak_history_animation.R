@@ -34,7 +34,7 @@ get_outbreak_history_animation <- function(wahis_outbreak_history,
   # Load the data
   outbreak_history_dataset <- arrow::open_dataset(wahis_outbreak_history)
   
-  # Fastest way to use parquet files is to do as many opperations before collect or pull
+  # Fastest way to use parquet files is to do as many operations before collect or pull
   min_weight <- outbreak_history_dataset |>
     summarise(min_weight = min(weight, na.rm = TRUE)) |>
     pull(min_weight, as_vector = TRUE)

@@ -84,9 +84,9 @@ transform_modis_ndvi <- function(modis_ndvi_token,
     mutate(days_count = as.integer(end_date - start_date) + 1) |>
     uncount(days_count, .id = "step") |> # This is a pretty cool trick. Very fast.
     mutate(date = start_date + step - 1,
-           doy = lubridate::yday(date),
-           month = lubridate::month(date),
-           year = lubridate::year(date),
+           doy = as.integer(lubridate::yday(date)),
+           month = as.integer(lubridate::month(date)),
+           year = as.integer(lubridate::year(date)),
            source = "modis")
   
   # Save transformed rast as parquet

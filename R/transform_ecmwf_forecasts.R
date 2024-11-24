@@ -41,7 +41,13 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   # re-run it.
   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
   
-  if(!is.null(error_safe_read_parquet(transformed_file)) && year < year(Sys.time()) && !overwrite) {
+  # Re-run current forecasts as they may change
+  current_year <- as.numeric(format(Sys.Date(), "%Y"))
+  current_month <- as.numeric(format(Sys.Date(), "%m"))
+  
+  if (!is.null(error_safe_read_parquet(transformed_file)) &&
+      (year < current_year || (year == current_year && month < current_month)) &&
+      !overwrite) {
     message(glue::glue("{transformed_file} is already present and can be read."))
     return(transformed_file)
   }
@@ -70,8 +76,8 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
         product_type = product_type, 
         variable = variable, 
         year = year,
-        month = month,
-        leadtime_month = unlist(ecmwf_forecasts_api_parameters$leadtime_months), 
+        month = month, # The current month
+        leadtime_month = unlist(ecmwf_forecasts_api_parameters$leadtime_months), # What will the weather be X months from the current month?
         area = round(unlist(ecmwf_forecasts_api_parameters$spatial_bounds), 1),  
         format = "grib",
         dataset_short_name = "seasonal-monthly-single-levels",
@@ -112,15 +118,25 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   
   message(glue::glue("ecmwf_seasonal_forecast_{month}_{year} metadata successfully read."))
   
+  # The base date for an ECMWF forecast is the time when the forecast was initialized 
+  # or made. For example, a forecast with a base date of Wed 1 Nov 2024 18 UTC (T+6) s
+  # means that the forecast was made at 18 UTC on Wednesday, November 1, 2024
+  # And lead month is the month average for that many months out with a lead month
+  # of 1 being the month that includes the base_date which _should_ always be on the
+  # first of the month. So base date 01-01-2005 1 lead month is the monthly average
+  # forecast for January 2005. 
+  
   # 1. Convert kelvin to celsius (note these columns are mislabeled as C as provided by ecmwf)
-  # 2. Fix total_precipitation metadata and convert units from m/second to mm/day.
+  # 2. Fix total_precipitation metadata and convert units from m/second to mm/day. 
+  # Note the variable name is total_precipitation but it is really *mean total precipitation rate*
   # 3. Correct precip sd
   grib_data <- grib_data |> mutate(mean = ifelse(units == "C", mean - 273.15, ((mean > 0) * 8.64e+7 * mean)),
                                    sd = ifelse(units == "", ((sd > 0) * 8.64e+7 * sd), sd),
                                    var_id = ifelse(units == "", "tprate", var_id),
                                    units = ifelse(units == "", "mm/day", units),
-                                   month = month(forecast_end_date - 1),
-                                   year = year(forecast_end_date - 1),
+                                   month = as.integer(lubridate::month(base_date)), # Base month
+                                   year = as.integer(lubridate::year(base_date)), # Base year
+                                   lead_month = as.integer(lubridate::month(forecast_end_date - 1)),
                                    variable = fct_recode(variable,
                                                          dewpoint = "2m_dewpoint_temperature",
                                                          temperature = "2m_temperature",
@@ -128,9 +144,10 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   
   # Calculate relative humidity from temperature and dewpoint temperature
   grib_data <- grib_data |> 
-    select(x, y, base_date, month, year, mean, sd, variable) |>
-    pivot_wider(names_from = variable, values_from = c(mean, sd), names_glue = "{variable}_{.value}") |> # Reshape to make it easier to calculate composition values
+    select(x, y, base_date, month, year, lead_months, mean, sd, variable) |>
+    pivot_wider(names_from = variable, values_from = c(mean, sd), names_glue = "{variable}_{.value}") |> # Reshape to make it easier to calculate composite values like relative humidity
     mutate(
+  
       # Calculate saturation and actual vapor pressures
       saturation_vapor_pressure = exp((17.625 * temperature_mean) / (243.04 + temperature_mean)),
       actual_vapor_pressure = exp((17.625 * dewpoint_mean) / (243.04 + dewpoint_mean)),
@@ -139,7 +156,7 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
       relative_humidity_mean = 100 * actual_vapor_pressure / saturation_vapor_pressure,
       
       # Calculate partial derivatives of RH with respect to temperature and dewpoint temperature
-      # Used for propogation of error to get sd of rh from sd of temperature and dewpoint
+      # Used for propagation of error to get sd of rh from sd of temperature and dewpoint
       dRH_dT = -relative_humidity_mean * (17.625 * 243.04) / ((243.04 + temperature_mean)^2),
       dRH_dTd = relative_humidity_mean * (17.625 * 243.04) / ((243.04 + dewpoint_mean)^2),
       

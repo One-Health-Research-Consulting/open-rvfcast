@@ -65,15 +65,32 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
   # contributions of March and April.
   
   # An easier way to do this is to just make a list of every day from start to 
-  # start + 30 - 1. Figure out the month and join to forecast month from 
+  # start + 30 - 1. Figure out the year nad month and join to forecast month from 
   # ecmwf_forecasts_transformed. That way we could do all the things at once.
   # Then group by x, y, and summarize average of data columns. Map over each
   # lead interval and done. A benefit of this approach is that it makes
   # comparing to historical means easy. Just find the historical means for each
   # day then left join that in by month as well.
   
-  forecasts_transformed_dataset <- arrow::open_dataset(ecmwf_forecasts_transformed) |>
-    filter(base_date == floor_date(model_dates_selected, unit = "month"))
+  # Updated notes after discussion with Noam
+  # We want current date, current ndvi, forecast amount in days, forecast weather, forecast outbreak history (check this), and all the static layers. So we don't want wide weather forecast but long.
+  
+  # Get a tibble of all the dates in the anomaly forecast range for the given lead interval
+  model_dates <- tibble(date = seq(from = model_dates_selected + lead_interval_start, 
+                                   to = model_dates_selected + lead_interval_end - 1, by = 1)) |>
+    mutate(doy = as.integer(lubridate::yday(date)),          # Calculate day of year
+           month = as.integer(lubridate::month(date)),       # Extract month
+           year = as.integer(lubridate::year(date)))         # Extract year
+  
+  # Get the relevant forecast data. From the most recent base_date that came 
+  # before the model_date selected. 
+  forecasts_transformed_dataset <- arrow::open_dataset(ecmwf_forecasts_transformed) |> filter(base_date <= model_dates_selected)
+  relevant_base_date <- forecasts_transformed_dataset |> 
+    select(base_date) |> 
+    distinct() |> 
+    arrange(base_date) |> 
+    pull(base_date, as_vector = TRUE)
+  forecasts_transformed_dataset <- forecasts_transformed_dataset |> filter(base_date == relevant_base_date)
   
   historical_means <- arrow::open_dataset(weather_historical_means) 
   
@@ -85,50 +102,58 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
     message(glue::glue("Processing forecast interval {lead_interval_start}-{lead_interval_end} days out"))
     
     # Get a tibble of all the dates in the anomaly forecast range for the given lead interval
-    model_dates <- tibble(date = seq(from = model_dates_selected + lead_interval_start, to = model_dates_selected + lead_interval_end - 1, by = 1)) |>
-      mutate(doy = as.integer(lubridate::yday(date)),        # Calculate day of year
-             month = month(date),                # Extract month
-             year = year(date),                  # Extract year
-             lead_interval_start = lead_interval_start,        # Store lead interval duration
+    forecast_anomaly <- model_dates |>
+      mutate(lead_interval_start = lead_interval_start,        # Store lead interval duration
              lead_interval_end = lead_interval_end)            # Store lead interval duration
     
     # Join historical means based on day of year (doy)
-    model_dates <- historical_means |> filter(doy >= min(model_dates$doy)) |>
-      right_join(model_dates, by = c("doy"))
+    forecast_anomaly <- historical_means |> filter(doy >= min(model_dates$doy)) |>
+      right_join(model_dates, by = c("doy")) |> relocate(-matches("precipitation|temperature|humidity"))
     
     # Join in forecast data based on x, y, month, and year. 
     # The historical data and forecast data _should_ have the same column 
     # names so differentiate with a suffix
-    model_dates <- model_dates |>
+    forecast_anomaly <- forecast_anomaly |>
       left_join(forecasts_transformed_dataset, by = c("x", "y", "month", "year"), suffix = c("_historical", "_forecast"))
+    
     
     # Summarize by calculating the mean for each variable type (temperature, precipitation, relative_humidity) 
     # and across both historical data and forecast data over the days in the model_dates range
-    model_dates <- model_dates |>
+    forecast_anomaly <- forecast_anomaly |>
       group_by(x, y, lead_interval_start, lead_interval_end) |>
       summarize(across(matches("temperature|precipitation|relative_humidity"), ~mean(.x)), .groups = "drop")
     
+    
     # Calculate temperature anomalies
-    model_dates <- model_dates |>
+    forecast_anomaly <- forecast_anomaly |>
       mutate(anomaly_forecast_temperature = temperature_forecast - temperature_historical,
              anomaly_forecast_scaled_temperature = anomaly_forecast_temperature / temperature_sd_historical)
     
     # Calculate precipitation anomalies
-    model_dates <- model_dates |>
+    forecast_anomaly <- forecast_anomaly |>
       mutate(anomaly_forecast_precipitation = precipitation_forecast - precipitation_historical,
              anomaly_forecast_scaled_precipitation = anomaly_forecast_precipitation / precipitation_sd_historical)
     
     # Calculate relative_humidity anomalies
-    model_dates <- model_dates |>
+    forecast_anomaly <- forecast_anomaly |>
       mutate(anomaly_forecast_relative_humidity = relative_humidity_forecast - relative_humidity_historical,
              anomaly_forecast_scaled_relative_humidity = anomaly_forecast_relative_humidity / relative_humidity_sd_historical)
     
     # Clean up intermediate columns
-    model_dates |> 
+    forecast_anomaly |> 
       mutate(date = model_dates_selected) |> 
-      select(x, y, date, 'lead_interval_start', 'lead_interval_end', starts_with("anomaly")) |>
+      select(x, y, date, doy, month, year, 'lead_interval_start', 'lead_interval_end', starts_with("anomaly")) |>
       collect()
   })
+  
+  # Change forecast lead and start to just forecast weather column and forecast days. Include zero here. I don't think NASA weather is necessary then.
+  forecasts_anomalies <- forecasts_anomalies |>
+    select(-lead_interval_start) # |>
+    # pivot_wider(
+    #   names_from = lead_interval_end,
+    #   values_from = contains("anomaly"),
+    #   names_sep = "_"
+    # )
   
   # Write output to a parquet file
   arrow::write_parquet(forecasts_anomalies, save_filename, compression = "gzip", compression_level = 5)

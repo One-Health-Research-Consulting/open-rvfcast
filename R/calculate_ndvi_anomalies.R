@@ -64,7 +64,10 @@ calculate_ndvi_anomalies <- function(sentinel_ndvi_transformed,
   
   # Remove intermediate columns
   ndvi_transformed_dataset <- ndvi_transformed_dataset |> 
-    select(x, y, date, starts_with("anomaly"))
+    mutate(doy = as.integer(lubridate::yday(date)),          # Calculate day of year
+           month = as.integer(lubridate::month(date)),       # Extract month
+           year = as.integer(lubridate::year(date))) |>      # Extract year
+  select(x, y, date, doy, month, year, starts_with("anomaly"))
   
   # Save as parquet 
   arrow::write_parquet(ndvi_transformed_dataset, save_filename, compression = "gzip", compression_level = 5)

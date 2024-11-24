@@ -77,7 +77,10 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
   
   # Remove intermediate columns
   weather_transformed_dataset <- weather_transformed_dataset |> 
-    select(x, y, date, starts_with("anomaly"))
+    mutate(doy = as.integer(lubridate::yday(date)),          # Calculate day of year
+           month = as.integer(lubridate::month(date)),       # Extract month
+           year = as.integer(lubridate::year(date))) |>      # Extract year
+    select(x, y, date, doy, month, year, starts_with("anomaly"))
   
   # Save as parquet 
   arrow::write_parquet(weather_transformed_dataset, save_filename, compression = "gzip", compression_level = 5)

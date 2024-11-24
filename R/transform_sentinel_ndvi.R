@@ -28,6 +28,7 @@
 transform_sentinel_ndvi <- function(sentinel_ndvi_api_parameters,
                                     continent_raster_template,
                                     sentinel_ndvi_transformed_directory,
+                                    sentinel_ndvi_token_file = "sentinel.token",
                                     overwrite = FALSE,
                                     ...) {
   
@@ -44,11 +45,8 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_api_parameters,
   # Extract start and end dates from the raw downloaded file name
   # naming conventions
   # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-3-synergy/naming-conventions
-  filename_dates <- regmatches(basename(raw_filename), gregexpr("\\d{8}", basename(raw_filename))) |> 
-    unlist() |>
-    map_vec(~as.Date(.x, format = "%Y%m%d"))
-  start_date <- min(filename_dates)
-  end_date <- max(filename_dates)
+  start_date <- sentinel_ndvi_api_parameters$properties$startDate |> as.Date()
+  end_date <-  sentinel_ndvi_api_parameters$properties$completionDate |> as.Date()
   
   sentinel_ndvi_filename <- file.path(sentinel_ndvi_transformed_directory, glue::glue("transformed_sentinel_NDVI_{start_date}_to_{end_date}.gz.parquet"))
   
@@ -59,7 +57,7 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_api_parameters,
   }
   
   # Download raw data
-  sentinel_ndvi_downloaded <- download_sentinel_ndvi(sentinel_ndvi_api_parameters, raw_filename)
+  sentinel_ndvi_downloaded <- download_sentinel_ndvi(sentinel_ndvi_api_parameters, raw_filename, sentinel_ndvi_token_file)
   
   message(paste0("Transforming ", raw_filename))
   
@@ -77,9 +75,9 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_api_parameters,
            days_count = as.integer(end_date - start_date) + 1) |>
     uncount(days_count, .id = "step") |> # This is a pretty cool trick. Very fast.
     mutate(date = start_date + step - 1,
-           doy = lubridate::yday(date),
-           month = lubridate::month(date),
-           year = lubridate::year(date),
+           doy = as.integer(lubridate::yday(date)),
+           month =  as.integer(lubridate::month(date)),
+           year =  as.integer(lubridate::year(date)),
            source = "sentinel") |>
     select(-start_date, -end_date, -step)
   

@@ -1,31 +1,21 @@
-#' Download files from an AWS S3 bucket to a local folder
+#' AWS S3 Bucket File Retrieval
 #'
-#' This function downloads files from a specified S3 bucket and prefix to a local folder.
-#' It only downloads files that are not already present in the local folder.
-#' Additionally, it ensures that AWS credentials and region are set in the environment.
+#' The function retrieves files stored in an AWS S3 bucket to a local folder and removes faulty parquet files.
 #'
-#' @author Nathan Layman
+#' @author Nathan C. Layman
 #'
-#' @param local_folder Character. The path to the local folder where files should be downloaded and the AWS prefix
-#' @param ... 
+#' @param local_folder A string representing the local folder where the files will be downloaded
+#' @param ... additional arguments not used by this function, included for generic function compatibility
 #'
-#' @return A list of files downloaded from AWS
-#' 
-#' @note
-#' The AWS environment variables `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, and `AWS_BUCKET_ID`
-#' must be set correctly in order to access the S3 bucket. If any of these are missing, the function will stop with an error.
-#' Files in the S3 bucket will be deleted if they cannot be successfully read as parquet files.
+#' @return A vector of strings representing the paths of the downloaded files. If no files are found, NULL is returned.
 #'
+#' @note This function requires the AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION environment variables to be set.
+#' Access AWS S3 bucket contents, download files locally, clean faulty data, and return the list of downloaded files.
 #'
 #' @examples
-#' \dontrun{
-#'   # Ensure the AWS environment variables are set in your system or .env file:
-#'   # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, and AWS_BUCKET_ID
+#' # Ensure to set AWS environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION)
+#' AWS_get_folder(local_folder = "./data")
 #'
-#'   # Download files from an S3 bucket folder to a local directory
-#'   downloaded_files <- AWS_get_folder("my/local/folder")
-#' }
-#' 
 #' @export
 AWS_get_folder <- function(local_folder, ...) {
   
@@ -108,31 +98,28 @@ AWS_get_folder <- function(local_folder, ...) {
 }
 
 
-#' Upload and Sync Files with AWS S3
+#' Upload Transformed Files to AWS
 #'
-#' This function synchronizes a local folder with an AWS S3 bucket. It checks for AWS credentials, 
-#' lists existing files in the S3 bucket, and compares them with the local files to upload new files
-#' or remove files that are no longer needed.
-#' 
-#' @author Nathan Layman
+#' This function uploads transformed files to AWS given a list of files and a target local folder. It supports continuation token for handling large quantities of files. It also checks for existing files on AWS and in local folder before upload, providing informative messages about the uploading process.
 #'
-#' @param transformed_file_list A character vector of file paths that should be present on AWS S3.
-#' @param local_folder A character string specifying the path to the local folder to be synced with AWS S3.
+#' @author Nathan C. Layman
+#'
+#' @param transformed_file_list A character vector of filenames that have been transformed and are to be uploaded to AWS S3. Filenames should be base names, not full paths.
+#' @param local_folder A character string indicating the local directory that contains the transformed files to be uploaded to AWS S3.
+#' @param ... Additional arguments not used by this function.
+#'
+#' @return A character vector of messages indicating the outcomes of trying to upload each file in the transformed_file_list to AWS.
+#'
+#' @note The function uses AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION environment variables to access AWS. These should be set prior to running this function.
 #'
 #' @examples
-#' \dontrun{
-#'   AWS_put_files(transformed_file_list = c("file1.parquet", "file2.parquet"), 
-#'                  local_folder = "path/to/local/folder")
-#' }
-#'
-#' @return A list of actions taken
+#' AWS_put_files(transformed_file_list = c("file1.csv", "file2.csv"), 
+#'               local_folder = "./transformed_data")
 #'
 #' @export
 AWS_put_files <- function(transformed_file_list,
                           local_folder,
                           ...) {
-  
-  transformed_file_list <- basename(transformed_file_list |> unlist())
   
   # Check if AWS credentials and region are set in the environment
   if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
@@ -166,10 +153,10 @@ AWS_put_files <- function(transformed_file_list,
   }
   
   # Get files in local folder
-  local_folder_files <- list.files(path = local_folder, recursive = TRUE)
+  local_folder_files <- list.files(path = local_folder, recursive = TRUE, full.names = T)
   
   # Collect outcomes
-  outcome <- c()
+  outcomes <- c()
   
   # Walk through local_folder_files
   for(file in local_folder_files) {
@@ -177,36 +164,33 @@ AWS_put_files <- function(transformed_file_list,
     # Is the file in the transformed_file_list?
     if(file %in% transformed_file_list) {
       
-      # Is the file already on AWS?
-      if(file %in% s3_files) {
-        
-        outcome <- c(outcome, glue::glue("{file} already present on AWS"))
-        
-      } else {
-        
-        outcome <- c(outcome, glue::glue("Uploading {file} to AWS"))
-        
-        # Put the file on S3
-        s3_upload <- s3$put_object(
-          Body = file.path(local_folder, file),
-          Bucket = Sys.getenv("AWS_BUCKET_ID"),
-          Key = file.path(local_folder, file))
-      }
+      # Put the file on S3
+      s3_upload <- s3$put_object(
+        Body = file,
+        Bucket = Sys.getenv("AWS_BUCKET_ID"),
+        Key = file)
+      
+      outcome <- glue::glue("Uploading {file} to AWS")
+      
     } else {
       
       # Remove the file from AWS if it's present in the folder and on AWS
       # but not in the list of successfully transformed files. This file is
       # not relevant to the pipeline
-      if(file.path(local_folder, file) %in% s3_files) {
+      if(file %in% s3_files) {
         
-        outcome <- c(outcome, glue::glue("Cleaning up dangling file {file} from AWS"))
+        outcome <- glue::glue("Cleaning up dangling file {file} from AWS")
         
         # Remove the file from AWS
         s3_delete_receipt <- s3$delete_object(
-          Bucket = Sys.getenv("AWS_BUCKET_ID"),
+          Bucket  = Sys.getenv("AWS_BUCKET_ID"),
           Key = file.path(local_folder, file))
+      } else {
+        next
       }
     }
+    message(outcome)
+    outcomes <- c(outcomes, outcome)
   }
   
   outcome
