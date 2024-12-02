@@ -13,6 +13,13 @@ aws_bucket = Sys.getenv("AWS_BUCKET_ID")
 # Targets options
 source("_targets_settings.R")
 
+# Convenience function to format .env flags properly for overwrite parameter and target cues
+parse_flag <- function(flag, cue = F) {
+  flag <- as.logical(Sys.getenv(flag, unset = "FALSE"))
+  if(cue) flag <- ifelse(flag, "always", "thorough")
+  flag
+}
+
 # Every major data target returns a list of parquet file names. Those can then be 
 # combined and opened using arrow::open_dataset which allows a lot of operations 
 # to be performed on the data without loading it all into memory. See 
@@ -469,6 +476,38 @@ dynamic_targets <- tar_plan(
                                                               modis_ndvi_transformed_directory),
              error = "null"),
   
+  # Combine Sentinel an MODIS ndvi data and interopolate to daily interval
+  # Check if modis_ndvi files already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(ndvi_transformed_directory, 
+             create_data_directory(directory_path = "data/ndvi_transformed")),
+  
+  tar_target(ndvi_transformed_AWS, AWS_get_folder(ndvi_transformed_directory,
+                                                  modis_ndvi_transformed,
+                                                  sentinel_ndvi_transformed,
+                                                  model_dates_selected),
+             error = "null",
+             cue = tar_cue("always")),
+  
+  tar_target(ndvi_years, lubridate::year(modis_task_end_dates)),
+  
+  # Combine modis and sentinel datasets into a single source for lagging
+  tar_target(ndvi_transformed, transform_ndvi(modis_ndvi_transformed,
+                                              sentinel_ndvi_transformed,
+                                              ndvi_transformed_directory,
+                                              model_dates_selected,
+                                              overwrite = parse_flag("OVERWRITE_MODIS_NDVI") | parse_flag("OVERWRITE_SENTINEL_NDVI")),
+             pattern = map(ndvi_years),
+             format = "file",
+             repository = "local",
+             error = "null"),
+  
+  # Put ndvi_transformed files on AWS
+  tar_target(ndvi_transformed_AWS_upload, AWS_put_files(ndvi_transformed,
+                                                        ndvi_transformed_directory),
+             error = "null"),
+
+  
   # NASA POWER recorded weather -----------------------------------------------------------
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
   # T2M             MERRA-2 Temperature at 2 Meters (C) ;
@@ -509,6 +548,9 @@ dynamic_targets <- tar_plan(
              error = "null"),
   
   
+  # How many months out are we forecasting?
+  tar_target(ecmwf_lead_months, seq(1,6)),
+  
   # ECMWF Weather Forecast data -----------------------------------------------------------
   tar_target(ecmwf_forecasts_transformed_directory, 
              create_data_directory(directory_path = "data/ecmwf_forecasts_transformed")),
@@ -516,11 +558,11 @@ dynamic_targets <- tar_plan(
   # set branching for ecmwf download
   # Note: Neet to auto update years here.
   tar_target(ecmwf_forecasts_api_parameters, set_ecmwf_api_parameter(start_year = 2005,
-                                                                     bbox_coords = sf::st_bbox(continent_polygon),
+                                                                     bbox_coords = sf::st_bbox(terra::rast(continent_raster_template)),
                                                                      variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
                                                                      # product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
                                                                      product_types = c("monthly_mean"),
-                                                                     leadtime_months = c("1", "2", "3", "4", "5", "6")),
+                                                                     lead_months = ecmwf_lead_months),
              cue = tar_cue("always")),
   
   # Check if ecmwf files already exists on AWS and can be loaded
@@ -536,18 +578,19 @@ dynamic_targets <- tar_plan(
   # and may need to be run more than once if rebuilding data from scratch 
   # because it's also prone to random failures. Expected parquet file size
   # is ~100MB.
+  # If this target fails it could be the API is down. Check status at https://status.ecmwf.int/
   # TODO: NAs outside of the continent
   tar_target(ecmwf_forecasts_transformed, 
              transform_ecmwf_forecasts(ecmwf_forecasts_api_parameters,
                                        local_folder = ecmwf_forecasts_transformed_directory,
                                        continent_raster_template,
-                                       overwrite = as.logical(Sys.getenv("OVERWRITE_ECMWF_FORECASTS", unset = "FALSE")),
+                                       overwrite = parse_flag("OVERWRITE_ECMWF_FORECASTS"),
                                        get_ecmwf_forecasts_AWS), # Enforce Dependency
              pattern = map(ecmwf_forecasts_api_parameters),
              error = "null",
              format = "file",
              repository = "local",
-             cue = tar_cue("always")),
+             cue = tar_cue(parse_flag("OVERWRITE_ECMWF_FORECASTS", cue = T))),
   
   # Next step put modis_ndvi_transformed files on AWS.
   tar_target(ecmwf_forecasts_transformed_AWS_upload, AWS_put_files(ecmwf_forecasts_transformed,
@@ -560,9 +603,14 @@ dynamic_targets <- tar_plan(
 # Why are we subsetting here again?
 data_targets <- tar_plan(
   
-  tar_target(lag_intervals, c(30, 60, 90)), 
-  tar_target(lead_intervals, c(30, 60, 90, 120, 150)), 
-  tar_target(days_of_year, 1:365),
+  # How far back should we look for lagged responses?
+  # These will be the mean conditions 0-30 days back, 30-60 days back, and 60-90 days back
+  # Must start with zero.
+  tar_target(lag_intervals, c(0, 30, 60, 90)), 
+  
+  # How far out are we forecasting?
+  # 0-30, 30-60, 60-90 days out ect...
+  tar_target(forecast_intervals, c(0, 30, 60, 90, 120, 150)), 
   
   # NCL: This function produces a random sampling of n_per_month dates for every month
   # in every year between start_year and end_year. If a new year is added, the 
@@ -570,7 +618,6 @@ data_targets <- tar_plan(
   tar_target(model_dates_selected, set_model_dates(start_year = 2005, 
                                                    end_year = lubridate::year(Sys.time()), 
                                                    n_per_month = 2, 
-                                                   lag_intervals, 
                                                    seed = 212)
   ),
   
@@ -581,9 +628,6 @@ data_targets <- tar_plan(
   # Check if weather_historical_means parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(weather_historical_means_AWS, AWS_get_folder(weather_historical_means_directory,
-                                                          days_of_year, # Enforce dependency
-                                                          lag_intervals, # Enforce dependency
-                                                          lead_intervals, # Enforce dependency
                                                           nasa_weather_transformed),
              error = "null",
              cue = tar_cue("always")), # Enforce dependency
@@ -607,7 +651,6 @@ data_targets <- tar_plan(
   tar_target(weather_anomalies_AWS, AWS_get_folder(weather_anomalies_directory,
                                                    weather_historical_means, # Enforce dependency
                                                    model_dates_selected, # Enforce dependency
-                                                   lag_intervals, # Enforce dependency
                                                    nasa_weather_transformed),
              error = "null",
              cue = tar_cue("always")), # Enforce dependency
@@ -639,7 +682,6 @@ data_targets <- tar_plan(
   tar_target(forecasts_anomalies_AWS, AWS_get_folder(forecasts_anomalies_directory,
                                                      weather_historical_means, # Enforce dependency
                                                      model_dates_selected, # Enforce dependency
-                                                     lead_intervals, # Enforce dependency
                                                      ecmwf_forecasts_transformed),
              error = "null",
              cue = tar_cue("always")), # Enforce dependency
@@ -654,7 +696,7 @@ data_targets <- tar_plan(
   # forecasts_anomalies |>
   #   collect() |>
   #   select(-contains("start")) |> 
-  #   pivot_wider(names_from = lead_interval_end,
+  #   pivot_wider(names_from = forecast_intervals_end,
   #               values_from = starts_with("anomaly_forecast"),
   #               names_sep = "_")
 
@@ -662,7 +704,7 @@ data_targets <- tar_plan(
                                                                 weather_historical_means,
                                                                 forecasts_anomalies_directory,
                                                                 model_dates_selected,
-                                                                lead_intervals,
+                                                                forecast_intervals,
                                                                 overwrite = as.logical(Sys.getenv("OVERWRITE_FORECAST_ANOMALIES", unset = "FALSE")),
                                                                 ecmwf_forecasts_transformed,# Enforce dependency
                                                                 forecasts_anomalies_AWS), # Enforce dependency
@@ -687,6 +729,8 @@ data_targets <- tar_plan(
              error = "null",
              cue = tar_cue("always")), # Enforce dependency
   
+  # NCL NOTE: MAKE NDVI TRANSFORMED THAT DOES THE STEP INTERPOLATION AND COMBINES NDVI SOURCES
+  # FEED THAT INTO ANOMALIES. WE NEED IT SEPARATE TO DO LAGS.
   tar_target(ndvi_historical_means, calculate_ndvi_historical_means(sentinel_ndvi_transformed,
                                                                     modis_ndvi_transformed,
                                                                     ndvi_historical_means_directory,
@@ -708,13 +752,11 @@ data_targets <- tar_plan(
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(ndvi_anomalies_AWS, AWS_get_folder(ndvi_anomalies_directory,
                                                 ndvi_historical_means, # Enforce dependency
-                                                model_dates_selected, # Enforce dependency
-                                                lag_intervals),
+                                                model_dates_selected), # Enforce dependency
              error = "null",
              cue = tar_cue("always")), # Enforce dependency
   
-  tar_target(ndvi_anomalies, calculate_ndvi_anomalies(sentinel_ndvi_transformed,
-                                                      modis_ndvi_transformed,
+  tar_target(ndvi_anomalies, calculate_ndvi_anomalies(ndvi_transformed,
                                                       ndvi_historical_means,
                                                       ndvi_anomalies_directory,
                                                       model_dates_selected,
@@ -730,6 +772,32 @@ data_targets <- tar_plan(
                                                       ndvi_anomalies_directory),
              error = "null"),
   
+  # Get lagged ndvi data
+  tar_target(ndvi_transformed_lagged_directory, 
+             create_data_directory(directory_path = "data/ndvi_transformed_lagged")),
+  
+  tar_target(ndvi_transformed_lagged_AWS, AWS_get_folder(ndvi_transformed_lagged_directory,
+                                                         ndvi_historical_means, # Enforce dependency
+                                                         model_dates_selected), # Enforce dependency
+             error = "null",
+             cue = tar_cue("always")), # Enforce dependency
+  
+  tar_target(ndvi_transformed_lagged, lag_data(ndvi_transformed,
+                                               lag_intervals,
+                                               model_dates_selected,
+                                               overwrite = TRUE,
+                                               ndvi_transformed_lagged_AWS), # Enforce dependency
+             pattern = map(model_dates_selected),
+             error = "null",
+             format = "file", 
+             repository = "local"),  
+  
+  # Next step put ndvi_historical_means files on AWS.
+  tar_target(ndvi_transformed_lagged_AWS_upload, AWS_put_files(ndvi_anomalies,
+                                                      ndvi_anomalies_directory),
+             error = "null"),
+  
+  
   tar_target(augmented_data_directory,
              create_data_directory(directory_path = "data/augmented_data")),
   
@@ -740,6 +808,14 @@ data_targets <- tar_plan(
              error = "null",
              cue = tar_cue("always")), # Enforce dependency
 
+  
+  # Notes: This data will be aggregated. Mean monthly anomaly lagged 1, 2, 3 months back
+  # Current date, lagged ndvi and weather anomalies, current ndvi and weather anomalies, forecast anomaly
+  # over forecast interval. Forecast interval Response is number of outbreaks (or cases?) over forecast interval
+  # so count data and poisson model. Then we have multiple forecast intervals we're working on. 0-30, 30-60, 60-90, ect..
+  # We can get a rate for each interval and use simulation to determine the probability of no outbreaks across
+  # combined interval and error probability no outbreaks in each interval is (1-e^-lambda)
+  
   # Combine all static and dynamic data layers by x, y, date, or doy
   # Partition to complete dataset out into separate parquet files by year.
   tar_target(augmented_data, list(response = rvf_outbreaks,
@@ -754,9 +830,9 @@ data_targets <- tar_plan(
                                   dynamic_layers = c(weather_historical_means, # Good to join
                                                      ndvi_historical_means, # Good to join
                                                      ecmwf_forecasts_transformed, # Good to join
-                                                     weather_anomalies, # Good to join
+                                                     weather_anomalies, # Add in lagged anomalies lag_anomaly()
                                                      forecasts_anomalies, # Need to add month and year as integer for partitioning
-                                                     ndvi_anomalies)) |> ## Good to join
+                                                     ndvi_anomalies)) |> # Add in lagged anomalies
                unlist() |>
                arrow::open_dataset(unify_schemas = T) |>
                arrow::write_dataset(partitioning = c("year", "month")), 

@@ -83,7 +83,6 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
         dataset_short_name = "seasonal-monthly-single-levels",
         target = basename(raw_file)
       )
-      
     })
     
     ecmwfr::wf_set_key(user = Sys.getenv("ECMWF_USERID"), key = Sys.getenv("ECMWF_TOKEN"))
@@ -113,7 +112,7 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   # Here mean refers to taking the average of the values within a grid cell.
   # The mean operation performed within extract_grib_data averages across the forecast ensemble
   grib_data <- pmap_dfr(raw_files, function(product_type, variable, raw_file) {
-    extract_grib_data(raw_file, continent_raster_template) |> mutate(variable = variable)
+    extract_grib_data(raw_file, template = continent_raster_template) |> mutate(variable = variable)
   })
   
   message(glue::glue("ecmwf_seasonal_forecast_{month}_{year} metadata successfully read."))
@@ -137,6 +136,7 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
                                    month = as.integer(lubridate::month(base_date)), # Base month
                                    year = as.integer(lubridate::year(base_date)), # Base year
                                    lead_month = as.integer(lubridate::month(forecast_end_date - 1)),
+                                   lead_year = as.integer(lubridate::year(forecast_end_date - 1)),
                                    variable = fct_recode(variable,
                                                          dewpoint = "2m_dewpoint_temperature",
                                                          temperature = "2m_temperature",
@@ -144,7 +144,7 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   
   # Calculate relative humidity from temperature and dewpoint temperature
   grib_data <- grib_data |> 
-    select(x, y, base_date, month, year, lead_months, mean, sd, variable) |>
+    select(x, y, base_date, month, year, lead_month, lead_year, mean, sd, variable) |>
     pivot_wider(names_from = variable, values_from = c(mean, sd), names_glue = "{variable}_{.value}") |> # Reshape to make it easier to calculate composite values like relative humidity
     mutate(
   

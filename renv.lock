@@ -803,7 +803,7 @@
     },
     "ecmwfr": {
       "Package": "ecmwfr",
-      "Version": "2.0.0",
+      "Version": "2.0.2",
       "Source": "Repository",
       "Repository": "RSPM",
       "Requirements": [
@@ -814,7 +814,7 @@
         "keyring",
         "memoise"
       ],
-      "Hash": "e71cf10e6459dcfe7ca75b277ad05c2d"
+      "Hash": "83dca0f4fcaf5ad42d514819511a6884"
     },
     "ellipsis": {
       "Package": "ellipsis",

@@ -10,7 +10,7 @@
 #' @param bbox_coords The bounding box coordinates for the location for which the data are to be retrieved.
 #' @param variables The variables to retrieve from the API; default are '2m_dewpoint_temperature', '2m_temperature', and 'total_precipitation'.
 #' @param product_types The type of data product to retrieve; default are 'monthly_mean', 'monthly_maximum', 'monthly_minimum', 'monthly_standard_deviation'.
-#' @param leadtime_months The lead times in months for which the forecasts are made; default are '1', '2', '3', '4', '5', '6'.
+#' @param lead_months The lead times in months for which the forecasts are made; default are '1', '2', '3', '4', '5', '6'.
 #'
 #' @return A tibble containing the set parameters.
 #'
@@ -21,13 +21,13 @@
 #'                         bbox_coords = c(50.8503, 4.3517), 
 #'                         variables = c("2m_temperature", "total_precipitation"),
 #'                         product_types = c("monthly_mean", "monthly_maximum"),
-#'                         leadtime_months = c("1", "2", "3"))
+#'                         lead_months = c("1", "2", "3"))
 #'
 set_ecmwf_api_parameter <- function(start_year = 2005,
                                     bbox_coords = continent_bounding_box,
                                     variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
                                     product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
-                                    leadtime_months = c("1", "2", "3", "4", "5", "6")) {
+                                    lead_months = seq(1,6)) {
 
   
   # API details from:
@@ -84,5 +84,5 @@ set_ecmwf_api_parameter <- function(start_year = 2005,
     mutate(spatial_bounds = list(spatial_bounds)) |> 
     mutate(variables = list(variables)) |> 
     mutate(product_types = list(product_types)) |> 
-    mutate(leadtime_months = list(leadtime_months))
+    mutate(leadtime_months = list(as.character(lead_months)))
 }

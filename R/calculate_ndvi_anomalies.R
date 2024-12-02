@@ -24,8 +24,7 @@
 #' 'historical_means', '/directory_path/', 'model_date', overwrite = TRUE)
 #'
 #' @export> 
-calculate_ndvi_anomalies <- function(sentinel_ndvi_transformed,
-                                     modis_ndvi_transformed,
+calculate_ndvi_anomalies <- function(ndvi_transformed,
                                      ndvi_historical_means,
                                      ndvi_anomalies_directory,
                                      model_dates_selected,
@@ -48,7 +47,7 @@ calculate_ndvi_anomalies <- function(sentinel_ndvi_transformed,
   }
   
   # Open dataset to transformed data
-  ndvi_transformed_dataset <- arrow::open_dataset(c(sentinel_ndvi_transformed, modis_ndvi_transformed)) |> 
+  ndvi_transformed_dataset <- arrow::open_dataset(ndvi_transformed) |> 
     filter(date == model_dates_selected)
   
   # Open dataset to historical ndvi data

@@ -87,7 +87,8 @@ transform_modis_ndvi <- function(modis_ndvi_token,
            doy = as.integer(lubridate::yday(date)),
            month = as.integer(lubridate::month(date)),
            year = as.integer(lubridate::year(date)),
-           source = "modis")
+           source = "modis") |>
+    select(-step)
   
   # Save transformed rast as parquet
   arrow::write_parquet(transformed_raster, transformed_file, compression = "gzip", compression_level = 5)
