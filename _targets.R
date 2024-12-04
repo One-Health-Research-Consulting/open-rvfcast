@@ -571,7 +571,7 @@ dynamic_targets <- tar_plan(
                                                      ecmwf_forecasts_api_parameters, # Enforce Dependency
                                                      continent_raster_template),
              error = "null",
-             cue = tar_cue("never")), # Enforce Dependency
+             cue = tar_cue("always")), # Enforce Dependency
   
   # Download ecmwf forecasts, project to the template and save as arrow dataset
   # Note: This target takes a while (mostly because the ECMWF API is slow)

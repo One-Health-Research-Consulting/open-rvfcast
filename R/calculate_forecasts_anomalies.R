@@ -151,7 +151,7 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
     # Regenerate month and year
     forecast_anomaly <- forecast_anomaly |> 
       mutate(date = model_dates_selected,
-             doy = lubridate::ymd(date),
+             doy = lubridate::yday(date),
              month = lubridate::month(date),
              year = lubridate::year(date),
              forecast_interval = lead_interval_end) |> 
