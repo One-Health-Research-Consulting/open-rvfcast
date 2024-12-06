@@ -793,18 +793,42 @@ data_targets <- tar_plan(
              repository = "local"),  
   
   # Next step put ndvi_historical_means files on AWS.
-  tar_target(ndvi_transformed_lagged_AWS_upload, AWS_put_files(ndvi_anomalies,
-                                                      ndvi_anomalies_directory),
+  tar_target(ndvi_transformed_lagged_AWS_upload, AWS_put_files(ndvi_transformed_lagged,
+                                                               ndvi_transformed_lagged_directory),
+             error = "null"),
+  
+  # Get lagged weather data
+  tar_target(nasa_weather_transformed_lagged_directory, 
+             create_data_directory(directory_path = "data/nasa_weather_transformed_lagged")),
+  
+  tar_target(nasa_weather_transformed_lagged_AWS, AWS_get_folder(nasa_weather_transformed_lagged_directory,
+                                                                 nasa_weather_transformed_historical_means, # Enforce dependency
+                                                                 model_dates_selected), # Enforce dependency
+             error = "null",
+             cue = tar_cue("always")), # Enforce dependency
+  
+  tar_target(nasa_weather_transformed_lagged, lag_data(nasa_weather_transformed,
+                                               lag_intervals,
+                                               model_dates_selected,
+                                               overwrite = TRUE,
+                                               nasa_weather_transformed_lagged_AWS), # Enforce dependency
+             pattern = map(model_dates_selected),
+             error = "null",
+             format = "file", 
+             repository = "local"),  
+  
+  # Next step put ndvi_historical_means files on AWS.
+  tar_target(nasa_weather_transformed_lagged_AWS_upload, AWS_put_files(nasa_weather_transformed_lagged,
+                                                                       nasa_weather_transformed_lagged_directory),
              error = "null"),
   
   
-  tar_target(augmented_data_directory,
-             create_data_directory(directory_path = "data/augmented_data")),
+  tar_target(explanatory_variables_directory,
+             create_data_directory(directory_path = "data/explanatory_variables")),
   
   # Check if ndvi_anomalies_AWS parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
-  tar_target(augmented_data_AWS, AWS_get_folder(augmented_data_directory,
-                                                augmented_data_sources),
+  tar_target(explanatory_variables_AWS, AWS_get_folder(explanatory_variables_directory),
              error = "null",
              cue = tar_cue("always")), # Enforce dependency
 
@@ -816,31 +840,37 @@ data_targets <- tar_plan(
   # We can get a rate for each interval and use simulation to determine the probability of no outbreaks across
   # combined interval and error probability no outbreaks in each interval is (1-e^-lambda)
   
-  # Combine all static and dynamic data layers by x, y, date, or doy
-  # Partition to complete dataset out into separate parquet files by year.
-  tar_target(augmented_data, list(response = rvf_outbreaks,
-                                  outbreak_history_layers = wahis_outbreak_history, # Good to join
-                                  static_layers = c(soil_preprocessed, # Good to join
-                                                    aspect_preprocessed, # Good to join
-                                                    slope_preprocessed, # Good to join
-                                                    glw_preprocessed, # Good to join
-                                                    elevation_preprocessed, # Good to join
-                                                    bioclim_preprocessed, # Good to join
-                                                    landcover_preprocessed), # Good to join
-                                  dynamic_layers = c(weather_historical_means, # Good to join
-                                                     ndvi_historical_means, # Good to join
-                                                     ecmwf_forecasts_transformed, # Good to join
-                                                     weather_anomalies, # Add in lagged anomalies lag_anomaly()
-                                                     forecasts_anomalies, # Need to add month and year as integer for partitioning
-                                                     ndvi_anomalies)) |> # Add in lagged anomalies
-               unlist() |>
-               arrow::open_dataset(unify_schemas = T) |>
-               arrow::write_dataset(partitioning = c("year", "month")), 
-             repository = "local"),
+  # Combine all static and dynamic data layers.
+  # Partition into separate parquet files by month and year.
+  tar_target(explanatory_variable_sources, tribble(
+    ~type,                 ~name,                                ~list_of_files,
+    "static",              "soil_preprocessed",                   soil_preprocessed,
+    "static",              "aspect_preprocessed",                 aspect_preprocessed,
+    "static",              "slope_preprocessed",                  slope_preprocessed,
+    "static",              "glw_preprocessed",                    glw_preprocessed,
+    "static",              "elevation_preprocessed",              elevation_preprocessed,
+    "static",              "bioclim_preprocessed",                bioclim_preprocessed,
+    "static",              "landcover_preprocessed",              landcover_preprocessed,
+    "historical_mean",     "weather_historical_means",            weather_historical_means,
+    "historical_mean",     "ndvi_historical_means",               ndvi_historical_means,
+    "dynamic",             "wahis_outbreak_history",              wahis_outbreak_history,
+    "dynamic",             "ecmwf_forecasts_transformed",         ecmwf_forecasts_transformed,
+    "dynamic",             "weather_anomalies",                   weather_anomalies,
+    "dynamic",             "forecasts_anomalies",                 forecasts_anomalies,
+    "dynamic",             "ndvi_anomalies",                      ndvi_anomalies
+   # "dynamic",             "ndvi_transformed_lagged",             ndvi_transformed_lagged,
+    #"dynamic",             "nasa_weather_transformed_lagged",     nasa_weather_transformed_lagged
+  )),
+  
+  # Join all explanatory variable data sources using file based partitioning instead of hive
+  tar_target(explanatory_variables, join_data_sources(sources = explanatory_variable_sources,
+                                                      path = explanatory_variables_directory,
+                                                      basename_template = "explanatory_variable.parquet")
+             ),
 
   # Next step put combined_anomalies files on AWS.
-  tar_target(augmented_data_AWS_upload, AWS_put_files(augmented_data,
-                                                      augmented_data_directory),
+  tar_target(explanatory_variables_AWS_upload, AWS_put_files(explanatory_variables,
+                                                             augmented_data_directory),
              error = "null"),
 
 )
