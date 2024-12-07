@@ -14,10 +14,10 @@ aws_bucket = Sys.getenv("AWS_BUCKET_ID")
 source("_targets_settings.R")
 
 # Convenience function to format .env flags properly for overwrite parameter and target cues
-parse_flag <- function(flag, cue = F) {
-  flag <- as.logical(Sys.getenv(flag, unset = "FALSE"))
-  if(cue) flag <- ifelse(flag, "always", "thorough")
-  flag
+parse_flag <- function(flags, cue = F) {
+  flags <- any(as.logical(Sys.getenv(flags, unset = "FALSE")))
+  if(cue) flags <- tar_cue(ifelse(flags, "always", "thorough"))
+  flags
 }
 
 # Every major data target returns a list of parquet file names. Those can then be 
@@ -495,12 +495,13 @@ dynamic_targets <- tar_plan(
   tar_target(ndvi_transformed, transform_ndvi(modis_ndvi_transformed,
                                               sentinel_ndvi_transformed,
                                               ndvi_transformed_directory,
-                                              model_dates_selected,
-                                              overwrite = parse_flag("OVERWRITE_MODIS_NDVI") | parse_flag("OVERWRITE_SENTINEL_NDVI")),
+                                              ndvi_years,
+                                              overwrite = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED"))),
              pattern = map(ndvi_years),
              format = "file",
              repository = "local",
-             error = "null"),
+             error = "null",
+             cue = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED"), cue = T)),
   
   # Put ndvi_transformed files on AWS
   tar_target(ndvi_transformed_AWS_upload, AWS_put_files(ndvi_transformed,
@@ -590,7 +591,7 @@ dynamic_targets <- tar_plan(
              error = "null",
              format = "file",
              repository = "local",
-             cue = tar_cue(parse_flag("OVERWRITE_ECMWF_FORECASTS", cue = T))),
+             cue = parse_flag("OVERWRITE_ECMWF_FORECASTS", cue = T)),
   
   # Next step put modis_ndvi_transformed files on AWS.
   tar_target(ecmwf_forecasts_transformed_AWS_upload, AWS_put_files(ecmwf_forecasts_transformed,
@@ -665,7 +666,8 @@ data_targets <- tar_plan(
              pattern = map(model_dates_selected),
              error = "null",
              format = "file", 
-             repository = "local"),  
+             repository = "local",
+             cue = parse_flag("OVERWRITE_WEATHER_ANOMALIES", cue = T)),  
   
   # Next step put weather_historical_means files on AWS.
   tar_target(weather_anomalies_AWS_upload, AWS_put_files(weather_anomalies,
@@ -711,7 +713,8 @@ data_targets <- tar_plan(
              pattern = map(model_dates_selected),
              error = "null",
              format = "file", 
-             repository = "local"), 
+             repository = "local",
+             cue = parse_flag("OVERWRITE_FORECAST_ANOMALIES", cue = T)), 
   
   # Next step put weather_historical_means files on AWS.
   tar_target(forecasts_anomalies_AWS_upload, AWS_put_files(forecasts_anomalies, 
@@ -765,7 +768,8 @@ data_targets <- tar_plan(
              pattern = map(model_dates_selected),
              error = "null",
              format = "file", 
-             repository = "local"),  
+             repository = "local",
+             cue = parse_flag("OVERWRITE_NDVI_ANOMALIES", cue = T)),  
   
   # Next step put ndvi_historical_means files on AWS.
   tar_target(ndvi_anomalies_AWS_upload, AWS_put_files(ndvi_anomalies,
@@ -835,7 +839,7 @@ data_targets <- tar_plan(
   
   # Notes: This data will be aggregated. Mean monthly anomaly lagged 1, 2, 3 months back
   # Current date, lagged ndvi and weather anomalies, current ndvi and weather anomalies, forecast anomaly
-  # over forecast interval. Forecast interval Response is number of outbreaks (or cases?) over forecast interval
+  # over forecast interval. Forecast interval. Response is number of outbreaks (or cases?) over forecast interval
   # so count data and poisson model. Then we have multiple forecast intervals we're working on. 0-30, 30-60, 60-90, ect..
   # We can get a rate for each interval and use simulation to determine the probability of no outbreaks across
   # combined interval and error probability no outbreaks in each interval is (1-e^-lambda)
@@ -851,22 +855,23 @@ data_targets <- tar_plan(
     "static",              "elevation_preprocessed",              elevation_preprocessed,
     "static",              "bioclim_preprocessed",                bioclim_preprocessed,
     "static",              "landcover_preprocessed",              landcover_preprocessed,
-    "historical_mean",     "weather_historical_means",            weather_historical_means,
-    "historical_mean",     "ndvi_historical_means",               ndvi_historical_means,
     "dynamic",             "wahis_outbreak_history",              wahis_outbreak_history,
     "dynamic",             "ecmwf_forecasts_transformed",         ecmwf_forecasts_transformed,
     "dynamic",             "weather_anomalies",                   weather_anomalies,
     "dynamic",             "forecasts_anomalies",                 forecasts_anomalies,
-    "dynamic",             "ndvi_anomalies",                      ndvi_anomalies
-   # "dynamic",             "ndvi_transformed_lagged",             ndvi_transformed_lagged,
-    #"dynamic",             "nasa_weather_transformed_lagged",     nasa_weather_transformed_lagged
+    "dynamic",             "ndvi_anomalies",                      ndvi_anomalies,
+    # "dynamic",             "ndvi_transformed_lagged",             ndvi_transformed_lagged,
+    # "dynamic",             "nasa_weather_transformed_lagged",     nasa_weather_transformed_lagged
+    # "historical_mean",     "weather_historical_means",            weather_historical_means, # doy joins must come last
+    # "historical_mean",     "ndvi_historical_means",               ndvi_historical_means
   )),
   
   # Join all explanatory variable data sources using file based partitioning instead of hive
   tar_target(explanatory_variables, join_data_sources(sources = explanatory_variable_sources,
                                                       path = explanatory_variables_directory,
-                                                      basename_template = "explanatory_variable.parquet")
-             ),
+                                                      basename_template = "explanatory_variable.parquet",
+                                                      years = nasa_weather_years,
+                                                      months = 1:12)),
 
   # Next step put combined_anomalies files on AWS.
   tar_target(explanatory_variables_AWS_upload, AWS_put_files(explanatory_variables,
