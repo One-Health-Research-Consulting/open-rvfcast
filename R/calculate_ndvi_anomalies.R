@@ -50,8 +50,10 @@ calculate_ndvi_anomalies <- function(ndvi_transformed,
   ndvi_transformed_dataset <- arrow::open_dataset(ndvi_transformed) |> 
     filter(date == model_dates_selected)
   
+  model_date_doy <- lubridate::yday(model_dates_selected)
+  
   # Open dataset to historical ndvi data
-  historical_means <- arrow::open_dataset(ndvi_historical_means) |> filter(doy == lubridate::yday(model_dates_selected)) 
+  historical_means <- arrow::open_dataset(ndvi_historical_means) |> filter(doy == model_date_doy) 
   
   # Join the two datasets by day of year (doy)
   ndvi_transformed_dataset <- left_join(ndvi_transformed_dataset, historical_means, by = c("x","y","doy"), suffix = c("", "_historical"))
@@ -66,7 +68,8 @@ calculate_ndvi_anomalies <- function(ndvi_transformed,
     mutate(doy = as.integer(lubridate::yday(date)),          # Calculate day of year
            month = as.integer(lubridate::month(date)),       # Extract month
            year = as.integer(lubridate::year(date))) |>      # Extract year
-  select(x, y, date, doy, month, year, starts_with("anomaly"))
+  select(x, y, date, doy, month, year, starts_with("anomaly")) |>
+    collect()
   
   # Save as parquet 
   arrow::write_parquet(ndvi_transformed_dataset, save_filename, compression = "gzip", compression_level = 5)

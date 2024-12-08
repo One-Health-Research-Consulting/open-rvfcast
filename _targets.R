@@ -443,10 +443,15 @@ dynamic_targets <- tar_plan(
   # when we go to forecast. Right now we're just using step function 
   # interpolation where the NDVI value is constant for the entire 16-day period, 
   # then it steps up or down to the next interval's NDVI value.
+  
+  # NCL: 
   tarchetypes::tar_group_size(name = modis_ndvi_requests, 
                               size = 10,
                               command = modis_ndvi_bundle_request |>
                                 arrange(start_date) |>
+                                group_by(sha256) |> # Remove duplicate file requests
+                                slice_max(created, n = 1) |> 
+                                ungroup() |>
                                 mutate(end_date = lead(start_date) - days(1),
                                        end_date = case_when(
                                          is.na(end_date) ~ start_date + 15,
@@ -492,13 +497,16 @@ dynamic_targets <- tar_plan(
   tar_target(ndvi_years, lubridate::year(modis_task_end_dates)),
   
   # Combine modis and sentinel datasets into a single source for lagging
+  # There is some kind of bug between targets and arrow which interferes 
+  # when branching over ndvi_years. I end up with empty parquet files
+  # I have no idea why pattern = map(ndvi_years) breaks things.
+  # Solution is to not use dynamic branching here.
   tar_target(ndvi_transformed, transform_ndvi(modis_ndvi_transformed,
                                               sentinel_ndvi_transformed,
                                               ndvi_transformed_directory,
                                               ndvi_years,
                                               ndvi_months = 1:12,
                                               overwrite = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED"))),
-             pattern = map(ndvi_years),
              format = "file",
              repository = "local",
              error = "null",
@@ -638,7 +646,8 @@ data_targets <- tar_plan(
                                                                           weather_historical_means_directory,
                                                                           weather_historical_means_AWS), # Enforce dependency
              format = "file", 
-             repository = "local"),  
+             repository = "local",
+             cue = parse_flag("OVERWRITE_WEATHER_ANOMALIES", cue = T)),  
   
   # Next step put weather_historical_means files on AWS.
   tar_target(weather_historical_means_AWS_upload, AWS_put_files(weather_historical_means,
@@ -733,14 +742,13 @@ data_targets <- tar_plan(
              error = "null",
              cue = tar_cue("always")), # Enforce dependency
   
-  # NCL NOTE: MAKE NDVI TRANSFORMED THAT DOES THE STEP INTERPOLATION AND COMBINES NDVI SOURCES
-  # FEED THAT INTO ANOMALIES. WE NEED IT SEPARATE TO DO LAGS.
   tar_target(ndvi_historical_means, calculate_ndvi_historical_means(sentinel_ndvi_transformed,
                                                                     modis_ndvi_transformed,
                                                                     ndvi_historical_means_directory,
                                                                     ndvi_historical_means_AWS), # Enforce dependency
              format = "file", 
-             repository = "local"),  
+             repository = "local",
+             cue = parse_flag("OVERWRITE_NDVI_TRANSFORMED", cue = T)),  
 
   
   # Next step put ndvi_historical_means files on AWS.
@@ -847,32 +855,35 @@ data_targets <- tar_plan(
   
   # Combine all static and dynamic data layers.
   # Partition into separate parquet files by month and year.
-  tar_target(explanatory_variable_sources, tribble(
-    ~type,                 ~name,                                ~list_of_files,
-    "static",              "soil_preprocessed",                   soil_preprocessed,
-    "static",              "aspect_preprocessed",                 aspect_preprocessed,
-    "static",              "slope_preprocessed",                  slope_preprocessed,
-    "static",              "glw_preprocessed",                    glw_preprocessed,
-    "static",              "elevation_preprocessed",              elevation_preprocessed,
-    "static",              "bioclim_preprocessed",                bioclim_preprocessed,
-    "static",              "landcover_preprocessed",              landcover_preprocessed,
-    "dynamic",             "wahis_outbreak_history",              wahis_outbreak_history,
-    "dynamic",             "ecmwf_forecasts_transformed",         ecmwf_forecasts_transformed,
-    "dynamic",             "weather_anomalies",                   weather_anomalies,
-    "dynamic",             "forecasts_anomalies",                 forecasts_anomalies,
-    "dynamic",             "ndvi_anomalies",                      ndvi_anomalies,
-    # "dynamic",             "ndvi_transformed_lagged",             ndvi_transformed_lagged,
-    # "dynamic",             "nasa_weather_transformed_lagged",     nasa_weather_transformed_lagged
-    # "historical_mean",     "weather_historical_means",            weather_historical_means, # doy joins must come last
-    # "historical_mean",     "ndvi_historical_means",               ndvi_historical_means
+  # Why NO WAY to deparse substitute a list of variables?
+  tar_target(explanatory_variable_sources, list(
+    soil_preprocessed = soil_preprocessed,
+    aspect_preprocessed = aspect_preprocessed,
+    slope_preprocessed = slope_preprocessed,
+    glw_preprocessed = glw_preprocessed,
+    elevation_preprocessed = elevation_preprocessed,
+    bioclim_preprocessed = bioclim_preprocessed,
+    landcover_preprocessed = landcover_preprocessed,
+    wahis_outbreak_history = wahis_outbreak_history,
+    ecmwf_forecasts_transformed = ecmwf_forecasts_transformed,
+    weather_anomalies = weather_anomalies,
+    forecasts_anomalies = forecasts_anomalies,
+    ndvi_anomalies = ndvi_anomalies
+    # ndvi_transformed_lagged = ndvi_transformed_lagged,
+    # nasa_weather_transformed_lagged = nasa_weather_transformed_lagged
+    # weather_historical_means = weather_historical_means,
+    # ndvi_historical_means = ndvi_historical_means
   )),
   
   # Join all explanatory variable data sources using file based partitioning instead of hive
-  tar_target(explanatory_variables, join_data_sources(sources = explanatory_variable_sources,
-                                                      path = explanatory_variables_directory,
-                                                      basename_template = "explanatory_variable.parquet",
-                                                      years = nasa_weather_years,
-                                                      months = 1:12)),
+  # error needs to be null here because some predictors (like wahis_outbreak_sources) aren't
+  # present in all times.
+  tar_target(explanatory_variables, file_partition_duckdb(sources = explanatory_variable_sources,
+                                                          path = explanatory_variables_directory,
+                                                          years = nasa_weather_years,
+                                                          months = 1:12),
+             format = "file", 
+             repository = "local"),
 
   # Next step put combined_anomalies files on AWS.
   tar_target(explanatory_variables_AWS_upload, AWS_put_files(explanatory_variables,
