@@ -496,6 +496,7 @@ dynamic_targets <- tar_plan(
                                               sentinel_ndvi_transformed,
                                               ndvi_transformed_directory,
                                               ndvi_years,
+                                              ndvi_months = 1:12,
                                               overwrite = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED"))),
              pattern = map(ndvi_years),
              format = "file",
