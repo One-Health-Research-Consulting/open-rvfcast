@@ -56,12 +56,17 @@ submit_modis_ndvi_bundle_request <- function(modis_ndvi_token,
   }
   message(" ")
   
-  bundle_response <- httr::GET(paste("https://appeears.earthdatacloud.nasa.gov/api/bundle/", task_id, sep = ""), httr::add_headers(Authorization = modis_ndvi_token))
+  bundle_response <- httr::GET(paste("https://appeears.earthdatacloud.nasa.gov/api/bundle/", task_id, sep = ""), 
+                               httr::add_headers(Authorization = modis_ndvi_token))
+  
   bundle_response <- jsonlite::fromJSON(jsonlite::toJSON(httr::content(bundle_response))) |> 
     bind_cols() |> 
     filter(file_type == "tif", grepl("NDVI", file_name)) |>
     mutate(year_doy = sub(".*doy(\\d+).*", "\\1", file_name),
-           start_date = as.Date(year_doy, format = "%Y%j")) # confirmed this is start date through manual download test
+           start_date = as.Date(year_doy, format = "%Y%j"),
+           year = year(start_date)) |> # confirmed this is start date through manual download test
+    arrange(start_date) |> 
+    filter(year == modis_ndvi_task_id_continent$year) # Ensure we're not getting stuff outside the requested year which might lead to dupes
   
   # Return bundle response files
   return(bundle_response)

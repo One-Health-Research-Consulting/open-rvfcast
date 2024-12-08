@@ -443,10 +443,15 @@ dynamic_targets <- tar_plan(
   # when we go to forecast. Right now we're just using step function 
   # interpolation where the NDVI value is constant for the entire 16-day period, 
   # then it steps up or down to the next interval's NDVI value.
+  
+  # NCL: 
   tarchetypes::tar_group_size(name = modis_ndvi_requests, 
                               size = 10,
                               command = modis_ndvi_bundle_request |>
                                 arrange(start_date) |>
+                                group_by(sha256) |> # Remove duplicate file requests
+                                slice_max(created, n = 1) |> 
+                                ungroup() |>
                                 mutate(end_date = lead(start_date) - days(1),
                                        end_date = case_when(
                                          is.na(end_date) ~ start_date + 15,
