@@ -25,7 +25,14 @@ get_sentinel_ndvi_api_parameters <- function() {
   # 229 results as of 2023-03-20, so max records of 500 is safe
   url <- "https://catalogue.dataspace.copernicus.eu/resto/api/collections/Sentinel3/search.json?maxRecords=500&productType=SY_2_V10___&platform=S3A&box=13.4,7.46,24.0,23.4&timeliness=NT" 
   resp <- httr::GET(url)
-  out <- jsonlite::fromJSON(rawToChar(resp$content))
-  return(out$features)
+  out <- jsonlite::fromJSON(rawToChar(resp$content)) |> 
+    pluck("features") |>
+    arrange(properties$startDate) |>
+    mutate(start_date = lubridate::floor_date(lubridate::as_date(properties$startDate), unit = "day"), 
+           end_date = lead(start_date - 1))
+  
+  out$end_date[nrow(out)] <- lubridate::floor_date(lubridate::as_date(out$properties$completionDate[nrow(out)]), unit = "day")
+  
+  return(out)
 
 }

@@ -45,8 +45,11 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_api_parameters,
   # Extract start and end dates from the raw downloaded file name
   # naming conventions
   # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-3-synergy/naming-conventions
-  start_date <- sentinel_ndvi_api_parameters$properties$startDate |> as.Date()
-  end_date <-  sentinel_ndvi_api_parameters$properties$completionDate |> as.Date()
+  # Darned sentinel data has INCLUSIVE startDate and completionDate. Collection finishes at ~noon UTC. 
+  # Solve by shifting end date back one day. This slightly changes range
+  # Do this in sentinel_ndvi_api_parameters step
+  start_date <- sentinel_ndvi_api_parameters$start_date
+  end_date <-  sentinel_ndvi_api_parameters$end_date
   
   sentinel_ndvi_filename <- file.path(sentinel_ndvi_transformed_directory, glue::glue("transformed_sentinel_NDVI_{start_date}_to_{end_date}.gz.parquet"))
   
