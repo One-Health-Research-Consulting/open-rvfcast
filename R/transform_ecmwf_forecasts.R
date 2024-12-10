@@ -6,7 +6,7 @@
 #' @author Nathan Layman, Emma Mendelsohn
 #'
 #' @param ecmwf_forecasts_api_parameters A list containing the parameters for the ECMWF API request such as year, month, variables, etc.
-#' @param local_folder Character. The path to the local folder where transformed files will be saved. Defaults to `ecmwf_forecasts_transformed_directory`.
+#' @param ecmwf_forecasts_transformed_directory Character. The path to the local folder where transformed files will be saved. Defaults to `ecmwf_forecasts_transformed_directory`.
 #' @param continent_raster_template The path to the raster file used as a template for continent-level spatial alignment.
 #' @param overwrite A boolean flag indicating whether to overwrite existing processed files. Default is FALSE.
 #' @param ... Further arguments not used by the function but included for compatibility.
@@ -21,7 +21,7 @@
 #' 
 #' #' @author Nathan Layman, Emma Mendelsohn
 transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
-                                      local_folder,
+                                      ecmwf_forecasts_transformed_directory,
                                       continent_raster_template,
                                       overwrite = FALSE,
                                       ...) {
@@ -33,7 +33,7 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   year <- ecmwf_forecasts_api_parameters$year
   month <- unlist(ecmwf_forecasts_api_parameters$month)
   
-  transformed_file <- file.path(local_folder, glue::glue("ecmwf_seasonal_forecast_{month}_{year}.gz.parquet"))
+  transformed_file <- file.path(ecmwf_forecasts_transformed_directory, glue::glue("ecmwf_seasonal_forecast_{month}_{year}.gz.parquet"))
   
   # Check if transformed file already exists and can be loaded. 
   # If so return file name and path **unless it's the current year**
@@ -56,7 +56,7 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   raw_files <- expand.grid(product_type = unlist(ecmwf_forecasts_api_parameters$product_types), 
                            variable = unlist(ecmwf_forecasts_api_parameters$variables)) |>
     rowwise() |>
-    mutate(raw_file = file.path(local_folder, glue::glue("ecmwf_seasonal_forecast_{month}_{year}_{product_type}_{variable}.grib")))
+    mutate(raw_file = file.path(ecmwf_forecasts_transformed_directory, glue::glue("ecmwf_seasonal_forecast_{month}_{year}_{product_type}_{variable}.grib")))
   
   # Restrict to one product type
   raw_files <- raw_files |> filter(str_detect(product_type, "mean"))
@@ -93,7 +93,7 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
                 .progress = TRUE,
                 ~ecmwfr::wf_request(request = .x,
                                     user = Sys.getenv("ECMWF_USERID"), 
-                                    path = local_folder,
+                                    path = ecmwf_forecasts_transformed_directory,
                                     verbose = T))
   
     # Verify that terra can open all the saved grib files. If not error out to try again next time
@@ -129,12 +129,13 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   # 2. Fix total_precipitation metadata and convert units from m/second to mm/day. 
   # Note the variable name is total_precipitation but it is really *mean total precipitation rate*
   # 3. Correct precip sd
-  grib_data <- grib_data |> mutate(mean = ifelse(units == "C", mean - 273.15, ((mean > 0) * 8.64e+7 * mean)),
+  grib_data <- grib_data |> mutate(date = base_date,
+                                   mean = ifelse(units == "C", mean - 273.15, ((mean > 0) * 8.64e+7 * mean)),
                                    sd = ifelse(units == "", ((sd > 0) * 8.64e+7 * sd), sd),
                                    var_id = ifelse(units == "", "tprate", var_id),
                                    units = ifelse(units == "", "mm/day", units),
-                                   month = as.integer(lubridate::month(base_date)), # Base month
-                                   year = as.integer(lubridate::year(base_date)), # Base year
+                                   month = as.integer(lubridate::month(date)), # Base month
+                                   year = as.integer(lubridate::year(date)), # Base year
                                    lead_month = as.integer(lubridate::month(forecast_end_date - 1)),
                                    lead_year = as.integer(lubridate::year(forecast_end_date - 1)),
                                    variable = fct_recode(variable,
@@ -144,7 +145,7 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   
   # Calculate relative humidity from temperature and dewpoint temperature
   grib_data <- grib_data |> 
-    select(x, y, base_date, month, year, lead_month, lead_year, mean, sd, variable) |>
+    select(x, y, date, month, year, lead_month, lead_year, mean, sd, variable) |>
     pivot_wider(names_from = variable, values_from = c(mean, sd), names_glue = "{variable}_{.value}") |> # Reshape to make it easier to calculate composite values like relative humidity
     mutate(
   

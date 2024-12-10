@@ -592,7 +592,7 @@ dynamic_targets <- tar_plan(
   # TODO: NAs outside of the continent
   tar_target(ecmwf_forecasts_transformed, 
              transform_ecmwf_forecasts(ecmwf_forecasts_api_parameters,
-                                       local_folder = ecmwf_forecasts_transformed_directory,
+                                       ecmwf_forecasts_transformed_directory,
                                        continent_raster_template,
                                        overwrite = parse_flag("OVERWRITE_ECMWF_FORECASTS"),
                                        get_ecmwf_forecasts_AWS), # Enforce Dependency
@@ -845,7 +845,7 @@ data_targets <- tar_plan(
              error = "null",
              cue = tar_cue("always")), # Enforce dependency
 
-  
+   
   # Notes: This data will be aggregated. Mean monthly anomaly lagged 1, 2, 3 months back
   # Current date, lagged ndvi and weather anomalies, current ndvi and weather anomalies, forecast anomaly
   # over forecast interval. Forecast interval. Response is number of outbreaks (or cases?) over forecast interval
@@ -878,10 +878,11 @@ data_targets <- tar_plan(
   # Join all explanatory variable data sources using file based partitioning instead of hive
   # error needs to be null here because some predictors (like wahis_outbreak_sources) aren't
   # present in all times.
-  tar_target(explanatory_variables, file_partition_duckdb(sources = explanatory_variable_sources,
-                                                          path = explanatory_variables_directory,
-                                                          years = nasa_weather_years,
-                                                          months = 1:12),
+  tar_target(explanatory_variables, file_partition_duckdb(explanatory_variable_sources,
+                                                          explanatory_variables_directory,
+                                                          model_dates_selected,
+                                                          overwrite = parse_flag("OVERWRITE_EXPLANATORY_VARIABLES")),
+             pattern = map(model_dates_selected),
              format = "file", 
              repository = "local"),
 

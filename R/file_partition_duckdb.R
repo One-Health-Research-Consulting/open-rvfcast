@@ -23,82 +23,93 @@
 #' years = 2007: 2010,  months = 1:12 )  
 #'
 #' @export
-file_partition_duckdb <- function(sources, # A named, nested list of parquet files
-                                  path = "data/explanatory_variables",
-                                  basename_template = "explanatory_variables_{.y}_{.m}.gz.parquet",
-                                  years = 2007:2010,
-                                  months = 1:12) {
+file_partition_duckdb <- function(explanatory_variable_sources, # A named, nested list of parquet files
+                                  explanatory_variables_directory = "data/explanatory_variables",
+                                  model_dates_selected,
+                                  basename_template = "explanatory_variables_{model_dates_selected}.gz.parquet",
+                                  overwrite = FALSE) {
   
   # NCL change to branch off of model date for combo
   # This approach does work. Only writing complete datasets
   # 2005 doesn't have any outbreak history so what do we input?
+  # Next step is lagged data.
+  # JOINING ON model_dates_selected means going back and changing 'base_date' to 'date' in ecmwf_transformed and anomaly
   
-  file_partitions <- expand.grid(.y = years, .m = months)
+  # Check that we're only working on one date at a time
+  stopifnot(length(model_dates_selected) == 1)
   
-  files <- pmap_vec(file_partitions, function(.y, .m) {
-    
-    # Create a connect to a DuckDB database
-    con <- duckdb::dbConnect(duckdb::duckdb())
-    
-    # For each explanatory variable target create a table filtered appropriately
-    walk2(names(sources), sources, function(table_name, list_of_files) {
+  # Set filename
+  save_filename <- file.path(explanatory_variables_directory, glue::glue(basename_template))
+  message(paste0("Combining explanatory variables for ", model_dates_selected))
+  
+  # Check if file already exists and can be read
+  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
+  
+  if(!is.null(error_safe_read_parquet(save_filename)) & !overwrite) {
+    message("file already exists and can be loaded, skipping download")
+    return(save_filename)
+  }
+  
+  # Create a connect to a DuckDB database
+  con <- duckdb::dbConnect(duckdb::duckdb())
+  
+  # For each explanatory variable target create a table filtered appropriately
+  walk2(names(explanatory_variable_sources), explanatory_variable_sources, function(table_name, list_of_files) {
       
-      # Prepare the list of files
-      parquet_list <- glue::glue("SELECT * FROM '{list_of_files}'")
-      
-      file_schemas <- map(list_of_files, ~arrow::open_dataset(.x)$schema)
-      unified_schema <- all(map_vec(file_schemas, ~.x == file_schemas[[1]]))
+    # Prepare the list of files
+    parquet_list <- glue::glue("SELECT * FROM '{list_of_files}'")
+    
+    file_schemas <- map(list_of_files, ~arrow::open_dataset(.x)$schema)
+    unified_schema <- all(map_vec(file_schemas, ~.x == file_schemas[[1]]))
+    
+    parquet_filter <- c()
+    if(!is.null(file_schemas[[1]]$year)) parquet_filter <- c(parquet_filter, paste("year ==", year(model_dates_selected)))
+    if(!is.null(file_schemas[[1]]$month)) parquet_filter <- c(parquet_filter, paste("month ==", month(model_dates_selected)))
+    if(length(parquet_filter)) {
+      parquet_filter <- paste("WHERE", paste(parquet_filter, collapse = " AND "))
+    } else {
+      parquet_filter = ""
+    }
+  
+    parquet_list <- glue::glue("{parquet_list} {parquet_filter}")
       
       # Filter if the type is dynamic to reduce as much as possible the memory footprint
-      parquet_filter <- c()
-      if(!is.null(file_schemas[[1]]$year)) parquet_filter <- c(parquet_filter, paste("year ==", .y))
-      if(!is.null(file_schemas[[1]]$month)) parquet_filter <- c(parquet_filter, paste("month ==", .m))
-      if(length(parquet_filter)) {
-        parquet_filter <- paste("WHERE", paste(parquet_filter, collapse = " AND "))
-      } else {
-        parquet_filter = ""
-      }
+    if(!is.null(file_schemas[[1]]$year)) parquet_list <- glue::glue("{parquet_list} WHERE year = {year(model_dates_selected)}")
+    
+    # Check if all schemas are identical
+    if(unified_schema) {
       
       parquet_list <- glue::glue("{parquet_list} {parquet_filter}")
+      # If all schema are identical: union all files
+      parquet_list <- paste(parquet_list, collapse = " UNION ALL ")
       
-      # Check if all schemas are identical
-      if(unified_schema) {
-        
-        # If all schema are identical: union all files
-        parquet_list <- paste(parquet_list, collapse = " UNION ALL ")
-        
-      } else {
-        
-        # If not: inner join all files
-        parquet_list <- glue::glue("({parquet_list})")
-        parquet_list <- glue::glue("{parquet_list} AS {tools::file_path_sans_ext(basename(list_of_files))}")
-        parquet_list <- paste0("SELECT * FROM ", paste(parquet_list, collapse = " NATURAL JOIN "))
-      }
+    } else {
       
-      # Set up query to add the table to the database
-      query <- glue::glue("CREATE OR REPLACE TABLE {table_name} AS {parquet_list}")
-      
-      # Execute the query
-      add_table_result <- DBI::dbExecute(con, query) 
-      message(glue::glue("{table_name} table created with {add_table_result} rows"))
-    })  
+      # If not: inner join all files
+      parquet_list <- glue::glue("({parquet_list})")
+      parquet_list <- glue::glue("{parquet_list} AS {tools::file_path_sans_ext(basename(list_of_files))}")
+      parquet_list <- paste0("SELECT * FROM ", paste(parquet_list, collapse = " NATURAL JOIN "))
+    }
     
-    # Establish a file name for the combination of month and year
-    filename <- file.path(path, glue::glue(basename_template))
+    # Set up query to add the table to the database
+    query <- glue::glue("CREATE OR REPLACE TABLE {table_name} AS {parquet_list}")
     
-    # Set up a natural inner join for all the tables and output the result to file(s)
-    query <- glue::glue("COPY (SELECT * FROM {paste(names(sources), collapse = ' NATURAL JOIN ')}) TO '{filename}' (FORMAT 'parquet', CODEC 'gzip', ROW_GROUP_SIZE 100_000)")
-    
-    # Execute the join
-    result <- DBI::dbExecute(con, query) 
-    message(result)
-    
-    # Clean up the database connection
-    duckdb::dbDisconnect(con)
-    
-    # Return filename for the list
-    filename
-  }) 
+    # Execute the query
+    add_table_result <- DBI::dbExecute(con, query) 
+    message(glue::glue("{table_name} table created with {add_table_result} rows"))
+  })  
   
-  files
+  # Set up a natural inner join for all the tables and output the result to file(s)
+  query <- glue::glue("COPY (SELECT * FROM {paste(names(explanatory_variable_sources), collapse = ' NATURAL JOIN ')}) TO '{save_filename}' (FORMAT 'parquet', CODEC 'gzip', ROW_GROUP_SIZE 100_000)")
+  
+  # Execute the join
+  result <- DBI::dbExecute(con, query) 
+  message(result)
+  
+  # Clean up the database connection
+  duckdb::dbDisconnect(con)
+  
+  # Return filename for the list
+  save_filename
+  
 }
