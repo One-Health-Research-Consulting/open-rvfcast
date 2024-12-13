@@ -589,7 +589,10 @@ dynamic_targets <- tar_plan(
   # because it's also prone to random failures. Expected parquet file size
   # is ~100MB.
   # If this target fails it could be the API is down. Check status at https://status.ecmwf.int/
-  # TODO: NAs outside of the continent
+  # NOTE: This can't be joined in with other datasets directly because DATE is
+  # base_date - the date the forecast was made which is once a month.
+  # Most often a 30 day forecast, in example, will overlap multiple base date
+  # forecast ranges.
   tar_target(ecmwf_forecasts_transformed, 
              transform_ecmwf_forecasts(ecmwf_forecasts_api_parameters,
                                        ecmwf_forecasts_transformed_directory,
@@ -615,11 +618,12 @@ data_targets <- tar_plan(
   
   # How far back should we look for lagged responses?
   # These will be the mean conditions 0-30 days back, 30-60 days back, and 60-90 days back
-  # Must start with zero.
-  tar_target(lag_intervals, c(0, 30, 60, 90)), 
+  # Must start with zero. Right now 5 months back
+  tar_target(lag_intervals, c(0, -30, -60, -90, -120, -150)), 
   
   # How far out are we forecasting?
   # 0-30, 30-60, 60-90 days out ect...
+  # Right now 5 months foreward
   tar_target(forecast_intervals, c(0, 30, 60, 90, 120, 150)), 
   
   # NCL: This function produces a random sampling of n_per_month dates for every month
@@ -786,28 +790,30 @@ data_targets <- tar_plan(
              error = "null"),
   
   # Get lagged ndvi data
-  tar_target(ndvi_transformed_lagged_directory, 
-             create_data_directory(directory_path = "data/ndvi_transformed_lagged")),
+  tar_target(ndvi_anomalies_lagged_directory, 
+             create_data_directory(directory_path = "data/ndvi_anomalies_lagged")),
   
-  tar_target(ndvi_transformed_lagged_AWS, AWS_get_folder(ndvi_transformed_lagged_directory,
-                                                         ndvi_historical_means, # Enforce dependency
-                                                         model_dates_selected), # Enforce dependency
+  tar_target(ndvi_anomalies_lagged_AWS, AWS_get_folder(ndvi_anomalies_lagged_directory,
+                                                       ndvi_anomalies, # Enforce dependency
+                                                       model_dates_selected), # Enforce dependency
              error = "null",
              cue = tar_cue("always")), # Enforce dependency
   
-  tar_target(ndvi_transformed_lagged, lag_data(ndvi_transformed,
-                                               lag_intervals,
-                                               model_dates_selected,
-                                               overwrite = TRUE,
-                                               ndvi_transformed_lagged_AWS), # Enforce dependency
+  tar_target(ndvi_anomalies_lagged, lag_data(data_files = ndvi_anomalies,
+                                             lag_intervals,
+                                             model_dates_selected,
+                                             overwrite = TRUE,
+                                             lagged_data_directory = ndvi_anomalies_lagged_directory,
+                                             basename_template = "ndvi_anomalies_lagged_{model_dates_selected}.gz.parquet",
+                                             ndvi_anomalies_lagged_AWS), # Enforce dependency
              pattern = map(model_dates_selected),
              error = "null",
              format = "file", 
              repository = "local"),  
   
   # Next step put ndvi_historical_means files on AWS.
-  tar_target(ndvi_transformed_lagged_AWS_upload, AWS_put_files(ndvi_transformed_lagged,
-                                                               ndvi_transformed_lagged_directory),
+  tar_target(ndvi_anomalies_lagged_AWS_upload, AWS_put_files(ndvi_anomalies_lagged,
+                                                             ndvi_anomalies_lagged_directory),
              error = "null"),
   
   # Get lagged weather data
@@ -821,10 +827,11 @@ data_targets <- tar_plan(
              cue = tar_cue("always")), # Enforce dependency
   
   tar_target(nasa_weather_transformed_lagged, lag_data(nasa_weather_transformed,
-                                               lag_intervals,
-                                               model_dates_selected,
-                                               overwrite = TRUE,
-                                               nasa_weather_transformed_lagged_AWS), # Enforce dependency
+                                                       lag_intervals,
+                                                       model_dates_selected,
+                                                       nasa_weather_transformed_lagged_directory,
+                                                       overwrite = TRUE,
+                                                       nasa_weather_transformed_lagged_AWS), # Enforce dependency
              pattern = map(model_dates_selected),
              error = "null",
              format = "file", 
@@ -836,12 +843,12 @@ data_targets <- tar_plan(
              error = "null"),
   
   
-  tar_target(explanatory_variables_directory,
-             create_data_directory(directory_path = "data/explanatory_variables")),
+  tar_target(africa_full_model_data_directory,
+             create_data_directory(directory_path = "data/africa_full_model_data")),
   
   # Check if ndvi_anomalies_AWS parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
-  tar_target(explanatory_variables_AWS, AWS_get_folder(explanatory_variables_directory),
+  tar_target(africa_full_model_data_AWS, AWS_get_folder(africa_full_model_data_directory),
              error = "null",
              cue = tar_cue("always")), # Enforce dependency
 
@@ -856,39 +863,35 @@ data_targets <- tar_plan(
   # Combine all static and dynamic data layers.
   # Partition into separate parquet files by month and year.
   # Why NO WAY to deparse substitute a list of variables?
-  tar_target(explanatory_variable_sources, list(
-    soil_preprocessed = soil_preprocessed,
-    aspect_preprocessed = aspect_preprocessed,
-    slope_preprocessed = slope_preprocessed,
-    glw_preprocessed = glw_preprocessed,
-    elevation_preprocessed = elevation_preprocessed,
-    bioclim_preprocessed = bioclim_preprocessed,
-    landcover_preprocessed = landcover_preprocessed,
-    wahis_outbreak_history = wahis_outbreak_history,
-    ecmwf_forecasts_transformed = ecmwf_forecasts_transformed,
-    weather_anomalies = weather_anomalies,
-    forecasts_anomalies = forecasts_anomalies,
-    ndvi_anomalies = ndvi_anomalies
-    # ndvi_transformed_lagged = ndvi_transformed_lagged,
-    # nasa_weather_transformed_lagged = nasa_weather_transformed_lagged
-    # weather_historical_means = weather_historical_means,
-    # ndvi_historical_means = ndvi_historical_means
-  )),
+  tar_target(africa_full_model_data_sources, list(rvf_response = rvf_response,
+                                                  soil_preprocessed = soil_preprocessed,
+                                                  aspect_preprocessed = aspect_preprocessed,
+                                                  slope_preprocessed = slope_preprocessed,
+                                                  glw_preprocessed = glw_preprocessed,
+                                                  elevation_preprocessed = elevation_preprocessed, 
+                                                  bioclim_preprocessed = bioclim_preprocessed,
+                                                  landcover_preprocessed = landcover_preprocessed,
+                                                  wahis_outbreak_history = wahis_outbreak_history,
+                                                  weather_anomalies = weather_anomalies,
+                                                  forecasts_anomalies = forecasts_anomalies,
+                                                  ndvi_anomalies = ndvi_anomalies,
+                                                  ndvi_anomalies_lagged = ndvi_anomalies_lagged,
+                                                  weather_anomalies_lagged = weather_anomalies_lagged)),
   
   # Join all explanatory variable data sources using file based partitioning instead of hive
   # error needs to be null here because some predictors (like wahis_outbreak_sources) aren't
   # present in all times.
-  tar_target(explanatory_variables, file_partition_duckdb(explanatory_variable_sources,
-                                                          explanatory_variables_directory,
-                                                          model_dates_selected,
-                                                          overwrite = parse_flag("OVERWRITE_EXPLANATORY_VARIABLES")),
+  tar_target(africa_full_model_data, file_partition_duckdb(africa_full_model_data,
+                                                           africa_full_model_data_directory,
+                                                           model_dates_selected,
+                                                           overwrite = parse_flag("OVERWRITE_AFRICA_FULL_MODEL_DATA")),
              pattern = map(model_dates_selected),
              format = "file", 
              repository = "local"),
 
   # Next step put combined_anomalies files on AWS.
-  tar_target(explanatory_variables_AWS_upload, AWS_put_files(explanatory_variables,
-                                                             augmented_data_directory),
+  tar_target(africa_full_model_data_AWS_upload, AWS_put_files(africa_full_model_data,
+                                                              africa_full_model_data_directory),
              error = "null"),
 
 )

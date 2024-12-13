@@ -129,13 +129,12 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   # 2. Fix total_precipitation metadata and convert units from m/second to mm/day. 
   # Note the variable name is total_precipitation but it is really *mean total precipitation rate*
   # 3. Correct precip sd
-  grib_data <- grib_data |> mutate(date = base_date,
-                                   mean = ifelse(units == "C", mean - 273.15, ((mean > 0) * 8.64e+7 * mean)),
+  grib_data <- grib_data |> mutate(mean = ifelse(units == "C", mean - 273.15, ((mean > 0) * 8.64e+7 * mean)),
                                    sd = ifelse(units == "", ((sd > 0) * 8.64e+7 * sd), sd),
                                    var_id = ifelse(units == "", "tprate", var_id),
                                    units = ifelse(units == "", "mm/day", units),
-                                   month = as.integer(lubridate::month(date)), # Base month
-                                   year = as.integer(lubridate::year(date)), # Base year
+                                   month = as.integer(lubridate::month(base_date)), # Base month
+                                   year = as.integer(lubridate::year(base_date)), # Base year
                                    lead_month = as.integer(lubridate::month(forecast_end_date - 1)),
                                    lead_year = as.integer(lubridate::year(forecast_end_date - 1)),
                                    variable = fct_recode(variable,
@@ -145,7 +144,7 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   
   # Calculate relative humidity from temperature and dewpoint temperature
   grib_data <- grib_data |> 
-    select(x, y, date, month, year, lead_month, lead_year, mean, sd, variable) |>
+    select(x, y, base_date, month, year, lead_month, lead_year, mean, sd, variable) |>
     pivot_wider(names_from = variable, values_from = c(mean, sd), names_glue = "{variable}_{.value}") |> # Reshape to make it easier to calculate composite values like relative humidity
     mutate(
   

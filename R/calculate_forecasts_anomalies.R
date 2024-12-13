@@ -133,6 +133,7 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
       summarize(across(matches("temperature|precipitation|relative_humidity"), ~mean(.x, na.rm = T)), .groups = "drop")
     
     # Calculate temperature anomalies
+    # scaled requires non na values for SD which means there must be variation in temp at that site.
     forecast_anomaly <- forecast_anomaly |>
       mutate(anomaly_forecast_temperature = temperature_forecast - temperature_historical,
              anomaly_forecast_scaled_temperature = anomaly_forecast_temperature / temperature_sd_historical)

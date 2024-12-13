@@ -73,13 +73,8 @@ file_partition_duckdb <- function(explanatory_variable_sources, # A named, neste
   
     parquet_list <- glue::glue("{parquet_list} {parquet_filter}")
       
-      # Filter if the type is dynamic to reduce as much as possible the memory footprint
-    if(!is.null(file_schemas[[1]]$year)) parquet_list <- glue::glue("{parquet_list} WHERE year = {year(model_dates_selected)}")
-    
     # Check if all schemas are identical
     if(unified_schema) {
-      
-      parquet_list <- glue::glue("{parquet_list} {parquet_filter}")
       # If all schema are identical: union all files
       parquet_list <- paste(parquet_list, collapse = " UNION ALL ")
       
@@ -100,11 +95,12 @@ file_partition_duckdb <- function(explanatory_variable_sources, # A named, neste
   })  
   
   # Set up a natural inner join for all the tables and output the result to file(s)
-  query <- glue::glue("COPY (SELECT * FROM {paste(names(explanatory_variable_sources), collapse = ' NATURAL JOIN ')}) TO '{save_filename}' (FORMAT 'parquet', CODEC 'gzip', ROW_GROUP_SIZE 100_000)")
+  query <- glue::glue("SELECT * FROM {paste(names(explanatory_variable_sources), collapse = ' NATURAL JOIN ')}")
   
   # Execute the join
-  result <- DBI::dbExecute(con, query) 
-  message(result)
+  result <- DBI::dbGetQuery(con, query) |> as_tibble() |> relocate(x, y, date, doy, year, month)
+  
+  arrow::write_parquet(result, save_filename, compression = "gzip", compression_level = 5)
   
   # Clean up the database connection
   duckdb::dbDisconnect(con)
