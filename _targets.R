@@ -802,7 +802,7 @@ data_targets <- tar_plan(
   tar_target(ndvi_anomalies_lagged, lag_data(data_files = ndvi_anomalies,
                                              lag_intervals,
                                              model_dates_selected,
-                                             overwrite = TRUE,
+                                             overwrite = parse_flag("OVERWRITE_NDVI_ANOMALIES_LAGGED"),
                                              lagged_data_directory = ndvi_anomalies_lagged_directory,
                                              basename_template = "ndvi_anomalies_lagged_{model_dates_selected}.gz.parquet",
                                              ndvi_anomalies_lagged_AWS), # Enforce dependency
@@ -817,31 +817,31 @@ data_targets <- tar_plan(
              error = "null"),
   
   # Get lagged weather data
-  tar_target(nasa_weather_transformed_lagged_directory, 
-             create_data_directory(directory_path = "data/nasa_weather_transformed_lagged")),
+  tar_target(weather_anomalies_lagged_directory, 
+             create_data_directory(directory_path = "data/weather_anomalies_lagged")),
   
-  tar_target(nasa_weather_transformed_lagged_AWS, AWS_get_folder(nasa_weather_transformed_lagged_directory,
-                                                                 nasa_weather_transformed_historical_means, # Enforce dependency
-                                                                 model_dates_selected), # Enforce dependency
+  tar_target(weather_anomalies_lagged_AWS, AWS_get_folder(weather_anomalies_lagged_directory,
+                                                          nasa_weather_transformed_historical_means, # Enforce dependency
+                                                          model_dates_selected), # Enforce dependency
              error = "null",
              cue = tar_cue("always")), # Enforce dependency
   
-  tar_target(nasa_weather_transformed_lagged, lag_data(nasa_weather_transformed,
-                                                       lag_intervals,
-                                                       model_dates_selected,
-                                                       nasa_weather_transformed_lagged_directory,
-                                                       overwrite = TRUE,
-                                                       nasa_weather_transformed_lagged_AWS), # Enforce dependency
+  tar_target(weather_anomalies_lagged, lag_data(weather_anomalies,
+                                                lag_intervals,
+                                                model_dates_selected,
+                                                overwrite = parse_flag("OVERWRITE_WEATHER_ANOMALIES_LAGGED"),
+                                                lagged_data_directory = weather_anomalies_lagged_directory,
+                                                basename_template = "weather_anomalies_lagged_{model_dates_selected}.gz.parquet",
+                                                weather_anomalies_lagged_AWS), # Enforce dependency
              pattern = map(model_dates_selected),
              error = "null",
              format = "file", 
              repository = "local"),  
   
   # Next step put ndvi_historical_means files on AWS.
-  tar_target(nasa_weather_transformed_lagged_AWS_upload, AWS_put_files(nasa_weather_transformed_lagged,
-                                                                       nasa_weather_transformed_lagged_directory),
+  tar_target(weather_anomalies_lagged_AWS_upload, AWS_put_files(weather_anomalies_lagged,
+                                                                       weather_anomalies_lagged_directory),
              error = "null"),
-  
   
   tar_target(africa_full_model_data_directory,
              create_data_directory(directory_path = "data/africa_full_model_data")),
