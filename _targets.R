@@ -60,7 +60,9 @@ static_targets <- tar_plan(
   tar_target(rsa_polygon, rgeoboundaries::geoboundaries("South Africa", "adm2")),
   
   # SOIL -----------------------------------------------------------
-  tar_target(soil_directory, create_data_directory(directory_path = "data/soil_dataset")),
+  tar_target(soil_directory, 
+             create_data_directory(directory_path = "data/soil_dataset"),
+             format = "file"),
   
   # Check if preprocessed soil data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
@@ -87,7 +89,9 @@ static_targets <- tar_plan(
                             "aspect_twotwentyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClW_30as.rar",
                             "aspect_undef" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloAspectClU_30as.rar")),
   
-  tar_target(aspect_directory, create_data_directory(directory_path = "data/aspect_dataset")),
+  tar_target(aspect_directory, 
+             create_data_directory(directory_path = "data/aspect_dataset"),
+             format = "file"),
   
   # Check if preprocessed aspect data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
@@ -122,7 +126,9 @@ static_targets <- tar_plan(
                            "slope_thirty" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl7_30as.rar",
                            "slope_fortyfive" = "https://www.fao.org/fileadmin/user_upload/soils/HWSD%20Viewer/GloSlopesCl8_30as.rar")),
   
-  tar_target(slope_directory, create_data_directory(directory_path = "data/slope_dataset")),
+  tar_target(slope_directory, 
+             create_data_directory(directory_path = "data/slope_dataset"),
+             format = "file"),
   
   # Check if preprocessed slope data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
@@ -153,7 +159,8 @@ static_targets <- tar_plan(
                          "glw_goats" = "https://dataverse.harvard.edu/api/access/datafile/6769692")),
   
   tar_target(glw_directory, 
-             create_data_directory(directory_path = "data/glw_dataset")),
+             create_data_directory(directory_path = "data/glw_dataset"),
+             format = "file"),
   
   # Check if preprocessed glw data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
@@ -177,7 +184,8 @@ static_targets <- tar_plan(
 
 # ELEVATION -----------------------------------------------------------
 tar_target(elevation_directory, 
-           create_data_directory(directory_path = "data/elevation_dataset")),
+           create_data_directory(directory_path = "data/elevation_dataset"),
+           format = "file"),
 
 # Check if preprocessed elevation data already exists on AWS and can be loaded.
 # If so download from AWS instead of primary source
@@ -201,7 +209,8 @@ tar_target(elevation_preprocessed_AWS_upload, AWS_put_files(elevation_preprocess
 
 # BIOCLIM -----------------------------------------------------------
 tar_target(bioclim_directory, 
-           create_data_directory(directory_path = "data/bioclim_dataset")),
+           create_data_directory(directory_path = "data/bioclim_dataset"),
+           format = "file"),
 
 # Check if preprocessed bioclim data already exists on AWS and can be loaded.
 # If so download from AWS instead of primary source
@@ -226,7 +235,8 @@ tar_target(bioclim_preprocessed_AWS_upload, AWS_put_files(bioclim_preprocessed,
 tar_target(landcover_types, c("trees", "grassland", "shrubs", "cropland", "built", "bare", "snow", "water", "wetland", "mangroves", "moss")),
 
 tar_target(landcover_directory, 
-           create_data_directory(directory_path = "data/landcover_dataset")),
+           create_data_directory(directory_path = "data/landcover_dataset"),
+           format = "file"),
 
 # Check if preprocessed bioclim data already exists on AWS and can be loaded.
 # If so download from AWS instead of primary source
@@ -285,7 +295,8 @@ dynamic_targets <- tar_plan(
   # the path to the .gitkeep file. That way if it gets deleted the target automatically
   # re-runs
   tar_target(wahis_outbreak_history_directory, 
-             create_data_directory(directory_path = "data/outbreak_history_dataset")),
+             create_data_directory(directory_path = "data/outbreak_history_dataset"),
+             format = "file"),
   
   tar_target(wahis_raster_template, terra::rasterize(terra::vect(continent_polygon), # Take the boundary of Africa
                                                      terra::rast(continent_polygon, # Mask against a raster filled with 1's
@@ -323,7 +334,8 @@ dynamic_targets <- tar_plan(
              repository = "local"),
   
   tar_target(wahis_outbreak_history_animations_directory, 
-             create_data_directory(directory_path = "outputs/wahis_outbreak_history_animations")),
+             create_data_directory(directory_path = "outputs/wahis_outbreak_history_animations"),
+             format = "file"),
   
   tar_target(wahis_outbreak_history_AWS_upload, AWS_put_files(wahis_outbreak_history,
                                                               wahis_outbreak_history_animations_directory),
@@ -357,7 +369,8 @@ dynamic_targets <- tar_plan(
   # 2018-present
   # 10 day period
   tar_target(sentinel_ndvi_transformed_directory, 
-             create_data_directory(directory_path = "data/sentinel_ndvi_transformed")),
+             create_data_directory(directory_path = "data/sentinel_ndvi_transformed"),
+             format = "file"),
   
   tar_target(get_sentinel_ndvi_AWS, AWS_get_folder(sentinel_ndvi_transformed_directory),
              error = "null",
@@ -395,7 +408,8 @@ dynamic_targets <- tar_plan(
   # ~10 day period. Note the period of sentinel data does not match modis.
   # Some interpolation would be useful. Currently using step function.
   tar_target(modis_ndvi_transformed_directory, 
-             create_data_directory(directory_path = "data/modis_ndvi_transformed")),
+             create_data_directory(directory_path = "data/modis_ndvi_transformed"),
+             format = "file"),
   
   # This target reads in an Appears token from the .env file and tests that it 
   # still works. It requests a new token and updates the .env file if not.
@@ -485,7 +499,8 @@ dynamic_targets <- tar_plan(
   # Check if modis_ndvi files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(ndvi_transformed_directory, 
-             create_data_directory(directory_path = "data/ndvi_transformed")),
+             create_data_directory(directory_path = "data/ndvi_transformed"),
+             format = "file"),
   
   tar_target(ndvi_transformed_AWS, AWS_get_folder(ndvi_transformed_directory,
                                                   modis_ndvi_transformed,
@@ -523,7 +538,8 @@ dynamic_targets <- tar_plan(
   # T2M             MERRA-2 Temperature at 2 Meters (C) ;
   # PRECTOTCORR     MERRA-2 Precipitation Corrected (mm/day)  
   tar_target(nasa_weather_transformed_directory, 
-             create_data_directory(directory_path = "data/nasa_weather_transformed")),
+             create_data_directory(directory_path = "data/nasa_weather_transformed"),
+             format = "file"),
   
   # Set branching for nasa_weather download
   tar_target(nasa_weather_years, 2005:(year(Sys.time()) - 1)),
@@ -563,7 +579,8 @@ dynamic_targets <- tar_plan(
   
   # ECMWF Weather Forecast data -----------------------------------------------------------
   tar_target(ecmwf_forecasts_transformed_directory, 
-             create_data_directory(directory_path = "data/ecmwf_forecasts_transformed")),
+             create_data_directory(directory_path = "data/ecmwf_forecasts_transformed"),
+             format = "file"),
   
   # set branching for ecmwf download
   # Note: Neet to auto update years here.
@@ -637,7 +654,8 @@ data_targets <- tar_plan(
   
   # Recorded weather anomalies --------------------------------------------------
   tar_target(weather_historical_means_directory, 
-             create_data_directory(directory_path = "data/weather_historical_means")),
+             create_data_directory(directory_path = "data/weather_historical_means"),
+             format = "file"),
   
   # Check if weather_historical_means parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
@@ -659,7 +677,8 @@ data_targets <- tar_plan(
              error = "null"),
   
   tar_target(weather_anomalies_directory, 
-             create_data_directory(directory_path = "data/weather_anomalies")),
+             create_data_directory(directory_path = "data/weather_anomalies"),
+             format = "file"),
   
   # Check if weather_historical_means parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
@@ -691,7 +710,8 @@ data_targets <- tar_plan(
   
   # forecast weather anomalies ----------------------------------------------------------------------
   tar_target(forecasts_anomalies_directory, 
-             create_data_directory(directory_path = "data/forecast_anomalies")),
+             create_data_directory(directory_path = "data/forecast_anomalies"),
+             format = "file"),
   
   # Check if weather_historical_means parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
@@ -736,7 +756,8 @@ data_targets <- tar_plan(
              error = "null"),
   
   tar_target(ndvi_historical_means_directory, 
-             create_data_directory(directory_path = "data/ndvi_historical_means")),
+             create_data_directory(directory_path = "data/ndvi_historical_means"),
+             format = "file"),
   
   # Check if weather_historical_means parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
@@ -762,7 +783,8 @@ data_targets <- tar_plan(
   
   
   tar_target(ndvi_anomalies_directory, 
-             create_data_directory(directory_path = "data/ndvi_anomalies")),
+             create_data_directory(directory_path = "data/ndvi_anomalies"),
+             format = "file"),
   
   # Check if ndvi_anomalies_AWS parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
@@ -791,7 +813,8 @@ data_targets <- tar_plan(
   
   # Get lagged ndvi data
   tar_target(ndvi_anomalies_lagged_directory, 
-             create_data_directory(directory_path = "data/ndvi_anomalies_lagged")),
+             create_data_directory(directory_path = "data/ndvi_anomalies_lagged"),
+             format = "file"),
   
   tar_target(ndvi_anomalies_lagged_AWS, AWS_get_folder(ndvi_anomalies_lagged_directory,
                                                        ndvi_anomalies, # Enforce dependency
@@ -818,7 +841,8 @@ data_targets <- tar_plan(
   
   # Get lagged weather data
   tar_target(weather_anomalies_lagged_directory, 
-             create_data_directory(directory_path = "data/weather_anomalies_lagged")),
+             create_data_directory(directory_path = "data/weather_anomalies_lagged"),
+             format = "file"),
   
   tar_target(weather_anomalies_lagged_AWS, AWS_get_folder(weather_anomalies_lagged_directory,
                                                           nasa_weather_transformed_historical_means, # Enforce dependency
@@ -844,7 +868,8 @@ data_targets <- tar_plan(
              error = "null"),
   
   tar_target(africa_full_model_data_directory,
-             create_data_directory(directory_path = "data/africa_full_model_data")),
+             create_data_directory(directory_path = "data/africa_full_model_data"),
+             format = "file"),
   
   # Check if ndvi_anomalies_AWS parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
@@ -901,7 +926,8 @@ model_targets <- tar_plan(
   
   # RSA --------------------------------------------------
   tar_target(augmented_data_rsa_directory,
-             create_data_directory(directory_path = "data/augmented_data_rsa")),
+             create_data_directory(directory_path = "data/augmented_data_rsa"),
+             format = "file"),
   
   # # Switch to parquet based to save memory. Arrow left joins automatically.
   # tar_target(model_data,

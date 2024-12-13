@@ -1,0 +1,2 @@
+rm nohup.out
+nohup Rscript -e 'targets::tar_make_future(weather_anomalies_lagged_AWS_upload, workers = 50, reporter = "timestamp")' &
