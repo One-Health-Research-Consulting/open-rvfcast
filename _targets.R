@@ -73,7 +73,7 @@ static_targets <- tar_plan(
   
   tar_target(soil_preprocessed, preprocess_soil(soil_directory, 
                                                 continent_raster_template, 
-                                                overwrite = as.logical(Sys.getenv("OVERWRITE_STATIC_DATA", unset = "FALSE")),
+                                                overwrite = parse_flag("OVERWRITE_STATIC_DATA"),
                                                 soil_AWS), # Enforce dependency
              format = "file",
              repository = "local"),
@@ -107,7 +107,7 @@ static_targets <- tar_plan(
                                                      aggregate_method = "which.max", # What is the dominant aspect for each point?
                                                      resample_method = "mode", # What is the dominant aspect at the scale of the template raster?
                                                      factorize = TRUE,
-                                                     overwrite = as.logical(Sys.getenv("OVERWRITE_STATIC_DATA", unset = "FALSE")),
+                                                     overwrite = parse_flag("OVERWRITE_STATIC_DATA"),
                                                      aspect_AWS), # Enforce dependency
              format = "file",
              repository = "local"),
@@ -144,7 +144,7 @@ static_targets <- tar_plan(
                                                     aggregate_method = "which.max", # What is the dominant slope for each point?
                                                     resample_method = "mode", # What is the dominant slope at the scale of the template raster?
                                                     factorize = TRUE,
-                                                    overwrite = as.logical(Sys.getenv("OVERWRITE_STATIC_DATA", unset = "FALSE")),
+                                                    overwrite = parse_flag("OVERWRITE_STATIC_DATA"),
                                                     slope_AWS), # Enforce dependency
              format = "file",
              repository = "local"),
@@ -173,7 +173,7 @@ static_targets <- tar_plan(
              preprocess_glw_data(glw_directory, 
                                  glw_urls,
                                  continent_raster_template,
-                                 overwrite = as.logical(Sys.getenv("OVERWRITE_STATIC_DATA", unset = "FALSE")),
+                                 overwrite = parse_flag("OVERWRITE_STATIC_DATA"),
                                  glw_AWS),
              format = "file",
              repository = "local"), # Enforce dependency
@@ -198,7 +198,7 @@ tar_target(elevation_preprocessed,
            get_elevation_data(output_dir = elevation_directory, 
                               output_filename = "africa_elevation.parquet",
                               continent_raster_template,
-                              overwrite = as.logical(Sys.getenv("OVERWRITE_STATIC_DATA", unset = "FALSE")),
+                              overwrite = parse_flag("OVERWRITE_STATIC_DATA"),
                               elevation_AWS), # Enforce dependency
            format = "file",
            repository = "local"),
@@ -223,7 +223,7 @@ tar_target(bioclim_preprocessed,
            get_bioclim_data(output_dir = bioclim_directory, 
                             output_filename = "bioclim.parquet",
                             continent_raster_template,
-                            overwrite = as.logical(Sys.getenv("OVERWRITE_STATIC_DATA", unset = "FALSE"))),
+                            overwrite = parse_flag("OVERWRITE_STATIC_DATA")),
            format = "file",
            repository = "local"),
 
@@ -250,7 +250,7 @@ tar_target(landcover_preprocessed,
                               output_filename = "landcover.parquet",
                               landcover_types,
                               continent_raster_template,
-                              overwrite = as.logical(Sys.getenv("OVERWRITE_STATIC_DATA", unset = "FALSE")),
+                              overwrite = parse_flag("OVERWRITE_STATIC_DATA"),
                               landcover_AWS), # Enforce Dependency
            format = "file",
            repository = "local"),
@@ -258,8 +258,8 @@ tar_target(landcover_preprocessed,
 tar_target(landcover_preprocessed_AWS_upload, AWS_put_files(landcover_preprocessed,
                                                             landcover_directory),
            error = "null"), # Continue the pipeline even on error
-)
 
+)
 
 # Dynamic Data Download -----------------------------------------------------------
 dynamic_targets <- tar_plan(
@@ -326,7 +326,7 @@ dynamic_targets <- tar_plan(
                                                                 beta_time = 0.5,
                                                                 max_years = 10,
                                                                 recent = 3/12,
-                                                                overwrite = as.logical(Sys.getenv("OVERWRITE_OUTBREAK_HISTORY", unset = "FALSE")),
+                                                                overwrite = parse_flag("OVERWRITE_OUTBREAK_HISTORY"),
                                                                 wahis_outbreak_history_AWS), # Enforce Dependency
              pattern = map(wahis_outbreak_dates),
              error = "null", # Keep going if error. It will be caught next time the pipeline is run.
@@ -356,7 +356,7 @@ dynamic_targets <- tar_plan(
   # # and combining with gifski took 50 minutes for all of them.
   # tar_target(wahis_outbreak_history_animations, get_outbreak_history_animation(wahis_outbreak_history,
   #                                                                              wahis_outbreak_history_animations_directory,
-  #                                                                              overwrite = as.logical(Sys.getenv("OVERWRITE_OUTBREAK_HISTORY", unset = "FALSE"))), # Just included to enforce dependency with wahis_outbreak_history
+  #                                                                              overwrite = parse_flag("OVERWRITE_OUTBREAK_HISTORY"), # Just included to enforce dependency with wahis_outbreak_history
   #            pattern = map(wahis_outbreak_history),
   #            error = "null",
   #            repository = "local"), 
@@ -391,7 +391,7 @@ dynamic_targets <- tar_plan(
                                      continent_raster_template,
                                      sentinel_ndvi_transformed_directory,
                                      sentinel_ndvi_token_file,
-                                     overwrite = as.logical(Sys.getenv("OVERWRITE_SENTINEL_NDVI", unset = "FALSE")),
+                                     overwrite = parse_flag("OVERWRITE_SENTINEL_NDVI"),
                                      get_sentinel_ndvi_AWS),
              pattern = map(sentinel_ndvi_api_parameters),
              error = "null", # Keep going if error. It will be caught next time the pipeline is run.
@@ -483,7 +483,7 @@ dynamic_targets <- tar_plan(
                                            modis_ndvi_requests[.x,],
                                            continent_raster_template,
                                            modis_ndvi_transformed_directory,
-                                           overwrite = as.logical(Sys.getenv("OVERWRITE_MODIS_NDVI", unset = "FALSE")),
+                                           overwrite = parse_flag("OVERWRITE_MODIS_NDVI"),
                                            modis_ndvi_transformed_AWS)), # Enforce dependency
              pattern = map(modis_ndvi_requests), # This map is branching: multiple branches per bundle
              format = "file",
@@ -561,7 +561,7 @@ dynamic_targets <- tar_plan(
                                                               nasa_weather_variables = c("RH2M", "T2M", "PRECTOTCORR"),
                                                               continent_raster_template,
                                                               local_folder = nasa_weather_transformed_directory,
-                                                              overwrite = as.logical(Sys.getenv("OVERWRITE_NASA_WEATHER", unset = "FALSE")),
+                                                              overwrite = parse_flag("OVERWRITE_NASA_WEATHER"),
                                                               nasa_weather_AWS), # Enforce Dependency
              pattern = map(nasa_weather_years),
              error = "null",
@@ -694,7 +694,7 @@ data_targets <- tar_plan(
                                                             weather_historical_means,
                                                             weather_anomalies_directory,
                                                             model_dates_selected,
-                                                            overwrite = as.logical(Sys.getenv("OVERWRITE_WEATHER_ANOMALIES", unset = "FALSE")),
+                                                            overwrite = parse_flag("OVERWRITE_WEATHER_ANOMALIES"),
                                                             weather_anomalies_AWS), # Enforce dependency
              pattern = map(model_dates_selected),
              error = "null",
@@ -741,7 +741,7 @@ data_targets <- tar_plan(
                                                                 forecasts_anomalies_directory,
                                                                 model_dates_selected,
                                                                 forecast_intervals,
-                                                                overwrite = as.logical(Sys.getenv("OVERWRITE_FORECAST_ANOMALIES", unset = "FALSE")),
+                                                                overwrite = parse_flag("OVERWRITE_FORECAST_ANOMALIES"),
                                                                 ecmwf_forecasts_transformed,# Enforce dependency
                                                                 forecasts_anomalies_AWS), # Enforce dependency
              pattern = map(model_dates_selected),
@@ -798,7 +798,7 @@ data_targets <- tar_plan(
                                                       ndvi_historical_means,
                                                       ndvi_anomalies_directory,
                                                       model_dates_selected,
-                                                      overwrite = as.logical(Sys.getenv("OVERWRITE_NDVI_ANOMALIES", unset = "FALSE")),
+                                                      overwrite = parse_flag("OVERWRITE_NDVI_ANOMALIES"),
                                                       ndvi_anomalies_AWS), # Enforce dependency
              pattern = map(model_dates_selected),
              error = "null",
