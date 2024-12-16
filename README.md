@@ -81,7 +81,7 @@ data sources. While the data acquisition module requires the processing
 of large datasets, the final cleaned data can be accessed directly from
 the cloud by opening the following connection:
 
-    dataset <- open_dataset("s3://open-rvfcast/data/africa_full_model_data")
+    dataset <- arrow::open_dataset("s3://open-rvfcast/data/explanatory_variables")
     dataset$schema
 
 As parquet files are a columnar format with structured metadata
@@ -92,11 +92,11 @@ collect() on the dataset will initiate the download. For example, the
 following will filter the data and then download the model data for a
 single day:
 
-    dataset <- open_dataset("s3://open-rvfcast/data/africa_full_model_data") |> 
-    filter(date == "2023-12-14") |> ß
+    dataset <- arrow::open_dataset("s3://open-rvfcast/data/explanatory_variables") |> 
+    filter(date == "2023-12-14") |>
     collect()
 
-However, due to computational demands of such large data, the model
+However, due to the computational demands of such large data, the model
 analysis pipeline will download the data in entirety before analysis. In
 addition, the dataset has been subsetted to two randomly chosen days per
 month between 2007 and 2024.
