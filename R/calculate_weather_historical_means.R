@@ -39,12 +39,21 @@ calculate_weather_historical_means <- function(nasa_weather_transformed,
   weather_historical_means <- map_vec(1:366, .progress = TRUE, function(i) {
     filename <- file.path(weather_historical_means_directory, 
                           glue::glue("weather_historical_mean_doy_{i}.parquet"))
-    nasa_weather_data |> 
+    
+    mean_vals <- nasa_weather_data |> 
       filter(doy == i) |>
       group_by(x, y, doy) |> 
-      summarize(across(matches("temperature|precipitation|humidity"), ~mean(.x)),
-                across(matches("temperature|precipitation|humidity"), ~sd(.x), .names = "{.col}_sd")) |>
-      arrow::write_parquet(filename)
+      summarize(across(matches("temperature|precipitation|humidity"), ~mean(.x, na.rm = T)), 
+                       .groups = "drop")
+                
+    sd_vals <- nasa_weather_data |> 
+      filter(doy == i) |>
+      group_by(x, y, doy) |> 
+      summarize(across(matches("temperature|precipitation|humidity"), ~sd(.x, na.rm = T), 
+                .names = "{.col}_sd"),
+                .groups = "drop")
+    
+    mean_vals |> left_join(sd_vals) |> arrow::write_parquet(filename, compression = "gzip", compression_level = 5)
     
     filename
   })

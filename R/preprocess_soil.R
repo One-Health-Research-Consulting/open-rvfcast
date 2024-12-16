@@ -98,12 +98,13 @@ preprocess_soil <- function(soil_directory_dataset,
   # Figure out where key is for the units are in HWSD2
   # NCL: This is confusing but keeping to match previous work
   soil_preprocessed <- soil_preprocessed |> mutate(soil_texture = if_else(soil_texture == 5, 1, # clay (heavy) + clay loam
-                                                                          if_else(soil_texture == 7, 2, # silty clay + silty loam aka
-                                                                                  if_else(soil_texture == 8, 3, # clay + sandy clay
-                                                                                          if_else(soil_texture == 9, 4, # silty clay loam
-                                                                                                  if_else(soil_texture == 10, 5, # clay loam + sandy clay loam BUT SEE RULE 1!!!
-                                                                                                          if_else(soil_texture == 11, 6, # silt sandy + loam
-                                                                                                                  if_else(soil_texture == 12, 7, 0))))))) |>
+                                                                          if_else(soil_texture == 7, 2, # silt loam + silty clay
+                                                                                  if_else(soil_texture == 8, 3, # sandy clay + clay
+                                                                                          if_else(soil_texture == 9, 4, # loam + silty clay loam
+                                                                                                  if_else(soil_texture == 10, 5, # sandy clay loam SEE RULE 1!!!
+                                                                                                          if_else(soil_texture == 11, 6, # sandy loam + silt
+                                                                                                                  if_else(soil_texture == 12, 7, # loamy sand + silt loam
+                                                                                                                          0))))))) |>
                                                      as.factor()) # loamy sand + silt loam
                                            
 

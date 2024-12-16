@@ -89,7 +89,8 @@ get_remote_rasters <- function(urls,
     }
     
     # Extract the raster file to a temporary directory
-    system2("unrar", c("e", "-o+", rar_file, here::here(output_dir), ">/dev/null"))    
+    # Capture persistent File CRC error. If it's truly corrupted it won't open in the next step
+    try(archive::archive_extract(rar_file, output_dir), silent = T)
     
     # Load the raster data
     unpacked_raster <- terra::rast(raster_file)

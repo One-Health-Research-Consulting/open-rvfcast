@@ -132,8 +132,8 @@ static_targets <- tar_plan(
   
   # Check if preprocessed slope data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
-  tar_target(t, AWS_get_folder(slope_directory,
-                               continent_raster_template), # Enforce Dependency
+  tar_target(slope_AWS, AWS_get_folder(aspect_directory,
+                                       continent_raster_template), # Enforce Dependency
              error = "null",
              cue = tar_cue("always")), # Continue the pipeline even on error
   
@@ -543,7 +543,7 @@ dynamic_targets <- tar_plan(
              format = "file"),
   
   # Set branching for nasa_weather download
-  tar_target(nasa_weather_years, 2005:(year(Sys.time()))),
+  tar_target(nasa_weather_years, 2005:(year(Sys.time()) - 1)),
   tar_target(nasa_weather_variables, c("RH2M", "T2M", "PRECTOTCORR")),
   tar_target(nasa_weather_coordinates, get_nasa_weather_coordinates(country_bounding_boxes)),
   
@@ -851,7 +851,7 @@ data_targets <- tar_plan(
              error = "null",
              cue = tar_cue("always")), # Enforce dependency
   
-  tar_target(weather_anomalies_lagged, lag_data(data_files = weather_anomalies,
+  tar_target(weather_anomalies_lagged, lag_data(weather_anomalies,
                                                 lag_intervals,
                                                 model_dates_selected,
                                                 overwrite = parse_flag("OVERWRITE_WEATHER_ANOMALIES_LAGGED"),
@@ -1068,11 +1068,21 @@ model_targets <- tar_plan(
   
 )
 
+
+# Plots -----------------------------------------------------------
+plot_targets <- tar_plan(
+  
+)
+
 # Reports -----------------------------------------------------------
 eda_targets <- tar_plan(
   
 )
 
+# Testing -----------------------------------------------------------
+test_targets <- tar_plan(
+  
+)
 
 # Documentation -----------------------------------------------------------
 documentation_targets <- tar_plan(
@@ -1086,5 +1096,4 @@ documentation_targets <- tar_plan(
 list(static_targets,
      dynamic_targets,
      data_targets,
-     eda_targets,
-     documentation_targets)
+     eda_targets)
