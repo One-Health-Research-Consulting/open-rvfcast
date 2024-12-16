@@ -167,13 +167,16 @@ provided by the [World Animal Health Information System
 [database](https://www.dolthub.com/csv/ecohealthalliance/wahisdb/main/wahis_outbreaks)
 of cleaned outbreak data managed by EcoHealth Alliance.
 
+1.  RVF_occurance: A binary factor reflecting RVF occurance at each
+    location across the 5 forecast intervals.
+
 #### Static Data
 
 The following data sources are static, or time-invariant. Raw static
 data was downloaded from the linked sources and joined with dynamic
 data, such as temperature, which varied by day.
 
-1.  [Soil
+2.  [Soil
     types](https://www.fao.org/soils-portal/data-hub/soil-maps-and-databases/harmonized-world-soil-database-v20/en/):
     Soil types based on the Food and Agriculture Organization of the
     United Nations ([FAO](https://www.fao.org/home/en)) Harmonized World
@@ -186,9 +189,9 @@ data, such as temperature, which varied by day.
     2](https://www.fao.org/soils-portal/data-hub/soil-maps-and-databases/harmonized-world-soil-database-v20/en/)).
     Data was aggregated by identifying the most common slope or aspect
     within each 0.1 degree grid cell.
-2.  [Slope and Aspect](Global%20Terrain%20Slope%20and%20Aspect%20Data):
+3.  [Slope and Aspect](Global%20Terrain%20Slope%20and%20Aspect%20Data):
     Slope and aspect data from the FAO Global Terrain Slope and Aspect
-3.  [Gridded Livestock of the World 3
+4.  [Gridded Livestock of the World 3
     (GLW3)](https://www.nature.com/articles/sdata2018227): Global
     distribution data included
     [cattle](https://dataverse.harvard.edu/api/access/datafile/6769710),
@@ -198,18 +201,18 @@ data, such as temperature, which varied by day.
     censused in 2010 and available at a native resolution of 5
     arc-minutes. Data was accessed via the [Harvard
     dataverse](https://dataverse.harvard.edu/).
-4.  [Elevation](https://srtm.csi.cgiar.org/): Elevation data accessed
+5.  [Elevation](https://srtm.csi.cgiar.org/): Elevation data accessed
     via the `elevation_global()` function of the
     [geodata](https://rdrr.io/cran/geodata/man/elevation.html) package
     in R, drawn from the Shuttle Radar Topography Mission (SRTM) at
     resolution of 0.5 minutes of a degree.
-5.  [Bioclimatic data\*](https://www.worldclim.org/data/bioclim.html):
+6.  [Bioclimatic data\*](https://www.worldclim.org/data/bioclim.html):
     Bioclimactic data from the WorldClim version 2.1 accessed via the
     `worldclim_global()` function of the
     [geodata](https://rdrr.io/cran/geodata/man/worldclim.html) package
     in R and represent the global mean values across the period of
     1970-2000 at a 2.5m resolution.
-6.  [Landcover
+7.  [Landcover
     type](https://search.r-project.org/CRAN/refmans/geodata/html/landcover.html):
     Landcover data was accessed via the `landcover()` function of
     [geodata](https://rdrr.io/cran/geodata/man/elevation.html) package
@@ -236,14 +239,22 @@ Dynamic data sources are those that vary with time. Dynamic predictors
 can be highly conflated with each other due to a shared dependence on
 time, to account for this shared dependence, we used calculated the
 anomaly, or difference between current values and historical means,
-instead of using the raw values. Focusing on anomalous values helped
-mitigate the strong correlation with time that naturally exists in
-environmental variables like temperature and NDVI. Seasonality was then
-accounted for by including year and day-of-year (DOY) as predictors in
-the model. The following sources make up the dynamic layers:
+instead of using the raw values. Anomalies were calculated by first
+determining the difference between the current value and its historical
+mean for that day-of-year (DOY) and scaled by dividing by the standard
+deviation for that DOY. Focusing on anomalous values helped mitigate the
+strong correlation with time that naturally exists in environmental
+variables like temperature and NDVI. Seasonality was then accounted for
+by including year and day-of-year (DOY) as predictors in the model. The
+following sources make up the dynamic layers:
 
-7.  [weather_anomalies](): Historical weather data was sourced from
-8.  [forecasts_anomalies]():
+8.  [weather_anomalies](): NASA weather data was acquired across Africa
+    using the `get_power()` function of the
+    [nasapower](https://docs.ropensci.org/nasapower/) package in R which
+    provides access to NASA meteorological data from the
+    [NASAPOWER](https://power.larc.nasa.gov/) project. The difference,
+    or anomaly value, was then found by subtracting each weather value
+    from the average value for that day-of-year (DOY).
 9.  ndvi_anomalies: NDVI data was sourced from both the NASA’s Moderate
     Resolution Imaging Spectroradiometer
     ([MODIS](https://modis.gsfc.nasa.gov/data/dataprod/mod13.php)) and
@@ -251,16 +262,15 @@ the model. The following sources make up the dynamic layers:
     [Sentinel-3](https://user.eumetsat.int/catalogue/EO:EUM:DAT:0340)
     missions. MODIS is due to be retired in 2025 while Sentinel-3 NDVI
     data is available from September 2018. MODIS and Sentinel-3 NDVI
-    values were averaged across overlapping time periods and then
-    interpolated to a daily interval from their native 16 day (MODIS)
-    and \~10 day (Sentinel-3) intervals using a step-function. The
-    difference, or anomaly value, was then found by comparing the value
-    at every location and date to the average value for that day-of-year
-    (DOY).
+    values were interpolated to a daily interval from their native 16
+    day (MODIS) and \~10 day (Sentinel-3) intervals using a
+    step-function and NDVI averaged when data from both sources were
+    available. The difference, or anomaly value, was then found by
+    subtracting NDVI from the average value for that day-of-year (DOY).
 
-#### Forecast Dynamic Data
+##### Weather Forecasts
 
-11. [ecmwf_forecasts](https://cds.climate.copernicus.eu/datasets/seasonal-monthly-single-levels?tab=overview)
+10. [ecmwf_forecasts](https://cds.climate.copernicus.eu/datasets/seasonal-monthly-single-levels?tab=overview)
     We also included long-range projections of future weather provided
     by the European Centre for Medium-Range Weather Forecasts (ECMWF)
     and accessed through the [Copernicus Climate Data Store
@@ -282,9 +292,9 @@ the influence of past environmental conditions, we included lagged
 weather and NDVI data, specifically the average values from 0-30, 30-60,
 60-90, 90-120, and 120-150 days prior.
 
-12. weather_anomalies: Average weather anomaly values lagged over the
+11. weather_anomalies: Average weather anomaly values lagged over the
     previous 1-5 months
-13. ndvi_anomalies_lagged: Average NDVI anomaly values lagged over the
+12. ndvi_anomalies_lagged: Average NDVI anomaly values lagged over the
     previous 1-5 months
 
 ##### Historical Outbreak Data
@@ -292,8 +302,9 @@ weather and NDVI data, specifically the average values from 0-30, 30-60,
 An important factor in evaluating the potential for a future outbreak is
 the history of outbreaks in a region. Recent nearby outbreaks can
 amplify the likelihood of an outbreak occurring at a given location,
-while older outbreaks may reduce the risk by increasing local
-resistance, reflecting prior exposure to the disease.
+while older outbreaks might reduce the risk by influencing the
+resistance landscape, reflecting a history of prior exposure to the
+disease.
 
 To account for the influence of outbreak history, we generated outbreak
 exposure weights for both recent and historical outbreaks. These weights
@@ -308,7 +319,12 @@ last 3 months were classified as ‘recent’ and included as a separate
 predictor in the model allowing them to have a different effect on the
 model outcome compared to the older outbreak exposures.
 
-14. outbreak_history
+13. outbreak_history: Outbreak history was calculated using the data
+    provided from same data described in the response section (item 1)
+    above. As outbreak history contains information about the state of
+    variable being predicted, special care was taken when splitting the
+    data into test and training datasets to prevent data leakage
+    described further below.
 
 ### Targets Pipeline
 
