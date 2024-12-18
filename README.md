@@ -93,7 +93,7 @@ following will filter the data and then download the model data for a
 single day:
 
     dataset <- open_dataset("s3://open-rvfcast/data/africa_full_model_data") |> 
-    filter(date == "2023-12-14") |> ß
+    filter(date == "2023-12-14") |> 
     collect()
 
 However, due to computational demands of such large data, the model
@@ -154,6 +154,16 @@ Environment variables to add to the .env file:
 All spatial data were interpolated to a resolution of 0.1° across Africa
 and standardized to the WGS 84 coordinate reference system. All temporal
 data layers were joined by date.
+
+If data files become corrupted they can be re-generated from the raw
+sources by setting the `OVERWRITE_X` flags to TRUE in the .env file.
+This will prevent the pipeline from first downloading the data on AWS,
+re-download and process the raw data from the original sources, and
+upload the processed files to AWS for future use. Note that, under
+normal use, these should always be set to FALSE. The pipeline will
+automatically download any missing data without having to change these
+settings. This is only to replace data that has already been downloaded
+and processed mainly for pipeline development purposes.
 
 #### The Response Variable
 

@@ -280,8 +280,9 @@ dynamic_targets <- tar_plan(
              iteration = "group"),
   
   tar_target(wahis_outbreaks, wahis_rvf_outbreaks_preprocessed |> 
-               mutate(end_date = coalesce(outbreak_end_date, outbreak_start_date), na.rm = T) |>
-               select(cases, end_date, latitude, longitude) |>
+               mutate(start_date = coalesce(outbreak_start_date, outbreak_end_date),
+                      end_date = coalesce(outbreak_end_date, outbreak_start_date)) |>
+               select(cases, start_date, end_date, latitude, longitude) |>
                distinct() |>
                arrange(end_date) |>
                mutate(outbreak_id = 1:n())),
@@ -313,6 +314,7 @@ dynamic_targets <- tar_plan(
              cue = parse_flag("OVERWRITE_STATIC_DATA", cue = "never")), # cue is what to do when flag == "TRUE"
   
   # Dynamic branch over year batch over day otherwise too many branches.
+  # NOTE: Uses outbreak end date while response variable uses outbreak start date
   tar_target(wahis_outbreak_history, get_daily_outbreak_history(wahis_outbreak_dates,
                                                                 wahis_outbreaks,
                                                                 wahis_distance_matrix,
@@ -338,23 +340,27 @@ dynamic_targets <- tar_plan(
   
   # NCL: Note need to refactor to account for switching to wide format wahis_outbreak_history
   
-  # # Check if preprocessed wahis_outbreak_history data already exists on AWS and can be loaded.
-  # # If so download from AWS instead of primary source
-  # tar_target(wahis_outbreak_history_animations_AWS, AWS_get_folder(wahis_outbreak_history_animations_directory,
-  #                                                                  wahis_outbreak_history), # Enforce Dependency
-  #            error = "null",
-  #            cue = tar_cue("always")), # Continue the pipeline even on error
-  # 
-  # # Animate a SpatRaster stack where each layer is a date.
-  # # gganimate took 20 minutes per file.
-  # # just saving all the frames as separate pngs
-  # # and combining with gifski took 50 minutes for all of them.
-  # tar_target(wahis_outbreak_history_animations, get_outbreak_history_animation(wahis_outbreak_history,
-  #                                                                              wahis_outbreak_history_animations_directory,
-  #                                                                              overwrite = parse_flag("OVERWRITE_OUTBREAK_HISTORY"), # Just included to enforce dependency with wahis_outbreak_history
-  #            pattern = map(wahis_outbreak_history),
-  #            error = "null",
-  #            repository = "local"), 
+  # Check if preprocessed wahis_outbreak_history data already exists on AWS and can be loaded.
+  # If so download from AWS instead of primary source
+  tar_target(wahis_outbreak_history_animations_AWS, AWS_get_folder(wahis_outbreak_history_animations_directory,
+                                                                   wahis_outbreak_history), # Enforce Dependency
+             error = "null",
+             cue = tar_cue("always")), # Continue the pipeline even on error
+  
+  # Identify min and max of weights and years to branch over
+  tar_target(wahis_outbreak_history_animation_metadata, get_wahis_outbreak_history_metadata(wahis_outbreak_history)),
+  
+  # Animate a SpatRaster stack where each layer is a date.
+  # gganimate took 20 minutes per file.
+  # just saving all the frames as separate pngs
+  # and combining with gifski took 50 minutes for all of them.
+  tar_target(wahis_outbreak_history_animations, get_outbreak_history_animation(wahis_outbreak_history,
+                                                                               wahis_outbreak_history_animation_metadata,
+                                                                               wahis_outbreak_history_animations_directory,
+                                                                               overwrite = parse_flag("OVERWRITE_OUTBREAK_HISTORY"), # Just included to enforce dependency with wahis_outbreak_history
+             pattern = map(wahis_outbreak_history_animation_metadata),
+             error = "null",
+             repository = "local")),
   # 
   # tar_target(wahis_outbreak_history_animations_AWS_upload, AWS_put_files(wahis_outbreak_history_animations,
   #                                                                        wahis_outbreak_history_animations_directory),
@@ -849,6 +855,8 @@ data_targets <- tar_plan(
   tar_target(weather_anomalies_lagged_AWS_upload, AWS_put_files(weather_anomalies_lagged,
                                                                 weather_anomalies_lagged_directory),
              error = "null"),
+  
+  tar_target(rvf_response, get_rvf_response(wahis)),
   
   tar_target(africa_full_model_data_directory,
              create_data_directory(directory_path = "data/africa_full_model_data")),
