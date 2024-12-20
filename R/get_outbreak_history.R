@@ -45,6 +45,7 @@ get_daily_outbreak_history <- function(wahis_outbreak_dates,
                                        overwrite = FALSE,
                                        ...) {
   
+  message("out")
   year <- wahis_outbreak_dates$year |> unique()
   month <- wahis_outbreak_dates$month |> unique()
   
@@ -104,7 +105,7 @@ get_daily_outbreak_history <- function(wahis_outbreak_dates,
 #' Extracting Outbreak History from WAHIS Data
 #'
 #' This function extracts outbreak history from World Animal Health Information System (WAHIS). 
-#' It uses the end_date of each outbreak, logarithm of the number of cases (if available), and exponential of the years since the end_date to weight the outbreak 
+#' It uses the start_date of each outbreak, logarithm of the number of cases (if available), and exponential of the years since the start_date to weight the outbreak 
 #' and generate rasters for recent and old outbreaks based on the provided recent period.
 #'
 #' @author Nathan C. Layman
@@ -140,9 +141,9 @@ get_outbreak_history <- function(date,
   
   outbreak_history <- wahis_outbreaks |> 
     arrange(outbreak_id) |>
-    mutate(end_date = pmin(date, end_date, na.rm = T),
-           years_since = as.numeric(as.duration(date - end_date), "years")) |>
-    filter(date > end_date, years_since < max_years & years_since >= 0) |>
+    mutate(start_date = pmin(date, start_date, na.rm = T),
+           years_since = as.numeric(as.duration(date - start_date), "years")) |>
+    filter(date > start_date, years_since < max_years & years_since >= 0) |>
     mutate(time_weight = ifelse(is.na(cases), 1, log10(cases + 1))*exp(-beta_time*years_since))
   
   old_outbreaks <- outbreak_history |> filter(years_since >= recent) |> 
@@ -190,7 +191,7 @@ combine_weights <- function(outbreaks,
   # Multiply time weights by distance weights
   
   # Super fast matrix multiplication step. This is the secret sauce.
-  # Performs sweep(outbreaks$time_weight, "*") and rowsums() all in once go
+  # Performs sweep(outbreaks$time_weight, "*") and rowsums() all in one go
   # and indexes the wahis_distance_matrix (which was calculated only once)
   # instead of re-calculating distances every day. These changes
   # sped it up from needing 7 hours to calculate the daily history for

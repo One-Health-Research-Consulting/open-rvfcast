@@ -39,7 +39,7 @@ AWS_get_folder <- function(local_folder, ...) {
   repeat {
     response <- s3$list_objects_v2(
       Bucket = Sys.getenv("AWS_BUCKET_ID"),
-      Prefix = local_folder,
+      Prefix = paste0(local_folder,"/"), # Arggg! Without the "/" you can mix 'ndvi_anomaly' with 'ndvi_anomaly_lagged'....
       ContinuationToken = continuation_token)
     
     # Append the files from this response to the main list
@@ -61,7 +61,7 @@ AWS_get_folder <- function(local_folder, ...) {
   downloaded_files <- c()
   
   # Loop through S3 files and download if they don't exist locally
-  # NCL AND THAT THEY CAN BE OPENED!!
+  # NCL AND THEY CAN BE OPENED!!
   for (file in s3_files) {
     
     # Check if file already exists locally

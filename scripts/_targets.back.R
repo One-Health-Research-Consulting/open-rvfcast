@@ -311,10 +311,10 @@ dynamic_targets <- tar_plan(
                                                         wahis_distance_matrix, # Enforce Dependency
                                                         wahis_raster_template), # Enforce Dependency
              error = "null",
-             cue = parse_flag("OVERWRITE_STATIC_DATA", cue = "never")), # cue is what to do when flag == "TRUE"
+             cue = parse_flag("OVERWRITE_OUTBREAK_HISTORY", cue = "never")), # cue is what to do when flag == "TRUE"
   
   # Dynamic branch over year batch over day otherwise too many branches.
-  # NOTE: Uses outbreak end date while response variable uses outbreak start date
+  # NOTE: Uses outbreak start date
   tar_target(wahis_outbreak_history, get_daily_outbreak_history(wahis_outbreak_dates,
                                                                 wahis_outbreaks,
                                                                 wahis_distance_matrix,
@@ -345,7 +345,7 @@ dynamic_targets <- tar_plan(
   tar_target(wahis_outbreak_history_animations_AWS, AWS_get_folder(wahis_outbreak_history_animations_directory,
                                                                    wahis_outbreak_history), # Enforce Dependency
              error = "null",
-             cue = tar_cue("always")), # Continue the pipeline even on error
+             cue = parse_flag("OVERWRITE_OUTBREAK_HISTORY", cue = "never")), # Continue the pipeline even on error
   
   # Identify min and max of weights and years to branch over
   tar_target(wahis_outbreak_history_animation_metadata, get_wahis_outbreak_history_metadata(wahis_outbreak_history)),
@@ -626,7 +626,6 @@ dynamic_targets <- tar_plan(
 )
 
 # Data Processing -----------------------------------------------------------
-# Why are we subsetting here again?
 data_targets <- tar_plan(
   
   # How far back should we look for lagged responses?
@@ -642,6 +641,8 @@ data_targets <- tar_plan(
   # NCL: This function produces a random sampling of n_per_month dates for every month
   # in every year between start_year and end_year. If a new year is added, the 
   # random draws for the previous years won't change unless the seed is updated. 
+  # Ideally we want to make the full dataset for every day and store it then subset
+  # only right before fitting the model.
   tar_target(model_dates_selected, set_model_dates(start_year = 2005, 
                                                    end_year = lubridate::year(Sys.time()), 
                                                    n_per_month = 2, 
@@ -721,13 +722,6 @@ data_targets <- tar_plan(
   # Expected target size is ~40MB. Each branch takes 1-2 minutes in serial
   # on an M1 mac. Expect to take a day to regenerate the data if re-building from
   # scratch.
-  # To join to other data: 
-  # forecasts_anomalies |>
-  #   collect() |>
-  #   select(-contains("start")) |> 
-  #   pivot_wider(names_from = forecast_intervals_end,
-  #               values_from = starts_with("anomaly_forecast"),
-  #               names_sep = "_")
 
   tar_target(forecasts_anomalies, calculate_forecasts_anomalies(ecmwf_forecasts_transformed,
                                                                 weather_historical_means,
@@ -779,7 +773,7 @@ data_targets <- tar_plan(
   
   # Check if ndvi_anomalies_AWS parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
-  tar_target(ndvi_anomalies_AWS, AWS_get_folder(ndvi_anomalies_directory,
+  tar_target(ndvi_anomalies_AWS, AWS_get_folder(local_folder = ndvi_anomalies_directory,
                                                 ndvi_historical_means, # Enforce dependency
                                                 model_dates_selected), # Enforce dependency
              error = "null",
@@ -856,57 +850,85 @@ data_targets <- tar_plan(
                                                                 weather_anomalies_lagged_directory),
              error = "null"),
   
-  tar_target(rvf_response, get_rvf_response(wahis)),
   
-  tar_target(africa_full_model_data_directory,
-             create_data_directory(directory_path = "data/africa_full_model_data")),
+  # outbreak layer --------------------------------------------------
+  tar_target(rvf_response_directory, create_data_directory(directory_path = "rvf_response")),
+  
+  tar_target(rvf_response, get_rvf_response(wahis_outbreaks,
+                                            wahis_raster_template,
+                                            forecast_intervals,
+                                            model_dates_selected,
+                                            local_folder = rvf_response_directory),
+             format = "file", 
+             repository = "local"),
+  
+  tar_target(africa_full_data_directory,
+             create_data_directory(directory_path = "data/africa_full_data")),
+  
+  # Assemble Africa Wide Model Data --------------------------------------------------
   
   # Check if ndvi_anomalies_AWS parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
-  tar_target(africa_full_model_data_AWS, AWS_get_folder(africa_full_model_data_directory),
+  tar_target(africa_full_data_AWS, AWS_get_folder(africa_full_data_directory),
              error = "null",
              cue = parse_flag("OVERWRITE_AFRICA_FULL_MODEL_DATA", cue = "never")), # cue is what to do when flag == "TRUE"
-  
-   
-  # Notes: This data will be aggregated. Mean monthly anomaly lagged 1, 2, 3 months back
-  # Current date, lagged ndvi and weather anomalies, current ndvi and weather anomalies, forecast anomaly
-  # over forecast interval. Forecast interval. Response is number of outbreaks (or cases?) over forecast interval
-  # so count data and poisson model. Then we have multiple forecast intervals we're working on. 0-30, 30-60, 60-90, ect..
-  # We can get a rate for each interval and use simulation to determine the probability of no outbreaks across
-  # combined interval and error probability no outbreaks in each interval is (1-e^-lambda)
   
   # Combine all static and dynamic data layers.
   # Partition into separate parquet files by month and year.
   # Why NO WAY to deparse substitute a list of variables?
-  tar_target(africa_full_model_data_sources, list(rvf_response = rvf_response,
-                                                  soil_preprocessed = soil_preprocessed,
-                                                  aspect_preprocessed = aspect_preprocessed,
-                                                  slope_preprocessed = slope_preprocessed,
-                                                  glw_preprocessed = glw_preprocessed,
-                                                  elevation_preprocessed = elevation_preprocessed, 
-                                                  bioclim_preprocessed = bioclim_preprocessed,
-                                                  landcover_preprocessed = landcover_preprocessed,
-                                                  wahis_outbreak_history = wahis_outbreak_history,
-                                                  weather_anomalies = weather_anomalies,
-                                                  forecasts_anomalies = forecasts_anomalies,
-                                                  ndvi_anomalies = ndvi_anomalies,
-                                                  ndvi_anomalies_lagged = ndvi_anomalies_lagged,
-                                                  weather_anomalies_lagged = weather_anomalies_lagged)),
+  tar_target(africa_full_data_sources, list(forecasts_anomalies = forecasts_anomalies,
+                                            weather_anomalies_lagged = weather_anomalies_lagged,
+                                            ndvi_anomalies_lagged = ndvi_anomalies_lagged,
+                                            weather_anomalies = weather_anomalies,
+                                            ndvi_anomalies = ndvi_anomalies,
+                                            soil_preprocessed = soil_preprocessed,
+                                            aspect_preprocessed = aspect_preprocessed,
+                                            slope_preprocessed = slope_preprocessed,
+                                            glw_preprocessed = glw_preprocessed,
+                                            elevation_preprocessed = elevation_preprocessed, 
+                                            bioclim_preprocessed = bioclim_preprocessed,
+                                            landcover_preprocessed = landcover_preprocessed)),
   
   # Join all explanatory variable data sources using file based partitioning instead of hive
   # error needs to be null here because some predictors (like wahis_outbreak_sources) aren't
   # present in all times.
-  tar_target(africa_full_model_data, file_partition_duckdb(africa_full_model_data_sources,
-                                                           africa_full_model_data_directory,
-                                                           model_dates_selected,
-                                                           overwrite = parse_flag("OVERWRITE_AFRICA_FULL_MODEL_DATA")),
-             pattern = head(model_dates_selected, 5),
+  tar_target(africa_full_data, file_partition_duckdb(sources = africa_full_data_sources,
+                                                     model_dates_selected,
+                                                     local_folder = africa_full_data_directory,
+                                                     basename_template = "africa_full_data_{model_dates_selected}.parquet",
+                                                     overwrite = parse_flag("OVERWRITE_AFRICA_FULL_RVF_MODEL_DATA"),
+                                                     africa_full_data_AWS), # Enforce dependency
+             pattern = map(model_dates_selected),
              format = "file", 
              repository = "local"),
 
   # Next step put combined_anomalies files on AWS.
-  tar_target(africa_full_model_data_AWS_upload, AWS_put_files(africa_full_model_data,
-                                                              africa_full_model_data_directory),
+  tar_target(africa_full_data_AWS_upload, AWS_put_files(africa_full_data,
+                                                        africa_full_data_directory),
+             error = "null"),
+  
+  # Full model data also has the RVF response added.
+  tar_target(africa_full_rvf_model_data_directory,
+             create_data_directory(directory_path = "data/africa_full_rvf_model_data")),
+  
+  tar_target(africa_full_rvf_model_data_AWS, AWS_get_folder(africa_full_rvf_model_data_directory),
+             error = "null",
+             cue = parse_flag("OVERWRITE_AFRICA_FULL_RVF_MODEL_DATA", cue = "never")), # cue is what to do when flag == "TRUE"
+  
+  tar_target(africa_full_rvf_model_data, join_response(rvf_response,
+                                                       africa_full_data,
+                                                       model_dates_selected,
+                                                       local_folder = africa_full_rvf_model_data_directory,
+                                                       basename_template = "africa_full_rvf_model_data_{model_dates_selected}.parquet",
+                                                       overwrite = parse_flag("OVERWRITE_AFRICA_FULL_MODEL_DATA"),
+                                                       africa_full_model_data_AWS), # Enforce dependency
+             pattern = map(model_dates_selected),
+             format = "file", 
+             repository = "local"),
+  
+  # Next step put combined_anomalies files on AWS.
+  tar_target(africa_full_rvf_model_data_AWS_upload, AWS_put_files(africa_full_rvf_model_data,
+                                                                  africa_full_rvf_model_data_directory),
              error = "null"),
 
 )

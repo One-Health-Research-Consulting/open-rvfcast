@@ -23,11 +23,12 @@
 #' years = 2007: 2010,  months = 1:12 )  
 #'
 #' @export
-file_partition_duckdb <- function(explanatory_variable_sources, # A named, nested list of parquet files
-                                  explanatory_variables_directory = "data/explanatory_variables",
+file_partition_duckdb <- function(sources, # A named, nested list of parquet files
                                   model_dates_selected,
-                                  basename_template = "explanatory_variables_{model_dates_selected}.gz.parquet",
-                                  overwrite = FALSE) {
+                                  local_folder = "data/africa_full_data",
+                                  basename_template = "africa_full_data_{model_dates_selected}.parquet",
+                                  overwrite = FALSE,
+                                  ...) {
   
   # NCL change to branch off of model date for combo
   # This approach does work. Only writing complete datasets
@@ -39,7 +40,7 @@ file_partition_duckdb <- function(explanatory_variable_sources, # A named, neste
   stopifnot(length(model_dates_selected) == 1)
   
   # Set filename
-  save_filename <- file.path(explanatory_variables_directory, glue::glue(basename_template))
+  save_filename <- file.path(local_folder, glue::glue(basename_template))
   message(paste0("Combining explanatory variables for ", model_dates_selected))
   
   # Check if file already exists and can be read
@@ -54,7 +55,7 @@ file_partition_duckdb <- function(explanatory_variable_sources, # A named, neste
   con <- duckdb::dbConnect(duckdb::duckdb())
   
   # For each explanatory variable target create a table filtered appropriately
-  walk2(names(explanatory_variable_sources), explanatory_variable_sources, function(table_name, list_of_files) {
+  walk2(names(sources), sources, function(table_name, list_of_files) {
       
     # Prepare the list of files
     parquet_list <- glue::glue("SELECT * FROM '{list_of_files}'")
@@ -63,8 +64,7 @@ file_partition_duckdb <- function(explanatory_variable_sources, # A named, neste
     unified_schema <- all(map_vec(file_schemas, ~.x == file_schemas[[1]]))
     
     parquet_filter <- c()
-    if(!is.null(file_schemas[[1]]$year)) parquet_filter <- c(parquet_filter, paste("year ==", year(model_dates_selected)))
-    if(!is.null(file_schemas[[1]]$month)) parquet_filter <- c(parquet_filter, paste("month ==", month(model_dates_selected)))
+    if(!is.null(file_schemas[[1]]$date)) parquet_filter <- c(parquet_filter, paste("date = '", model_dates_selected, "'"))
     if(length(parquet_filter)) {
       parquet_filter <- paste("WHERE", paste(parquet_filter, collapse = " AND "))
     } else {
@@ -95,12 +95,15 @@ file_partition_duckdb <- function(explanatory_variable_sources, # A named, neste
   })  
   
   # Set up a natural inner join for all the tables and output the result to file(s)
-  query <- glue::glue("SELECT * FROM {paste(names(explanatory_variable_sources), collapse = ' NATURAL JOIN ')}")
-  
+  # Ensure that there are NO duplicates and that all rows with NULL value have been dropped
+  query <- glue::glue("SELECT DISTINCT * FROM {paste(names(sources), collapse = ' NATURAL JOIN ')}")
+  query <- paste0("COPY (",
+                  query,
+                  glue::glue(" WHERE COLUMNS(*) IS NOT NULL) TO '{save_filename}' (FORMAT PARQUET, COMPRESSION 'GZIP');"))
+   
   # Execute the join
-  result <- DBI::dbGetQuery(con, query) |> as_tibble() |> relocate(x, y, date, doy, year, month)
-  
-  arrow::write_parquet(result, save_filename, compression = "gzip", compression_level = 5)
+  rows_written <- DBI::dbExecute(con, query) 
+  message(glue::glue("{rows_written} rows in joined dataset"))
   
   # Clean up the database connection
   duckdb::dbDisconnect(con)

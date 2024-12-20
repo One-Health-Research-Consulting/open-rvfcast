@@ -66,7 +66,7 @@ get_outbreak_history_animation <- function(wahis_outbreak_history,
     
     message(paste("Animating", basename(output_filename))) 
     
-    dates <- outbreak_history_dataset |> filter(time_frame == tf) |> select(date) |> distinct() |> pull(date, as_vector = TRUE)
+    dates <- outbreak_history_dataset |> filter(time_frame == tf) |> select(date) |> distinct() |> pull(date)
     
     # This function makes a png for each date which will then get stiched together
     # into the animation. Saving each png is faster than trying to do everything
@@ -75,8 +75,7 @@ get_outbreak_history_animation <- function(wahis_outbreak_history,
                                     dates, 
                                     function(d) plot_outbreak_history(outbreak_history_dataset |> 
                                                                         filter(date == d) |>
-                                                                        filter(time_frame == tf) |>
-                                                                        collect(),
+                                                                        filter(time_frame == tf),
                                                                       tmp_dir = tmp_dir,
                                                                       write_frame = TRUE,
                                                                       lims = lims)) |> 

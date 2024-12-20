@@ -5,7 +5,7 @@
 #' and any months out present in the forecast. It then saves the forecast anomolies 
 #' in a specified directory. 
 #'
-#' @author Emma Mendelsohn
+#' @author Emma Mendelsohn and Nathan C. Layman
 #'
 #' @param ecmwf_forecasts_transformed_directory Directory containing the transformed forecasts.
 #' @param weather_historical_means Filepath to the historical weather means data.
@@ -64,7 +64,7 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
   # contributions of March and April.
   
   # An easier way to do this is to just make a list of every day from start to 
-  # start + 30 - 1. Figure out the year nad month and join to forecast month from 
+  # start + 30 - 1. Figure out the year and month and join to forecast month from 
   # ecmwf_forecasts_transformed. That way we could do all the things at once.
   # Then group by x, y, and summarize average of data columns. Map over each
   # lead interval and done. A benefit of this approach is that it makes

@@ -44,19 +44,32 @@ Project code is available on the [open-rvfcast](https://github.com/ecohealthalli
 We utilized parquet files and the `arrow` package in R as our primary method of storing data. Parquet files are optimized for high-performance, out-of-memory data processing, making it well-suited for efficiently handling and processing large, complex datasets. Additionally, `arrow::open_dataset()` supports seamless integration with cloud storage, enabling direct access to remote datasets, which improves workflow efficiency and scalability when working with large, distributed data sources. While the data acquisition module requires the processing of large datasets, the final cleaned data can be accessed directly from the cloud by opening the following connection:
 
 ```
-dataset <- arrow::open_dataset("s3://open-rvfcast/data/africa_full_model_data")
+dataset <- arrow::open_dataset(arrow::s3_bucket("open-rvfcast/data/explanatory_variables/", anonymous = TRUE))
 dataset$schema
 ```
 
 As parquet files are a columnar format with structured metadata available in each file, some operations, such as filtering, summarizing, and inspecting the data schema can be applied directly to remote datasets without having to first download the full data. Calling collect() on the dataset will initiate the download. For example, the following will filter the data and then download the model data for a single day:
 
 ```
-dataset <- arrow::open_dataset("s3://open-rvfcast/data/africa_full_model_data") |> 
-filter(date == "2023-12-14") |> 
-collect()
+dataset <- arrow::open_dataset(arrow::s3_bucket("open-rvfcast/data/explanatory_variables/", anonymous = TRUE))
+  dplyr::filter(date == "2023-12-14") |> 
+  dplyr::collect()
+  
+dataset
 ```
 
-However, due to computational demands of such large data, the model analysis pipeline will download the data in entirety before analysis. In addition, the dataset has been subsetted to two randomly chosen days per month between 2007 and 2024.
+However, due to computational demands of such large data, the model analysis pipeline will download the data in entirety before analysis. In addition, the dataset has been subsetted to two randomly chosen days per month between 2007 and 2024. Future work will provide the entire dataset for every day between 2005 and the current year.
+
+The data targets that are subsetted this way are:
+
+1. weather_anomalies
+2. weather_anomalies_lagged
+3. forecasts_anomalies
+4. forecast_anomalies_lagged
+5. ndvi_anomalies
+6. ndvi_anomalies_lagged
+7. rvf_response
+8. africa_full_model_data
 
 ## 1. Data Acquisition Module
 
@@ -148,8 +161,10 @@ To account for the influence of outbreak history, we generated outbreak exposure
 
 A visualization of the data acquisition module can be found below. Additional targets not shown are responsible for fetching and storing intermediate datasets on the cloud. To run the data acquisition module, download the repository from github and run the following command. Note, without access to the common S3 bucket store this pipeline will take a significant amount of time and space to run. In addition, without access to the remote data store, the data acquisition module must be run before running the modeling module.
 
+The output of the data acquisition pipeline is an Africa wide dataset produced by joining every source above together. There are two versions. `africa_full_data` and `africa_full_rvf_model_data`. The first is the full dataset of explanatory variables and the second pairs that with RVF outbreak data as the response variable. The following command will start the data acquisition pipeline, either downloading pre-processed files from an AWS bucket or other cloud based resource or re-generating the data from the raw sources. The expected size of the full pipeline is >200Gb and so will require significant storage and time to run. Each day in the africa_ful_rvf_model_data is saved as a separate parquet file of ~500Mb. 
+
 ```
-tar_make(script = "data_acquisition_targets.R")
+tar_make(africa_full_rvf_model_data, script = "data_acquisition_targets.R")
 ```
 
 The schematic figure below summarizes the steps of the data acquisition module. The figure is generated using `mermaid.js` syntax and should display as a graph on GitHub.  It can also be viewed by pasting the code into <https://mermaid.live>.)

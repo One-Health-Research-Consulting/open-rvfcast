@@ -12,16 +12,20 @@ aggregate_augmented_data_by_adm <- function(augmented_data,
                                             rsa_polygon, 
                                             model_dates_selected) {
   
-  r <- arrow::read_parquet(glue::glue("{augmented_data}/date={model_dates_selected}/part-0.parquet")) |> 
-    rast() 
-  crs(r) <- crs(rast())
-  r <- mask(r, rsa_polygon) 
+  # #
+  # points_with_municipalities <- st_join(africa_points, rsa_polygon)
+  # 
   
-  p <- terra::extract(r, rsa_polygon, mean, na.rm = TRUE, weights = TRUE)
-  
-  bind_cols(rsa_polygon, p) |> 
-    as_tibble() |> 
-    mutate(date = model_dates_selected) |> 
-    select(date, shapeName, ID, names(p))
+  # r <- arrow::read_parquet(glue::glue("{augmented_data}/date={model_dates_selected}/part-0.parquet")) |> 
+  #   rast() 
+  # crs(r) <- crs(rast())
+  # r <- mask(r, rsa_polygon) 
+  # 
+  # p <- terra::extract(r, rsa_polygon, mean, na.rm = TRUE, weights = TRUE)
+  # 
+  # bind_cols(rsa_polygon, p) |> 
+  #   as_tibble() |> 
+  #   mutate(date = model_dates_selected) |> 
+  #   select(date, shapeName, ID, names(p))
 
 }
