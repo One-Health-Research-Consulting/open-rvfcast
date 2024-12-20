@@ -1,26 +1,30 @@
-#' Partition files for DuckDB database
+#' Partition Files using DuckDB
 #'
-#' This function is designed to partition files for the DuckDB database in R. 
-#' It takes in the sources of the files, path to store the partitioned files,
-#' the template for file naming and the range of years and months. 
+#' This function reads from various data sources, applies filters based on selected dates, 
+#' performs some data transformation, and writes out the data to a Parquet file. 
+#' If an existing file with the same name is found and overwrite is set to FALSE, 
+#' the function returns without any write operation.
 #'
 #' @author Nathan C. Layman
 #'
-#' @param sources The sources from where the files will be read.
-#' @param path The directory where the partitioned files will be stored. Default is "data/explanatory_variables".
-#' @param basename_template The template used to name the partitioned files. Default is "explanatory_variables_{.y}_{.m}".
-#' @param years The years for which the files need to be partitioned. Default is 2007:2010.
-#' @param months The months for which the files need to be partitioned. Default is 1:12.
+#' @param sources A named list of fully qualified file paths to parquet files.
+#' @param model_dates_selected A character vector of dates to filter data. Only one date is allowed in this vector.
+#' @param local_folder A character string indicating the data output directory. Default is 'data/africa_full_data'.
+#' @param basename_template A character string that will be used to create the output file name along with the selected date. Default is 'africa_full_data_{model_dates_selected}.parquet'.
+#' @param overwrite A logical indicating whether to overwrite an existing file if found. Default is FALSE.
+#' @param ... Additional arguments not used by this function but included for generic function compatibility.
 #'
-#' @return A string vector representing the filepath to each partitioned file.
+#' @return A string containing the filepath to the processed Parquet file.
 #'
-#' @note The function creates a connection with DuckDB database and loads file from each source. Then performs a join operation, next it partitions files 
-#' based on the selected years and months. The partitioned files are saved in Parquet format with the gzip codec.
+#' @note In case of an imbalanced schema in source files, the function will perform a Natural Join across 
+#' the sources using Spark's DataFrame API, else it will perform a Union All operation.
 #'
 #' @examples
-#' file_partition_duckdb(sources = list("source_path1","source_path2"),
-#' path = 'data/explanatory_variables', basename_template = "explanatory_variables_{.y}_{.m}",
-#' years = 2007: 2010,  months = 1:12 )  
+#' file_partition_duckdb(sources = list(s1 = "data/s1.parquet", s2 = "data/s2.parquet"),
+#'                       model_dates_selected = "2022-01-01",
+#'                       local_folder = "output",
+#'                       basename_template = "output_{model_dates_selected}.parquet",
+#'                       overwrite = TRUE)
 #'
 #' @export
 file_partition_duckdb <- function(sources, # A named, nested list of parquet files

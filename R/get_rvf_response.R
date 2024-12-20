@@ -1,5 +1,32 @@
-
-
+#' Retrieve and process RVF response data
+#'
+#' 'get_rvf_response' function downloads, transforms and saves the Rift Valley Fever (RVF) response data, 
+#' as an optimized Parquet file in the specified directory. If a file already exists at the target filepath, 
+#' it is used.
+#'
+#' @author Nathan C. Layman
+#'
+#' @param wahis_outbreaks Outbreak data to be processed.
+#' @param wahis_raster_template Template to be used for raster operations.
+#' @param forecast_intervals Intervals for which forecasts are to be made.
+#' @param model_dates_selected Dates for which predictions are to be made.
+#' @param local_folder Local folder where the processed files will be saved. This directory is created if it doesn't exist. Default is 'data/rvf_response'.
+#' @param save_filename Desired filename for the processed file. Default is 'rvf_response.gz.parquet'.
+#'
+#' @return A string containing the filepath to the processed file.
+#'
+#' @note This function handles data downloading, processing and saving. If a file already exists at the target 
+#' filepath, it is used and not overwritten.
+#'
+#' @examples
+#' get_rvf_response(wahis_outbreaks,
+#'                  wahis_raster_template,
+#'                  forecast_intervals,
+#'                  model_dates_selected,
+#'                  local_folder = "data/rvf_response",
+#'                  save_filename = "rvf_response.gz.parquet")
+#'
+#' @export
 get_rvf_response <- function(wahis_outbreaks,
                              wahis_raster_template,
                              forecast_intervals,

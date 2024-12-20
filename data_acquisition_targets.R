@@ -924,7 +924,8 @@ data_targets <- tar_plan(
   # from within duckdb which only supports setting compression level
   # for zstd and not gzip. The following target used arrow to write
   # the parquet files after joining in the response so we can use
-  # a higher compression level (5 vs 3).
+  # a higher compression level (5 vs 1?). 
+  # https://github.com/duckdb/duckdb/pull/11791
   tar_target(africa_full_rvf_model_data, join_response(rvf_response,
                                                        africa_full_data,
                                                        model_dates_selected,
