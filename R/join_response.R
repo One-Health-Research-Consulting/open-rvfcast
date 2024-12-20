@@ -25,7 +25,8 @@ join_response <- function(rvf_response,
     filter(date == model_dates_selected) |>
     left_join(arrow::open_dataset(rvf_response) |> select(-forecast_start, -forecast_end)) |>
     mutate(cases = coalesce(cases, 0)) |>
-    select(x, y, cases, date, forecast_interval, lag_interval, everything())
+    mutate(lag_interval = lag_interval_end) |>
+    select(x, y, cases, date, forecast_interval, lag_interval, everything(), -contains("lag_interval_"))
   
   # Write output to a parquet file
   arrow::write_parquet(result, save_filename, compression = "gzip", compression_level = 5)

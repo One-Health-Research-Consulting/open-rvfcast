@@ -855,7 +855,7 @@ derived_data_targets <- tar_plan(
 data_targets <- tar_plan(
   
   # outbreak layer --------------------------------------------------
-  tar_target(rvf_response_directory, create_data_directory(directory_path = "rvf_response")),
+  tar_target(rvf_response_directory, create_data_directory(directory_path = "data/rvf_response")),
   
   tar_target(rvf_response, get_rvf_response(wahis_outbreaks,
                                             wahis_raster_template,
@@ -918,6 +918,13 @@ data_targets <- tar_plan(
              error = "null",
              cue = parse_flag("OVERWRITE_AFRICA_FULL_RVF_MODEL_DATA", cue = "never")), # cue is what to do when flag == "TRUE"
   
+  # This actually produces smaller parquet files than the africa_full_data
+  # even though it is joining in the response column. This is because
+  # the compressed parquet file in the africa_full_data is written
+  # from within duckdb which only supports setting compression level
+  # for zstd and not gzip. The following target used arrow to write
+  # the parquet files after joining in the response so we can use
+  # a higher compression level (5 vs 3).
   tar_target(africa_full_rvf_model_data, join_response(rvf_response,
                                                        africa_full_data,
                                                        model_dates_selected,

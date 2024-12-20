@@ -7,6 +7,8 @@ get_rvf_response <- function(wahis_outbreaks,
                              local_folder = "data/rvf_response",
                              save_filename = "rvf_response.gz.parquet") {
   
+  save_filename <- file.path(local_folder, save_filename)
+  
   # Unwrap packed template raster
   wahis_raster_template <- terra::rast(wahis_raster_template)
   
