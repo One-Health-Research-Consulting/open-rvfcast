@@ -116,3 +116,22 @@ file_partition_duckdb <- function(sources, # A named, nested list of parquet fil
   save_filename
   
 }
+
+# Example duckdb join query generated above
+# COPY (
+#   SELECT DISTINCT * 
+#     FROM forecasts_anomalies 
+#     NATURAL JOIN weather_anomalies_lagged
+#     NATURAL JOIN ndvi_anomalies_lagged
+#     NATURAL JOIN weather_anomalies
+#     NATURAL JOIN ndvi_anomalies
+#     NATURAL JOIN soil_preprocessed
+#     NATURAL JOIN aspect_preprocessed
+#     NATURAL JOIN slope_preprocessed
+#     NATURAL JOIN glw_preprocessed
+#     NATURAL JOIN elevation_preprocessed
+#     NATURAL JOIN bioclim_preprocessed
+#     NATURAL JOIN landcover_preprocessed
+#     WHERE COLUMNS(*) IS NOT NULL
+# ) TO 'data/africa_full_rvf_model_data/africa_full_data_2005-01-14.parquet' 
+#     (FORMAT PARQUET, COMPRESSION 'GZIP');
