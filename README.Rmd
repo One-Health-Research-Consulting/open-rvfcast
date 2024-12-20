@@ -44,17 +44,17 @@ Project code is available on the [open-rvfcast](https://github.com/ecohealthalli
 We utilized parquet files and the `arrow` package in R as our primary method of storing data. Parquet files are optimized for high-performance, out-of-memory data processing, making it well-suited for efficiently handling and processing large, complex datasets. Additionally, `arrow::open_dataset()` supports seamless integration with cloud storage, enabling direct access to remote datasets, which improves workflow efficiency and scalability when working with large, distributed data sources. While the data acquisition module requires the processing of large datasets, the final cleaned data can be accessed directly from the cloud by opening the following connection:
 
 ```
-dataset <- arrow::open_dataset(arrow::s3_bucket("open-rvfcast/data/explanatory_variables/", anonymous = TRUE))
+dataset <- arrow::open_dataset(arrow::s3_bucket("open-rvfcast/data/africa_full_data/", anonymous = TRUE))
 dataset$schema
 ```
 
 As parquet files are a columnar format with structured metadata available in each file, some operations, such as filtering, summarizing, and inspecting the data schema can be applied directly to remote datasets without having to first download the full data. Calling collect() on the dataset will initiate the download. For example, the following will filter the data and then download the model data for a single day:
 
 ```
-dataset <- arrow::open_dataset(arrow::s3_bucket("open-rvfcast/data/explanatory_variables/", anonymous = TRUE))
-  dplyr::filter(date == "2023-12-14") |> 
+dataset <- arrow::open_dataset(arrow::s3_bucket("open-rvfcast/data/africa_full_data/", anonymous = TRUE)) |>
+  dplyr::filter(date == "2005-01-08") |> 
   dplyr::collect()
-  
+
 dataset
 ```
 
