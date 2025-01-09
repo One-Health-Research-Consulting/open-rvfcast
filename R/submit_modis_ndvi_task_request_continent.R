@@ -47,11 +47,11 @@ submit_modis_ndvi_task_request_continent <- function(end_date,
 
   # Check if a previous request already exists for that task in the task history
   current_tasks <- get_task_status_overview(modis_ndvi_token) |> 
-    filter(startDate == task$startDate, endDate == task$endDate, crashed == FALSE) |>
+    dplyr::filter(startDate == task$startDate, endDate == task$endDate, crashed == FALSE) |>
     arrange(status) |>
     slice(1)
-    
-  if(nrow(current_tasks)) {
+  
+  if(length(current_tasks$status) > 0 && current_tasks$status != "expired") {
     task_response <- tibble(task_id = current_tasks$task_id, status = current_tasks$status)
     } else {
       # post the task request

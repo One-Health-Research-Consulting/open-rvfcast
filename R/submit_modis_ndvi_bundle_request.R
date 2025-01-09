@@ -42,7 +42,7 @@ submit_modis_ndvi_bundle_request <- function(modis_ndvi_token,
   while(task_status != "done") {
     
     task_response <- httr::GET("https://appeears.earthdatacloud.nasa.gov/api/task", httr::add_headers(Authorization = modis_ndvi_token))
-    task_response <- jsonlite::fromJSON(jsonlite::toJSON(httr::content(task_response))) |> filter(task_id == !!task_id)
+    task_response <- jsonlite::fromJSON(jsonlite::toJSON(httr::content(task_response))) |> dplyr::filter(task_id == !!task_id)
     task_status <- task_response |> pull(status) |> unlist()
     assertthat::assert_that(task_status %in% c("queued", "pending", "processing", "done"))
     
@@ -61,12 +61,12 @@ submit_modis_ndvi_bundle_request <- function(modis_ndvi_token,
   
   bundle_response <- jsonlite::fromJSON(jsonlite::toJSON(httr::content(bundle_response))) |> 
     bind_cols() |> 
-    filter(file_type == "tif", grepl("NDVI", file_name)) |>
+    dplyr::filter(file_type == "tif", grepl("NDVI", file_name)) |>
     mutate(year_doy = sub(".*doy(\\d+).*", "\\1", file_name),
            start_date = as.Date(year_doy, format = "%Y%j"),
            year = year(start_date)) |> # confirmed this is start date through manual download test
     arrange(start_date) |> 
-    filter(year == modis_ndvi_task_id_continent$year) # Ensure we're not getting stuff outside the requested year which might lead to dupes
+    dplyr::filter(year == modis_ndvi_task_id_continent$year) # Ensure we're not getting stuff outside the requested year which might lead to dupes
   
   # Return bundle response files
   return(bundle_response)
@@ -100,13 +100,13 @@ delete_appears_task <- function(modis_ndvi_token, task_id) {
 }
 
 delete_crashed_tasks <- function(modis_ndvi_token) {
-  crashed_tasks <- get_task_status_overview(modis_ndvi_token) |> filter(crashed == TRUE) |> pull(task_id)
+  crashed_tasks <- get_task_status_overview(modis_ndvi_token) |> dplyr::filter(crashed == TRUE) |> pull(task_id)
   
   map(crashed_tasks, ~delete_appears_task(modis_ndvi_token, .x))
 }
 
 delete_all_current_tasks <- function(modis_ndvi_token) {
-  current_tasks <- get_task_status_overview(modis_ndvi_token) |> filter(status %in% c("queued", "pending", "processing")) |> pull(task_id)
+  current_tasks <- get_task_status_overview(modis_ndvi_token) |> dplyr::filter(status %in% c("queued", "pending", "processing")) |> pull(task_id)
   
   map(current_tasks, ~delete_appears_task(modis_ndvi_token, .x))
 }

@@ -354,13 +354,13 @@ dynamic_targets <- tar_plan(
   # gganimate took 20 minutes per file.
   # just saving all the frames as separate pngs
   # and combining with gifski took 50 minutes for all of them.
-  tar_target(wahis_outbreak_history_animations, get_outbreak_history_animation(wahis_outbreak_history,
+  tar_target(t, get_outbreak_history_animation(wahis_outbreak_history,
                                                                                wahis_outbreak_history_animation_metadata,
                                                                                wahis_outbreak_history_animations_directory,
-                                                                               overwrite = parse_flag("OVERWRITE_OUTBREAK_HISTORY"), # Just included to enforce dependency with wahis_outbreak_history
-                                                                               pattern = map(wahis_outbreak_history_animation_metadata),
-                                                                               error = "null",
-                                                                               repository = "local")),
+                                                                               overwrite = parse_flag("OVERWRITE_OUTBREAK_HISTORY")), # Just included to enforce dependency with wahis_outbreak_history
+             pattern = map(wahis_outbreak_history_animation_metadata),
+             error = "null",
+             repository = "local"),
   
   tar_target(wahis_outbreak_history_animations_AWS_upload, AWS_put_files(wahis_outbreak_history_animations,
                                                                          wahis_outbreak_history_animations_directory),
