@@ -942,22 +942,38 @@ data_targets <- tar_plan(
                                                               africa_full_rvf_model_data_directory),
              error = "null"),
   
-  # Full model data also has the RVF response added.
+  # Aggregate data down to a specified set of sf multipolygons.
+  # This involves aggregating a bunch of different types of data.
+  # We specified the aggregating function for each variable by hand
+  tar_target(predictor_aggregating_functions, read_csv("data/predictor_summary.csv")),
+  
   tar_target(RSA_rvf_model_data_directory,
              create_data_directory(directory_path = "data/RSA_rvf_model_data")),
   
-  # Check if combined_anomalies parquet files already exists on AWS and can be loaded
+  # Check if RSA_rvf_model_data parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(RSA_rvf_model_data_AWS, AWS_get_folder(RSA_rvf_model_data_directory,
                                                     africa_full_rvf_model_data),
              error = "null",
              cue = parse_flag("OVERWRITE_AFRICA_FULL_RVF_MODEL_DATA", cue = "never")), # cue is what to do when flag == "TRUE"
   
-  tar_target(aggregated_data_rsa,
-             aggregate_augmented_data_by_adm(augmented_data,
-                                             rsa_polygon,
-                                             model_dates_selected),
-             pattern = model_dates_selected),
+  tar_target(RSA_rvf_model_data, spatial_aggregate_arrow(africa_full_rvf_model_data,
+                                                         rsa_polygon,
+                                                         predictor_aggregating_functions,
+                                                         model_dates_selected,
+                                                         local_folder = "data/RSA_rvf_model_data",
+                                                         basename_template = "RSA_rvf_model_data_{model_dates_selected}.parquet",
+                                                         overwrite = parse_flag("OVERWRITE_AFRICA_FULL_RVF_MODEL_DATA"),
+                                                         RSA_rvf_model_data_AWS), # Enforce dependency
+             pattern = map(model_dates_selected),
+             format = "file", 
+             repository = "local"),
+  
+  # Next step put combined_anomalies files on AWS.
+  tar_target(RSA_rvf_model_data_AWS_upload, AWS_put_files(RSA_rvf_model_data,
+                                                                  RSA_rvf_model_data_directory),
+             error = "null"),
+  
   
 )
 

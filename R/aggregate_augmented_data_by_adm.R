@@ -8,9 +8,20 @@
 #' @return
 #' @author Emma Mendelsohn
 #' @export
-aggregate_augmented_data_by_adm <- function(augmented_data, 
-                                            rsa_polygon, 
+aggregate_augmented_data_by_adm <- function(parquet_file_list, 
+                                            sf_df, 
+                                            predictor_aggregating_functions,
                                             model_dates_selected) {
+  
+  
+  arrow_db <- arrow::open_dataset(parquet_file_list)
+  
+  # Check that the setdiff between variable names and predictor_aggregating_functions is zero
+  # if not we need to update the predictor_aggregating_function csv file
+  if(length(setdiff(predictor_aggregating_functions$var, arrow_db$schema$names)) != 0) {
+    stop("predictor_summary.csv does not match the columns in the provided data. Harmonize before preceeding.")
+  }  
+  
   
   # #
   # points_with_municipalities <- st_join(africa_points, rsa_polygon)
