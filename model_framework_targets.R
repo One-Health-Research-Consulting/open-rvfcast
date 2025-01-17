@@ -20,10 +20,12 @@ parse_flag <- function(flags, cue = F) {
   flags
 }
 
-# Download the data fromt the S3 bucket and partition into training, validation, and test splits
-data_partitioning_targets <- tar_plan(
+# Download the data from the S3 bucket and partition into training, validation, and test splits
+data_targets <- tar_plan(
   
-  tar_target()
+  tar_target(RSA_data, arrow::open_dataset("s3://open-rvfcast/data/RSA_rvf_model_data") |> 
+               collect() |>
+               pivot_wider(names_from = lag_interval, values_from = c("ndvi_anomalies", "weather_anomolies"))),
   
 )
 
@@ -193,7 +195,7 @@ documentation_targets <- tar_plan(
 
 # List targets -----------------------------------------------------------------
 # all_targets() doesn't work with tarchetypes like tar_change().
-list(data_partitioning,
+list(data_targets,
      modeling_targets,
      model_performance_targets,
      report_targets,
