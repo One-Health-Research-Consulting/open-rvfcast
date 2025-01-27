@@ -78,6 +78,10 @@ spatial_aggregate_arrow <- function(parquet_file_list,
       across(all_of(mode_vars), ~ mode_fn(.x), .names = "{.col}_mode"),
       .groups = "drop")
   
+  result <- result |> left_join(polygons_sf |> mutate(area = sf::st_area(polygons_sf)) |>
+                                  as_tibble() |>
+                                  select(shapeName, area))
+  
   # Write output to a parquet file
   arrow::write_parquet(result, save_filename, compression = "gzip", compression_level = 5)
   

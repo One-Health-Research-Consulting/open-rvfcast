@@ -32,7 +32,8 @@ data_targets <- tar_plan(
 # Model -----------------------------------------------------------
 modeling_targets <- tar_plan(
   
-  
+  tar_target(training_data, RSA_data |> filter(date <= "2017-12-31")),
+  tar_target(holdout_data, RSA_data |> filter(date > "2017-12-31")),
   
   # # RSA --------------------------------------------------
   # tar_target(augmented_data_rsa_directory,
@@ -114,7 +115,7 @@ modeling_targets <- tar_plan(
   #                                   skip = rolling_n - 1)),
   # 
   # # tuning
-  # tar_target(tuned, model_tune(wf, splits, grid)),
+  tar_target(tuned, model_tune(wf, splits, grid)),
   
   # final model
   # tar_target(final, {
@@ -178,6 +179,8 @@ modeling_targets <- tar_plan(
 )
 
 # Reports -----------------------------------------------------------
+# The goal is to compare model performance. 
+# We want a plot with ROC curves for every different model specification
 model_performance_targets <- tar_plan(
   
 )
