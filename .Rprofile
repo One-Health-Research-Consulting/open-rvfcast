@@ -57,3 +57,20 @@ if(interactive()){
   require(targets)
   require(tidyverse)
 }
+
+if (interactive() && Sys.getenv("TERM_PROGRAM") == "vscode") {
+  options(vsc.dev.args = list(
+    width = 1500,
+    height = 1500,
+    pointsize = 12,
+    res = 300
+  ))
+
+  if (requireNamespace("httpgd", quietly = TRUE)) {
+    options(vsc.plot = FALSE)
+    options(device = function(...) {
+      httpgd::hgd(silent = TRUE)
+      .vsc.browser(httpgd::hgd_url(history = FALSE), viewer = "Beside")
+    })
+  }
+}
