@@ -37,12 +37,16 @@ lag_data <- function(data_files,
     arrow::open_dataset(data_files) |> 
       filter(date > start_date, date <= end_date) |>
       collect() |>
-      group_by(x, y, date, doy, month, year) |> 
-      summarize(across(everything(), ~mean(.x, na.rm = T)), .groups = "drop") |>
-      mutate(lag_interval_start = lag_interval_start,
-             lag_interval_end = lag_interval_end) 
-    
-  })
+      group_by(x, y) |> 
+      summarize(across(contains("anomaly"), ~mean(.x, na.rm = T)), .groups = "drop") |>
+      mutate(lag_interval_start = abs(lag_interval_start)) |>
+      select(x, y, lag_interval_start, everything())
+  }) |>       
+    pivot_wider(names_from = lag_interval_start, 
+                values_from = -c(x, y, lag_interval_start),
+                names_glue = "{.value}_lag_{lag_interval_start}") |>
+    mutate(date = model_dates_selected) |>
+    select(x, y, date, everything())
   
   arrow::write_parquet(lagged_data, save_filename, compression = "gzip", compression_level = 5)
   

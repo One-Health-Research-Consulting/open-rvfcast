@@ -880,10 +880,10 @@ data_targets <- tar_plan(
   # Partition into separate parquet files by month and year.
   # Why NO WAY to deparse substitute a list of variables?
   tar_target(africa_full_data_sources, list(forecasts_anomalies = forecasts_anomalies,
-                                            weather_anomalies_lagged = weather_anomalies_lagged,
-                                            ndvi_anomalies_lagged = ndvi_anomalies_lagged,
                                             weather_anomalies = weather_anomalies,
+                                            weather_anomalies_lagged = weather_anomalies_lagged,
                                             ndvi_anomalies = ndvi_anomalies,
+                                            ndvi_anomalies_lagged = ndvi_anomalies_lagged,
                                             soil_preprocessed = soil_preprocessed,
                                             aspect_preprocessed = aspect_preprocessed,
                                             slope_preprocessed = slope_preprocessed,
