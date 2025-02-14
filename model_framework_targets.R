@@ -1,5 +1,5 @@
 # Re-record current dependencies for CAPSULE users
-if(Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true"))
+if (Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true"))
   capsule::capshot(c("packages.R",
                      list.files(pattern = "_targets.*\\.(r|R)$", full.names = TRUE),
                      list.files("R", pattern = "\\.(R|r)$", full.names = TRUE)))
@@ -8,7 +8,7 @@ if(Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true"))
 suppressPackageStartupMessages(source("packages.R"))
 for (f in list.files(here::here("R"), full.names = TRUE)) source (f)
 
-aws_bucket = Sys.getenv("AWS_BUCKET_ID")
+aws_bucket <- Sys.getenv("AWS_BUCKET_ID")
 
 # Targets options
 source("_targets_settings.R")
@@ -16,22 +16,19 @@ source("_targets_settings.R")
 # Convenience function to format .env flags properly for overwrite parameter and target cues
 parse_flag <- function(flags, cue = F) {
   flags <- any(as.logical(Sys.getenv(flags, unset = "FALSE")))
-  if(cue) flags <- tar_cue(ifelse(flags, "always", "thorough"))
+  if (cue) flags <- targets::tar_cue(ifelse(flags, "always", "thorough"))
   flags
 }
 
 # Download the data from the S3 bucket and partition into training, validation, and test splits
 data_targets <- tar_plan(
-  
   tar_target(RSA_data, arrow::open_dataset("s3://open-rvfcast/data/RSA_rvf_model_data") |> 
                collect() |>
                pivot_wider(names_from = lag_interval, values_from = c("ndvi_anomalies", "weather_anomolies"))),
-  
 )
 
 # Model -----------------------------------------------------------
 modeling_targets <- tar_plan(
-  
   tar_target(training_data, RSA_data |> filter(date <= "2017-12-31")),
   tar_target(holdout_data, RSA_data |> filter(date > "2017-12-31")),
   
@@ -165,17 +162,12 @@ modeling_targets <- tar_plan(
   #     ceteris_paribus_layer(cPplot, show_rugs = TRUE)
   #   
   #   
-  # }),
-  
-  
+  # }),  
   
   #TODO fit final model
   #TODO test that interaction constraints worked - a) extract model object b) cp - 
   # need the conditional effect - area is x, y is effect, should not change when you change other stuff
   # ceteris parabus plots - should be parallel - points can differ but profile should be the same - expectation is that it is linear if doing it on area
-  
-  
-  
 )
 
 # Reports -----------------------------------------------------------

@@ -1,0 +1,68 @@
+---
+tz = "America/New_York"title: "Model Performance Report"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    embed-resources: true
+    page-layout: full
+---
+
+# Model Performance Report
+
+## Test
+
+```{r setup}
+#| echo: false
+library(spatialsample)
+library(rsample)
+library(yardstick)
+library(tidymodels)
+library(vip)
+library(git2r)
+library(xgboost)
+
+commit <- sha(repository_head()) |> substr(1, 7)
+branch <- repository_head()$name
+print(glue::glue("Rendered: {lubridate::now(tz = 'America/New_York')} EDT\nFrom: {commit} {branch}"))
+```
+
+```{r}
+source("scripts/spatiotemporal_cv.R")
+```
+
+::: panel-tabset
+## CV
+```{r}
+
+```
+
+## Model Diagnostics
+```{r}
+
+
+```
+
+## Performance Metrics
+```{r}
+
+```
+
+## ROC
+```{r}
+# Plot the ROC curve
+autoplot(roc_data)
+```
+
+## Ceteris Paribus
+```{r}
+
+```
+
+## Feature Importance
+```{r}
+# Use Gain for understanding feature impact on predictions, Frequency for how often a feature is used.
+xgb.plot.importance(importance_matrix = importance)
+```
+
+:::

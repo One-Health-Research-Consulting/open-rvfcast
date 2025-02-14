@@ -1,34 +1,34 @@
-{
-  "version": "2.0.0",
-  "inputs": [
-    {
-      "id": "RTerm",
-      "type": "command",
-      "command": "runCommands",
-      "args": {
-        "commands": [
-          // commands to run in sequence
-          "r.createRTerm",
-          "workbench.action.terminal.moveToEditor",
-          "foam-vscode.open-daily-note",
-          "editor.action.copyLinesDownAction"
-        ]
-      }
-    }
-  ],
-  "tasks": [
-    {
-      "label": "Startup R Terminal",
-      "type": "process",
-      "command": "${input:RTerm}",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      },
-      "runOptions": {
-        "runOn": "folderOpen"
-      }
-    }
-  ]
-}
+// {
+//   "version": "2.0.0",
+//   "inputs": [
+//     {
+//       "id": "RTerm",
+//       "type": "command",
+//       "command": "runCommands",
+//       "args": {
+//         "commands": [
+//           // commands to run in sequence
+//           "r.createRTerm",
+//           "workbench.action.terminal.moveToEditor",
+//           "foam-vscode.open-daily-note",
+//           "editor.action.copyLinesDownAction"
+//         ]
+//       }
+//     }
+//   ],
+//   "tasks": [
+//     {
+//       "label": "Startup R Terminal",
+//       "type": "process",
+//       "command": "${input:RTerm}",
+//       "problemMatcher": [],
+//       "presentation": {
+//         "reveal": "always",
+//         "panel": "new"
+//       },
+//       "runOptions": {
+//         "runOn": "folderOpen"
+//       }
+//     }
+//   ]
+// }

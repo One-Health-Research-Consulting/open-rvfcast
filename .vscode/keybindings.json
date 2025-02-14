@@ -1,9 +1,10 @@
 // Place your key bindings in this file to override the defaults
 [
     {
-      "key": "cmd+shift+n",
+      "key": "shift+cmd+n",
       "command": "foam-vscode.create-note"
     },
+    
     {
       "key": "cmd+shift+d",
       "command": "foam-vscode.open-daily-note"

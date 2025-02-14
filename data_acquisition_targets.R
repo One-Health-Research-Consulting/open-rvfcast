@@ -1,5 +1,5 @@
 # Re-record current dependencies for CAPSULE users
-if(Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true"))
+if (Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true"))
   capsule::capshot(c("packages.R",
                      list.files(pattern = "_targets.*\\.(r|R)$", full.names = TRUE),
                      list.files("R", pattern = "\\.(R|r)$", full.names = TRUE)))

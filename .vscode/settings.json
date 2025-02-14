@@ -1,29 +1,42 @@
 {
-    "files.autoSave": "onFocusChange",
-    "editor.minimap.enabled": false,
-    "editor.wrappingIndent": "indent",
-    "editor.overviewRulerBorder": false,
-    "editor.lineHeight": 24,
-    "foam.edit.linkReferenceDefinitions": "withExtensions",
-    "[markdown]": {
-      "editor.quickSuggestions": {
-        "other": true,
-        "comments": false,
-        "strings": false
-      }
-    },
-    "git.enableSmartCommit": true,
-    "git.postCommitCommand": "sync",
-    "foam.openDailyNote.directory": "resources/notes",
-    "foam.openDailyNote.titleFormat": "fullDate",
-    "foam.files.newNotePath": "currentDir",
-    "files.exclude": {
-      // Hide everything except the "notes" folder
-      "renv/**/*": true
-    },
-    "files.insertFinalNewline": true,
-    "markdown.styles": [".vscode/custom-tag-style.css"],
-    "r.bracketedPaste": true,
-    "r.plot.useHttpgd": true,
-    "task.allowAutomaticTasks": "on"
-  }
+  "files.autoSave": "onFocusChange",
+  "editor.minimap.enabled": false,
+  "editor.wrappingIndent": "indent",
+  "editor.overviewRulerBorder": false,
+  "editor.lineHeight": 24,
+  "foam.edit.linkReferenceDefinitions": "withExtensions",
+  "foam.openDailyNote.titleFormat": "fullDate",
+  "foam.openDailyNote.directory": "resources/notes",
+  "foam.openDailyNote.fileExtension": "qmd",
+  "foam.files.notesExtensions": "qmd",
+  "foam.supportedLanguages": ["markdown", "quarto", "rmarkdown"],
+  "git.enableSmartCommit": true,
+  "git.postCommitCommand": "sync",
+  "files.exclude": {
+    "_site/**": true,
+    "renv/**/*": true
+  },
+  "files.insertFinalNewline": true,
+  "markdown.styles": [".vscode/custom-tag-style.css"],
+  // "markdownlint.config": {
+  //   "MD007": false,
+  //   "MD030": false
+  // },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.quickSuggestions": {
+      "other": true,
+      "comments": false,
+      "strings": false
+    }
+  },
+  "[quarto]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+  },
+  "r.rterm.option": ["--no-save"],
+  //"r.rterm.mac": "/Users/nathanlayman/Documents/personal_repos/notes/.pixi/envs/default/bin/radian",
+  "r.bracketedPaste": false,
+  "r.plot.useHttpgd": true
+}

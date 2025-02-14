@@ -177,5 +177,3 @@ holdout_predictions <- predict(trained_workflow, new_data = holdout_data, type =
 roc_data <- holdout_predictions |>
   roc_curve(truth = outbreak, .pred_1)
 
-# Plot the ROC curve
-autoplot(roc_data)
