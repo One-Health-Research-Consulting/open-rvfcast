@@ -17,7 +17,9 @@
 #' AWS_get_folder(local_folder = "./data")
 #'
 #' @export
-AWS_get_folder <- function(local_folder, ...) {
+AWS_get_folder <- function(local_folder, 
+                           skip_fetch = FALSE,
+                           ...) {
   
   # Check if AWS credentials and region are set in the environment
   if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
@@ -61,12 +63,18 @@ AWS_get_folder <- function(local_folder, ...) {
   downloaded_files <- c()
   
   # Loop through S3 files and download if they don't exist locally
-  # NCL AND THEY CAN BE OPENED!!
+  # or if the local copy can't be read
   for (file in s3_files) {
     
     # Check if file already exists locally
     if (!file %in% local_files) {
       
+      if(skip_fetch) {
+        cat("Skipping:", file, "\n")
+        downloaded_files <- c(downloaded_files, file) 
+        next
+      }
+
       # Download the file from S3
       s3_download <- s3$get_object(
         Bucket = Sys.getenv("AWS_BUCKET_ID"),

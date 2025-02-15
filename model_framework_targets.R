@@ -1,3 +1,7 @@
+# This repository uses targets projects. 
+# To switch to the modeling pipeline run:
+# Sys.setenv(TAR_PROJECT = "model")
+
 # Re-record current dependencies for CAPSULE users
 if (Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true"))
   capsule::capshot(c("packages.R",
@@ -31,6 +35,21 @@ data_targets <- tar_plan(
 modeling_targets <- tar_plan(
   tar_target(training_data, RSA_data |> filter(date <= "2017-12-31")),
   tar_target(holdout_data, RSA_data |> filter(date > "2017-12-31")),
+
+  tar_target(folds),
+
+  tar_target(xgb_mod),
+
+  tar_target(xgb_grid),
+
+  tar_target(xgb_recipe),
+
+  tar_target(xgb_metrics),
+
+  
+
+
+
   
   # # RSA --------------------------------------------------
   # tar_target(augmented_data_rsa_directory,

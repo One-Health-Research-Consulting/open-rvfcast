@@ -6,10 +6,10 @@ output: github_document
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  fig.path = "man/figures/README-",
-  out.width = "100%"
+    collapse = TRUE,
+    comment = "#>",
+    fig.path = "man/figures/README-",
+    out.width = "100%"
 )
 ```
 
@@ -136,7 +136,7 @@ The following data sources are static, or time-invariant. Raw static data was do
 Dynamic data sources are those that vary with time. Dynamic predictors can be highly conflated with each other due to a shared dependence on time, to account for this shared dependence, we used calculated the anomaly, or difference between current values and historical means, instead of using the raw values. Anomalies were calculated by first determining the difference between the current value and its historical mean for that day-of-year (DOY) and scaled by dividing by the standard deviation for that DOY. Focusing on anomalous values helped mitigate the strong correlation with time that naturally exists in environmental variables like temperature and NDVI. Seasonality was then accounted for by including year and day-of-year (DOY) as predictors in the model. The following sources make up the dynamic layers:
 
 8. [weather_anomalies](): NASA weather data was acquired across Africa using the `get_power()` function of the [nasapower](https://docs.ropensci.org/nasapower/) package in R which provides access to NASA meteorological data from the [NASAPOWER](https://power.larc.nasa.gov/) project. The difference, or anomaly value, was then found by subtracting each weather value from the average value for that day-of-year (DOY).
-9. ndvi_anomalies: NDVI data was sourced from both the NASA's Moderate Resolution Imaging Spectroradiometer ([MODIS](https://modis.gsfc.nasa.gov/data/dataprod/mod13.php)) and the European Space Agency's Copernicus [Sentinel-3](https://user.eumetsat.int/catalogue/EO:EUM:DAT:0340) missions. MODIS is due to be retired in 2025 while Sentinel-3 NDVI data is available from September 2018. MODIS and Sentinel-3 NDVI values were interpolated to a daily interval from their native 16 day (MODIS) and ~10 day (Sentinel-3) intervals using a step-function. NDVI values were averaged when data from both sources were available. The difference, or anomaly value, was then found by subtracting NDVI from the average value for that day-of-year (DOY).
+9. ndvi_anomalies: NDVI data was sourced from both the NASA's Moderate Resolution Imaging Spectroradiometer ([MODIS](https://modis.gsfc.nasa.gov/data/dataprod/mod13)) and the European Space Agency's Copernicus [Sentinel-3](https://user.eumetsat.int/catalogue/EO:EUM:DAT:0340) missions. MODIS is due to be retired in 2025 while Sentinel-3 NDVI data is available from September 2018. MODIS and Sentinel-3 NDVI values were interpolated to a daily interval from their native 16 day (MODIS) and ~10 day (Sentinel-3) intervals using a step-function. NDVI values were averaged when data from both sources were available. The difference, or anomaly value, was then found by subtracting NDVI from the average value for that day-of-year (DOY).
 
 ##### Weather Forecasts
 

@@ -51,17 +51,24 @@ transform_nasa_weather <- function(nasa_weather_coordinates,
   # nasapower seems like it only does one call per point?
   # Why can't we just do the entire continent?
   nasa_recorded_weather <- map_dfr(1:nrow(coords), .progress = T, function(i) {
-    nasapower::get_power(community = "ag",
-                         lonlat = c(coords[i,]$x_1,
-                                    coords[i,]$y_1, 
-                                    coords[i,]$x_2, 
-                                    coords[i,]$y_2), # xmin (W), ymin (S), xmax (E), ymax (N)
-                         pars = nasa_weather_variables,
-                         dates = dates,
-                         temporal_api = "daily")
+
+    map(nasa_weather_variables, function(j) {
+
+      nasapower::get_power(community = "ag",
+                        lonlat = c(coords[i,]$x_1,
+                                   coords[i,]$y_1,
+                                   coords[i,]$x_2,
+                                   coords[i,]$y_2), # xmin (W), ymin (S), xmax (E), ymax (N)
+                        pars = j,
+                        dates = dates,
+                        temporal_api = "daily")
+    }) |>
+    plyr::join_all() |>
+    as_tibble() |> 
+    suppressMessages()
   })
-  
-  nasa_weather_transformed <- nasa_recorded_weather |> 
+
+  nasa_weather_transformed <- nasa_recorded_weather |>
     distinct() |>
     rename_all(tolower) |> 
     rename(relative_humidity = rh2m, temperature = t2m, precipitation= prectotcorr,

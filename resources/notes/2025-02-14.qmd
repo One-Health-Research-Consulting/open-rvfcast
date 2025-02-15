@@ -1,0 +1,40 @@
+# Friday, February 14, 2025
+
+## Data acquisition pipeline
+
+### Bugs
+
+1. Initial run of pipeline and _AWS targets as dependencies.
+   1. Switch from cues to overwrite flag for AWS function. If true return null
+2. package `x` was built under R version 4.3.3. Update R? Rig? Pixi?
+
+## General
+
+
+### TODO 
+
+- [ ] Switch over to targets projects (may invove re-running the whole data acquisition pipeline so make sure AWS is up to date first)
+- [ ] Clean up weekly TODOs into discrete issues
+- [ ] Add milestone for finishing data acquisition pipeline. 
+- [ ] Devise pipeline tests for Noam and document
+- [ ] Transfer notes to relevant issues.
+  
+## Report
+
+1. Targets that are performance summary statistics. Not terribly large
+2. Object with residuals.
+3. List or table with performance summary statistics.
+4. Integrate with RELIC so we can look at performance over these versions.
+5. Plot showing how performance improves.
+6. tar_read_version() tar_read_raw_version()
+   1. Looks up AWS reference and looks 
+   2. Will need to commit and push every time
+   3. AWS based targets
+7. Add calibration
+8. Set up to run pipeline in docker run command. 
+   1. Docker run image tar_make()
+
+## Servers
+
+1. Moving from EHA will likely involve a full wipe
+2. 
