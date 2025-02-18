@@ -70,7 +70,7 @@ AWS_get_folder <- function(local_folder,
     if (!file %in% local_files) {
       
       if(skip_fetch) {
-        cat("Skipping:", file, "\n")
+        cat("Skipped fetching AWS file: ", file, ".\n")
         downloaded_files <- c(downloaded_files, file) 
         next
       }
@@ -83,7 +83,7 @@ AWS_get_folder <- function(local_folder,
       # Write output to file
       writeBin(s3_download$Body, con = file)
       
-      cat("Downloaded:", file, "\n")
+      cat("Downloaded AWS file:", file, "\n")
       
       # Create an error safe way to test if the parquet file can be read
       error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
