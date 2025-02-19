@@ -4,6 +4,7 @@
   "editor.wrappingIndent": "indent",
   "editor.overviewRulerBorder": false,
   "editor.lineHeight": 24,
+  "terminal.integrated.altClickMovesCursor": true,
   "foam.edit.linkReferenceDefinitions": "withExtensions",
   "foam.openDailyNote.titleFormat": "fullDate",
   "foam.openDailyNote.directory": "resources/notes",

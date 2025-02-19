@@ -910,7 +910,7 @@ data_targets <- tar_plan(
                                             landcover_preprocessed = landcover_preprocessed)),
   
   # Join all explanatory variable data sources using file based partitioning instead of hive
-  # error needs to be null here because some predictors (like wahis_outbreak_sources) aren't
+  # error needs to be null here because some prsedictors (like wahis_outbreak_sources) aren't
   # present in all times.
   tar_target(africa_full_data, file_partition_duckdb(sources = africa_full_data_sources,
                                                      model_dates_selected,

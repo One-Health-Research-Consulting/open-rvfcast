@@ -59,6 +59,7 @@ if(interactive()){
 }
 
 if (interactive() && Sys.getenv("TERM_PROGRAM") == "vscode") {
+
   options(vsc.dev.args = list(
     width = 1500,
     height = 1500,

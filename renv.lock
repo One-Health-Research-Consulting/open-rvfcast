@@ -7,10 +7,6 @@
         "URL": "https://cloud.r-project.org"
       },
       {
-        "Name": "MILESMCBAIN",
-        "URL": "https://milesmcbin.r-universe.dev"
-      },
-      {
         "Name": "ROPENSCI",
         "URL": "https://ropensci.r-universe.dev"
       }
@@ -1104,7 +1100,7 @@
     "capsule": {
       "Package": "capsule",
       "Version": "0.4.2",
-      "Source": "unknown",
+      "Source": "GitHub",
       "Title": "A streamlined inversion of `renv`",
       "Authors@R": "c(person(given = \"Miles\", family = \"McBain\", role = c(\"aut\", \"cre\"), email = \"miles.mcbain@gmail.com\", comment = c(ORCID = \"0000-0003-2865-2548\")), person(given = \"Garrick\", family = \"Aden-Buie\", role = c(\"aut\"), email = \"garrick@adenbuie.com\"))",
       "Description": "A `capsule` is a stable local package library that you consciously choose to execute code within. Think of it as representing 'production', while your normal interactive R session represents 'development'.",
@@ -1130,8 +1126,10 @@
       "Copyright": "2022 Miles McBain, unless noted. Some MIT licensed code taken from RStudio bears Copyright in comments.",
       "Author": "Miles McBain [aut, cre] (<https://orcid.org/0000-0003-2865-2548>), Garrick Aden-Buie [aut]",
       "Maintainer": "Miles McBain <miles.mcbain@gmail.com>",
-      "RemoteType": "repository",
-      "RemoteUrl": "https://github.com/milesmcbain/capsule",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "MilesMcBain",
+      "RemoteRepo": "capsule",
       "RemoteRef": "master",
       "RemoteSha": "401d0c98adc329c17d0bb129069c9ec220a26646",
       "Remotes": "anthonynorth/using"
