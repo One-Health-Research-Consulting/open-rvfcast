@@ -86,7 +86,8 @@ file_partition_duckdb <- function(sources, # A named, nested list of parquet fil
       
       # If not: inner join all files
       parquet_list <- glue::glue("({parquet_list})")
-      parquet_list <- glue::glue("{parquet_list} AS {tools::file_path_sans_ext(basename(list_of_files))}")
+      as_names <- gsub('\\..*', '', basename(list_of_files))
+      parquet_list <- glue::glue("{parquet_list} AS {gsub('-', '_', as_names)}")
       parquet_list <- paste0("SELECT * FROM ", paste(parquet_list, collapse = " NATURAL JOIN "))
     }
     

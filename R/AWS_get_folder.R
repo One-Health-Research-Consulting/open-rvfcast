@@ -70,7 +70,7 @@ AWS_get_folder <- function(local_folder,
     if (!file %in% local_files) {
       
       if(skip_fetch) {
-        cat("Skipped fetching AWS file: ", file, ".\n")
+        cat("Skipped fetching AWS file: ", file, ".\n", sep = "")
         downloaded_files <- c(downloaded_files, file) 
         next
       }

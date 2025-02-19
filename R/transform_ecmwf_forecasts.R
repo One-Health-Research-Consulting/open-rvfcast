@@ -23,6 +23,7 @@
 transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
                                       ecmwf_forecasts_transformed_directory,
                                       continent_raster_template,
+                                      basename_template = "ecmwf_seasonal_forecast_{month}_{year}.parquet",
                                       overwrite = FALSE,
                                       ...) {
   
@@ -33,7 +34,7 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   year <- ecmwf_forecasts_api_parameters$year
   month <- unlist(ecmwf_forecasts_api_parameters$month)
   
-  transformed_file <- file.path(ecmwf_forecasts_transformed_directory, glue::glue("ecmwf_seasonal_forecast_{month}_{year}.gz.parquet"))
+  transformed_file <- file.path(ecmwf_forecasts_transformed_directory, glue::glue(basename_template))
   
   # Check if transformed file already exists and can be loaded. 
   # If so return file name and path **unless it's the current year**

@@ -1,0 +1,6 @@
+# Tuesday, February 18, 2025
+
+## Switching to '.parquet.gz'
+1. soil_preprocessed
+2. aspect_preprocessed
+3. 

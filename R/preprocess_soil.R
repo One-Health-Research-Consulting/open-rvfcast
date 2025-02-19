@@ -6,7 +6,7 @@
 #' 
 #' @author Nathan C. Layman & Whitney Bagge
 #'
-#' @param soil_directory_dataset Directory where the soil dataset and preprocessed files will be stored.
+#' @param soil_directory Directory where the soil dataset and preprocessed files will be stored.
 #' @param continent_raster_template Template to be used for projecting the soil raster file.
 #' @param overwrite Boolean flag determining whether the processing should be done if a preprocessed file already exists. Default is FALSE.
 #' @param ... Additional arguments not used by this function but included for compatibility with generic functions
@@ -18,13 +18,14 @@
 #' before saving the processed file as 'soil_preprocessed.parquet'.
 #'
 #' @examples
-#' preprocess_soil(soil_directory_dataset = "./data",
+#' preprocess_soil(soil_directory = "./data",
 #'                 continent_raster_template = raster_template,
 #'                 overwrite = TRUE)
 #'
 #' @export
-preprocess_soil <- function(soil_directory_dataset, 
+preprocess_soil <- function(soil_directory, 
                             continent_raster_template,
+                            output_filename = "soil_preprocessed.parquet.gz",
                             overwrite = FALSE,
                             ...) {
 
@@ -34,7 +35,7 @@ preprocess_soil <- function(soil_directory_dataset,
   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
   
   # Parquet filenames
-  soil_preprocessed_file <- file.path(soil_directory_dataset, "soil_preprocessed.parquet")
+  soil_preprocessed_file <- file.path(soil_directory, output_filename)
   
   # Check if soil files exist and can be read and that we don't want to overwrite them.
   if(!is.null(error_safe_read_parquet(soil_preprocessed_file)) & 
@@ -45,13 +46,13 @@ preprocess_soil <- function(soil_directory_dataset,
   
   ###### DOWNLOAD HWSD2 DATA #######
   
-  HWSD2_raw_file <- file.path(soil_directory_dataset, "HWSD2.zip")
+  HWSD2_raw_file <- file.path(soil_directory, "HWSD2.zip")
   download.file(url="https://s3.eu-west-1.amazonaws.com/data.gaezdev.aws.fao.org/HWSD/HWSD2_RASTER.zip", 
                 destfile = HWSD2_raw_file)
-  unzip(HWSD2_raw_file, exdir = soil_directory_dataset)
+  unzip(HWSD2_raw_file, exdir = soil_directory)
   
   # Download HWSD2 SMU key
-  HWSD2_SMU_key_file <- file.path(soil_directory_dataset, "HWSD2_SMU_key.sqlite")
+  HWSD2_SMU_key_file <- file.path(soil_directory, "HWSD2_SMU_key.sqlite")
   download.file(url="https://www.isric.org/sites/default/files/HWSD2.sqlite", 
                 destfile = HWSD2_SMU_key_file)
   
@@ -64,7 +65,7 @@ preprocess_soil <- function(soil_directory_dataset,
   continent_raster_template <- terra::unwrap(continent_raster_template)
   
   # Each pixel in the raster corresponds to a Soil Mapping Unit (SMU).
-  HWSD2_raster <- terra::rast(file.path(soil_directory_dataset, "/HWSD2.bil")) |> 
+  HWSD2_raster <- terra::rast(file.path(soil_directory, "/HWSD2.bil")) |> 
     terra::project(continent_raster_template, method = "near", mask = T) |>
     setNames("HWSD2_SMU_ID") |>
     as.data.frame(xy = TRUE) |>
@@ -144,12 +145,12 @@ preprocess_soil <- function(soil_directory_dataset,
   # Test if soil parquet files can be loaded. If not clean up directory and return NULL
   if(is.null(error_safe_read_parquet(soil_preprocessed_file))) {
     message("Preprocessed soil parquet file couldn't be read after processing. Cleaning up")
-    file.remove(list.files(soil_directory_dataset, full.names = TRUE))
+    file.remove(list.files(soil_directory, full.names = TRUE))
     return(NULL)
   }
   
   # Clean up all non-parquet files
-  file.remove(grep("\\.parquet$", list.files(soil_directory_dataset, full.names = TRUE), value = TRUE, invert = TRUE))
+  file.remove(grep("\\.parquet.*$", list.files(soil_directory, full.names = TRUE), value = TRUE, invert = TRUE))
   
   return(soil_preprocessed_file)
 }

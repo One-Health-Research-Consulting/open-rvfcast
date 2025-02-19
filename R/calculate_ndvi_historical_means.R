@@ -28,6 +28,7 @@
 calculate_ndvi_historical_means <- function(sentinel_ndvi_transformed,
                                             modis_ndvi_transformed,
                                             ndvi_historical_means_directory,
+                                            basename_template = "ndvi_historical_mean_doy_{i}.gz.parquet",
                                             ndvi_historical_means_AWS,
                                             ...) {
   
@@ -39,7 +40,7 @@ calculate_ndvi_historical_means <- function(sentinel_ndvi_transformed,
   ndvi_historical_means <- map_vec(1:366, .progress = TRUE, function(i) {
       
     filename <- file.path(ndvi_historical_means_directory, 
-                          glue::glue("ndvi_historical_mean_doy_{i}.gz.parquet"))
+                          glue::glue(basename_template))
     
     ndvi_data |>
       filter(doy == i) |>

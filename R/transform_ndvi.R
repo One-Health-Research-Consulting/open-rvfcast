@@ -1,6 +1,7 @@
 transform_ndvi <- function(modis_ndvi_transformed, 
                            sentinel_ndvi_transformed,
                            ndvi_transformed_directory,
+                           basename_template = "ndvi_transformed_{.y}_{.m}.parquet",
                            ndvi_years,
                            ndvi_months,
                            overwrite = FALSE,
@@ -35,7 +36,7 @@ transform_ndvi <- function(modis_ndvi_transformed,
       collect()
 
     # Set filename
-    save_filename <- file.path(ndvi_transformed_directory, glue::glue("ndvi_transformed_{.y}_{.m}.gz.parquet"))
+    save_filename <- file.path(ndvi_transformed_directory, glue::glue(basename_template))
     message(paste("Combining ndvi sources for", .y, "month", .m, "with", nrow(ndvi_transformed_data), "rows"))
 
     # Check if file already exists and can be read

@@ -29,6 +29,7 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_api_parameters,
                                     continent_raster_template,
                                     sentinel_ndvi_transformed_directory,
                                     sentinel_ndvi_token_file = "sentinel.token",
+                                    basename_template = "transformed_sentinel_NDVI_{start_date}_to_{end_date}.parquet",
                                     overwrite = FALSE,
                                     ...) {
   
@@ -51,7 +52,7 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_api_parameters,
   start_date <- sentinel_ndvi_api_parameters$start_date
   end_date <-  sentinel_ndvi_api_parameters$end_date
   
-  sentinel_ndvi_filename <- file.path(sentinel_ndvi_transformed_directory, glue::glue("transformed_sentinel_NDVI_{start_date}_to_{end_date}.gz.parquet"))
+  sentinel_ndvi_filename <- file.path(sentinel_ndvi_transformed_directory, glue::glue(basename_template))
   
   # Check if glw files exist and can be read and that we don't want to overwrite them.
   if(!is.null(error_safe_read_parquet(sentinel_ndvi_filename)) & !overwrite) {

@@ -27,6 +27,7 @@ transform_modis_ndvi <- function(modis_ndvi_token,
                                  modis_ndvi_bundle_request,
                                  continent_raster_template,
                                  modis_ndvi_transformed_directory,
+                                 basename_template = "transformed_modis_NDVI_{start_date}.gz.parquet",
                                  overwrite = FALSE,
                                  ...) {
   
@@ -39,7 +40,7 @@ transform_modis_ndvi <- function(modis_ndvi_token,
   continent_raster_template <- terra::unwrap(continent_raster_template)
   
   # Set transformed file name and path for saving
-  transformed_file <- file.path(modis_ndvi_transformed_directory, glue::glue("transformed_modis_NDVI_{start_date}.gz.parquet"))
+  transformed_file <- file.path(modis_ndvi_transformed_directory, glue::glue(basename_template))
   
   # Create an error safe way to test if the parquet file can be read, if it exists
   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
