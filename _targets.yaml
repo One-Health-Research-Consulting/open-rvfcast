@@ -1,6 +1,9 @@
-data:
+acquire:
   store: data_acquisition_targets
   script: data_acquisition_targets.R
+aggregate:
+  store: data_aggregation_targets
+  script: data_aggregation_targets.R
 model:
   store: model_framework_targets
   script: model_framework_targets.R

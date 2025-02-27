@@ -56,15 +56,5 @@
     "editor.tabSize": 2,
     "editor.wordBasedSuggestions": "off",
     "editor.wordSeparators": "`~!@#$%^&*()-=+[{]}\\|;:'\",<>/"
-  },
-  "sqltools.useNodeRuntime": true,
-  "sqltools.connections": [
-    {
-      "previewLimit": 50,
-      "driver": "DuckDB",
-      "name": "test",
-      "group": "test",
-      "database": "my_database.duckdb"
-    }
-  ]
+  }
 }
