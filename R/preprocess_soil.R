@@ -25,7 +25,7 @@
 #' @export
 preprocess_soil <- function(soil_directory, 
                             continent_raster_template,
-                            output_filename = "soil_preprocessed.parquet.gz",
+                            output_filename = "soil_preprocessed.parquet",
                             overwrite = FALSE,
                             ...) {
 

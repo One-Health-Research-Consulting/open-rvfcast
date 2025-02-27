@@ -1,24 +1,38 @@
 // Place your key bindings in this file to override the defaults
 [
-    {
-      "key": "shift+cmd+n",
-      "command": "foam-vscode.create-note"
-    },
-    
-    {
-      "key": "cmd+shift+d",
-      "command": "foam-vscode.open-daily-note"
-    },
+  {
+    "key": "cmd+shift+n",
+    "command": "foam-vscode.create-note"
+  },
 
-    {
-      "command": "runCommands",
-      "key": "shift+cmd+r",
-      "args": {
-        "commands": [
-          // commands to run in sequence
-          "r.createRTerm",
-          "workbench.action.terminal.moveToEditor"
-        ]
-      }
+  {
+    "key": "cmd+shift+d",
+    "command": "foam-vscode.open-daily-note"
+  },
+
+  {
+    "command": "runCommands",
+    "key": "cmd+shift+r",
+    "args": {
+      "commands": [
+        // commands to run in sequence
+        "r.createRTerm",
+        "workbench.action.terminal.moveToEditor"
+      ]
     }
+  },
+  {
+    "key": "alt+shift+m",
+    "command": "workbench.action.terminal.sendSequence",
+    "args": {
+      "text": "tar_make()\r"
+    }
+  },
+  {
+    "key": "alt+shift+l",
+    "command": "workbench.action.terminal.sendSequence",
+    "args": {
+        "text": "tar_load(${TM_CURRENT_WORD})\r"
+    }
+  }
 ]

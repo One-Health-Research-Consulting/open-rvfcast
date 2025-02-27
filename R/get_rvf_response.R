@@ -11,7 +11,7 @@
 #' @param forecast_intervals Intervals for which forecasts are to be made.
 #' @param model_dates_selected Dates for which predictions are to be made.
 #' @param local_folder Local folder where the processed files will be saved. This directory is created if it doesn't exist. Default is 'data/rvf_response'.
-#' @param save_filename Desired filename for the processed file. Default is 'rvf_response.gz.parquet'.
+#' @param save_filename Desired filename for the processed file. Default is 'rvf_response.parquet'.
 #'
 #' @return A string containing the filepath to the processed file.
 #'
@@ -24,7 +24,7 @@
 #'                  forecast_intervals,
 #'                  model_dates_selected,
 #'                  local_folder = "data/rvf_response",
-#'                  save_filename = "rvf_response.gz.parquet")
+#'                  save_filename = "rvf_response.parquet")
 #'
 #' @export
 get_rvf_response <- function(wahis_outbreaks,
@@ -32,7 +32,7 @@ get_rvf_response <- function(wahis_outbreaks,
                              forecast_intervals,
                              model_dates_selected,
                              local_folder = "data/rvf_response",
-                             save_filename = "rvf_response.gz.parquet") {
+                             save_filename = "rvf_response.parquet") {
   
   save_filename <- file.path(local_folder, save_filename)
   

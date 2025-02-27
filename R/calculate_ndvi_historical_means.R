@@ -28,7 +28,7 @@
 calculate_ndvi_historical_means <- function(sentinel_ndvi_transformed,
                                             modis_ndvi_transformed,
                                             ndvi_historical_means_directory,
-                                            basename_template = "ndvi_historical_mean_doy_{i}.gz.parquet",
+                                            basename_template = "ndvi_historical_mean_doy_{i}.parquet",
                                             ndvi_historical_means_AWS,
                                             ...) {
   

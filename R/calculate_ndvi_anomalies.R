@@ -27,6 +27,7 @@
 calculate_ndvi_anomalies <- function(ndvi_transformed,
                                      ndvi_historical_means,
                                      ndvi_anomalies_directory,
+                                     basename_template = "ndvi_anomaly_{model_dates_selected}.parquet",
                                      model_dates_selected,
                                      overwrite = FALSE,
                                      ...) {
@@ -35,7 +36,7 @@ calculate_ndvi_anomalies <- function(ndvi_transformed,
   stopifnot(length(model_dates_selected) == 1)
   
   # Set filename
-  save_filename <- file.path(ndvi_anomalies_directory, glue::glue("ndvi_anomaly_{model_dates_selected}.gz.parquet"))
+  save_filename <- file.path(ndvi_anomalies_directory, glue::glue(basename_template))
   message(paste0("Calculating ndvi anomalies for ", model_dates_selected))
   
   # Check if file already exists and can be read
@@ -88,7 +89,7 @@ calculate_ndvi_anomalies <- function(ndvi_transformed,
 #                                      ...) {
 #   # Set filename
 #   date_selected <- model_dates_selected
-#   ndvi_anomalies_filename <- file.path(ndvi_anomalies_directory, glue::glue("ndvi_anomaly_{date_selected}.gz.parquet"))
+#   ndvi_anomalies_filename <- file.path(ndvi_anomalies_directory, glue::glue("ndvi_anomaly_{date_selected}.parquet"))
 #   
 #   # Set up safe way to read parquet files
 #   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)

@@ -13,7 +13,7 @@
 #                          join_by = c("x", "y"), 
 #                          join_function = inner_join,
 #                          model_dates_selected = NULL,
-#                          filename = "africa_full_static_data.gz.parquet", 
+#                          filename = "africa_full_static_data.parquet", 
 #                          local_folder = "data/africa_full_static_data",
 #                          overwrite = FALSE,
 #                          ...) {

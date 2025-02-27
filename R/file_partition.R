@@ -6,7 +6,7 @@
 #' @author Nathan C. Layman
 #'
 #' @param arrow_dataset Arrow dataset to be partitioned and written to disk.
-#' @param path Directory where the parquet files will be saved. 
+#' @param path Directory where the parquet files will be saved.
 #' @param basename_template Template for creating the file names of the output parquet files.
 #' @param groups Groups to partition the Arrow dataset. Default is c("year","month").
 #'
@@ -22,17 +22,17 @@
 #'
 #' @export
 file_partition <- function(explanatory_variable_sources, 
-                           path, 
-                           basename_template, 
+                           path,
+                           basename_template,
                            years = 2007:2009,
                            months = 1:2) {
-  
+
   # Extract filtering groups
   data_groups <- expand.grid(year = years, month = months)
-  
+
   # Write each group using file partitioning instead of hive partitioning
   files <- map_vec(years, function(y) {
-    
+
     map_vec(months, function(m) {
       
     # Okay I need to map through the dataset then map through each file in the list

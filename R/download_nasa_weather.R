@@ -26,7 +26,7 @@ download_nasa_weather <- function(nasa_weather_coordinates,
   
   filename <- paste("nasa", "recorded_weather", nasa_weather_coordinates$country_iso3c, nasa_weather_years, sep = "_")
   message(paste0("Downloading ", filename))
-  filename <- paste0(filename, ".gz.parquet") 
+  filename <- paste0(filename, ".parquet") 
   
   if(filename %in% existing_files & !overwrite) {
     message("file already exists, skipping download")

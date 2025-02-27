@@ -10,13 +10,13 @@ transform_ndvi <- function(modis_ndvi_transformed,
   
   # NCL I noticed some issues with duplicates in modis_transformed. Check why.
   # There is a duplicate filename in the modis_ndvi_transformed target. WHY?
-  # data/modis_ndvi_transformed/transformed_modis_NDVI_2018-12-19.gz.parquet
+  # data/modis_ndvi_transformed/transformed_modis_NDVI_2018-12-19.parquet
   # Removing that file fixed the problem of duplicates with arrow::open_dataset at least for 2018
   
   # For sentinel the problem is duplication of boundary date data
-  # "data/sentinel_ndvi_transformed/transformed_sentinel_NDVI_2018-10-12_to_2018-10-22.gz.parquet" and
-  # "data/sentinel_ndvi_transformed/transformed_sentinel_NDVI_2018-10-22_to_2018-11-01.gz.parquet"
-  # Has 2018-10-22 in both files. 
+  # "data/sentinel_ndvi_transformed/transformed_sentinel_NDVI_2018-10-12_to_2018-10-22.parquet" and
+  # "data/sentinel_ndvi_transformed/transformed_sentinel_NDVI_2018-10-22_to_2018-11-01.parquet"
+  # Has 2018-10-22 in both files.
   
   ndvi_transformed_dataset <- arrow::open_dataset(c(sentinel_ndvi_transformed, modis_ndvi_transformed))
   

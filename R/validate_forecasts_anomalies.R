@@ -43,7 +43,7 @@ validate_forecasts_anomalies <- function(forecasts_validate_directory,
   
   # Set filename
   date_selected <- model_dates_selected
-  save_filename <- glue::glue("forecast_validate_{date_selected}.gz.parquet")
+  save_filename <- glue::glue("forecast_validate_{date_selected}.parquet")
   message(paste0("Validating forecast for ", date_selected))
   
   # Check if file already exists and can be read
