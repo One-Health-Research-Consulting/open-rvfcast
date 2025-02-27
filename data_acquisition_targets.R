@@ -1035,84 +1035,7 @@ derived_data_targets <- tar_plan(
     ndvi_anomalies_directory
   ),
   error = "null"
-  ),
-
-  # Get lagged ndvi data
-  tar_target(
-    ndvi_anomalies_lagged_directory,
-    create_data_directory(directory_path = "data/ndvi_anomalies_lagged")
-  ),
-  tar_target(ndvi_anomalies_lagged_AWS,
-    AWS_get_folder(ndvi_anomalies_lagged_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      ndvi_anomalies, # Enforce dependency
-      model_dates_selected
-    ), # Enforce dependency
-    error = "null",
-    cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
-
-  tar_target(ndvi_anomalies_lagged, lag_data(
-    data_files = ndvi_anomalies,
-    lag_intervals,
-    model_dates_selected,
-    overwrite = parse_flag("OVERWRITE_NDVI_ANOMALIES_LAGGED"),
-    lagged_data_directory = ndvi_anomalies_lagged_directory,
-    basename_template = "ndvi_anomalies_lagged_{model_dates_selected}.parquet",
-    ndvi_anomalies_lagged_AWS
-  ), # Enforce dependency
-  pattern = map(model_dates_selected),
-  error = "null",
-  format = "file",
-  repository = "local"
-  ),
-
-  # Next step put ndvi_anomalies_lagged files on AWS.
-  tar_target(ndvi_anomalies_lagged_AWS_upload, AWS_put_files(
-    ndvi_anomalies_lagged,
-    ndvi_anomalies_lagged_directory
-  ),
-  error = "null"
-  ),
-
-  # Get lagged weather data
-  tar_target(
-    weather_anomalies_lagged_directory,
-    create_data_directory(directory_path = "data/weather_anomalies_lagged")
-  ),
-  tar_target(weather_anomalies_lagged_AWS,
-    AWS_get_folder(weather_anomalies_lagged_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      nasa_weather_transformed_historical_means, # Enforce dependency
-      model_dates_selected
-    ), # Enforce dependency
-    error = "null",
-    cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
-
-  tar_target(weather_anomalies_lagged, lag_data(
-    data_files = weather_anomalies,
-    lag_intervals,
-    model_dates_selected,
-    overwrite = parse_flag("OVERWRITE_WEATHER_ANOMALIES_LAGGED"),
-    lagged_data_directory = weather_anomalies_lagged_directory,
-    basename_template = "weather_anomalies_lagged_{model_dates_selected}.parquet",
-    weather_anomalies_lagged_AWS
-  ), # Enforce dependency
-  pattern = map(model_dates_selected),
-  error = "null",
-  format = "file",
-  repository = "local",
-  cue = tar_cue("always")
-  ),
-
-  # Next step put weather_anomalies_lagged files on AWS.
-  tar_target(weather_anomalies_lagged_AWS_upload, AWS_put_files(
-    weather_anomalies_lagged,
-    weather_anomalies_lagged_directory
-  ),
-  error = "null"
-  ),
+  )
 )
 
 # Join all data sources -----------------------------------------------------------
@@ -1156,9 +1079,7 @@ data_targets <- tar_plan(
   tar_target(africa_full_data_sources, list(
     forecasts_anomalies = forecasts_anomalies,
     weather_anomalies = weather_anomalies,
-    # weather_anomalies_lagged = weather_anomalies_lagged,
     ndvi_anomalies = ndvi_anomalies,
-    # ndvi_anomalies_lagged = ndvi_anomalies_lagged,
     soil_preprocessed = soil_preprocessed,
     aspect_preprocessed = aspect_preprocessed,
     slope_preprocessed = slope_preprocessed,
