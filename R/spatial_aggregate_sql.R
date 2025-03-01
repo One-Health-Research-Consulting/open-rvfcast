@@ -1,232 +1,82 @@
-#' Aggregate Data by Spatial Polygons Using SQL
-#'
-#' This function performs spatial aggregation of point data within polygons using SQL queries
-#' in DuckDB. It supports various aggregation functions (SUM, AVG, MODE) for different variables
-#' and calculates results for a specific date.
-#'
-#' @param con DBI connection object to a DuckDB database
-#' @param table_name Character. Name of the source table containing point data with x, y coordinates
-#' @param output_table_name Character. Name for the output table (default: table_name + "_agg")
-#' @param polygons_sf SF dataframe with POLYGON or MULTIPOLYGON geometries
-#' @param predictor_aggregating_functions Dataframe with columns 'var' and 'aggregating_function'
-#'        specifying how each variable should be aggregated (AVG, SUM, MODE, or NA for grouping variables)
-#' @param model_date_selected Character or Date. Single date to filter points by
-#' @param id_column Character. Name of the identifier column in polygons_sf (default: "shapeName")
-#'
-#' @return Invisibly returns the name of the output table
-#'
-#' @details 
-#' The function loads polygon geometries into DuckDB, performs a spatial join with the point data,
-#' and then applies the specified aggregation functions within each polygon. It handles three types
-#' of aggregations:
-#' 
-#' - AVG: Calculates the mean of values within each polygon
-#' - SUM: Calculates the sum of values within each polygon
-#' - MODE: Finds the most common value within each polygon
-#' 
-#' The function also adds an area column to the output table, calculated from the polygon geometries.
-#' All operations are performed within a database transaction to ensure data integrity.
-#'
-#' @examples
-#' \dontrun{
-#' # Connect to DuckDB
-#' con <- DBI::dbConnect(duckdb::duckdb())
-#' 
-#' # Define aggregation functions
-#' predictor_agg <- tibble::tibble(
-#'   var = c("shapeName", "date", "anomaly_ndvi", "temperature", "precipitation", "doy"),
-#'   aggregating_function = c(NA, NA, "AVG", "AVG", "SUM", "MODE")
-#' )
-#' 
-#' # Run spatial aggregation
-#' spatial_aggregate_sql(
-#'   con = con,
-#'   table_name = "ndvi_data",
-#'   output_table_name = "admin_level_ndvi",
-#'   polygons_sf = admin_boundaries,
-#'   predictor_aggregating_functions = predictor_agg,
-#'   model_date_selected = "2005-06-24"
-#' )
-#' }
-#'
-#' @export
-spatial_aggregate_sql <- function(
-  con,                           # DuckDB connection
-  table_name,                    # Name of the source table
-  output_table_name = NULL,      # Name for the output table (default: table_name + "_agg")
-  polygons_sf,                   # SF dataframe with polygons
-  predictor_aggregating_functions, # Dataframe specifying aggregation functions
-  model_date_selected,           # Single date to filter by
-  id_column = "shapeName"        # Name of the identifier column in polygons_sf
-) {
-  
-# Input validation
-  if (!inherits(polygons_sf, "sf")) {
-    stop("Input `polygons_sf` must be an SF dataframe.")
-  }
-  if (!all(sf::st_geometry_type(polygons_sf) %in% c("POLYGON", "MULTIPOLYGON"))) {
-    stop("polygons_sf must be an sf object and contain POLYGON or MULTIPOLYGON geometries.")
-  }
-  if (length(model_date_selected) != 1) {
-    stop("Only one model date can be processed at a time.")
-  }
-  
-  # Set default output table name if not provided
-  if (is.null(output_table_name)) {
-    output_table_name <- paste0(table_name, "_agg")
-  }
-  
-  # Load polygons into DuckDB
-  polygon_table_name <- "temp_polygons"
-  
-  # Convert polygons to a table with WKT representations
-  polygons_df <- polygons_sf %>%
-    dplyr::mutate(geometry_wkt = sf::st_as_text(geometry)) %>%
-    sf::st_drop_geometry() %>%
-    dplyr::select(!!id_column, geometry_wkt)
-  
-  # Create polygon table in DuckDB
-  DBI::dbWriteTable(con, polygon_table_name, polygons_df, overwrite = TRUE)
-  
-  # Extract grouping and aggregation variables
-  grouping_vars <- predictor_aggregating_functions %>%
-    dplyr::filter(is.na(aggregating_function), !var %in% c("x", "y")) %>%
-    dplyr::pull(var)
-  
-  # Separate aggregation functions
-  agg_functions <- list(
-    SUM = predictor_aggregating_functions %>%
-      dplyr::filter(aggregating_function == "SUM") %>%
-      dplyr::pull(var),
-    AVG = predictor_aggregating_functions %>%
-      dplyr::filter(aggregating_function == "AVG") %>%
-      dplyr::pull(var),
-    MODE = predictor_aggregating_functions %>%
-      dplyr::filter(aggregating_function == "MODE") %>%
-      dplyr::pull(var)
-  )
-  
-  # Begin transaction
-  DBI::dbExecute(con, "BEGIN TRANSACTION")
-  
-  tryCatch({
-    # 1. Register ST extensions (for spatial functions)
-    DBI::dbExecute(con, "INSTALL spatial;")
-    DBI::dbExecute(con, "LOAD spatial;")
-    
-    # 2. Create a filtered table with points for the selected date
-    date_filter <- format(as.Date(model_date_selected), "%Y-%m-%d")
-    DBI::dbExecute(con, glue::glue("
-      CREATE TEMPORARY TABLE temp_points AS 
-      SELECT * FROM {table_name} 
-      WHERE date = '{date_filter}'
-    "))
-    
-    # 3. Create a spatial index view to speed up the join
-    DBI::dbExecute(con, glue::glue("
-      CREATE TEMPORARY TABLE spatial_join AS
-      SELECT 
-        p.*,
-        poly.{id_column}
-      FROM temp_points p
-      JOIN {polygon_table_name} poly
-      ON ST_Within(
-        ST_Point(p.x, p.y), 
-        ST_GeomFromText(poly.geometry_wkt)
-      )
-    "))
-    
-    # 4. Build the aggregation query
-    # Construct the GROUP BY clause
-    group_by_clause <- paste(c(id_column, grouping_vars), collapse = ", ")
-    
-    # Construct the aggregation expressions
-    agg_expressions <- c()
-    
-    # Add SUM aggregations
-    if (length(agg_functions$SUM) > 0) {
-      sum_exprs <- sapply(agg_functions$SUM, function(col) {
-        glue::glue("SUM({col}) AS {col}_sum")
-      })
-      agg_expressions <- c(agg_expressions, sum_exprs)
-    }
-    
-    # Add AVG aggregations
-    if (length(agg_functions$AVG) > 0) {
-      avg_exprs <- sapply(agg_functions$AVG, function(col) {
-        glue::glue("AVG({col}) AS {col}_avg")
-      })
-      agg_expressions <- c(agg_expressions, avg_exprs)
-    }
-    
-    # Add MODE aggregations (using string_agg trick)
-    if (length(agg_functions$MODE) > 0) {
-      mode_exprs <- sapply(agg_functions$MODE, function(col) {
-        glue::glue("
-          (SELECT mode_val FROM (
-            SELECT {col} AS mode_val, COUNT(*) AS mode_count 
-            FROM spatial_join sj
-            WHERE sj.{id_column} = spatial_join.{id_column}
-            GROUP BY {col}
-            ORDER BY mode_count DESC
-            LIMIT 1
-          )) AS {col}_mode")
-      })
-      agg_expressions <- c(agg_expressions, mode_exprs)
-    }
-    
-    # Combine all aggregation expressions
-    agg_clause <- paste(agg_expressions, collapse = ", ")
-    
-# 5. Execute the aggregation query
-# Prepare the column list for the SELECT clause
-select_cols <- c(id_column)
-if (length(grouping_vars) > 0) {
-  select_cols <- c(select_cols, grouping_vars)
-}
+# # Step 1. Map over polygon list using dynamic branching
+# # Step 2. Send in parquet file list and aggregation spec
+# # Step 3. Use arrow to open the parquet files, filter by bounding box of polygon, collect()
+# # Step 4. Aggregate collected data aggregation spec grouping appropriately
+# # Step 5. Save parquet file of aggregated region
+# # Step 6. Return polygon filename
 
-select_clause <- paste(select_cols, collapse = ", ")
+# library(sf)
+# library(dplyr)
+# library(tidyr)
 
-# Now construct the query without risking comma issues
-agg_query <- glue::glue("
-  CREATE TABLE {output_table_name} AS
-  SELECT 
-    {select_clause}
-    {ifelse(length(agg_expressions) > 0, paste0(', ', paste(agg_expressions, collapse = ', ')), '')}
-  FROM spatial_join
-  GROUP BY {group_by_clause}
-")
-    
-    DBI::dbExecute(con, agg_query)
-    
-    # 6. Add area information from polygons
-    DBI::dbExecute(con, glue::glue("
-      ALTER TABLE {output_table_name} 
-      ADD COLUMN area DOUBLE;
-      
-      UPDATE {output_table_name} 
-      SET area = (
-        SELECT ST_Area(ST_GeomFromText(geometry_wkt)) 
-        FROM {polygon_table_name} p
-        WHERE p.{id_column} = {output_table_name}.{id_column}
-      );
-    "))
-    
-    # 7. Clean up temporary tables
-    DBI::dbExecute(con, "DROP TABLE temp_points;")
-    DBI::dbExecute(con, "DROP TABLE spatial_join;")
-    DBI::dbExecute(con, glue::glue("DROP TABLE {polygon_table_name};"))
-    
-    # Commit transaction
-    DBI::dbExecute(con, "COMMIT")
-    
-    message(glue::glue("Spatial aggregation completed successfully. Results stored in table '{output_table_name}'"))
-    return(invisible(output_table_name))
-    
-  }, error = function(e) {
-    # Rollback in case of error
-    DBI::dbExecute(con, "ROLLBACK")
-    message("Error during spatial aggregation: ", e$message)
-    stop(e)
-  })
-}
+# # Example tibble of points
+# points <- tibble(
+#   lat = c(45.5, 46.2, 44.8, 45.5, 45.5, 46.2),
+#   lon = c(-116.2, -115.8, -117.1, -116.2, -116.2, -115.8),
+#   date = as.Date(c("2024-01-01", "2024-01-02", "2024-01-03", "2024-01-01", "2024-01-01", "2024-01-02")),
+#   category = c("A", "A", "B", "A", "B", "A"),  # A grouping column
+#   value1 = c(10, 20, 30, 10, 15, 25),
+#   value2 = c(100, 200, 300, 100, 150, 250),
+#   value3 = c(5, 10, 15, 5, 5, 10)
+# )
+
+# # Example dataframe specifying operations
+# agg_spec <- tibble(
+#   column = c("value1", "value2", "value3", "category", "date"), 
+#   operation = c("mean", "sum", "mode", NA, NA)  # NA means grouping
+# )
+
+# # Convert to sf object
+# points_sf <- st_as_sf(points, coords = c("lon", "lat"), crs = 4326)
+
+# # Example polygon (assuming it's already in sf format)
+# polygon_sf <- st_read("path/to/polygon.shp")  # Replace with actual path
+
+# # Subset points within the polygon
+# points_within <- points_sf[st_within(points_sf, polygon_sf, sparse = FALSE), ] %>%
+#   st_drop_geometry()  # Drop spatial info for aggregation
+
+# # Function to compute mode
+# mode_function <- function(x) {
+#   unique_x <- unique(x)
+#   unique_x[which.max(tabulate(match(x, unique_x)))]
+# }
+
+# # Identify all columns from the data
+# all_columns <- colnames(points_within)
+
+# # Identify columns explicitly mentioned in agg_spec
+# agg_columns <- agg_spec$column
+
+# # Identify grouping columns:
+# # - Columns that are NOT in `agg_spec`
+# # - OR columns that are in `agg_spec` but have `NA` as operation
+# grouping_cols <- setdiff(all_columns, agg_columns) %>%
+#   union(agg_spec %>% filter(is.na(operation)) %>% pull(column))
+
+# # Identify columns by operation type
+# mean_cols <- agg_spec %>% filter(operation == "mean") %>% pull(column)
+# sum_cols <- agg_spec %>% filter(operation == "sum") %>% pull(column)
+# mode_cols <- agg_spec %>% filter(operation == "mode") %>% pull(column)
+
+# # Perform aggregation dynamically
+# aggregated <- points_within %>%
+#   group_by(across(all_of(grouping_cols))) %>%  # Auto-detected grouping columns
+#   summarise(
+#     across(all_of(mean_cols), mean, na.rm = TRUE),
+#     across(all_of(sum_cols), sum, na.rm = TRUE),
+#     across(all_of(mode_cols), mode_function, .names = "mode_{.col}")
+#   )
+
+# # View results
+# print(aggregated)
+
+
+# mode_function <- function(x) {
+#   freq_table <- table(x)  # Count occurrences
+#   max_freq <- max(freq_table)  # Get highest frequency
+#   modes <- names(freq_table[freq_table == max_freq])  # Get values with highest frequency
+  
+#   # Randomly select one mode if there's a tie
+#   return(as.numeric(sample(modes, 1)))  
+# }

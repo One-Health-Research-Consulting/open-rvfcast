@@ -70,7 +70,6 @@ static_targets <- tar_plan(
   # ecmwf = 1;
   # sentinel ndvi = 0.01
   # modis ndvi = 0.01
-  tar_target(rsa_polygon, rgeoboundaries::geoboundaries("South Africa", "adm2")),
 
   # SOIL -----------------------------------------------------------
   tar_target(

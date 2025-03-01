@@ -3,6 +3,12 @@ library(dplyr)
 library(duckdb)
 library(tibble)
 
+test_polygons <- tar_read(rsa_polygon, store = "data_aggregation_targets") |> 
+  slice(1) |>
+  pull(geometry)
+
+test_points <- arrow::open_dataset(tar_read(africa_full_rvf_model_data)) |> filter(date = min(date))
+
 # 1. Create a small test dataset with a few points
 test_points <- tibble(
   x = c(-16.37, -16.35, -16.33, -15.77, -15.75),
