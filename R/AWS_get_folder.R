@@ -123,6 +123,7 @@ AWS_get_folder <- function(local_folder,
 AWS_put_files <- function(transformed_file_list,
                           local_folder,
                           ...) {
+  
   # Check if AWS credentials and region are set in the environment
   if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
     msg <- paste(
@@ -170,7 +171,7 @@ AWS_put_files <- function(transformed_file_list,
         
         # Remove the file from AWS using aws.s3
         aws.s3::delete_object(
-          object = file.path(local_folder, file),
+          object = file.path(file),
           bucket = Sys.getenv("AWS_BUCKET_ID")
         )
       } else {

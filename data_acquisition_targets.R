@@ -373,6 +373,7 @@ dynamic_targets <- tar_plan(
     tar_group(),
   iteration = "group"
   ),
+  
   tar_target(wahis_outbreaks, wahis_rvf_outbreaks_preprocessed |>
     mutate(
       start_date = coalesce(outbreak_start_date, outbreak_end_date),
