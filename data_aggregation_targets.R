@@ -22,13 +22,64 @@ source("_targets_settings.R")
 
 data_aggregating_targets <- tar_plan(
 
-  tar_target(africa_full_rvf_model_data_AWS,
-    AWS_get_folder(africa_full_rvf_model_data_directory),
-    error = "null",
+  # Import full africa dataset from data_acquisition project
+  tar_target(africa_full_data,
+    tar_read(africa_full_data, store = "data_acquisition_targets"),
     cue = tar_cue("always")
+  ), # cue is what to do when flag == "TRUE"
+
+  # Establish aggregation polygons
+  tar_target(rsa_polygon, rgeoboundaries::geoboundaries("South Africa", "adm2"))
+
+  # Add RVF data and lagged variables
+  tar_target(RVF_africa_full_data,
+  function_that_aggregates_data_and_lags_data,
+  # Aggregate by polygon
+  tar_target(RSA_data, spatiaal)
+
+
+  tar_target(
+    africa_full_rvf_model_data_directory,
+    create_data_directory(directory_path = "data/africa_full_rvf_model_data")
   ),
 
-  tar_target(rsa_polygon, rgeoboundaries::geoboundaries("South Africa", "adm2"))
+  tar_target(africa_full_rvf_model_data_AWS,
+    AWS_get_folder(africa_full_rvf_model_data_directory,
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
+    error = "null",
+    cue = tar_cue("always")
+  ), # cue is what to do when flag == "TRUE"
+
+  # This actually produces smaller parquet files than the africa_full_data
+  # even though it is joining in the response column. This is because
+  # the compressed parquet file in the africa_full_data is written
+  # from within duckdb which only supports setting compression level
+  # for zstd and not gzip. The following target used arrow to write
+  # the parquet files after joining in the response so we can use
+  # a higher compression level (5 vs 1?).
+  # https://github.com/duckdb/duckdb/pull/11791
+  tar_target(africa_full_rvf_model_data,
+    join_response(rvf_response,
+      africa_full_data,
+      model_dates_selected,
+      local_folder = africa_full_rvf_model_data_directory,
+      basename_template = "africa_full_rvf_model_data_{model_dates_selected}.parquet",
+      overwrite = parse_flag("OVERWRITE_AFRICA_FULL_RVF_MODEL_DATA"),
+      africa_full_rvf_model_data_AWS
+    ), # Enforce dependency
+    pattern = map(model_dates_selected),
+    format = "file",
+    repository = "local"
+  ),
+
+  # Next step put combined_anomalies files on AWS.
+  tar_target(africa_full_rvf_model_data_AWS_upload, AWS_put_files(
+    africa_full_rvf_model_data,
+    africa_full_rvf_model_data_directory
+  ),
+  error = "null"
+  )
 
 )
 
