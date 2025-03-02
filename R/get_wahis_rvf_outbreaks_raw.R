@@ -14,13 +14,14 @@
 #' get_wahis_rvf_outbreaks_raw()
 #'
 #' @export
-get_wahis_rvf_outbreaks_raw <- function() {
-  
+get_wahis_rvf_outbreaks <- function() {
   
   # Read full dataset into memory and filter for RVF
   wahis_outbreaks <- read_csv("https://www.dolthub.com/csv/ecohealthalliance/wahisdb/main/wahis_outbreaks") |>
     filter(standardized_disease_name == "rift valley fever")
   
+  wahis_outbreaks <- preprocess_wahis_rvf_outbreaks(wahis_outbreaks)
+
   return(wahis_outbreaks)
   
   # Below is archived code for retrieving data via SQL query through dolthub API
