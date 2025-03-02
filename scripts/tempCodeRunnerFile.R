@@ -11,4 +11,7 @@ compute_preds <- function(inner_resample,
     grid = xgb_grid,
     metrics = xgb_metrics,
     control = control_grid(save_pred = FALSE)
-  )
+  ) {
+    
+  }
+  }

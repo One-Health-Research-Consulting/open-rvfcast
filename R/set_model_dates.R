@@ -32,5 +32,8 @@ set_model_dates <- function(start_year, end_year, n_per_month, seed = 123) {
   # we won't change the random draw for previous months unless we change the seed.
   model_dates <- map(model_dates, ~.x + sample(lubridate::days_in_month(.x), n_per_month, replace = FALSE) - 1) |> unlist() |> as.Date()
   
+  # Remove dates earlier than today
+  model_dates <- model_dates[model_dates <= Sys.Date()]
+  
   return(model_dates)
 }

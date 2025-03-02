@@ -437,18 +437,18 @@ dynamic_targets <- tar_plan(
     format = "file",
     repository = "local"
   ),
+  
+  tar_target(wahis_outbreak_history_AWS_upload, AWS_put_files(
+    wahis_outbreak_history,
+    wahis_outbreak_history_directory
+  ),
+  error = "null"
+  ), # Continue the pipeline even on error
+  
   tar_target(
     wahis_outbreak_history_animations_directory,
     create_data_directory(directory_path = "outputs/wahis_outbreak_history_animations")
   ),
-  tar_target(wahis_outbreak_history_AWS_upload, AWS_put_files(
-    wahis_outbreak_history,
-    wahis_outbreak_history_animations_directory
-  ),
-  error = "null"
-  ), # Continue the pipeline even on error
-
-  # NCL: Note need to refactor to account for switching to wide format wahis_outbreak_history
 
   # Check if preprocessed wahis_outbreak_history data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
@@ -478,6 +478,7 @@ dynamic_targets <- tar_plan(
     error = "null",
     repository = "local"
   ),
+  
   tar_target(wahis_outbreak_history_animations_AWS_upload, AWS_put_files(
     wahis_outbreak_history_animations,
     wahis_outbreak_history_animations_directory
@@ -492,6 +493,7 @@ dynamic_targets <- tar_plan(
     sentinel_ndvi_transformed_directory,
     create_data_directory(directory_path = "data/sentinel_ndvi_transformed")
   ),
+  
   tar_target(get_sentinel_ndvi_AWS,
     AWS_get_folder(sentinel_ndvi_transformed_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
@@ -524,6 +526,7 @@ dynamic_targets <- tar_plan(
     format = "file",
     repository = "local"
   ),
+  
   tar_target(sentinel_ndvi_transformed_AWS_upload, AWS_put_files(
     sentinel_ndvi_transformed,
     sentinel_ndvi_transformed_directory
@@ -812,11 +815,6 @@ dynamic_targets <- tar_plan(
 
 # Data Processing -----------------------------------------------------------
 derived_data_targets <- tar_plan(
-
-  # How far back should we look for lagged responses?
-  # These will be the mean conditions 0-30 days back, 30-60 days back, and 60-90 days back
-  # Must start with zero. Right now 5 months back
-  tar_target(lag_intervals, c(0, 0, -30, -60, -90, -120, -150)),
 
   # How far out are we forecasting?
   # 0-30, 30-60, 60-90 days out ect...
