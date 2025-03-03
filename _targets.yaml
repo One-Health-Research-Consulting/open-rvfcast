@@ -1,9 +1,9 @@
-acquire:
-  store: data_acquisition_targets
-  script: data_acquisition_targets.R
-aggregate:
-  store: data_aggregation_targets
-  script: data_aggregation_targets.R
+base:
+  store: predictor_data_processing_targets
+  script: predictor_data_processing_targets.R
+rvf:
+  store: rvf_data_processing_targets
+  script: rvf_data_processing_targets.R
 model:
   store: model_framework_targets
   script: model_framework_targets.R

@@ -349,144 +349,6 @@ static_targets <- tar_plan(
 # Dynamic Data Download -----------------------------------------------------------
 dynamic_targets <- tar_plan(
 
-  # WAHIS -----------------------------------------------------------
-  tar_target(wahis_rvf_outbreaks_raw, get_wahis_rvf_outbreaks_raw()),
-  tar_target(
-    wahis_rvf_outbreaks_preprocessed,
-    preprocess_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw)
-  ),
-  tar_target(wahis_rvf_controls_raw, get_wahis_rvf_controls_raw()),
-  tar_target(
-    wahis_rvf_controls_preprocessed,
-    preprocess_wahis_rvf_controls(wahis_rvf_controls_raw)
-  ),
-  tar_target(wahis_outbreak_dates, tibble(
-    date = seq(
-      from = min(coalesce(wahis_rvf_outbreaks_preprocessed$outbreak_end_date, wahis_rvf_outbreaks_preprocessed$outbreak_start_date), na.rm = TRUE),
-      to = max(coalesce(wahis_rvf_outbreaks_preprocessed$outbreak_end_date, wahis_rvf_outbreaks_preprocessed$outbreak_start_date), na.rm = TRUE),
-      by = "day"
-    ),
-    year = year(date),
-    month = month(date)
-  ) |>
-    group_by(month, year) |>
-    tar_group(),
-  iteration = "group"
-  ),
-  
-  tar_target(wahis_outbreaks, wahis_rvf_outbreaks_preprocessed |>
-    mutate(
-      start_date = coalesce(outbreak_start_date, outbreak_end_date),
-      end_date = coalesce(outbreak_end_date, outbreak_start_date)
-    ) |>
-    select(cases, start_date, end_date, latitude, longitude) |>
-    distinct() |>
-    arrange(end_date) |>
-    mutate(outbreak_id = seq_len(n()))),
-
-  # OUTBREAK HISTORY -----------------------------------------------------------
-
-  # NOTE: next time make these format = "file" and have create_data_directory return
-  # the path to the .gitkeep file. That way if it gets deleted the target automatically
-  # re-runs
-  tar_target(
-    wahis_outbreak_history_directory,
-    create_data_directory(directory_path = "data/outbreak_history_dataset")
-  ),
-  tar_target(wahis_raster_template, terra::rasterize(
-    terra::vect(continent_polygon), # Take the boundary of Africa
-    terra::rast(continent_polygon, # Mask against a raster filled with 1's
-      resolution = 0.1, # Set resolution
-      vals = 1
-    )
-  ) |>
-    terra::wrap()), # Wrap to avoid problems with targets
-
-  tar_target(wahis_distance_matrix, get_outbreak_distance_matrix(wahis_outbreaks, wahis_raster_template)),
-
-  # Check if preprocessed wahis_outbreak_history data already exists on AWS and can be loaded.
-  # If so download from AWS instead of primary source
-  tar_target(wahis_outbreak_history_AWS,
-    AWS_get_folder(wahis_outbreak_history_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      wahis_outbreak_dates, # Enforce Dependency
-      wahis_outbreaks, # Enforce Dependency
-      wahis_distance_matrix, # Enforce Dependency
-      wahis_raster_template
-    ), # Enforce Dependency
-    error = "null",
-    cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
-
-  # Dynamic branch over year batch over day otherwise too many branches.
-  # NOTE: Uses outbreak start date
-  tar_target(wahis_outbreak_history,
-    get_daily_outbreak_history(wahis_outbreak_dates,
-      wahis_outbreaks,
-      wahis_distance_matrix,
-      wahis_raster_template,
-      output_dir = wahis_outbreak_history_directory,
-      output_filename = "outbreak_history.parquet",
-      beta_time = 0.5,
-      max_years = 10,
-      recent = 3 / 12,
-      overwrite = parse_flag("OVERWRITE_OUTBREAK_HISTORY"),
-      wahis_outbreak_history_AWS
-    ), # Enforce Dependency
-    pattern = map(wahis_outbreak_dates),
-    error = "null", # Keep going if error. It will be caught next time the pipeline is run.
-    format = "file",
-    repository = "local"
-  ),
-  
-  tar_target(wahis_outbreak_history_AWS_upload, AWS_put_files(
-    wahis_outbreak_history,
-    wahis_outbreak_history_directory
-  ),
-  error = "null"
-  ), # Continue the pipeline even on error
-  
-  tar_target(
-    wahis_outbreak_history_animations_directory,
-    create_data_directory(directory_path = "outputs/wahis_outbreak_history_animations")
-  ),
-
-  # Check if preprocessed wahis_outbreak_history data already exists on AWS and can be loaded.
-  # If so download from AWS instead of primary source
-  tar_target(wahis_outbreak_history_animations_AWS,
-    AWS_get_folder(wahis_outbreak_history_animations_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      wahis_outbreak_history
-    ), # Enforce Dependency
-    error = "null",
-    cue = tar_cue("always")
-  ), # Continue the pipeline even on error
-
-  # Identify min and max of weights and years to branch over
-  tar_target(wahis_outbreak_history_animation_metadata, get_wahis_outbreak_history_metadata(wahis_outbreak_history)),
-
-  # Animate a SpatRaster stack where each layer is a date.
-  # gganimate took 20 minutes per file.
-  # just saving all the frames as separate pngs
-  # and combining with gifski took 50 minutes for all of them.
-  tar_target(wahis_outbreak_history_animations,
-    get_outbreak_history_animation(wahis_outbreak_history,
-      wahis_outbreak_history_animation_metadata,
-      wahis_outbreak_history_animations_directory,
-      overwrite = parse_flag("OVERWRITE_OUTBREAK_HISTORY")
-    ), # Just included to enforce dependency with wahis_outbreak_history
-    pattern = map(wahis_outbreak_history_animation_metadata),
-    error = "null",
-    repository = "local"
-  ),
-  
-  tar_target(wahis_outbreak_history_animations_AWS_upload, AWS_put_files(
-    wahis_outbreak_history_animations,
-    wahis_outbreak_history_animations_directory
-  ),
-  error = "null"
-  ), # Continue the pipeline even on error
-
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
   # 10 day period
@@ -1037,32 +899,17 @@ derived_data_targets <- tar_plan(
 # Join all data sources -----------------------------------------------------------
 full_data_targets <- tar_plan(
 
-  # outbreak layer --------------------------------------------------
   tar_target(
-    rvf_response_directory,
-    create_data_directory(directory_path = "data/rvf_response")
-  ),
-  tar_target(rvf_response,
-    get_rvf_response(wahis_outbreaks,
-      wahis_raster_template,
-      forecast_intervals,
-      model_dates_selected,
-      local_folder = rvf_response_directory
-    ),
-    format = "file",
-    repository = "local"
-  ),
-  tar_target(
-    africa_full_data_directory,
-    create_data_directory(directory_path = "data/africa_full_data")
+    africa_full_predictor_data_directory,
+    create_data_directory(directory_path = "data/africa_full_predictor_data")
   ),
 
   # Assemble Africa Wide Model Data --------------------------------------------------
 
   # Check if ndvi_anomalies_AWS parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
-  tar_target(africa_full_data_AWS,
-    AWS_get_folder(africa_full_data_directory,
+  tar_target(africa_full_predictor_data_AWS,
+    AWS_get_folder(africa_full_predictor_data_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
     ),
     error = "null",
@@ -1072,7 +919,7 @@ full_data_targets <- tar_plan(
   # Combine all static and dynamic data layers.
   # Partition into separate parquet files by month and year.
   # Why NO WAY to deparse substitute a list of variables?
-  tar_target(africa_full_data_sources, list(
+  tar_target(africa_full_predictor_data_sources, list(
     forecasts_anomalies = forecasts_anomalies,
     weather_anomalies = weather_anomalies,
     ndvi_anomalies = ndvi_anomalies,
@@ -1088,13 +935,13 @@ full_data_targets <- tar_plan(
   # Join all explanatory variable data sources using file based partitioning instead of hive
   # error needs to be null here because some prsedictors (like wahis_outbreak_sources) aren't
   # present in all times.
-  tar_target(africa_full_data, file_partition_duckdb(
-    sources = africa_full_data_sources,
+  tar_target(africa_full_predictor_data, file_partition_duckdb(
+    sources = africa_full_predictor_data_sources,
     model_dates_selected,
-    local_folder = africa_full_data_directory,
-    basename_template = "africa_full_data_{model_dates_selected}.parquet",
+    local_folder = africa_full_predictor_data_directory,
+    basename_template = "africa_full_predictor_data_{model_dates_selected}.parquet",
     overwrite = parse_flag("OVERWRITE_AFRICA_FULL_MODEL_DATA"),
-    africa_full_data_AWS
+    africa_full_predictor_data_AWS
   ), # Enforce dependency
   pattern = map(model_dates_selected),
   format = "file",
@@ -1102,53 +949,9 @@ full_data_targets <- tar_plan(
   ),
 
   # Next step put combined_anomalies files on AWS.
-  tar_target(africa_full_data_AWS_upload, AWS_put_files(
-    africa_full_data,
-    africa_full_data_directory
-  ),
-  error = "null"
-  ),
-
-  # Full model data also has the RVF response added.
-  tar_target(
-    africa_full_rvf_model_data_directory,
-    create_data_directory(directory_path = "data/africa_full_rvf_model_data")
-  ),
-
-  tar_target(africa_full_rvf_model_data_AWS,
-    AWS_get_folder(africa_full_rvf_model_data_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
-    ),
-    error = "null",
-    cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
-
-  # This actually produces smaller parquet files than the africa_full_data
-  # even though it is joining in the response column. This is because
-  # the compressed parquet file in the africa_full_data is written
-  # from within duckdb which only supports setting compression level
-  # for zstd and not gzip. The following target used arrow to write
-  # the parquet files after joining in the response so we can use
-  # a higher compression level (5 vs 1?).
-  # https://github.com/duckdb/duckdb/pull/11791
-  tar_target(africa_full_rvf_model_data,
-    join_response(rvf_response,
-      africa_full_data,
-      model_dates_selected,
-      local_folder = africa_full_rvf_model_data_directory,
-      basename_template = "africa_full_rvf_model_data_{model_dates_selected}.parquet",
-      overwrite = parse_flag("OVERWRITE_AFRICA_FULL_RVF_MODEL_DATA"),
-      africa_full_rvf_model_data_AWS
-    ), # Enforce dependency
-    pattern = map(model_dates_selected),
-    format = "file",
-    repository = "local"
-  ),
-
-  # Next step put combined_anomalies files on AWS.
-  tar_target(africa_full_rvf_model_data_AWS_upload, AWS_put_files(
-    africa_full_rvf_model_data,
-    africa_full_rvf_model_data_directory
+  tar_target(africa_full_predictor_data_AWS_upload, AWS_put_files(
+    africa_full_predictor_data,
+    africa_full_predictor_data_directory
   ),
   error = "null"
   )
