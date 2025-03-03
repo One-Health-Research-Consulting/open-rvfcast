@@ -126,3 +126,8 @@ list(
   data_integration_targets,
   aggregation_targets
 )
+
+
+# Notes: 
+
+# Lag and rvf join should happen within context of aggregation function

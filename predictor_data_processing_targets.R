@@ -706,8 +706,8 @@ derived_data_targets <- tar_plan(
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(weather_historical_means_AWS, AWS_get_folder(
     weather_historical_means_directory,
-    nasa_weather_transformed
-  ), # Enforce dependency
+    nasa_weather_transformed # Enforce dependency
+  ),
   error = "null",
   cue = tar_cue("always")
   ), # cue is what to do when flag == "TRUE"
@@ -765,7 +765,8 @@ derived_data_targets <- tar_plan(
   # Next step put weather_historical_means files on AWS.
   tar_target(weather_anomalies_AWS_upload, AWS_put_files(
     weather_anomalies,
-    weather_anomalies_directory
+    weather_anomalies_directory,
+    aws_overwrite = Sys.getenv("AWS_OVERWRITE") == "TRUE",
   ),
   error = "null"
   ),
@@ -776,7 +777,7 @@ derived_data_targets <- tar_plan(
     create_data_directory(directory_path = "data/forecast_anomalies")
   ),
 
-  # Check if weather_historical_means parquet files already exists on AWS and can be loaded
+  # Check if forecasts_anomalies parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(forecasts_anomalies_AWS,
     AWS_get_folder(forecasts_anomalies_directory,
@@ -941,8 +942,8 @@ full_data_targets <- tar_plan(
     local_folder = africa_full_predictor_data_directory,
     basename_template = "africa_full_predictor_data_{model_dates_selected}.parquet",
     overwrite = parse_flag("OVERWRITE_AFRICA_FULL_MODEL_DATA"),
-    africa_full_predictor_data_AWS
-  ), # Enforce dependency
+    africa_full_predictor_data_AWS # Enforce dependency
+  ), 
   pattern = map(model_dates_selected),
   format = "file",
   repository = "local"

@@ -122,6 +122,7 @@ AWS_get_folder <- function(local_folder,
 #' @export
 AWS_put_files <- function(transformed_file_list,
                           local_folder,
+                          aws_overwrite = FALSE,
                           ...) {
   
   # Check if AWS credentials and region are set in the environment
@@ -139,8 +140,7 @@ AWS_put_files <- function(transformed_file_list,
     bucket = Sys.getenv("AWS_BUCKET_ID"),
     prefix = local_folder,
     max = Inf
-  ) |>
-    pull(Key)
+  ) |> pull(Key)
   
   # Get files in local folder
   local_folder_files <- list.files(path = local_folder, recursive = TRUE, full.names = TRUE)
@@ -150,18 +150,29 @@ AWS_put_files <- function(transformed_file_list,
   
   # Walk through local_folder_files
   for (file in local_folder_files) {
+
     # Is the file in the transformed_file_list?
     if (file %in% transformed_file_list) {
-      # Put the file on S3 using aws.s3
-      aws.s3::put_object(
-        file = file,
-        object = file,
-        multipart = TRUE,
-        part_size = 10485760,
-        bucket = Sys.getenv("AWS_BUCKET_ID")
-      )
+
+      # Check that schemas match
+      remote_schema <- arrow::open_dataset(paste0("s3://", Sys.getenv("AWS_BUCKET_ID"), "/", file))$schema
+      local_schema <- arrow::open_dataset(file)$schema
+
+      if(!remote_schema$Equals(local_schema) || aws_overwrite == TRUE) {
+
+        # Put the file on S3 using aws.s3
+        aws.s3::put_object(
+          file = file,
+          object = file,
+          multipart = TRUE,
+          part_size = 10485760,
+          bucket = Sys.getenv("AWS_BUCKET_ID")
+        )
       
-      outcome <- glue::glue("Uploading {file} to AWS")
+        outcome <- glue::glue("Uploading {file} to AWS")
+      } else {
+        outcome <- glue::glue("{file} with matching schema already present on AWS and aws_overwrite set to FALSE")
+      }
     } else {
       # Remove the file from AWS if it's present in the folder and on AWS
       # but not in the list of successfully transformed files. This file is
