@@ -82,11 +82,10 @@ static_targets <- tar_plan(
   tar_target(soil_AWS,
     AWS_get_folder(soil_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      continent_raster_template
-    ), # Enforce Dependency
+    ),
     error = "null",
     cue = tar_cue("always")
-  ), # Continue the pipeline even on error
+  ),
 
   tar_target(soil_preprocessed,
     preprocess_soil(soil_directory,
@@ -123,11 +122,10 @@ static_targets <- tar_plan(
   tar_target(aspect_AWS,
     AWS_get_folder(aspect_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      continent_raster_template
     ),
     error = "null",
     cue = tar_cue("always")
-  ), # Enforce Dependency
+  ),
 
   tar_target(aspect_preprocessed, get_remote_rasters(
     urls = aspect_urls,
@@ -170,12 +168,11 @@ static_targets <- tar_plan(
   # If so download from AWS instead of primary source
   tar_target(slope_AWS,
     AWS_get_folder(slope_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      continent_raster_template
-    ), # Enforce Dependency
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
     error = "null",
     cue = tar_cue("always")
-  ), # Continue the pipeline even on error
+  ),
 
   tar_target(slope_preprocessed, get_remote_rasters(
     urls = slope_urls,
@@ -213,12 +210,11 @@ static_targets <- tar_plan(
   # If so download from AWS instead of primary source
   tar_target(glw_AWS,
     AWS_get_folder(glw_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      continent_raster_template
-    ), # Enforce Dependency
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
     error = "null",
     cue = tar_cue("always")
-  ), # Continue the pipeline even on error
+  ),
 
   tar_target(glw_preprocessed,
     preprocess_glw_data(glw_directory,
@@ -248,12 +244,11 @@ static_targets <- tar_plan(
   # If so download from AWS instead of primary source
   tar_target(elevation_AWS,
     AWS_get_folder(elevation_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      continent_raster_template
-    ), # Enforce Dependency
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
     error = "null",
     cue = tar_cue("always")
-  ), # Continue the pipeline even on error
+  ),
 
   tar_target(elevation_preprocessed,
     get_elevation_data(
@@ -283,12 +278,11 @@ static_targets <- tar_plan(
   # If so download from AWS instead of primary source
   tar_target(bioclim_AWS,
     AWS_get_folder(bioclim_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      continent_raster_template
-    ), # Enforce Dependency
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
     error = "null", # Continue the pipeline even on error
     cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
+  ),
 
   tar_target(bioclim_preprocessed,
     get_bioclim_data(
@@ -319,12 +313,11 @@ static_targets <- tar_plan(
   # If so download from AWS instead of primary source
   tar_target(landcover_AWS,
     AWS_get_folder(landcover_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      continent_raster_template
-    ), # Enforce Dependency
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
     error = "null",
     cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
+  ),
 
   tar_target(landcover_preprocessed,
     get_landcover_data(
@@ -356,14 +349,14 @@ dynamic_targets <- tar_plan(
     sentinel_ndvi_transformed_directory,
     create_data_directory(directory_path = "data/sentinel_ndvi_transformed")
   ),
-  
+
   tar_target(get_sentinel_ndvi_AWS,
     AWS_get_folder(sentinel_ndvi_transformed_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
     ),
     error = "null",
     cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
+  ),
 
   # Should last 10 minutes. If it fails renew the token and try again.
   tar_target(sentinel_ndvi_token_file, get_sentinel_ndvi_token(), cue = tar_cue("always")),
@@ -442,15 +435,11 @@ dynamic_targets <- tar_plan(
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(modis_ndvi_transformed_AWS,
     AWS_get_folder(modis_ndvi_transformed_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      modis_ndvi_token, # Enforce dependency
-      modis_ndvi_bundle_request, # Enforce dependency
-      continent_raster_template, # Enforce dependency
-      modis_ndvi_transformed_directory
-    ), # Enforce dependency
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
     error = "null",
     cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
+  ),
 
   # Collect branches from modis_ndvi_bundle_request and split into branches
   # where each branch is a batch of 10 requests
@@ -518,14 +507,11 @@ dynamic_targets <- tar_plan(
   ),
   tar_target(ndvi_transformed_AWS,
     AWS_get_folder(ndvi_transformed_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      modis_ndvi_transformed, # Enforce dependency
-      sentinel_ndvi_transformed, # Enforce dependency
-      model_dates_selected
-    ), # Enforce dependency
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
     error = "null",
     cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
+  ),
 
   tar_target(ndvi_years, lubridate::year(modis_task_end_dates)),
 
@@ -575,14 +561,11 @@ dynamic_targets <- tar_plan(
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(nasa_weather_AWS,
     AWS_get_folder(nasa_weather_transformed_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      nasa_weather_coordinates, # Enforce Dependency
-      nasa_weather_years, # Enforce Dependency
-      continent_raster_template
-    ), # Enforce Dependency
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
     error = "null",
     cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
+  ),
 
   # Process the weather data
   tar_target(nasa_weather_transformed,
@@ -635,13 +618,11 @@ dynamic_targets <- tar_plan(
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(get_ecmwf_forecasts_AWS,
     AWS_get_folder(ecmwf_forecasts_transformed_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      ecmwf_forecasts_api_parameters, # Enforce Dependency
-      continent_raster_template
-    ), # Enforce Dependency
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
     error = "null",
     cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
+  ),
 
   # Download ecmwf forecasts, project to the template and save as arrow dataset
   # Note: This target takes a while (mostly because the ECMWF API is slow)
@@ -704,13 +685,13 @@ derived_data_targets <- tar_plan(
 
   # Check if weather_historical_means parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
-  tar_target(weather_historical_means_AWS, AWS_get_folder(
-    weather_historical_means_directory,
-    nasa_weather_transformed # Enforce dependency
+  tar_target(weather_historical_means_AWS,
+    AWS_get_folder(
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
+    error = "null",
+    cue = tar_cue("always")
   ),
-  error = "null",
-  cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
 
   tar_target(weather_historical_means, calculate_weather_historical_means(
     nasa_weather_transformed,
@@ -740,14 +721,11 @@ derived_data_targets <- tar_plan(
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(weather_anomalies_AWS,
     AWS_get_folder(weather_anomalies_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      weather_historical_means, # Enforce dependency
-      model_dates_selected, # Enforce dependency
-      nasa_weather_transformed
-    ), # Enforce dependency
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
     error = "null",
     cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
+  ),
 
   # Weather anomalies are deviations from the historical mean
   tar_target(weather_anomalies,
@@ -784,11 +762,8 @@ derived_data_targets <- tar_plan(
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(forecasts_anomalies_AWS,
     AWS_get_folder(forecasts_anomalies_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      weather_historical_means, # Enforce dependency
-      model_dates_selected, # Enforce dependency
-      ecmwf_forecasts_transformed
-    ), # Enforce dependency
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
     error = "null",
     cue = tar_cue("always")
   ),
@@ -833,13 +808,11 @@ derived_data_targets <- tar_plan(
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(ndvi_historical_means_AWS,
     AWS_get_folder(ndvi_historical_means_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      sentinel_ndvi_transformed, # Enforce dependency
-      modis_ndvi_transformed
-    ), # Enforce dependency
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
     error = "null",
     cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
+  ),
 
   tar_target(ndvi_historical_means,
     calculate_ndvi_historical_means(sentinel_ndvi_transformed,
@@ -867,15 +840,13 @@ derived_data_targets <- tar_plan(
 
   # Check if ndvi_anomalies_AWS parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
-  tar_target(ndvi_anomalies_AWS, AWS_get_folder(
-    local_folder = ndvi_anomalies_directory,
-    skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-    ndvi_historical_means, # Enforce dependency
-    model_dates_selected
-  ), # Enforce dependency
-  error = "null",
-  cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
+  tar_target(ndvi_anomalies_AWS,
+    AWS_get_folder(ndvi_anomalies_directory,
+      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    ),
+    error = "null",
+    cue = tar_cue("always")
+  ),
 
   tar_target(ndvi_anomalies,
     calculate_ndvi_anomalies(ndvi_transformed,
@@ -919,7 +890,7 @@ full_data_targets <- tar_plan(
     ),
     error = "null",
     cue = tar_cue("always")
-  ), # cue is what to do when flag == "TRUE"
+  ),
 
   # Combine all static and dynamic data layers.
   # Partition into separate parquet files by month and year.
