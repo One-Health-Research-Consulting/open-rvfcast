@@ -80,7 +80,8 @@ static_targets <- tar_plan(
   # Check if preprocessed soil data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
   tar_target(soil_AWS,
-    AWS_get_folder(soil_directory,
+    AWS_get_folder(
+      soil_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -121,7 +122,8 @@ static_targets <- tar_plan(
   # Check if preprocessed aspect data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
   tar_target(aspect_AWS,
-    AWS_get_folder(aspect_directory,
+    AWS_get_folder(
+      aspect_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -169,7 +171,8 @@ static_targets <- tar_plan(
   # Check if preprocessed slope data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
   tar_target(slope_AWS,
-    AWS_get_folder(slope_directory,
+    AWS_get_folder(
+      slope_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -212,7 +215,8 @@ static_targets <- tar_plan(
   # Check if preprocessed glw data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
   tar_target(glw_AWS,
-    AWS_get_folder(glw_directory,
+    AWS_get_folder(
+      glw_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -247,7 +251,8 @@ static_targets <- tar_plan(
   # Check if preprocessed elevation data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
   tar_target(elevation_AWS,
-    AWS_get_folder(elevation_directory,
+    AWS_get_folder(
+      elevation_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -282,7 +287,8 @@ static_targets <- tar_plan(
   # Check if preprocessed bioclim data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
   tar_target(bioclim_AWS,
-    AWS_get_folder(bioclim_directory,
+    AWS_get_folder(
+      bioclim_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -318,7 +324,8 @@ static_targets <- tar_plan(
   # Check if preprocessed bioclim data already exists on AWS and can be loaded.
   # If so download from AWS instead of primary source
   tar_target(landcover_AWS,
-    AWS_get_folder(landcover_directory,
+    AWS_get_folder(
+      landcover_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -358,7 +365,8 @@ dynamic_targets <- tar_plan(
   ),
 
   tar_target(get_sentinel_ndvi_AWS,
-    AWS_get_folder(sentinel_ndvi_transformed_directory,
+    AWS_get_folder(
+      sentinel_ndvi_transformed_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -442,7 +450,8 @@ dynamic_targets <- tar_plan(
   # Check if modis_ndvi files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(modis_ndvi_transformed_AWS,
-    AWS_get_folder(modis_ndvi_transformed_directory,
+    AWS_get_folder(
+      modis_ndvi_transformed_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -515,7 +524,8 @@ dynamic_targets <- tar_plan(
     create_data_directory(directory_path = "data/ndvi_transformed")
   ),
   tar_target(ndvi_transformed_AWS,
-    AWS_get_folder(ndvi_transformed_directory,
+    AWS_get_folder(
+      ndvi_transformed_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -570,7 +580,8 @@ dynamic_targets <- tar_plan(
   # Check if nasa_weather file already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(nasa_weather_AWS,
-    AWS_get_folder(nasa_weather_transformed_directory,
+    AWS_get_folder(
+      nasa_weather_transformed_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -628,7 +639,8 @@ dynamic_targets <- tar_plan(
   # Check if ecmwf files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(get_ecmwf_forecasts_AWS,
-    AWS_get_folder(ecmwf_forecasts_transformed_directory,
+    AWS_get_folder(
+      ecmwf_forecasts_transformed_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -699,6 +711,7 @@ derived_data_targets <- tar_plan(
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(weather_historical_means_AWS,
     AWS_get_folder(
+      weather_historical_means_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -733,7 +746,8 @@ derived_data_targets <- tar_plan(
   # Check if weather_historical_means parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(weather_anomalies_AWS,
-    AWS_get_folder(weather_anomalies_directory,
+    AWS_get_folder(
+      weather_anomalies_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -775,7 +789,8 @@ derived_data_targets <- tar_plan(
   # Check if forecasts_anomalies parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(forecasts_anomalies_AWS,
-    AWS_get_folder(forecasts_anomalies_directory,
+    AWS_get_folder(
+      forecasts_anomalies_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -822,7 +837,8 @@ derived_data_targets <- tar_plan(
   # Check if weather_historical_means parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(ndvi_historical_means_AWS,
-    AWS_get_folder(ndvi_historical_means_directory,
+    AWS_get_folder(
+      ndvi_historical_means_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -857,7 +873,8 @@ derived_data_targets <- tar_plan(
   # Check if ndvi_anomalies_AWS parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(ndvi_anomalies_AWS,
-    AWS_get_folder(ndvi_anomalies_directory,
+    AWS_get_folder(
+      ndvi_anomalies_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -902,7 +919,8 @@ full_data_targets <- tar_plan(
   # Check if ndvi_anomalies_AWS parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
   tar_target(africa_full_predictor_data_AWS,
-    AWS_get_folder(africa_full_predictor_data_directory,
+    AWS_get_folder(
+      africa_full_predictor_data_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
