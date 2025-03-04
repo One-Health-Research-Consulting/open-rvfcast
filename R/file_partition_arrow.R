@@ -12,14 +12,14 @@
 # join_sources <- function(sources, 
 #                          join_by = c("x", "y"), 
 #                          join_function = inner_join,
-#                          model_dates_selected = NULL,
+#                          dates_to_process = NULL,
 #                          filename = "africa_full_static_data.parquet", 
 #                          local_folder = "data/africa_full_static_data",
 #                          overwrite = FALSE,
 #                          ...) {
 # 
 #   # Check that we're only working on one date at a time
-#   stopifnot(length(model_dates_selected) <= 1)
+#   stopifnot(length(dates_to_process) <= 1)
 #   
 #   save_file <- file.path(local_folder, filename)
 #   
@@ -36,9 +36,9 @@
 #     reduce(join_function) 
 #   
 #   # Filter all datasets if partitioning by date
-#   if(!is.null(model_dates_selected)) {
-#     message(paste0("Combining explanatory variables for ", model_dates_selected))
-#     datasets <- map(datasets, ~.x |> filter(date == model_dates_selected))
+#   if(!is.null(dates_to_process)) {
+#     message(paste0("Combining explanatory variables for ", dates_to_process))
+#     datasets <- map(datasets, ~.x |> filter(date == dates_to_process))
 #   }
 #   |> 
 #     arrow::write_parquet(save_file, compression = "gzip", compression_level = 5)

@@ -11,7 +11,7 @@
 aggregate_augmented_data_by_adm <- function(parquet_file_list, 
                                             sf_df, 
                                             predictor_aggregating_functions,
-                                            model_dates_selected) {
+                                            dates_to_process) {
   
   
   arrow_db <- arrow::open_dataset(parquet_file_list)
@@ -27,7 +27,7 @@ aggregate_augmented_data_by_adm <- function(parquet_file_list,
   # points_with_municipalities <- st_join(africa_points, rsa_polygon)
   # 
   
-  # r <- arrow::read_parquet(glue::glue("{augmented_data}/date={model_dates_selected}/part-0.parquet")) |> 
+  # r <- arrow::read_parquet(glue::glue("{augmented_data}/date={dates_to_process}/part-0.parquet")) |> 
   #   rast() 
   # crs(r) <- crs(rast())
   # r <- mask(r, rsa_polygon) 
@@ -36,7 +36,7 @@ aggregate_augmented_data_by_adm <- function(parquet_file_list,
   # 
   # bind_cols(rsa_polygon, p) |> 
   #   as_tibble() |> 
-  #   mutate(date = model_dates_selected) |> 
+  #   mutate(date = dates_to_process) |> 
   #   select(date, shapeName, ID, names(p))
 
 }

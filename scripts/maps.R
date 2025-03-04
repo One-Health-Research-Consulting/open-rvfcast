@@ -9,10 +9,10 @@ continent_raster_template <- rast(tar_read(continent_raster_template))
 raster_crs <- crs(continent_raster_template) 
 
 # load selected model dates - user will be able to select from these
-model_dates_selected <- tar_read(model_dates_selected)
+dates_to_process <- tar_read(dates_to_process)
 
 # random select date
-user_date <- sample(model_dates_selected, 1)
+user_date <- sample(dates_to_process, 1)
 
 # leaflet base
 leafmap <- leaflet() |>  

@@ -39,8 +39,12 @@ tar_target(base_predictors_directory,
 
 # Download files from AWS to predictor directory if they don't already exist
 tar_target(base_predictors_AWS,
-  AWS_get_folder(base_predictors_directory),
-  error = "continue"
+  AWS_get_folder(base_predictors_directory,
+    skip_fetch = FALSE,
+    sync_with_remote = FALSE
+  ),
+  error = "continue",
+  cue = tar_cue("always")
 ),
 
 # Read all parquet files in the directory using Arrow

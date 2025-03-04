@@ -11,7 +11,7 @@
 #' @param forecasts_anomalies The dataset containing the aggregated weather anomaly forecasts.
 #' @param nasa_weather_transformed The processed NASA weather data.
 #' @param weather_historical_means The historical means of the weather variables to be used.
-#' @param model_dates_selected The dates selected for modelling.
+#' @param dates_to_process The dates selected for modelling.
 #' @param lead_intervals Time intervals for leading the forecast.
 #' @param overwrite A boolean indicating whether to overwrite existing validation files. Default is FALSE.
 #' @param ... Additional arguments not used by the function.
@@ -27,7 +27,7 @@
 #'                              forecasts_anomalies='forecasts_anomalies.parquet',
 #'                              nasa_weather_transformed='nasa_weather.parquet',
 #'                              weather_historical_means='weather_historical_means.parquet',
-#'                              model_dates_selected=as.Date('2007-01-01'),
+#'                              dates_to_process=as.Date('2007-01-01'),
 #'                              lead_intervals=c(0, 7, 14, 21),
 #'                              overwrite=FALSE)
 #'
@@ -36,13 +36,13 @@ validate_forecasts_anomalies <- function(forecasts_validate_directory,
                                          forecasts_anomalies,
                                          nasa_weather_transformed,
                                          weather_historical_means,
-                                         model_dates_selected, 
+                                         dates_to_process, 
                                          lead_intervals,
                                          overwrite = FALSE,
                                          ...) {
   
   # Set filename
-  date_selected <- model_dates_selected
+  date_selected <- dates_to_process
   save_filename <- glue::glue("forecast_validate_{date_selected}.parquet")
   message(paste0("Validating forecast for ", date_selected))
   

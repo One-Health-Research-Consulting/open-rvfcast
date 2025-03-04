@@ -9,7 +9,7 @@
 #' @param wahis_outbreaks Outbreak data to be processed.
 #' @param wahis_raster_template Template to be used for raster operations.
 #' @param forecast_intervals Intervals for which forecasts are to be made.
-#' @param model_dates_selected Dates for which predictions are to be made.
+#' @param dates_to_process Dates for which predictions are to be made.
 #' @param local_folder Local folder where the processed files will be saved. This directory is created if it doesn't exist. Default is 'data/rvf_response'.
 #' @param save_filename Desired filename for the processed file. Default is 'rvf_response.parquet'.
 #'
@@ -22,7 +22,7 @@
 #' get_rvf_response(wahis_outbreaks,
 #'                  wahis_raster_template,
 #'                  forecast_intervals,
-#'                  model_dates_selected,
+#'                  dates_to_process,
 #'                  local_folder = "data/rvf_response",
 #'                  save_filename = "rvf_response.parquet")
 #'
@@ -30,7 +30,7 @@
 get_rvf_response <- function(wahis_outbreaks,
                              wahis_raster_template,
                              forecast_intervals,
-                             model_dates_selected,
+                             dates_to_process,
                              local_folder = "data/rvf_response",
                              save_filename = "rvf_response.parquet") {
   
@@ -56,7 +56,7 @@ get_rvf_response <- function(wahis_outbreaks,
   # This is an important issue. What exactly are we predicting? Probability 
   # of an outbreak _occurring_ within a forecast window? Or of an outbreak 
   # _starting_ within the forecast window? Going with starting. Much easier.
-  rvf_respone <- map_dfr(model_dates_selected, function(model_date) {
+  rvf_respone <- map_dfr(dates_to_process, function(model_date) {
 
     map2_dfr(head(forecast_intervals, -1), tail(forecast_intervals, -1), function(interval_start, interval_end) {
       

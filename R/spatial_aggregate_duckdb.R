@@ -1,7 +1,7 @@
 spatial_aggregate_duckdb <- function(sf_df, 
                                      parquet_file_list, 
                                      predictor_aggregating_functions,
-                                     model_dates_selected) {
+                                     dates_to_process) {
   
   # Check input types
   if (!inherits(sf_df, "sf")) stop("Input `sf_df` must be an SF dataframe.")
@@ -13,7 +13,7 @@ spatial_aggregate_duckdb <- function(sf_df,
   # in base R. That means methods like arrow_db |> group_by(...) |> summarize(aspect = mvf(aspect)) won't work without
   # first calling collect(). This is super annoying.
   
-  arrow_db <- arrow::open_dataset(parquet_file_list) |> filter(date == model_dates_selected)
+  arrow_db <- arrow::open_dataset(parquet_file_list) |> filter(date == dates_to_process)
   
   # Check that the setdiff between variable names and predictor_aggregating_functions is zero
   # if not we need to update the predictor_aggregating_function csv file
@@ -73,7 +73,7 @@ spatial_aggregate_duckdb <- function(sf_df,
 WITH filtered_points AS (
     SELECT *
     FROM read_parquet(['{files}'])
-    WHERE date = '{model_dates_selected}'
+    WHERE date = '{dates_to_process}'
 ),
 joined AS (
     SELECT 

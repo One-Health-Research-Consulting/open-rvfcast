@@ -9,7 +9,7 @@
 #' @export
 create_outbreak_layer <- function(wahis_rvf_outbreaks_preprocessed,
                                   rsa_polygon,
-                                  model_dates_selected) {
+                                  dates_to_process) {
   
   # Get polygons for outbreaks
   rvf_points <- wahis_rvf_outbreaks_preprocessed |> 
@@ -22,7 +22,7 @@ create_outbreak_layer <- function(wahis_rvf_outbreaks_preprocessed,
     mutate(outbreak_start_date = ymd(outbreak_start_date))
   
   # For each model selected date, determine which polygons had an outbreak in the following 30 days
-  rvf_points_polygon_dates <- map_dfr(model_dates_selected, function(model_date){
+  rvf_points_polygon_dates <- map_dfr(dates_to_process, function(model_date){
     day_diff <- rvf_points_polygon$outbreak_start_date - model_date
     rvf_points_polygon[which(day_diff >= 1 & day_diff <= 30),] |> 
       mutate(date = model_date)

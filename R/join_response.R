@@ -8,9 +8,9 @@
 #'
 #' @param rvf_response File path for the RVF response dataset.
 #' @param africa_full_data File path for the complete Africa dataset.
-#' @param model_dates_selected The specific model date for which the join operation is performed.
+#' @param dates_to_process The specific model date for which the join operation is performed.
 #' @param local_folder Directory where the processed files will be saved. Default value is "data/africa_full_model_data".
-#' @param basename_template Filename template for the processed file. Default value is "africa_full_model_data_{model_dates_selected}.parquet".
+#' @param basename_template Filename template for the processed file. Default value is "africa_full_model_data_{dates_to_process}.parquet".
 #' @param overwrite Boolean flag indicating whether existing processed files should be overwritten. Default is FALSE.
 #' @param ... Additional arguments not used by this function but included for generic function compatibility.
 #'
@@ -22,26 +22,26 @@
 #' @examples
 #' join_response(rvf_response = 'path/to/rvf_response',
 #'               africa_full_data = 'path/to/africa_full_data',
-#'               model_dates_selected = 'selected_date',
+#'               dates_to_process = 'selected_date',
 #'               local_folder = './data/africa_full_model_data',
-#'               basename_template = "africa_full_model_data_{model_dates_selected}.parquet",
+#'               basename_template = "africa_full_model_data_{dates_to_process}.parquet",
 #'               overwrite = TRUE)
 #'
 #' @export
 join_response <- function(rvf_response,
                           africa_full_data,
-                          model_dates_selected,
+                          dates_to_process,
                           local_folder = "data/africa_full_model_data",
-                          basename_template = "africa_full_model_data_{model_dates_selected}.parquet",
+                          basename_template = "africa_full_model_data_{dates_to_process}.parquet",
                           overwrite = FALSE,
                           ...) {
   
   # Check that we're only working on one date at a time
-  stopifnot(length(model_dates_selected) == 1)
+  stopifnot(length(dates_to_process) == 1)
   
   # Set filename
   save_filename <- file.path(local_folder, glue::glue(basename_template))
-  message(paste0("Combining explanatory variables for ", model_dates_selected))
+  message(paste0("Combining explanatory variables for ", dates_to_process))
   
   # Check if file already exists and can be read
   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
@@ -52,7 +52,7 @@ join_response <- function(rvf_response,
   }
   
   result <- arrow::open_dataset(africa_full_data) |> 
-    filter(date == model_dates_selected) |>
+    filter(date == dates_to_process) |>
     left_join(arrow::open_dataset(rvf_response) |> select(-forecast_start, -forecast_end)) |>
     mutate(cases = coalesce(cases, 0)) |>
     select(x, y, cases, date, forecast_interval, everything())

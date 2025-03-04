@@ -1,9 +1,9 @@
 spatial_aggregate_arrow <- function(parquet_file_list, 
                                      polygons_sf, 
                                      predictor_aggregating_functions,
-                                     model_dates_selected,
+                                     dates_to_process,
                                      local_folder = "data/RSA_rvf_model_data",
-                                     basename_template = "RSA_rvf_model_data_{model_dates_selected}.parquet",
+                                     basename_template = "RSA_rvf_model_data_{dates_to_process}.parquet",
                                      overwrite = FALSE,
                                      ...) {
   
@@ -14,11 +14,11 @@ spatial_aggregate_arrow <- function(parquet_file_list,
   }
   
   # Check that we're only working on one date at a time
-  stopifnot(length(model_dates_selected) == 1)
+  stopifnot(length(dates_to_process) == 1)
   
   # Set filename
   save_filename <- file.path(local_folder, glue::glue(basename_template))
-  message(paste0("Aggregating model data for ", model_dates_selected))
+  message(paste0("Aggregating model data for ", dates_to_process))
   
   # Check if file already exists and can be read
   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
@@ -32,7 +32,7 @@ spatial_aggregate_arrow <- function(parquet_file_list,
   
   # Open point data
   points_sf <- arrow::open_dataset(parquet_file_list) |> 
-    filter(date == model_dates_selected) |> 
+    filter(date == dates_to_process) |> 
     filter(x > polygons_bbox$xmin) |>
     filter(x < polygons_bbox$xmax) |>
     filter(y > polygons_bbox$ymin) |>

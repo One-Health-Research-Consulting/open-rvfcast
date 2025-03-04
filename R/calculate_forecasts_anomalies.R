@@ -10,7 +10,7 @@
 #' @param ecmwf_forecasts_transformed_directory Directory containing the transformed forecasts.
 #' @param weather_historical_means Filepath to the historical weather means data.
 #' @param forecasts_anomalies_directory Directory in which to save the anomalies data.
-#' @param model_dates_selected Dates for models that have been selected.
+#' @param dates_to_process Dates for models that have been selected.
 #' @param lead_intervals Lead times for forecasts, which will determine the interval over which anomalies are averaged.
 #' @param overwrite Boolean flag indicating whether existing file should be overwritten. Default is FALSE.
 #' @param ... Additional unused arguments for future extensibility and function compatibility.
@@ -25,7 +25,7 @@
 #'   ecmwf_forecasts_transformed_directory = "./forecasts",
 #'   weather_historical_means = "./historical_means.parquet",
 #'   forecast_anomalies_directory = "./anomalies",
-#'   model_dates_selected = as.Date("2000-01-01"),
+#'   dates_to_process = as.Date("2000-01-01"),
 #'   lead_intervals = c(1, 10),
 #'   overwrite = TRUE
 #' )
@@ -34,13 +34,13 @@
 calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
                                           weather_historical_means,
                                           forecasts_anomalies_directory,
-                                          basename_template = "forecast_anomaly_{model_dates_selected}.parquet",
-                                          model_dates_selected,
+                                          basename_template = "forecast_anomaly_{dates_to_process}.parquet",
+                                          dates_to_process,
                                           forecast_intervals,
                                           overwrite = FALSE,
                                           ...) {
   # Check that we're only working on one date at a time
-  stopifnot(length(model_dates_selected) == 1)
+  stopifnot(length(dates_to_process) == 1)
 
   # Set filename
   save_filename <- file.path(forecasts_anomalies_directory, glue::glue(basename_template))
@@ -79,7 +79,7 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
   # Get the relevant forecast data. From the most recent base_date that came
   # before the model_date selected.
   forecasts_transformed_dataset <- arrow::open_dataset(ecmwf_forecasts_transformed) |>
-    filter(base_date <= model_dates_selected)
+    filter(base_date <= dates_to_process)
 
   relevant_base_date <- forecasts_transformed_dataset |>
     select(base_date) |>
@@ -99,12 +99,12 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
     lead_interval_start <- forecast_intervals[i]
     lead_interval_end <- forecast_intervals[i + 1]
 
-    message(glue::glue("Calculating ECMWF anomalies on {model_dates_selected} for {lead_interval_start}-{lead_interval_end} day forecast"))
+    message(glue::glue("Calculating ECMWF anomalies on {dates_to_process} for {lead_interval_start}-{lead_interval_end} day forecast"))
 
     # Get a tibble of all the dates in the anomaly forecast range for the given lead interval
     forecast_anomaly <- tibble(date = seq(
-      from = model_dates_selected + lead_interval_start,
-      to = model_dates_selected + lead_interval_end - 1, by = 1
+      from = dates_to_process + lead_interval_start,
+      to = dates_to_process + lead_interval_end - 1, by = 1
     )) |>
       mutate(
         doy = as.integer(lubridate::yday(date)), # Calculate day of year
@@ -165,7 +165,7 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
     # Regenerate month and year
     forecast_anomaly <- forecast_anomaly |>
       mutate(
-        date = model_dates_selected,
+        date = dates_to_process,
         doy = lubridate::yday(date),
         month = lubridate::month(date),
         year = lubridate::year(date),

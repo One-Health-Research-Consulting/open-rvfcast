@@ -8,9 +8,9 @@
 #' @author Nathan C. Layman
 #'
 #' @param sources A named list of fully qualified file paths to parquet files.
-#' @param model_dates_selected A character vector of dates to filter data. Only one date is allowed in this vector.
+#' @param dates_to_process A character vector of dates to filter data. Only one date is allowed in this vector.
 #' @param local_folder A character string indicating the data output directory. Default is 'data/africa_full_data'.
-#' @param basename_template A character string that will be used to create the output file name along with the selected date. Default is 'africa_full_data_{model_dates_selected}.parquet'.
+#' @param basename_template A character string that will be used to create the output file name along with the selected date. Default is 'africa_full_data_{dates_to_process}.parquet'.
 #' @param overwrite A logical indicating whether to overwrite an existing file if found. Default is FALSE.
 #' @param ... Additional arguments not used by this function but included for generic function compatibility.
 #'
@@ -22,31 +22,31 @@
 #' @examples
 #' file_partition_duckdb(
 #'   sources = list(s1 = "data/s1.parquet", s2 = "data/s2.parquet"),
-#'   model_dates_selected = "2022-01-01",
+#'   dates_to_process = "2022-01-01",
 #'   local_folder = "output",
-#'   basename_template = "output_{model_dates_selected}.parquet",
+#'   basename_template = "output_{dates_to_process}.parquet",
 #'   overwrite = TRUE
 #' )
 #'
 #' @export
 file_partition_duckdb <- function(sources, # A named, nested list of parquet files
-                                  model_dates_selected,
+                                  dates_to_process,
                                   local_folder = "data/africa_full_data",
-                                  basename_template = "africa_full_data_{model_dates_selected}.parquet",
+                                  basename_template = "africa_full_data_{dates_to_process}.parquet",
                                   overwrite = FALSE,
                                   ...) {
   # NCL change to branch off of model date for combo
   # This approach does work. Only writing complete datasets
   # 2005 doesn't have any outbreak history so what do we input?
   # Next step is lagged data.
-  # JOINING ON model_dates_selected means going back and changing 'base_date' to 'date' in ecmwf_transformed and anomaly
+  # JOINING ON dates_to_process means going back and changing 'base_date' to 'date' in ecmwf_transformed and anomaly
 
   # Check that we're only working on one date at a time
-  stopifnot(length(model_dates_selected) == 1)
+  stopifnot(length(dates_to_process) == 1)
 
   # Set filename
   save_filename <- file.path(local_folder, glue::glue(basename_template))
-  message(paste0("Combining explanatory variables for ", model_dates_selected))
+  message(paste0("Combining explanatory variables for ", dates_to_process))
 
   # Check if file already exists and can be read
   error_safe_read_parquet <- purrr::possibly(arrow::open_dataset, NULL)
@@ -66,7 +66,7 @@ file_partition_duckdb <- function(sources, # A named, nested list of parquet fil
     unified_schema <- all(purrr::map_vec(file_schemas, ~ .x == file_schemas[[1]]))
 
     parquet_filter <- c()
-    if (!is.null(file_schemas[[1]]$date)) parquet_filter <- c(parquet_filter, paste("date = '", model_dates_selected, "'"))
+    if (!is.null(file_schemas[[1]]$date)) parquet_filter <- c(parquet_filter, paste("date = '", dates_to_process, "'"))
     if (length(parquet_filter)) {
       parquet_filter <- paste("WHERE", paste(parquet_filter, collapse = " AND "))
     } else {

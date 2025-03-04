@@ -8,7 +8,7 @@
 #' @param nasa_weather_transformed_directory The directory where the transformed NASA weather data is located.
 #' @param weather_historical_means The historical weather averages used to calculate the weather anomalies.
 #' @param weather_anomalies_directory The directory where the calculated weather anomalies will be stored.
-#' @param model_dates_selected The dates for which the weather anomalies will be calculated.
+#' @param dates_to_process The dates for which the weather anomalies will be calculated.
 #' @param lag_intervals The intervals used to calculate the lags in the weather data.
 #' @param overwrite A flag indicating whether existing anomaly files should be overwritten. Defaults to FALSE.
 #' @param ... Additional arguments not used by this function but included for generic method compatibility.
@@ -24,7 +24,7 @@
 #'   nasa_weather_transformed_directory = "./data/nasa",
 #'   weather_historical_means = "./data/historical_means",
 #'   weather_anomalies_directory = "./data/anomalies",
-#'   model_dates_selected = as.Date("2020-01-01"),
+#'   dates_to_process = as.Date("2020-01-01"),
 #'   lag_intervals = c(1, 3, 7),
 #'   overwrite = TRUE
 #' )
@@ -33,16 +33,16 @@
 calculate_weather_anomalies <- function(nasa_weather_transformed,
                                         weather_historical_means,
                                         weather_anomalies_directory,
-                                        basename_template = "weather_anomaly_{model_dates_selected.parquet",
-                                        model_dates_selected,
+                                        basename_template = "weather_anomaly_{dates_to_process.parquet",
+                                        dates_to_process,
                                         overwrite = FALSE,
                                         ...) {
   # Check that we're only working on one date at a time
-  stopifnot(length(model_dates_selected) == 1)
+  stopifnot(length(dates_to_process) == 1)
 
   # Set filename
   save_filename <- file.path(weather_anomalies_directory, glue::glue(basename_template))
-  message(paste0("Calculating weather anomalies for ", model_dates_selected))
+  message(paste0("Calculating weather anomalies for ", dates_to_process))
 
   # Check if file already exists and can be read
   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
@@ -54,12 +54,12 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
 
   # Open dataset to transformed data
   weather_transformed_dataset <- arrow::open_dataset(nasa_weather_transformed) |>
-    filter(date == lubridate::as_date(model_dates_selected)) |>
+    filter(date == lubridate::as_date(dates_to_process)) |>
     collect()
 
   # Open dataset to historical weather data
   historical_means <- arrow::open_dataset(weather_historical_means) |>
-    filter(doy == lubridate::yday(model_dates_selected)) |>
+    filter(doy == lubridate::yday(dates_to_process)) |>
     collect()
 
   # Join the two datasets by day of year (doy)

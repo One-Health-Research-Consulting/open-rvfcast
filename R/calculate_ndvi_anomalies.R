@@ -10,7 +10,7 @@
 #' @param modis_ndvi_transformed Transformed MODIS NDVI data
 #' @param ndvi_historical_means Historical NDVI means data
 #' @param ndvi_anomalies_directory Directory where the calculated NDVI anomalies should be saved
-#' @param model_dates_selected Dates for the selected model
+#' @param dates_to_process Dates for the selected model
 #' @param overwrite Boolean flag indicating whether existing file of NDVI anomalies should be overwritten; Default is FALSE
 #' @param ... Additional arguments not used by this function but included for generic function compatibility
 #'
@@ -27,17 +27,17 @@
 calculate_ndvi_anomalies <- function(ndvi_transformed,
                                      ndvi_historical_means,
                                      ndvi_anomalies_directory,
-                                     basename_template = "ndvi_anomaly_{model_dates_selected}.parquet",
-                                     model_dates_selected,
+                                     basename_template = "ndvi_anomaly_{dates_to_process}.parquet",
+                                     dates_to_process,
                                      overwrite = FALSE,
                                      ...) {
   
   # Check that we're only working on one date at a time
-  stopifnot(length(model_dates_selected) == 1)
+  stopifnot(length(dates_to_process) == 1)
   
   # Set filename
   save_filename <- file.path(ndvi_anomalies_directory, glue::glue(basename_template))
-  message(paste0("Calculating ndvi anomalies for ", model_dates_selected))
+  message(paste0("Calculating ndvi anomalies for ", dates_to_process))
   
   # Check if file already exists and can be read
   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
@@ -49,9 +49,9 @@ calculate_ndvi_anomalies <- function(ndvi_transformed,
   
   # Open dataset to transformed data
   ndvi_transformed_dataset <- arrow::open_dataset(ndvi_transformed) |> 
-    filter(date == model_dates_selected)
+    filter(date == dates_to_process)
   
-  model_date_doy <- lubridate::yday(model_dates_selected)
+  model_date_doy <- lubridate::yday(dates_to_process)
   
   # Open dataset to historical ndvi data
   historical_means <- arrow::open_dataset(ndvi_historical_means) |> filter(doy == model_date_doy) 
@@ -83,12 +83,12 @@ calculate_ndvi_anomalies <- function(ndvi_transformed,
 # calculate_ndvi_anomalies <- function(ndvi_date_lookup, 
 #                                      ndvi_historical_means,
 #                                      ndvi_anomalies_directory,
-#                                      model_dates_selected, 
+#                                      dates_to_process, 
 #                                      lag_intervals,
 #                                      overwrite = FALSE,
 #                                      ...) {
 #   # Set filename
-#   date_selected <- model_dates_selected
+#   date_selected <- dates_to_process
 #   ndvi_anomalies_filename <- file.path(ndvi_anomalies_directory, glue::glue("ndvi_anomaly_{date_selected}.parquet"))
 #   
 #   # Set up safe way to read parquet files

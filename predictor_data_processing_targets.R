@@ -682,7 +682,7 @@ derived_data_targets <- tar_plan(
   # random draws for the previous years won't change unless the seed is updated.
   # Ideally we want to make the full dataset for every day and store it then subset
   # only right before fitting the model.
-  tar_target(model_dates_selected, set_model_dates(
+  tar_target(dates_to_process, set_model_dates(
     start_year = 2005,
     end_year = lubridate::year(Sys.time()),
     n_per_month = 2,
@@ -746,12 +746,12 @@ derived_data_targets <- tar_plan(
     calculate_weather_anomalies(nasa_weather_transformed,
       weather_historical_means,
       weather_anomalies_directory,
-      basename_template = "weather_anomaly_{model_dates_selected}.parquet",
-      model_dates_selected,
+      basename_template = "weather_anomaly_{dates_to_process}.parquet",
+      dates_to_process,
       overwrite = parse_flag("OVERWRITE_WEATHER_ANOMALIES"),
       weather_anomalies_AWS
     ), # Enforce dependency
-    pattern = map(model_dates_selected),
+    pattern = map(dates_to_process),
     error = "null",
     format = "file",
     repository = "local"
@@ -794,14 +794,14 @@ derived_data_targets <- tar_plan(
     calculate_forecasts_anomalies(ecmwf_forecasts_transformed,
       weather_historical_means,
       forecasts_anomalies_directory,
-      basename_template = "forecast_anomaly_{model_dates_selected}.parquet",
-      model_dates_selected,
+      basename_template = "forecast_anomaly_{dates_to_process}.parquet",
+      dates_to_process,
       forecast_intervals,
       overwrite = parse_flag("OVERWRITE_FORECAST_ANOMALIES"),
       ecmwf_forecasts_transformed, # Enforce dependency
       forecasts_anomalies_AWS
     ), # Enforce dependency
-    pattern = map(model_dates_selected),
+    pattern = map(dates_to_process),
     error = "null",
     format = "file",
     repository = "local"
@@ -869,12 +869,12 @@ derived_data_targets <- tar_plan(
     calculate_ndvi_anomalies(ndvi_transformed,
       ndvi_historical_means,
       ndvi_anomalies_directory,
-      basename_template = "ndvi_anomaly_{model_dates_selected}.parquet",
-      model_dates_selected,
+      basename_template = "ndvi_anomaly_{dates_to_process}.parquet",
+      dates_to_process,
       overwrite = parse_flag("OVERWRITE_NDVI_ANOMALIES"),
       ndvi_anomalies_AWS
     ), # Enforce dependency
-    pattern = map(model_dates_selected),
+    pattern = map(dates_to_process),
     error = "null",
     format = "file",
     repository = "local"
@@ -931,13 +931,13 @@ full_data_targets <- tar_plan(
   # present in all times.
   tar_target(africa_full_predictor_data, file_partition_duckdb(
     sources = africa_full_predictor_data_sources,
-    model_dates_selected,
+    dates_to_process,
     local_folder = africa_full_predictor_data_directory,
-    basename_template = "africa_full_predictor_data_{model_dates_selected}.parquet",
+    basename_template = "africa_full_predictor_data_{dates_to_process}.parquet",
     overwrite = parse_flag("OVERWRITE_AFRICA_FULL_MODEL_DATA"),
     africa_full_predictor_data_AWS # Enforce dependency
   ), 
-  pattern = map(model_dates_selected),
+  pattern = map(dates_to_process),
   format = "file",
   repository = "local"
   ),

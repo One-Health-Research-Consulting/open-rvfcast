@@ -74,15 +74,15 @@ modeling_targets <- tar_plan(
   # tar_target(augmented_data_rsa_AWS, AWS_get_folder(augmented_data_rsa_directory,
   #                                                   weather_anomalies, # Enforce dependency
   #                                                   ndvi_anomalies, # Enforce dependency
-  #                                                   model_dates_selected),
+  #                                                   dates_to_process),
   #            error = "null",
   #            cue = tar_cue("always")), # Enforce dependency
   #
   # tar_target(aggregated_data_rsa,
   #            aggregate_augmented_data_by_adm(augmented_data,
   #                                            rsa_polygon,
-  #                                            model_dates_selected),
-  #            pattern = model_dates_selected),
+  #                                            dates_to_process),
+  #            pattern = dates_to_process),
   #
   # tar_target(rsa_polygon_spatial_weights, rsa_polygon |>
   #              mutate(area = sf::st_area(rsa_polygon)) |>
