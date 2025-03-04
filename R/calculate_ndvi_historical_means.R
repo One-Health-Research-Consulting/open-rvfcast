@@ -29,18 +29,26 @@ calculate_ndvi_historical_means <- function(sentinel_ndvi_transformed,
                                             modis_ndvi_transformed,
                                             ndvi_historical_means_directory,
                                             basename_template = "ndvi_historical_mean_doy_{i}.parquet",
-                                            ndvi_historical_means_AWS,
+                                            overwrite = FALSE,
                                             ...) {
   
   # Open dataset can handle multi-file datasets larger than can
   # fit in memory
   ndvi_data <- arrow::open_dataset(c(modis_ndvi_transformed, sentinel_ndvi_transformed))
   
+  # Set up safe way to read parquet files
+  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
+  
   # Fast because we can avoid collecting until write_parquet
   ndvi_historical_means <- map_vec(1:366, .progress = TRUE, function(i) {
       
-    filename <- file.path(ndvi_historical_means_directory, 
-                          glue::glue(basename_template))
+    filename <- file.path(ndvi_historical_means_directory, glue::glue(basename_template))
+    
+    # Check if glw files exist and can be read and that we don't want to overwrite them.
+    if(!is.null(error_safe_read_parquet(filename)) & !overwrite) {
+      message(glue::glue("{filename} already exists and can be loaded, skipping"))
+      return(filename)
+    }
     
     ndvi_data |>
       filter(doy == i) |>

@@ -715,8 +715,10 @@ derived_data_targets <- tar_plan(
   tar_target(weather_historical_means, calculate_weather_historical_means(
     nasa_weather_transformed,
     weather_historical_means_directory,
-    weather_historical_means_AWS
-  ), # Enforce dependency
+    basename_template = "weather_historical_mean_doy_{i}.parquet",
+    overwrite = FALSE,
+    weather_historical_means_AWS # Enforce dependency
+  ),
   format = "file",
   repository = "local"
   ),
@@ -728,6 +730,7 @@ derived_data_targets <- tar_plan(
   ),
   error = "null"
   ),
+  
   tar_target(
     weather_anomalies_directory,
     create_data_directory(directory_path = "data/weather_anomalies")
@@ -843,8 +846,9 @@ derived_data_targets <- tar_plan(
       modis_ndvi_transformed,
       ndvi_historical_means_directory,
       basename_template = "ndvi_historical_mean_doy_{i}.parquet",
-      ndvi_historical_means_AWS
-    ), # Enforce dependency
+      overwrite = FALSE,
+      ndvi_historical_means_AWS # Enforce dependency
+    ),
     format = "file",
     repository = "local"
   ),

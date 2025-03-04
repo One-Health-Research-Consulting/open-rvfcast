@@ -135,6 +135,14 @@ AWS_put_files <- function(transformed_file_list,
     stop(msg)
   }
   
+  # Create a possibly-wrapped version of the function
+  error_safe_open_dataset <- possibly(
+    function(file) {
+      arrow::open_dataset(file)$schema
+    },
+    otherwise = NULL
+  )
+  
   # Get files from S3 bucket with prefix
   s3_files <- aws.s3::get_bucket_df(
     bucket = Sys.getenv("AWS_BUCKET_ID"),
@@ -155,11 +163,12 @@ AWS_put_files <- function(transformed_file_list,
     if (file %in% transformed_file_list) {
 
       # Check that schemas match
-      remote_schema <- arrow::open_dataset(paste0("s3://", Sys.getenv("AWS_BUCKET_ID"), "/", file))$schema
-      local_schema <- arrow::open_dataset(file)$schema
+      remote_file <- paste0("s3://", Sys.getenv("AWS_BUCKET_ID"), "/", file)
+      remote_schema <- error_safe_open_dataset(remote_file)
+      local_schema <- error_safe_open_dataset(file)
 
-      if(!remote_schema$Equals(local_schema) || aws_overwrite == TRUE) {
-
+      if (is.null(remote_schema) || !remote_schema$Equals(local_schema) || aws_overwrite == TRUE) {
+        
         # Put the file on S3 using aws.s3
         aws.s3::put_object(
           file = file,
