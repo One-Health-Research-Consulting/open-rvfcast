@@ -6,10 +6,10 @@ output: github_document
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
-    collapse = TRUE,
-    comment = "#>",
-    fig.path = "man/figures/README-",
-    out.width = "100%"
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
 )
 ```
 
@@ -59,6 +59,8 @@ dataset
 ```
 
 However, due to computational demands of such large data, the model analysis pipeline will download the data in entirety before analysis. In addition, the dataset has been subsetted to two randomly chosen days per month between 2007 and 2024. Future work will provide the entire dataset for every day between 2005 and the current year.
+
+The current full africa predictor dataset is ~56 Gb
 
 The data targets that are subsetted this way are:
 

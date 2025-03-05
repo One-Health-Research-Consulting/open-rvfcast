@@ -40,6 +40,9 @@ AWS_get_folder <- function(local_folder,
     stop(msg)
   }
 
+  # Create an error safe way to test if the parquet file can be read
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+
   # Get files from S3 bucket with prefix
   s3_files <- aws.s3::get_bucket_df(
     bucket = Sys.getenv("AWS_BUCKET_ID"),
@@ -58,17 +61,10 @@ AWS_get_folder <- function(local_folder,
   local_files <- list.files(local_folder, recursive = TRUE, full.names = TRUE)
   downloaded_files <- c()
 
-  # Loop through S3 files and download if they don't exist locally
-  # or if the local copy can't be read
+  # Loop through S3 files and download if needed
   for (file in s3_files) {
-    # Check if file already exists locally
-    if (!file %in% local_files) {
-      if (skip_fetch) {
-        cat("Skipped fetching AWS file: ", file, ".\n", sep = "")
-        downloaded_files <- c(downloaded_files, file)
-        next
-      }
-
+    # Only download if file doesn't exist locally AND skip_fetch is FALSE
+    if (!(file %in% local_files || skip_fetch)) {
       # Download the file from S3 using aws.s3
       aws.s3::save_object(
         object = file,
@@ -78,13 +74,9 @@ AWS_get_folder <- function(local_folder,
 
       cat("Downloaded AWS file:", file, "\n")
 
-      # Create an error safe way to test if the parquet file can be read
-      error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
-
-      # Check if transformed file can be loaded.
-      # Always clean up local files on failure, but only remove from AWS if cleanup_failed_files is TRUE
+      # Check if transformed file can be loaded
       if (is.null(error_safe_read_parquet(file))) {
-        # Always clean up local corrupted files
+        # Clean up local corrupted files
         unlink(file)
         cat("Removed local corrupted file:", file, "\n")
 
@@ -94,11 +86,14 @@ AWS_get_folder <- function(local_folder,
             object = file,
             bucket = Sys.getenv("AWS_BUCKET_ID")
           )
-          cat("Synced by removing file from AWS bucket\n")
+          cat("Synced by removing corrupt file from AWS bucket\n")
         }
       } else {
+        # Add to downloaded_files if file was successfully downloaded and readable
         downloaded_files <- c(downloaded_files, file)
       }
+    } else {
+      cat("Skipped file:", file, "\n")
     }
   }
 

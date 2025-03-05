@@ -21,9 +21,7 @@ aws_bucket <- Sys.getenv("AWS_BUCKET_ID")
 source("_targets_settings.R")
 
 data_import_targets <- tar_plan(
-  
   tar_target(continent_polygon, create_africa_polygon()),
-  
   tar_target(wahis_raster_template, terra::rasterize(
     terra::vect(continent_polygon), # Take the boundary of Africa
     terra::rast(continent_polygon, # Mask against a raster filled with 1's
@@ -32,33 +30,37 @@ data_import_targets <- tar_plan(
     )
   ) |> terra::wrap()), # Wrap to avoid problems with targets
 
-# Import base predictors from the predictor processing project
-tar_target(base_predictors_directory,
-  create_data_directory(directory_path = "data/africa_full_predictor_data")
-),
-
-# Download files from AWS to predictor directory if they don't already exist
-tar_target(base_predictors_AWS,
-  AWS_get_folder(base_predictors_directory,
-    skip_fetch = FALSE,
-    sync_with_remote = FALSE
+  # Import base predictors from the predictor processing project
+  tar_target(
+    base_predictors_directory,
+    create_data_directory(directory_path = "data/africa_full_predictor_data")
   ),
-  error = "continue",
-  cue = tar_cue("always")
-),
 
-# Read all parquet files in the directory using Arrow
-tar_target(base_predictors,
-  list.files(base_predictors_directory, 
-  pattern = "\\.parquet$", 
-  full.names = TRUE)),
+  # Download predictor files from AWS if they don't already exist
+  tar_target(base_predictors_AWS,
+    AWS_get_folder(base_predictors_directory,
+      skip_fetch = FALSE,
+      sync_with_remote = FALSE
+    ),
+    error = "continue",
+    cue = tar_cue("always")
+  ),
 
-  tar_target(predictor_dates, arrow::open_dataset(base_predictors) |>
-  distinct(date) |>
-  pull(date, as_vector = TRUE)),
+  # Read all parquet files in the directory using Arrow
+  tar_target(
+    base_predictors,
+    {
+      print(glue::glue("{length(base_predictors_AWS)} files downloaded from AWS"))
+
+      list.files(base_predictors_directory,
+        pattern = "\\.parquet$",
+        full.names = TRUE
+      )
+    }
+  ),
 
   # Import RVF outbreak data
-  tar_target(rvf_outbreaks,  get_wahis_rvf_outbreaks() |>
+  tar_target(rvf_outbreaks, get_wahis_rvf_outbreaks() |>
     mutate(
       start_date = coalesce(outbreak_start_date, outbreak_end_date),
       end_date = coalesce(outbreak_end_date, outbreak_start_date)
@@ -83,18 +85,13 @@ tar_target(base_predictors,
     format = "file",
     repository = "local"
   )
-
 )
 
-rvf_processing_targets <- tar_plan(
-
-)
+rvf_processing_targets <- tar_plan()
 
 # Lagging predictor variables or other tasks necessary before
 # integrating all data sources and aggregation
-feature_engineering_targets <- tar_plan(
-
-)
+feature_engineering_targets <- tar_plan()
 
 # Join response to processed predictors
 data_integration_targets <- tar_plan(
@@ -106,21 +103,22 @@ data_integration_targets <- tar_plan(
 aggregation_targets <- tar_plan(
 
   # Import any other necessary datasets
-   tar_target(zaf_districts, rgeoboundaries::geoboundaries("South Africa", "adm2")),
+  tar_target(zaf_districts, rgeoboundaries::geoboundaries("South Africa", "adm2")),
 
   # tar_target(aggregation_spec, ),
 
-  tar_target(rvf_zaf_data_directory, 
-  create_data_directory(directory_path = "data/rvf_zaf_data")),
-
+  tar_target(
+    rvf_zaf_data_directory,
+    create_data_directory(directory_path = "data/rvf_zaf_data")
+  ),
   tar_target(aggregate_model_data, aggregate_to_polygon(data,
-  zaf_districts,
-  aggregation_spec,
-  local_folder = rvf_zaf_data_directory,
-  basename_template = "rvf_zaf_{shapeName}.parquet",
+    zaf_districts,
+    aggregation_spec,
+    local_folder = rvf_zaf_data_directory,
+    basename_template = "rvf_zaf_{shapeName}.parquet",
   ),
   pattern = map(zaf_districts)
-)
+  )
 )
 
 list(
@@ -132,6 +130,6 @@ list(
 )
 
 
-# Notes: 
+# Notes:
 
 # Lag and rvf join should happen within context of aggregation function
