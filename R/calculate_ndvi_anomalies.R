@@ -1,15 +1,15 @@
 #' Calculate NDVI Anomalies
 #'
-#' This function calculates the NDVI anomalies using the transformed NDVI data from Sentinel and MODIS satellites,
+#' This function calculates the NDVI anomalies using the transformed NDVI data,
 #' historical NDVI means data, and dates provided for a selected model. The calculated anomalies are saved 
 #' as a parquet file in a designated directory.
 #'
 #' @author Nathan Layman and Emma Mendelsohn
 #'
-#' @param sentinel_ndvi_transformed Transformed Sentinel NDVI data
-#' @param modis_ndvi_transformed Transformed MODIS NDVI data
+#' @param ndvi_transformed Transformed NDVI data
 #' @param ndvi_historical_means Historical NDVI means data
 #' @param ndvi_anomalies_directory Directory where the calculated NDVI anomalies should be saved
+#' @param basename_template Template for the output filename with a placeholder for dates_to_process
 #' @param dates_to_process Dates for the selected model
 #' @param overwrite Boolean flag indicating whether existing file of NDVI anomalies should be overwritten; Default is FALSE
 #' @param ... Additional arguments not used by this function but included for generic function compatibility
@@ -20,10 +20,15 @@
 #' then, the existing file is returned without any calculations
 #'
 #' @examples
-#' calculate_ndvi_anomalies('sentinel_data_transformed', 'modis_data_transformed',
-#' 'historical_means', '/directory_path/', 'model_date', overwrite = TRUE)
+#' calculate_ndvi_anomalies(
+#'   ndvi_transformed = 'path/to/transformed/data', 
+#'   ndvi_historical_means = 'path/to/historical/means',
+#'   ndvi_anomalies_directory = '/directory_path/', 
+#'   dates_to_process = '2023-01-15', 
+#'   overwrite = TRUE
+#' )
 #'
-#' @export> 
+#' @export
 calculate_ndvi_anomalies <- function(ndvi_transformed,
                                      ndvi_historical_means,
                                      ndvi_anomalies_directory,
@@ -51,10 +56,10 @@ calculate_ndvi_anomalies <- function(ndvi_transformed,
   ndvi_transformed_dataset <- arrow::open_dataset(ndvi_transformed) |> 
     filter(date == dates_to_process)
   
-  model_date_doy <- lubridate::yday(dates_to_process)
+  doy_to_process <- lubridate::yday(dates_to_process)
   
   # Open dataset to historical ndvi data
-  historical_means <- arrow::open_dataset(ndvi_historical_means) |> filter(doy == model_date_doy) 
+  historical_means <- arrow::open_dataset(ndvi_historical_means) |> filter(doy == doy_to_process) 
   
   # Join the two datasets by day of year (doy)
   ndvi_transformed_dataset <- left_join(ndvi_transformed_dataset, historical_means, by = c("x","y","doy"), suffix = c("", "_historical"))
