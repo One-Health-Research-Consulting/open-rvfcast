@@ -57,9 +57,11 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
     filter(date == lubridate::as_date(dates_to_process)) |>
     collect()
 
+  doy_to_process <- as.numeric(lubridate::yday(dates_to_process))
+  
   # Open dataset to historical weather data
   historical_means <- arrow::open_dataset(weather_historical_means) |>
-    filter(doy == lubridate::yday(dates_to_process)) |>
+    filter(doy == doy_to_process) |>
     collect()
 
   # Join the two datasets by day of year (doy)
@@ -100,3 +102,4 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
 
   return(save_filename)
 }
+

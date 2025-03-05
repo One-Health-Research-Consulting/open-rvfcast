@@ -757,7 +757,8 @@ derived_data_targets <- tar_plan(
 
   # Weather anomalies are deviations from the historical mean
   tar_target(weather_anomalies,
-    calculate_weather_anomalies(nasa_weather_transformed,
+    calculate_weather_anomalies(
+      nasa_weather_transformed,
       weather_historical_means,
       weather_anomalies_directory,
       basename_template = "weather_anomaly_{dates_to_process}.parquet",
@@ -952,7 +953,7 @@ full_data_targets <- tar_plan(
     dates_to_process,
     local_folder = africa_full_predictor_data_directory,
     basename_template = "africa_full_predictor_data_{dates_to_process}.parquet",
-    overwrite = parse_flag("OVERWRITE_AFRICA_FULL_MODEL_DATA"),
+    overwrite = parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA"),
     africa_full_predictor_data_AWS # Enforce dependency
   ), 
   pattern = map(dates_to_process),
