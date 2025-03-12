@@ -16,6 +16,7 @@ if (Sys.getenv("NPROC", unset = "1") != "1") {
   tar_option_set(
     controller = crew::crew_controller_local(
       name = "local",
+      reset_globals = FALSE,
       workers = as.integer(Sys.getenv("NPROC", unset = "1"))
     )
   )

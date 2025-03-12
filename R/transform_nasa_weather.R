@@ -16,34 +16,46 @@
 #' 
 #' @export
 transform_nasa_weather <- function(nasa_weather_coordinates,
-                                   nasa_weather_years,
+                                   months_to_process,
                                    nasa_weather_variables = c("RH2M", "T2M", "PRECTOTCORR"),
                                    continent_raster_template,
                                    local_folder,
+                                   basename_template = glue::glue("nasa_weather_{months_to_process}.parquet"),
                                    overwrite = FALSE,
                                    ...) {
   
-  # Extract start and end dates to make filename
-  start <- paste0(nasa_weather_years, "-01-01")
-  end <- paste0(nasa_weather_years, "-12-31")
-  current_time <- Sys.Date()
-  if(nasa_weather_years == year(current_time)) end <- as.character(current_time-1)
-  dates <- c(start, end)
+  # Create date for the first of the month
+  start_date <- lubridate::ymd(paste0(months_to_process, "-01"))
   
-  transformed_file <- file.path(local_folder, glue::glue("nasa_weather_{nasa_weather_years}.parquet"))
+  # Get the last day of the month
+  end_date <- ceiling_date(start_date, "month") - days(1)
+  if (end_date > format(Sys.Date(), "%Y-%m-%d")) {
+    end_date <- as.Date(format(Sys.Date(), "%Y-%m-%d"))
+  }
+  
+  # Generate sequence of all dates
+  days_in_month <- seq(start_date, end_date, by = "day")
+  
+  # Establish filename
+  transformed_file <- file.path(local_folder, basename_template)
   
   # Create an error safe way to test if the parquet file can be read, if it exists
   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
   
+  existing_data <- error_safe_read_parquet(transformed_file)
+  
   # Check if transformed file already exists and can be loaded. If so return file name and path
-  if(!is.null(error_safe_read_parquet(transformed_file)) & !overwrite) {
-    message("file already exists and can be loaded, skipping download")
-    return(transformed_file)
+  if(!is.null(existing_data) & overwrite == FALSE) {
+    dates_in_existing_data <- existing_data |> select(date) |> distinct() |> collect() |> pull(date)
+    if(all(days_in_month %in% dates_in_existing_data)) {
+      message("file already exists and can be loaded, skipping download and processing")
+      return(transformed_file)
+    }
   }
   
   # If not extract the coordinates and prepare to re-download data from nasapower
   coords <- nasa_weather_coordinates |> 
-    select(coords) |> 
+    select(country,coords) |> 
     unnest(coords) |>
     unnest_wider(x, names_sep = "_") |> 
     unnest_wider(y, names_sep = "_")
@@ -53,14 +65,14 @@ transform_nasa_weather <- function(nasa_weather_coordinates,
   nasa_recorded_weather <- map_dfr(1:nrow(coords), .progress = T, function(i) {
 
     map(nasa_weather_variables, function(j) {
-
+      
       nasapower::get_power(community = "ag",
                         lonlat = c(coords[i,]$x_1,
                                    coords[i,]$y_1,
                                    coords[i,]$x_2,
                                    coords[i,]$y_2), # xmin (W), ymin (S), xmax (E), ymax (N)
                         pars = j,
-                        dates = dates,
+                        dates = c(start_date, end_date),
                         temporal_api = "daily")
     }) |>
     plyr::join_all() |>
@@ -99,7 +111,7 @@ transform_nasa_weather <- function(nasa_weather_coordinates,
       daily_info <- distinct(daily, month, day, year, doy, date)
       daily_rast <- select(daily, -month, -day, -year, -doy, -date)
       raw_raster <- terra::rast(daily_rast) 
-      terra::crs(raw_raster) <- terra::crs(terra::rast()) 
+      terra::crs(raw_raster) <- terra::crs(terra::rast(continent_raster_template)) 
       transformed_raster <- transform_raster(raw_raster = raw_raster,
                                              template = continent_raster_template)
       cbind(daily_info, as.data.frame(transformed_raster, xy = TRUE)) |> 
