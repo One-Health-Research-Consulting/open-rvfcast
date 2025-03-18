@@ -77,19 +77,19 @@ fetch_nasa_weather <- function(nasa_weather_coordinates,
                            temporal_api = "daily")
     }) |>
       plyr::join_all() |>
-      as_tibble()
+      as_tibble() |>
+      suppressMessages()
   })
   
   # Rename columns and clean up schema
   nasa_weather_raw <- nasa_recorded_weather |>
     distinct() |> # Distinct is necessary because there is a bit of overlap when gridding into 4.5 x 4.5 degree chunks
     rename_all(tolower) |> 
-    rename(!!!setNames(tolower(nasa_weather_variables), names(nasa_weather_variables)),
+    dplyr::rename(!!!setNames(tolower(nasa_weather_variables), names(nasa_weather_variables)),
            month = mm, day = dd, x = lon, y = lat) |>
     mutate(across(c(year, month, day, doy), as.integer)) |> 
     mutate(date = lubridate::make_date(year, month, day)) |> 
     select(x, y, everything(), -yyyymmdd)
-  
   
   # Write the transformed data to parquet
   nasa_weather_raw |> arrow::write_parquet(raw_file, compression = "gzip", compression_level = 5)
