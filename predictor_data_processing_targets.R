@@ -62,10 +62,10 @@ static_targets <- tar_plan(
     ),
     states = tibble(state = "Mayotte", country = "France")
   )),
-  tar_target(country_bounding_boxes, get_country_bounding_boxes(country_polygons)),
   tar_target(continent_polygon, create_africa_polygon()),
   tar_target(continent_raster_template, wrap(terra::rast(ext(continent_polygon), resolution = 0.1))),
-
+  tar_target(country_bounding_boxes, get_country_bounding_boxes(continent_polygon)),
+  
   # nasa power resolution = 0.5;
   # ecmwf = 1;
   # sentinel ndvi = 0.01
@@ -94,17 +94,19 @@ static_targets <- tar_plan(
       continent_raster_template,
       output_filename = "soil_preprocessed.parquet",
       overwrite = parse_flag("OVERWRITE_STATIC_DATA"),
-      soil_AWS
-    ), # Enforce dependency
+      soil_AWS  # Enforce dependency
+    ),
     format = "file",
     repository = "local"
   ),
+  
   tar_target(soil_preprocessed_AWS_upload, AWS_put_files(
     soil_preprocessed,
-    soil_directory
+    soil_directory,
+    overwrite = parse_flag("OVERWRITE_STATIC_DATA")
   ),
-  error = "null"
-  ), # Continue the pipeline even on error
+  error = "null" # Continue the pipeline even on error
+  ),
 
   # ASPECT -------------------------------------------------
   tar_target(aspect_urls, c(
@@ -145,9 +147,11 @@ static_targets <- tar_plan(
   format = "file",
   repository = "local"
   ),
+  
   tar_target(aspect_preprocessed_AWS_upload, AWS_put_files(
     aspect_preprocessed,
-    aspect_directory
+    aspect_directory,
+    overwrite = parse_flag("OVERWRITE_STATIC_DATA")
   ),
   error = "null"
   ), # Continue the pipeline even on error
@@ -194,9 +198,11 @@ static_targets <- tar_plan(
   format = "file",
   repository = "local"
   ),
+  
   tar_target(slope_preprocessed_AWS_upload, AWS_put_files(
     slope_preprocessed,
-    slope_directory
+    slope_directory,
+    overwrite = parse_flag("OVERWRITE_STATIC_DATA")
   ),
   error = "null"
   ), # Continue the pipeline even on error
@@ -237,7 +243,8 @@ static_targets <- tar_plan(
 
   tar_target(glw_preprocessed_AWS_upload, AWS_put_files(
     glw_preprocessed,
-    glw_directory
+    glw_directory,
+    overwrite = parse_flag("OVERWRITE_STATIC_DATA")
   ),
   error = "null"
   ), # Continue the pipeline even on error
@@ -271,9 +278,11 @@ static_targets <- tar_plan(
     format = "file",
     repository = "local"
   ),
+  
   tar_target(elevation_preprocessed_AWS_upload, AWS_put_files(
     elevation_preprocessed,
-    elevation_directory
+    elevation_directory,
+    overwrite = parse_flag("OVERWRITE_STATIC_DATA")
   ),
   error = "null"
   ), # Continue the pipeline even on error
@@ -307,9 +316,11 @@ static_targets <- tar_plan(
     format = "file",
     repository = "local"
   ),
+  
   tar_target(bioclim_preprocessed_AWS_upload, AWS_put_files(
     bioclim_preprocessed,
-    bioclim_directory
+    bioclim_directory,
+    overwrite = parse_flag("OVERWRITE_STATIC_DATA")
   ),
   error = "null"
   ), # Continue the pipeline even on error
@@ -345,9 +356,11 @@ static_targets <- tar_plan(
     format = "file",
     repository = "local"
   ),
+  
   tar_target(landcover_preprocessed_AWS_upload, AWS_put_files(
     landcover_preprocessed,
-    landcover_directory
+    landcover_directory,
+    overwrite = parse_flag("OVERWRITE_STATIC_DATA")
   ),
   error = "null"
   ), # Continue the pipeline even on error
@@ -401,7 +414,8 @@ dynamic_targets <- tar_plan(
   
   tar_target(sentinel_ndvi_transformed_AWS_upload, AWS_put_files(
     sentinel_ndvi_transformed,
-    sentinel_ndvi_transformed_directory
+    sentinel_ndvi_transformed_directory,
+    overwrite = parse_flag("OVERWRITE_SENTINEL_NDVI")
   ),
   error = "null"
   ), # Continue the pipeline even on error
@@ -511,7 +525,8 @@ dynamic_targets <- tar_plan(
   # Put modis_ndvi_transformed files on AWS
   tar_target(modis_ndvi_transformed_AWS_upload, AWS_put_files(
     modis_ndvi_transformed,
-    modis_ndvi_transformed_directory
+    modis_ndvi_transformed_directory,
+    overwrite = parse_flag("OVERWRITE_MODIS_NDVI")
   ),
   error = "null"
   ),
@@ -523,6 +538,7 @@ dynamic_targets <- tar_plan(
     ndvi_transformed_directory,
     create_data_directory(directory_path = "data/ndvi_transformed")
   ),
+  
   tar_target(ndvi_transformed_AWS,
     AWS_get_folder(
       ndvi_transformed_directory,
@@ -557,7 +573,8 @@ dynamic_targets <- tar_plan(
   # Put ndvi_transformed files on AWS
   tar_target(ndvi_transformed_AWS_upload, AWS_put_files(
     ndvi_transformed,
-    ndvi_transformed_directory
+    ndvi_transformed_directory,
+    overwrite = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED"))
   ),
   error = "null"
   ),
@@ -567,48 +584,94 @@ dynamic_targets <- tar_plan(
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
   # T2M             MERRA-2 Temperature at 2 Meters (C) ;
   # PRECTOTCORR     MERRA-2 Precipitation Corrected (mm/day)
-  tar_target(
-    nasa_weather_transformed_directory,
-    create_data_directory(directory_path = "data/nasa_weather_transformed")
+  tar_target(nasa_weather_raw_directory,
+    create_data_directory(directory_path = "data/nasa_weather_raw")
   ),
 
-  # Set branching for nasa_weather download
-  tar_target(nasa_weather_years, 2005:(year(Sys.time()))),
-  tar_target(nasa_weather_variables, c("RH2M", "T2M", "PRECTOTCORR")),
   tar_target(nasa_weather_coordinates, get_nasa_weather_coordinates(country_bounding_boxes)),
+  tar_target(months_to_process, dates_to_process |> format("%Y-%m") |> unique()),
 
   # Check if nasa_weather file already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
-  tar_target(nasa_weather_AWS,
+  tar_target(nasa_weather_raw_AWS,
     AWS_get_folder(
-      nasa_weather_transformed_directory,
+      nasa_weather_raw_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
     error = "null",
     cue = tar_cue("always")
   ),
-
+  
   # Process the weather data
-  tar_target(nasa_weather_transformed,
-    transform_nasa_weather(nasa_weather_coordinates,
-      nasa_weather_years,
-      nasa_weather_variables = c("RH2M", "T2M", "PRECTOTCORR"),
-      continent_raster_template,
-      local_folder = nasa_weather_transformed_directory,
+  # cue set to 'always' so that current year can be updated.
+  # the rest of the years will respect the overwrite flag.
+  tar_target(nasa_weather_raw,
+    fetch_nasa_weather(nasa_weather_coordinates,
+      months_to_process,
+      nasa_weather_variables = c("relative_humidity" = "RH2M", "temperature" = "T2M", "precipitation" = "PRECTOTCORR"),
+      local_folder = nasa_weather_raw_directory,
+      basename_template = glue::glue("nasa_weather_raw_{months_to_process}.parquet"),
       overwrite = parse_flag("OVERWRITE_NASA_WEATHER"),
-      nasa_weather_AWS
-    ), # Enforce Dependency
-    pattern = map(nasa_weather_years),
+      nasa_weather_raw_AWS, # Enforce Dependency
+      dates_to_process, # Enforce Dependency
+      ),
+    pattern = map(months_to_process),
     error = "null",
     format = "file",
-    repository = "local"
+    # repository = "local"
   ),
 
   # Put nasa_weather files on AWS
+  tar_target(nasa_weather_raw_AWS_upload, AWS_put_files(
+    nasa_weather_raw,
+    nasa_weather_raw_directory,
+    overwrite = parse_flag("OVERWRITE_NASA_WEATHER")
+  ),
+  error = "null"
+  ),
+  
+
+  tar_target(
+    nasa_weather_transformed_directory,
+    create_data_directory(directory_path = "data/nasa_weather_transformed")
+  ),
+  
+  # Check if nasa_weather file already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(nasa_weather_transformed_AWS,
+             AWS_get_folder(
+               nasa_weather_transformed_directory,
+               skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
+               sync_with_remote = TRUE
+             ),
+             error = "null",
+             cue = tar_cue("always")
+  ),
+  
+  # Process the weather data
+  # cue set to 'always' so that current year can be updated.
+  # the rest of the years will respect the overwrite flag.
+  tar_target(nasa_weather_transformed,
+             transform_nasa_weather(nasa_weather_raw,
+                                    continent_raster_template,
+                                    local_folder = nasa_weather_transformed_directory,
+                                    basename_template = glue::glue("nasa_weather_transformed_{months_to_process}.parquet"),
+                                    overwrite = parse_flag("OVERWRITE_NASA_WEATHER"),
+                                    nasa_weather_transformed_AWS, # Enforce Dependency
+                                    dates_to_process, # Enforce Dependency
+             ),
+             pattern = map(nasa_weather_raw),
+             error = "null",
+             format = "file",
+             # repository = "local"
+  ),
+  
+  # Put nasa_weather files on AWS
   tar_target(nasa_weather_transformed_AWS_upload, AWS_put_files(
     nasa_weather_transformed,
-    nasa_weather_transformed_directory
+    nasa_weather_transformed_directory,
+    overwrite = parse_flag("OVERWRITE_NASA_WEATHER")
   ),
   error = "null"
   ),
@@ -675,7 +738,8 @@ dynamic_targets <- tar_plan(
   # Next step put modis_ndvi_transformed files on AWS.
   tar_target(ecmwf_forecasts_transformed_AWS_upload, AWS_put_files(
     ecmwf_forecasts_transformed,
-    ecmwf_forecasts_transformed_directory
+    ecmwf_forecasts_transformed_directory,
+    overwrite = parse_flag("OVERWRITE_ECMWF_FORECASTS")
   ),
   error = "null"
   ),
@@ -699,7 +763,8 @@ derived_data_targets <- tar_plan(
     end_year = lubridate::year(Sys.time()),
     n_per_month = 2,
     seed = 212
-  )),
+  ),
+  cue = tar_cue("always")),
 
   # Recorded weather anomalies --------------------------------------------------
   tar_target(
@@ -723,7 +788,7 @@ derived_data_targets <- tar_plan(
     nasa_weather_transformed,
     weather_historical_means_directory,
     basename_template = "weather_historical_mean_doy_{i}.parquet",
-    overwrite = FALSE,
+    overwrite = parse_flag("OVERWRITE_HISTORICAL_MEANS"),
     weather_historical_means_AWS # Enforce dependency
   ),
   format = "file",
@@ -733,7 +798,8 @@ derived_data_targets <- tar_plan(
   # Next step put weather_historical_means files on AWS.
   tar_target(weather_historical_means_AWS_upload, AWS_put_files(
     weather_historical_means,
-    weather_historical_means_directory
+    weather_historical_means_directory,
+    overwrite = parse_flag("OVERWRITE_HISTORICAL_MEANS")
   ),
   error = "null"
   ),
@@ -769,6 +835,7 @@ derived_data_targets <- tar_plan(
     pattern = map(dates_to_process),
     error = "null",
     format = "file",
+    # cue = tar_cue("always"),
     repository = "local"
   ),
 
@@ -776,7 +843,7 @@ derived_data_targets <- tar_plan(
   tar_target(weather_anomalies_AWS_upload, AWS_put_files(
     weather_anomalies,
     weather_anomalies_directory,
-    aws_overwrite = Sys.getenv("AWS_OVERWRITE") == "TRUE",
+    aws_overwrite = Sys.getenv("OVERWRITE_WEATHER_ANOMALIES") == "TRUE",
   ),
   error = "null"
   ),
@@ -826,7 +893,8 @@ derived_data_targets <- tar_plan(
   # Next step put weather_historical_means files on AWS.
   tar_target(forecasts_anomalies_AWS_upload, AWS_put_files(
     forecasts_anomalies,
-    forecasts_anomalies_directory
+    forecasts_anomalies_directory,
+    overwrite = parse_flag("OVERWRITE_FORECAST_ANOMALIES")
   ),
   error = "null"
   ),
@@ -852,7 +920,7 @@ derived_data_targets <- tar_plan(
       modis_ndvi_transformed,
       ndvi_historical_means_directory,
       basename_template = "ndvi_historical_mean_doy_{i}.parquet",
-      overwrite = FALSE,
+      overwrite = parse_flag("OVERWRITE_HISTORICAL_MEANS"),
       ndvi_historical_means_AWS # Enforce dependency
     ),
     format = "file",
@@ -862,7 +930,8 @@ derived_data_targets <- tar_plan(
   # Next step put ndvi_historical_means files on AWS.
   tar_target(ndvi_historical_means_AWS_upload, AWS_put_files(
     ndvi_historical_means,
-    ndvi_historical_means_directory
+    ndvi_historical_means_directory,
+    overwrite = parse_flag("OVERWRITE_HISTORICAL_MEANS")
   ),
   error = "null"
   ),
@@ -901,7 +970,8 @@ derived_data_targets <- tar_plan(
   # Next step put ndvi_anomalies files on AWS.
   tar_target(ndvi_anomalies_AWS_upload, AWS_put_files(
     ndvi_anomalies,
-    ndvi_anomalies_directory
+    ndvi_anomalies_directory,
+    overwrite = parse_flag("OVERWRITE_NDVI_ANOMALIES")
   ),
   error = "null"
   )
@@ -964,7 +1034,8 @@ full_data_targets <- tar_plan(
   # Next step put combined_anomalies files on AWS.
   tar_target(africa_full_predictor_data_AWS_upload, AWS_put_files(
     africa_full_predictor_data,
-    africa_full_predictor_data_directory
+    africa_full_predictor_data_directory,
+    overwrite = parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA")
   ),
   error = "null"
   )

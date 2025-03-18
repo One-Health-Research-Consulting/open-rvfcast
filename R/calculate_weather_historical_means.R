@@ -45,7 +45,7 @@ calculate_weather_historical_means <- function(nasa_weather_transformed,
     
     filename <- file.path(weather_historical_means_directory, glue::glue(basename_template))
     
-    # Check if glw files exist and can be read and that we don't want to overwrite them.
+    # Check if parquet files exist and can be read and that we don't want to overwrite them.
     if(!is.null(error_safe_read_parquet(filename)) & !overwrite) {
       message(glue::glue("{filename} already exists and can be loaded, skipping"))
       return(filename)
