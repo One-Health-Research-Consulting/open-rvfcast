@@ -37,6 +37,7 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
                                         dates_to_process,
                                         overwrite = FALSE,
                                         ...) {
+  
   # Check that we're only working on one date at a time
   stopifnot(length(dates_to_process) == 1)
 
@@ -66,7 +67,7 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
     drop_na()
 
   # Join the two datasets by day of year (doy)
-  weather_transformed_dataset2 <- left_join(weather_transformed_dataset, historical_means, by = c("x", "y", "doy"), suffix = c("", "_historical")) |> drop_na()
+  weather_transformed_dataset <- left_join(weather_transformed_dataset, historical_means, by = c("x", "y", "doy"), suffix = c("", "_historical")) |> drop_na()
 
   # Calculate temperature anomalies
   weather_transformed_dataset <- weather_transformed_dataset |>

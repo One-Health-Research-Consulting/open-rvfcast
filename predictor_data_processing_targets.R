@@ -30,8 +30,6 @@ parse_flag <- function(flags, cue = NULL) {
   flag
 }
 
-print(.libPaths())
-
 # Every major data target returns a list of parquet file names. Those can then be
 # combined and opened using arrow::open_dataset which allows a lot of operations
 # to be performed on the data without loading it all into memory. See
@@ -64,10 +62,10 @@ static_targets <- tar_plan(
     ),
     states = tibble(state = "Mayotte", country = "France")
   )),
-  tar_target(country_bounding_boxes, get_country_bounding_boxes(country_polygons)),
   tar_target(continent_polygon, create_africa_polygon()),
   tar_target(continent_raster_template, wrap(terra::rast(ext(continent_polygon), resolution = 0.1))),
-
+  tar_target(country_bounding_boxes, get_country_bounding_boxes(continent_polygon)),
+  
   # nasa power resolution = 0.5;
   # ecmwf = 1;
   # sentinel ndvi = 0.01
@@ -586,40 +584,36 @@ dynamic_targets <- tar_plan(
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
   # T2M             MERRA-2 Temperature at 2 Meters (C) ;
   # PRECTOTCORR     MERRA-2 Precipitation Corrected (mm/day)
-  tar_target(
-    nasa_weather_transformed_directory,
-    create_data_directory(directory_path = "data/nasa_weather_transformed")
+  tar_target(nasa_weather_raw_directory,
+    create_data_directory(directory_path = "data/nasa_weather_raw")
   ),
 
-  tar_target(nasa_weather_variables, c("RH2M", "T2M", "PRECTOTCORR")),
   tar_target(nasa_weather_coordinates, get_nasa_weather_coordinates(country_bounding_boxes)),
+  tar_target(months_to_process, dates_to_process |> format("%Y-%m") |> unique()),
 
   # Check if nasa_weather file already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
-  tar_target(nasa_weather_AWS,
+  tar_target(nasa_weather_raw_AWS,
     AWS_get_folder(
-      nasa_weather_transformed_directory,
+      nasa_weather_raw_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
     error = "null",
     cue = tar_cue("always")
   ),
-
-  tar_target(months_to_process, dates_to_process |> format("%Y-%m") |> unique()),
   
   # Process the weather data
   # cue set to 'always' so that current year can be updated.
   # the rest of the years will respect the overwrite flag.
-  tar_target(nasa_weather_transformed,
-    transform_nasa_weather(nasa_weather_coordinates,
+  tar_target(nasa_weather_raw,
+    fetch_nasa_weather(nasa_weather_coordinates,
       months_to_process,
-      nasa_weather_variables = c("RH2M", "T2M", "PRECTOTCORR"),
-      continent_raster_template,
-      local_folder = nasa_weather_transformed_directory,
-      basename_template = glue::glue("nasa_weather_{months_to_process}.parquet"),
+      nasa_weather_variables = c("relative_humidity" = "RH2M", "temperature" = "T2M", "precipitation" = "PRECTOTCORR"),
+      local_folder = nasa_weather_raw_directory,
+      basename_template = glue::glue("nasa_weather_raw_{months_to_process}.parquet"),
       overwrite = parse_flag("OVERWRITE_NASA_WEATHER"),
-      nasa_weather_AWS, # Enforce Dependency
+      nasa_weather_raw_AWS, # Enforce Dependency
       dates_to_process, # Enforce Dependency
       ),
     pattern = map(months_to_process),
@@ -628,6 +622,51 @@ dynamic_targets <- tar_plan(
     # repository = "local"
   ),
 
+  # Put nasa_weather files on AWS
+  tar_target(nasa_weather_raw_AWS_upload, AWS_put_files(
+    nasa_weather_raw,
+    nasa_weather_raw_directory,
+    overwrite = parse_flag("OVERWRITE_NASA_WEATHER")
+  ),
+  error = "null"
+  ),
+  
+
+  tar_target(
+    nasa_weather_transformed_directory,
+    create_data_directory(directory_path = "data/nasa_weather_transformed")
+  ),
+  
+  # Check if nasa_weather file already exists on AWS and can be loaded
+  # The only important one is the directory. The others are there to enforce dependencies.
+  tar_target(nasa_weather_transformed_AWS,
+             AWS_get_folder(
+               nasa_weather_transformed_directory,
+               skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
+               sync_with_remote = TRUE
+             ),
+             error = "null",
+             cue = tar_cue("always")
+  ),
+  
+  # Process the weather data
+  # cue set to 'always' so that current year can be updated.
+  # the rest of the years will respect the overwrite flag.
+  tar_target(nasa_weather_transformed,
+             transform_nasa_weather(nasa_weather_raw,
+                                    continent_raster_template,
+                                    local_folder = nasa_weather_transformed_directory,
+                                    basename_template = glue::glue("nasa_weather_transformed_{months_to_process}.parquet"),
+                                    overwrite = parse_flag("OVERWRITE_NASA_WEATHER"),
+                                    nasa_weather_transformed_AWS, # Enforce Dependency
+                                    dates_to_process, # Enforce Dependency
+             ),
+             pattern = map(nasa_weather_raw),
+             error = "null",
+             format = "file",
+             # repository = "local"
+  ),
+  
   # Put nasa_weather files on AWS
   tar_target(nasa_weather_transformed_AWS_upload, AWS_put_files(
     nasa_weather_transformed,
