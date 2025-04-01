@@ -3,12 +3,12 @@
     "Version": "4.4.2",
     "Repositories": [
       {
-        "Name": "CRAN",
-        "URL": "https://cloud.r-project.org"
+        "Name": "ropensci",
+        "URL": "https://ropensci.r-universe.dev"
       },
       {
-        "Name": "ROPENSCI",
-        "URL": "https://ropensci.r-universe.dev"
+        "Name": "CRAN",
+        "URL": "https://cloud.r-project.org"
       }
     ]
   },
@@ -529,6 +529,42 @@
       "License": "GPL (>= 2.0)",
       "NeedsCompilation": "yes",
       "Author": "Manos Papadakis [aut, cre, cph], Michail Tsagris [aut], Marios Dimitriadis [ctb], Stefanos Fafalios [aut], Matteo Fasiolo [ctb], Morgan Jacob [ctb], Giorgos Borboudakis [ctb], John Burkardt [ctb], Changliang Zou [ctb], Kleanthi Lakiotaki [ctb], Christina Chatzipantsiou [ctb]",
+      "Repository": "CRAN"
+    },
+    "V8": {
+      "Package": "V8",
+      "Version": "6.0.3",
+      "Source": "Repository",
+      "Type": "Package",
+      "Title": "Embedded JavaScript and WebAssembly Engine for R",
+      "Authors@R": "c( person(\"Jeroen\", \"Ooms\", role = c(\"aut\", \"cre\"), email = \"jeroenooms@gmail.com\", comment = c(ORCID = \"0000-0002-4035-0289\")), person(\"Jan Marvin\", \"Garbuszus\", role = \"ctb\"))",
+      "Description": "An R interface to V8 <https://v8.dev>: Google's open source JavaScript and WebAssembly engine. This package can be compiled either with V8 version 6  and up or NodeJS when built as a shared library.",
+      "License": "MIT + file LICENSE",
+      "URL": "https://jeroen.r-universe.dev/V8",
+      "BugReports": "https://github.com/jeroen/v8/issues",
+      "SystemRequirements": "V8 engine version 6+ is needed for ES6 and WASM support. On Linux you can build against libv8-dev (Debian) or v8-devel (Fedora). We also provide static libv8 binaries for most platforms, see the README for details.",
+      "NeedsCompilation": "yes",
+      "VignetteBuilder": "knitr",
+      "Imports": [
+        "Rcpp (>= 0.12.12)",
+        "jsonlite (>= 1.0)",
+        "curl (>= 1.0)",
+        "utils"
+      ],
+      "LinkingTo": [
+        "Rcpp"
+      ],
+      "Suggests": [
+        "testthat",
+        "knitr",
+        "rmarkdown"
+      ],
+      "RoxygenNote": "7.3.1",
+      "Language": "en-US",
+      "Encoding": "UTF-8",
+      "Biarch": "true",
+      "Author": "Jeroen Ooms [aut, cre] (<https://orcid.org/0000-0002-4035-0289>), Jan Marvin Garbuszus [ctb]",
+      "Maintainer": "Jeroen Ooms <jeroenooms@gmail.com>",
       "Repository": "CRAN"
     },
     "archive": {
@@ -1222,6 +1258,49 @@
       "Maintainer": "Jennifer Bryan <jenny@stat.ubc.ca>",
       "Repository": "CRAN"
     },
+    "checkmate": {
+      "Package": "checkmate",
+      "Version": "2.3.2",
+      "Source": "Repository",
+      "Type": "Package",
+      "Title": "Fast and Versatile Argument Checks",
+      "Description": "Tests and assertions to perform frequent argument checks. A substantial part of the package was written in C to minimize any worries about execution time overhead.",
+      "Authors@R": "c( person(\"Michel\", \"Lang\", NULL, \"michellang@gmail.com\", role = c(\"cre\", \"aut\"), comment = c(ORCID = \"0000-0001-9754-0393\")), person(\"Bernd\", \"Bischl\", NULL, \"bernd_bischl@gmx.net\", role = \"ctb\"), person(\"Dénes\", \"Tóth\", NULL, \"toth.denes@kogentum.hu\", role = \"ctb\", comment = c(ORCID = \"0000-0003-4262-3217\")) )",
+      "URL": "https://mllg.github.io/checkmate/, https://github.com/mllg/checkmate",
+      "URLNote": "https://github.com/mllg/checkmate",
+      "BugReports": "https://github.com/mllg/checkmate/issues",
+      "NeedsCompilation": "yes",
+      "ByteCompile": "yes",
+      "Encoding": "UTF-8",
+      "Depends": [
+        "R (>= 3.0.0)"
+      ],
+      "Imports": [
+        "backports (>= 1.1.0)",
+        "utils"
+      ],
+      "Suggests": [
+        "R6",
+        "fastmatch",
+        "data.table (>= 1.9.8)",
+        "devtools",
+        "ggplot2",
+        "knitr",
+        "magrittr",
+        "microbenchmark",
+        "rmarkdown",
+        "testthat (>= 3.0.4)",
+        "tinytest (>= 1.1.0)",
+        "tibble"
+      ],
+      "License": "BSD_3_clause + file LICENSE",
+      "VignetteBuilder": "knitr",
+      "RoxygenNote": "7.3.2",
+      "Collate": "'AssertCollection.R' 'allMissing.R' 'anyInfinite.R' 'anyMissing.R' 'anyNaN.R' 'asInteger.R' 'assert.R' 'helper.R' 'makeExpectation.R' 'makeTest.R' 'makeAssertion.R' 'checkAccess.R' 'checkArray.R' 'checkAtomic.R' 'checkAtomicVector.R' 'checkCharacter.R' 'checkChoice.R' 'checkClass.R' 'checkComplex.R' 'checkCount.R' 'checkDataFrame.R' 'checkDataTable.R' 'checkDate.R' 'checkDirectoryExists.R' 'checkDisjunct.R' 'checkDouble.R' 'checkEnvironment.R' 'checkFALSE.R' 'checkFactor.R' 'checkFileExists.R' 'checkFlag.R' 'checkFormula.R' 'checkFunction.R' 'checkInt.R' 'checkInteger.R' 'checkIntegerish.R' 'checkList.R' 'checkLogical.R' 'checkMatrix.R' 'checkMultiClass.R' 'checkNamed.R' 'checkNames.R' 'checkNull.R' 'checkNumber.R' 'checkNumeric.R' 'checkOS.R' 'checkPOSIXct.R' 'checkPathForOutput.R' 'checkPermutation.R' 'checkR6.R' 'checkRaw.R' 'checkScalar.R' 'checkScalarNA.R' 'checkSetEqual.R' 'checkString.R' 'checkSubset.R' 'checkTRUE.R' 'checkTibble.R' 'checkVector.R' 'coalesce.R' 'isIntegerish.R' 'matchArg.R' 'qassert.R' 'qassertr.R' 'vname.R' 'wfwl.R' 'zzz.R'",
+      "Author": "Michel Lang [cre, aut] (<https://orcid.org/0000-0001-9754-0393>), Bernd Bischl [ctb], Dénes Tóth [ctb] (<https://orcid.org/0000-0003-4262-3217>)",
+      "Maintainer": "Michel Lang <michellang@gmail.com>",
+      "Repository": "CRAN"
+    },
     "class": {
       "Package": "class",
       "Version": "7.3-23",
@@ -1830,6 +1909,50 @@
       "Author": "Hadley Wickham [aut, cre], Maximilian Girlich [aut], Edgar Ruiz [aut], Posit Software, PBC [cph, fnd]",
       "Maintainer": "Hadley Wickham <hadley@posit.co>",
       "Repository": "CRAN"
+    },
+    "deposits": {
+      "Package": "deposits",
+      "Version": "0.2.1.061",
+      "Source": "Repository",
+      "Title": "A universal client for depositing and accessing research data anywhere",
+      "Authors@R": "person(\"Mark\", \"Padgham\", , \"mark.padgham@email.com\", role = c(\"aut\", \"cre\"), comment = c(ORCID = \"0000-0003-2172-5265\"))",
+      "Description": "A universal client for depositing and accessing research data anywhere. Currently supported services are zenodo and figshare.",
+      "License": "MIT + file LICENSE",
+      "URL": "https://docs.ropensci.org/deposits/",
+      "BugReports": "https://github.com/ropenscilabs/deposits/issues",
+      "Imports": [
+        "checkmate",
+        "fs",
+        "here",
+        "httr2",
+        "jsonlite",
+        "jsonvalidate",
+        "methods",
+        "R6",
+        "withr",
+        "xml2"
+      ],
+      "Suggests": [
+        "frictionless",
+        "httptest2",
+        "knitr",
+        "pkgbuild",
+        "rmarkdown",
+        "testthat (>= 3.0.0)"
+      ],
+      "Config/testthat/edition": "3",
+      "VignetteBuilder": "knitr",
+      "Encoding": "UTF-8",
+      "Roxygen": "list(markdown = TRUE)",
+      "RoxygenNote": "7.3.2",
+      "Config/pak/sysreqs": "make libxml2-dev libssl-dev libnode-dev",
+      "Repository": "https://ropensci.r-universe.dev",
+      "RemoteUrl": "https://github.com/ropenscilabs/deposits",
+      "RemoteRef": "main",
+      "RemoteSha": "3495041f03c4d29c58f392cb46e7a621aeece0c6",
+      "NeedsCompilation": "no",
+      "Author": "Mark Padgham [aut, cre] (<https://orcid.org/0000-0003-2172-5265>)",
+      "Maintainer": "Mark Padgham <mark.padgham@email.com>"
     },
     "desc": {
       "Package": "desc",
@@ -3646,6 +3769,37 @@
       "Encoding": "UTF-8",
       "NeedsCompilation": "yes",
       "Author": "Jeroen Ooms [aut, cre] (<https://orcid.org/0000-0002-4035-0289>), Duncan Temple Lang [ctb], Lloyd Hilaiel [cph] (author of bundled libyajl)",
+      "Repository": "CRAN"
+    },
+    "jsonvalidate": {
+      "Package": "jsonvalidate",
+      "Version": "1.5.0",
+      "Source": "Repository",
+      "Title": "Validate 'JSON' Schema",
+      "Authors@R": "c(person(\"Rich\", \"FitzJohn\", role = c(\"aut\", \"cre\"), email = \"rich.fitzjohn@gmail.com\"), person(\"Rob\", \"Ashton\", role = \"aut\"), person(\"Alex\", \"Hill\", role = \"ctb\"), person(\"Alicia\", \"Schep\", role = \"ctb\"), person(\"Ian\", \"Lyttle\", role = \"ctb\"), person(\"Kara\", \"Woo\", role = \"ctb\"), person(\"Mathias\", \"Buus\", role = c(\"aut\", \"cph\"), comment = \"Author of bundled imjv library\"), person(\"Evgeny\", \"Poberezkin\", role = c(\"aut\", \"cph\"), comment = \"Author of bundled Ajv library\"))",
+      "Maintainer": "Rich FitzJohn <rich.fitzjohn@gmail.com>",
+      "Description": "Uses the node library 'is-my-json-valid' or 'ajv' to validate 'JSON' against a 'JSON' schema.  Drafts 04, 06 and 07 of 'JSON' schema are supported.",
+      "License": "MIT + file LICENSE",
+      "URL": "https://docs.ropensci.org/jsonvalidate/, https://github.com/ropensci/jsonvalidate",
+      "BugReports": "https://github.com/ropensci/jsonvalidate/issues",
+      "Imports": [
+        "R6",
+        "V8"
+      ],
+      "Suggests": [
+        "knitr",
+        "jsonlite",
+        "rmarkdown",
+        "testthat",
+        "withr"
+      ],
+      "RoxygenNote": "7.3.2",
+      "VignetteBuilder": "knitr",
+      "Encoding": "UTF-8",
+      "Language": "en-GB",
+      "Config/testthat/edition": "3",
+      "NeedsCompilation": "no",
+      "Author": "Rich FitzJohn [aut, cre], Rob Ashton [aut], Alex Hill [ctb], Alicia Schep [ctb], Ian Lyttle [ctb], Kara Woo [ctb], Mathias Buus [aut, cph] (Author of bundled imjv library), Evgeny Poberezkin [aut, cph] (Author of bundled Ajv library)",
       "Repository": "CRAN"
     },
     "kableExtra": {
