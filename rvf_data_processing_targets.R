@@ -89,9 +89,6 @@ data_import_targets <- tar_plan(
 
 rvf_processing_targets <- tar_plan()
 
-# Lagging predictor variables or other tasks necessary before
-# integrating all data sources and aggregation
-feature_engineering_targets <- tar_plan()
 
 # Join response to processed predictors
 data_integration_targets <- tar_plan(
@@ -124,12 +121,6 @@ aggregation_targets <- tar_plan(
 list(
   data_import_targets,
   rvf_processing_targets,
-  feature_engineering_targets,
   data_integration_targets,
   aggregation_targets
 )
-
-
-# Notes:
-
-# Lag and rvf join should happen within context of aggregation function

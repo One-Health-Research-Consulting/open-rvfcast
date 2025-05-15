@@ -1,4 +1,4 @@
-# This repository uses targets projects. 
+# This repository uses targets projects
 # To switch to the modeling pipeline run:
 # Sys.setenv(TAR_PROJECT = "model")
 
@@ -25,14 +25,16 @@ parse_flag <- function(flags, cue = F) {
 }
 
 # Download the data from the S3 bucket and partition into training, validation, and test splits
-data_targets <- tar_plan(
+model_data_targets <- tar_plan(
   tar_target(RSA_data, arrow::open_dataset("s3://open-rvfcast/data/RSA_rvf_model_data") |> 
                collect() |>
                pivot_wider(names_from = lag_interval, values_from = c("ndvi_anomalies", "weather_anomolies"))),
 )
 
+cross_validation_targets <- tar_plan()
+
 # Model -----------------------------------------------------------
-modeling_targets <- tar_plan(
+model_tuning_targets <- tar_plan(
   tar_target(training_data, RSA_data |> filter(date <= "2017-12-31")),
   tar_target(holdout_data, RSA_data |> filter(date > "2017-12-31")),
 
@@ -46,10 +48,7 @@ modeling_targets <- tar_plan(
 
   tar_target(xgb_metrics),
 
-  
-
-
-
+model_fitting_targets <- tar_plan()
   
   # # RSA --------------------------------------------------
   # tar_target(augmented_data_rsa_directory,
@@ -131,7 +130,7 @@ modeling_targets <- tar_plan(
   #                                   skip = rolling_n - 1)),
   # 
   # # tuning
-  tar_target(tuned, model_tune(wf, splits, grid)),
+  # tar_target(tuned, model_tune(wf, splits, grid)),
   
   # final model
   # tar_target(final, {
@@ -192,7 +191,7 @@ modeling_targets <- tar_plan(
 # Reports -----------------------------------------------------------
 # The goal is to compare model performance. 
 # We want a plot with ROC curves for every different model specification
-model_performance_targets <- tar_plan(
+model_evaluation_targets <- tar_plan(
   
 )
 
@@ -209,8 +208,10 @@ documentation_targets <- tar_plan(
 
 # List targets -----------------------------------------------------------------
 # all_targets() doesn't work with tarchetypes like tar_change().
-list(data_targets,
-     modeling_targets,
-     model_performance_targets,
+list(model_data_targets,
+     cross_validation_targets,
+     model_tuning_targets,
+     model_fitting_targets,
+     model_evaluation_targets,
      report_targets,
      documentation_targets)
