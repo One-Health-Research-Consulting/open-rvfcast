@@ -1,4 +1,13 @@
 source("renv/activate.R")
+# Load env vars from any file starting with `.env`. This allows user-specific
+# options to be set in `.env_user` (which is .gitignored), and to have both
+# encrypted and non-encrypted .env files
+load_env <- function(){
+  for (env_file in list.files(all.files = TRUE, pattern = "^\\.env.*")) {
+    try(readRenviron(env_file), silent = TRUE)
+  }
+}
+load_env()
 
 # If there is a bucket, cache targets remotely. Otherwise, do so locally.
 if(!nzchar(Sys.getenv("TAR_PROJECT"))) {

@@ -1,0 +1,17 @@
+*
+!packages.R
+!packages.r
+!*.R
+!*.r
+!R/*.R
+!R/*.r
+!_targets*.R
+!_targets*.r
+!vignettes/*.r
+!vignettes/*.R
+!vignettes/*.Rmd
+!vignettes/*.rmd
+!reports/*.r
+!reports/*.R
+!reports/*.Rmd
+!reports/*.rmd

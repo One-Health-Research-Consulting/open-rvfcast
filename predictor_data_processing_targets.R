@@ -656,7 +656,6 @@ dynamic_targets <- tar_plan(
              transform_nasa_weather(nasa_weather_raw,
                                     continent_raster_template,
                                     local_folder = nasa_weather_transformed_directory,
-                                    basename_template = glue::glue("nasa_weather_transformed_{months_to_process}.parquet"),
                                     overwrite = parse_flag("OVERWRITE_NASA_WEATHER"),
                                     nasa_weather_transformed_AWS, # Enforce Dependency
                                     dates_to_process, # Enforce Dependency

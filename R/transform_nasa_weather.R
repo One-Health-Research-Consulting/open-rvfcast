@@ -6,19 +6,22 @@
 #'
 #' @param nasa_weather_coordinates Dataframe. A dataframe containing columns of country and nested coordinates 
 #'        for the bounding box to download weather data.
-#' @param start_date Date. The start date for which to download weather data.
-#' @param end_date Date. The end date for which to download weather data.
+#' @param months_to_process Character. The year-month (YYYY-MM format) for which to download weather data.
 #' @param nasa_weather_variables Named character vector. Variables to download from NASA POWER, with names being 
 #'        the column names in the output and values being the NASA POWER parameter codes.
 #'        Default: c("relative_humidity" = "RH2M", "temperature" = "T2M", "precipitation" = "PRECTOTCORR").
+#' @param local_folder Character. The directory where the raw data will be saved.
+#' @param basename_template Character. Template for the output filename. Default: glue::glue("nasa_weather_raw_{months_to_process}.parquet").
+#' @param overwrite Logical. Whether to overwrite existing data files. Default: FALSE.
+#' @param ... Additional parameters passed to internal functions.
 #'
-#' @return Tibble. A dataframe containing the raw NASA weather data.
+#' @return Character. The file path to the raw NASA weather data parquet file.
 #' 
 #' @export
 fetch_nasa_weather <- function(nasa_weather_coordinates,
                                months_to_process,
-                               nasa_weather_variables = c("relative_humidity" = "RH2M", 
-                                                          "temperature" = "T2M", 
+                               nasa_weather_variables = c("relative_humidity" = "RH2M",
+                                                          "temperature" = "T2M",
                                                           "precipitation" = "PRECTOTCORR"),
                                local_folder,
                                basename_template = glue::glue("nasa_weather_raw_{months_to_process}.parquet"),
@@ -36,8 +39,8 @@ fetch_nasa_weather <- function(nasa_weather_coordinates,
   
   # Get the last day of the month
   end_date <- lubridate::ceiling_date(start_date, "month") - lubridate::days(1)
-  if (end_date > format(Sys.Date(), "%Y-%m-%d")) {
-    end_date <- as.Date(format(Sys.Date(), "%Y-%m-%d"))
+  if (end_date > Sys.Date()) {
+    end_date <- Sys.Date()
   }
   
   message(glue::glue("Processing NASA weather data for month {months_to_process}"))
@@ -114,12 +117,9 @@ fetch_nasa_weather <- function(nasa_weather_coordinates,
 #'
 #' @author Nathan Layman, Emma Mendelsohn
 #'
-#' @param nasa_weather_raw Tibble. Raw NASA weather data from fetch_nasa_weather().
-#' @param months_to_process Character. The year-month (YYYY-MM format) for which the weather data was downloaded.
-#' @param nasa_weather_variables Named character vector. Variables downloaded from NASA POWER.
+#' @param nasa_weather_raw Character. File path to the raw NASA weather data parquet file from fetch_nasa_weather().
 #' @param continent_raster_template Character. The file path to the template raster used to resample and transform the weather data.
 #' @param local_folder Character. The directory where the transformed data will be saved.
-#' @param basename_template Character. Template for the output filename. Default: glue::glue("nasa_weather_{months_to_process}.parquet").
 #' @param overwrite Logical. Whether to overwrite existing transformed data files. Default: FALSE.
 #' @param ... Additional parameters passed to internal functions.
 #'
@@ -129,15 +129,15 @@ fetch_nasa_weather <- function(nasa_weather_coordinates,
 transform_nasa_weather <- function(nasa_weather_raw,
                                    continent_raster_template,
                                    local_folder,
-                                   basename_template = glue::glue("nasa_weather_transformed_{months_to_process}.parquet"),
                                    overwrite = FALSE,
                                    ...) {
   
-  # Check that months_to_process is only one value
+  # Check that nasa_weather_raw is only one value
   stopifnot(length(nasa_weather_raw) == 1)
   
-  # Establish filename
-  transformed_file <- file.path(local_folder, basename_template)
+  # Establish filename using local_folder and basename
+  transformed_filename <- gsub("raw", "transformed", basename(nasa_weather_raw))
+  transformed_file <- file.path(local_folder, transformed_filename)
   
   # Create an error safe way to test if the parquet file can be read, if it exists
   error_safe_read_parquet <- purrr::possibly(arrow::open_dataset, NULL)
@@ -152,6 +152,11 @@ transform_nasa_weather <- function(nasa_weather_raw,
   
   nasa_weather_raw <- arrow::read_parquet(nasa_weather_raw)
   
+  # Identify weather variable columns by excluding known coordinate and time columns
+  weather_vars <- nasa_weather_raw |>
+    select(-c(x, y, year, month, day, doy, date)) |>
+    names()
+  
   # Check for even spatial and temporal data coverage
   check_rows <- nasa_weather_raw |> dplyr::group_by(x, y) |> dplyr::count() |> dplyr::ungroup() |> dplyr::distinct(n)
   assertthat::are_equal(1, nrow(check_rows))
@@ -161,13 +166,14 @@ transform_nasa_weather <- function(nasa_weather_raw,
   # Transform point data into standardized raster grid format and back to tabular data:
   # Process each variable separately, standardize to template raster for each date,
   # then join all variables together with consistent spatial and temporal structure
-  dat_out <- purrr::map(names(nasa_weather_variables), function(var) {
+  dat_out <- purrr::map(weather_vars, function(var) {
     purrr::map_dfr(unique(nasa_weather_raw$date),
                    ~standardize_points_to_raster(nasa_weather_raw |> dplyr::filter(date == .x), 
                                                  template_raster = terra::rast(continent_raster_template),
                                                  value_col = var,
                                                  fill_na = TRUE) |>
                      terra::as.data.frame(xy = TRUE) |>
+                     dplyr::rename(!!var := names(.)[3]) |>  # Ensure correct column name
                      dplyr::mutate(date = .x,
                                    year = lubridate::year(date),
                                    month = lubridate::month(date),
