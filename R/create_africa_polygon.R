@@ -10,7 +10,7 @@
 create_africa_polygon <- function() {
   
   # Get all countries as sf
-  africa_countries <- ne_countries(scale = "medium", returnclass = "sf") |>
+  africa_countries <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf") |>
     dplyr::filter(continent == "Africa" | 
              name %in% c("Seychelles", "Mauritius", "Comoros", "Cape Verde", 
                          "São Tomé and Príncipe")) |>

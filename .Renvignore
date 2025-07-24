@@ -15,6 +15,3 @@
 !reports/*.R
 !reports/*.Rmd
 !reports/*.rmd
-
-# Ignore everything in scripts folder
-scripts/*
