@@ -44,12 +44,9 @@ AWS_get_folder <- function(local_folder,
   error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
 
   # Get files from S3 bucket with prefix
-  s3_files <- aws.s3::get_bucket_df(
-    bucket = Sys.getenv("AWS_BUCKET_ID"),
-    prefix = paste0(local_folder, "/"),
-    max = Inf # This ensures it gets ALL objects (default is 1000)
-  ) |>
-    pull(Key)
+  df_bucket_data <- aws.s3::get_bucket(bucket = Sys.getenv("AWS_BUCKET_ID"),
+                                        prefix = paste0(local_folder, "/"))
+  s3_files <- map_chr(df_bucket_data, pluck, "Key")
 
   # Check if S3 has files to download
   if (length(s3_files) == 0) {
