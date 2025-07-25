@@ -153,7 +153,7 @@ AWS_get_folder <- function(local_folder,
 #' )
 #' }
 #'
-#' @importFrom aws.s3 get_bucket_df put_object delete_object
+#' @importFrom aws.s3 get_bucket put_object delete_object
 #' @importFrom arrow open_dataset
 #' @importFrom glue glue
 #' @importFrom purrr possibly
