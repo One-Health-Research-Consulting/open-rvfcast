@@ -5624,6 +5624,64 @@
       "Maintainer": "Philippe Massicotte <pmassicotte@hotmail.com>",
       "Repository": "RSPM"
     },
+    "rnaturalearthdata": {
+      "Package": "rnaturalearthdata",
+      "Version": "1.0.0.9000",
+      "Source": "Repository",
+      "Title": "World Vector Map Data from Natural Earth Used in 'rnaturalearth'",
+      "Authors@R": "c( person( family = \"South\", given = \"Andy\", email = \"southandy@gmail.com\", role = c(\"aut\"), comment = c(ORCID = \"0000-0003-4051-6135\") ), person( family = \"Michael\", given = \"Schramm\", email = \"mpschramm@gmail.com\", role = c(\"aut\") ), person( family = \"Massicotte\", given = \"Philippe\", email = \"pmassicotte@hotmail.com\", role = c(\"aut\", \"cre\"), comment = c(ORCID = \"0000-0002-5919-4116\") ))",
+      "Description": "Vector map data from <https://www.naturalearthdata.com/>. Access functions are provided in the accompanying package 'rnaturalearth'.",
+      "License": "CC0",
+      "LazyData": "true",
+      "LazyDataCompression": "xz",
+      "Encoding": "UTF-8",
+      "URL": "https://docs.ropensci.org/rnaturalearthdata/, https://github.com/ropensci/rnaturalearthdata",
+      "BugReports": "https://github.com/ropensci/rnaturalearthdata/issues",
+      "Depends": [
+        "R (>= 3.1.1)"
+      ],
+      "Imports": [],
+      "Suggests": [
+        "knitr (>= 1.12.3)",
+        "testthat (>= 0.9.1)"
+      ],
+      "RoxygenNote": "7.3.1",
+      "Repository": "https://ropensci.r-universe.dev",
+      "RemoteUrl": "https://github.com/ropensci/rnaturalearthdata",
+      "RemoteRef": "main",
+      "RemoteSha": "ff4d891f74265473ae2c936dcfeb0c9afeac6631",
+      "NeedsCompilation": "no",
+      "Author": "Andy South [aut] (ORCID: <https://orcid.org/0000-0003-4051-6135>), Schramm Michael [aut], Philippe Massicotte [aut, cre] (ORCID: <https://orcid.org/0000-0002-5919-4116>)",
+      "Maintainer": "Philippe Massicotte <pmassicotte@hotmail.com>"
+    },
+    "rnaturalearthhires": {
+      "Package": "rnaturalearthhires",
+      "Version": "1.0.0.9000",
+      "Source": "Repository",
+      "Title": "High Resolution World Vector Map Data from Natural Earth used in rnaturalearth",
+      "Authors@R": "c( person( family = \"South\", given = \"Andy\", email = \"southandy@gmail.com\", role = c(\"aut\", \"cre\"), comment = c(ORCID = \"0000-0003-4051-6135\") ), person( family = \"Michael\", given = \"Schramm\", email = \"mpschramm@gmail.com\", role = c(\"aut\") ), person( family = \"Massicotte\", given = \"Philippe\", email = \"pmassicotte@hotmail.com\", role = c(\"aut\"), comment = c(ORCID = \"0000-0002-5919-4116\") ))",
+      "Description": "Facilitates mapping by making natural earth map data from http:// www.naturalearthdata.com/ more easily available to R users. Focuses on vector data.",
+      "License": "CC0",
+      "LazyData": "true",
+      "LazyDataCompression": "xz",
+      "URL": "https://docs.ropensci.org/rnaturalearthhires, https://github.com/ropensci/rnaturalearthhires",
+      "BugReports": "https://github.com/ropensci/rnaturalearthhires/issues",
+      "Depends": [
+        "R (>= 3.1.1)"
+      ],
+      "Suggests": [
+        "testthat (>= 0.9.1)"
+      ],
+      "RoxygenNote": "7.3.1",
+      "Encoding": "UTF-8",
+      "Repository": "https://ropensci.r-universe.dev",
+      "RemoteUrl": "https://github.com/ropensci/rnaturalearthhires",
+      "RemoteRef": "main",
+      "RemoteSha": "e4736f636baa1c013d77d2ba028dd5bc334defee",
+      "NeedsCompilation": "no",
+      "Author": "Andy South [aut, cre] (ORCID: <https://orcid.org/0000-0003-4051-6135>), Schramm Michael [aut], Philippe Massicotte [aut] (ORCID: <https://orcid.org/0000-0002-5919-4116>)",
+      "Maintainer": "Andy South <southandy@gmail.com>"
+    },
     "rprojroot": {
       "Package": "rprojroot",
       "Version": "2.0.4",
