@@ -1,5 +1,5 @@
 # This repository uses targets projects.
-# To switch to the data acquisition adn cleaning pipeline run:
+# To switch to the data acquisition and cleaning pipeline run:
 # `Sys.setenv(TAR_PROJECT = "data")`
 
 # Re-record current dependencies for CAPSULE users

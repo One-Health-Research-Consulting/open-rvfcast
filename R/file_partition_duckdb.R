@@ -95,7 +95,7 @@ file_partition_duckdb <- function(sources, # A named, nested list of parquet fil
     message(glue::glue("{table_name} table created with {add_table_result} rows"))
   })
 
-    # Set up a natural inner join for all the tables and output the result to file(s)
+  # Set up a natural inner join for all the tables and output the result to file(s)
   # Ensure that there are NO duplicates and that all rows with NULL value have been dropped
   query <- glue::glue("SELECT DISTINCT * FROM {paste(names(sources), collapse = ' NATURAL JOIN ')}")
   query <- paste0("COPY (",
