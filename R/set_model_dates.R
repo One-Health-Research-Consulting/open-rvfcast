@@ -43,7 +43,7 @@ set_model_dates <- function(start_year, end_year, n_per_month = NULL, seed = 123
   
   # Create a vector of dates from January of start year to December of end year with n_per_month random days
   # drawn from each month in the sequence.
-  model_dates <- seq(as.Date(paste0(start_year,"-01-01")), as.Date(paste0(end_year, "-12-31")), by = "month")
+  model_dates <- seq(as.Date(paste0(start_year, "-01-01")), as.Date(paste0(end_year, "-12-31")), by = "month")
   
   # Set seed after setting up sequence to ensure reproducibility.
   # Specifying the algorithm used to convert the seed into a random number

@@ -169,7 +169,7 @@ transform_nasa_weather <- function(nasa_weather_raw,
   dat_out <- purrr::map(weather_vars, function(var) {
     purrr::map_dfr(unique(nasa_weather_raw$date),
                    ~standardize_points_to_raster(nasa_weather_raw |> dplyr::filter(date == .x), 
-                                                 template_raster = terra::rast(continent_raster_template),
+                                                 template_raster = .x,
                                                  value_col = var,
                                                  fill_na = TRUE) |>
                      terra::as.data.frame(xy = TRUE) |>

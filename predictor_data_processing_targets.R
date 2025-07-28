@@ -630,7 +630,6 @@ dynamic_targets <- tar_plan(
   ),
   error = "null"
   ),
-  
 
   tar_target(
     nasa_weather_transformed_directory,
@@ -1024,7 +1023,7 @@ full_data_targets <- tar_plan(
     basename_template = "africa_full_predictor_data_{dates_to_process}.parquet",
     overwrite = parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA"),
     africa_full_predictor_data_AWS # Enforce dependency
-  ), 
+  ),
   pattern = map(dates_to_process),
   format = "file",
   repository = "local"
