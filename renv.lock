@@ -1,6 +1,6 @@
 {
   "R": {
-    "Version": "4.5.1",
+    "Version": "4.5.0",
     "Repositories": [
       {
         "Name": "CRAN",
@@ -28,7 +28,8 @@
       "NeedsCompilation": "no",
       "Author": "Dirk Eddelbuettel [aut, cre] (<https://orcid.org/0000-0001-6419-907X>), John W. Emerson [aut], Michael J. Kane [aut] (<https://orcid.org/0000-0003-1899-6662>)",
       "Maintainer": "Dirk Eddelbuettel <edd@debian.org>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest",
+      "Encoding": "UTF-8"
     },
     "DBI": {
       "Package": "DBI",
@@ -226,7 +227,8 @@
       "NeedsCompilation": "yes",
       "Author": "Dirk Eddelbuettel [aut, cre] (<https://orcid.org/0000-0001-6419-907X>), Ei-ji Nakama [aut] (Code in package Rhpc), Junji Nakano [aut] (Code in package Rhpc), R Core [aut] (Code in R file src/main/serialize.c)",
       "Maintainer": "Dirk Eddelbuettel <edd@debian.org>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest",
+      "Encoding": "UTF-8"
     },
     "RColorBrewer": {
       "Package": "RColorBrewer",
@@ -299,7 +301,7 @@
       "NeedsCompilation": "yes",
       "Author": "Kirill Müller [aut, cre] (ORCID: <https://orcid.org/0000-0002-1416-3412>), Hadley Wickham [aut], David A. James [aut], Seth Falcon [aut], D. Richard Hipp [ctb] (for the included SQLite sources), Dan Kennedy [ctb] (for the included SQLite sources), Joe Mistachkin [ctb] (for the included SQLite sources), SQLite Authors [ctb] (for the included SQLite sources), Liam Healy [ctb] (for the included SQLite sources), R Consortium [fnd], RStudio [cph]",
       "Maintainer": "Kirill Müller <kirill@cynkra.com>",
-      "Repository": "RSPM"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "Rcpp": {
       "Package": "Rcpp",
@@ -366,7 +368,7 @@
       "NeedsCompilation": "yes",
       "Author": "Dirk Eddelbuettel [aut, cre] (ORCID: <https://orcid.org/0000-0001-6419-907X>), Romain Francois [aut] (ORCID: <https://orcid.org/0000-0002-2444-4226>), Doug Bates [aut] (ORCID: <https://orcid.org/0000-0001-8316-9503>), Binxiang Ni [aut], Conrad Sanderson [aut] (ORCID: <https://orcid.org/0000-0002-0049-4501>)",
       "Maintainer": "Dirk Eddelbuettel <edd@debian.org>",
-      "Repository": "RSPM",
+      "Repository": "https://packagemanager.rstudio.com/all/latest",
       "Encoding": "UTF-8"
     },
     "RcppEigen": {
@@ -404,7 +406,7 @@
       "NeedsCompilation": "yes",
       "Author": "Doug Bates [aut] (<https://orcid.org/0000-0001-8316-9503>), Dirk Eddelbuettel [aut, cre] (<https://orcid.org/0000-0001-6419-907X>), Romain Francois [aut] (<https://orcid.org/0000-0002-2444-4226>), Yixuan Qiu [aut] (<https://orcid.org/0000-0003-0109-6692>), Authors of Eigen [cph] (Authorship and copyright in included Eigen library as detailed in inst/COPYRIGHTS)",
       "Maintainer": "Dirk Eddelbuettel <edd@debian.org>",
-      "Repository": "RSPM",
+      "Repository": "https://packagemanager.rstudio.com/all/latest",
       "Encoding": "UTF-8"
     },
     "RcppParallel": {
@@ -503,7 +505,7 @@
       "NeedsCompilation": "yes",
       "Author": "Jim Hester [aut] (<https://orcid.org/0000-0002-2739-7082>), Gábor Csárdi [aut, cre], Ondrej Holy [cph] (archive_write_add_filter implementation), RStudio [cph, fnd]",
       "Maintainer": "Gábor Csárdi <csardi.gabor@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "arrow": {
       "Package": "arrow",
@@ -618,7 +620,8 @@
       "NeedsCompilation": "no",
       "Author": "Hadley Wickham [aut, cre]",
       "Maintainer": "Hadley Wickham <hadley@rstudio.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest",
+      "Encoding": "UTF-8"
     },
     "aws.s3": {
       "Package": "aws.s3",
@@ -650,7 +653,7 @@
       "RoxygenNote": "7.0.2",
       "NeedsCompilation": "no",
       "Author": "Thomas J. Leeper [aut] (<https://orcid.org/0000-0003-4097-6326>), Boettiger Carl [ctb], Andrew Martin [ctb], Mark Thompson [ctb], Tyler Hunt [ctb], Steven Akins [ctb], Bao Nguyen [ctb], Thierry Onkelinx [ctb], Andrii Degtiarov [ctb], Dhruv Aggarwal [ctb], Alyssa Columbus [ctb], Simon Urbanek [cre, ctb]",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.posit.co/cran/latest"
     },
     "aws.signature": {
       "Package": "aws.signature",
@@ -676,7 +679,8 @@
       "NeedsCompilation": "no",
       "Author": "Thomas J. Leeper [aut] (<https://orcid.org/0000-0003-4097-6326>), Jonathan Stott [cre, aut], Mike Kaminsky [ctb]",
       "Maintainer": "Jonathan Stott <jonathan.stott@magairports.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.posit.co/cran/latest",
+      "Encoding": "UTF-8"
     },
     "backports": {
       "Package": "backports",
@@ -1094,7 +1098,7 @@
     },
     "capsule": {
       "Package": "capsule",
-      "Version": "0.4.4",
+      "Version": "0.4.3",
       "Source": "Repository",
       "Title": "A streamlined inversion of `renv`",
       "Authors@R": "c(person(given = \"Miles\", family = \"McBain\", role = c(\"aut\", \"cre\"), email = \"miles.mcbain@gmail.com\", comment = c(ORCID = \"0000-0003-2865-2548\")), person(given = \"Garrick\", family = \"Aden-Buie\", role = c(\"aut\"), email = \"garrick@adenbuie.com\"))",
@@ -1123,7 +1127,7 @@
       "Repository": "https://milesmcbain.r-universe.dev",
       "RemoteUrl": "https://github.com/milesmcbain/capsule",
       "RemoteRef": "master",
-      "RemoteSha": "7a40d61447e2f497574746bcfefff34f5a496bde",
+      "RemoteSha": "36c88b153aea556bc0b93a0dc91508a4e77c9541",
       "NeedsCompilation": "no",
       "Author": "Miles McBain [aut, cre] (ORCID: <https://orcid.org/0000-0003-2865-2548>), Garrick Aden-Buie [aut]",
       "Maintainer": "Miles McBain <miles.mcbain@gmail.com>"
@@ -1382,7 +1386,7 @@
       "NeedsCompilation": "no",
       "Author": "Vincent Arel-Bundock [aut, cre] (<https://orcid.org/0000-0003-2042-7063>), CJ Yetman [ctb] (<https://orcid.org/0000-0001-5099-9500>), Nils Enevoldsen [ctb] (<https://orcid.org/0000-0001-7195-4117>), Etienne Bacher [ctb] (<https://orcid.org/0000-0002-9271-5075>), Samuel Meichtry [ctb] (<https://orcid.org/0000-0003-2165-791X>)",
       "Maintainer": "Vincent Arel-Bundock <vincent.arel-bundock@umontreal.ca>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "cpp11": {
       "Package": "cpp11",
@@ -1539,7 +1543,7 @@
       "NeedsCompilation": "no",
       "Author": "William Michael Landau [aut, cre] (ORCID: <https://orcid.org/0000-0003-1878-3253>), Daniel Woodie [ctb], Eli Lilly and Company [cph, fnd]",
       "Maintainer": "William Michael Landau <will.landau.oss@gmail.com>",
-      "Repository": "RSPM"
+      "Repository": "https://packagemanager.posit.co/cran/latest"
     },
     "crul": {
       "Package": "crul",
@@ -1577,7 +1581,7 @@
       "NeedsCompilation": "no",
       "Author": "Scott Chamberlain [aut, cre] (<https://orcid.org/0000-0003-1444-9135>)",
       "Maintainer": "Scott Chamberlain <myrmecocystus@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "curl": {
       "Package": "curl",
@@ -1615,7 +1619,7 @@
     },
     "data.table": {
       "Package": "data.table",
-      "Version": "1.17.8",
+      "Version": "1.17.4",
       "Source": "Repository",
       "Title": "Extension of `data.frame`",
       "Depends": [
@@ -1899,7 +1903,7 @@
     },
     "duckdb": {
       "Package": "duckdb",
-      "Version": "1.3.2",
+      "Version": "1.3.0",
       "Source": "Repository",
       "Title": "DBI Package for the DuckDB Database Management System",
       "Authors@R": "c( person(\"Hannes\", \"Mühleisen\", , \"hannes@cwi.nl\", role = \"aut\", comment = c(ORCID = \"0000-0001-8552-0029\")), person(\"Mark\", \"Raasveldt\", , \"mark.raasveldt@cwi.nl\", role = \"aut\", comment = c(ORCID = \"0000-0001-5005-6844\")), person(\"Kirill\", \"Müller\", , \"kirill@cynkra.com\", role = \"cre\", comment = c(ORCID = \"0000-0002-1416-3412\")), person(\"Stichting DuckDB Foundation\", role = \"cph\"), person(\"Apache Software Foundation\", role = \"cph\"), person(\"PostgreSQL Global Development Group\", role = \"cph\"), person(\"The Regents of the University of California\", role = \"cph\"), person(\"Cameron Desrochers\", role = \"cph\"), person(\"Victor Zverovich\", role = \"cph\"), person(\"RAD Game Tools\", role = \"cph\"), person(\"Valve Software\", role = \"cph\"), person(\"Rich Geldreich\", role = \"cph\"), person(\"Tenacious Software LLC\", role = \"cph\"), person(\"The RE2 Authors\", role = \"cph\"), person(\"Google Inc.\", role = \"cph\"), person(\"Facebook Inc.\", role = \"cph\"), person(\"Steven G. Johnson\", role = \"cph\"), person(\"Jiahao Chen\", role = \"cph\"), person(\"Tony Kelman\", role = \"cph\"), person(\"Jonas Fonseca\", role = \"cph\"), person(\"Lukas Fittl\", role = \"cph\"), person(\"Salvatore Sanfilippo\", role = \"cph\"), person(\"Art.sy, Inc.\", role = \"cph\"), person(\"Oran Agra\", role = \"cph\"), person(\"Redis Labs, Inc.\", role = \"cph\"), person(\"Melissa O'Neill\", role = \"cph\"), person(\"PCG Project contributors\", role = \"cph\") )",
@@ -1937,11 +1941,10 @@
       "Encoding": "UTF-8",
       "RoxygenNote": "7.3.2.9000",
       "SystemRequirements": "xz (for building from source)",
-      "Biarch": "true",
       "NeedsCompilation": "yes",
       "Author": "Hannes Mühleisen [aut] (ORCID: <https://orcid.org/0000-0001-8552-0029>), Mark Raasveldt [aut] (ORCID: <https://orcid.org/0000-0001-5005-6844>), Kirill Müller [cre] (ORCID: <https://orcid.org/0000-0002-1416-3412>), Stichting DuckDB Foundation [cph], Apache Software Foundation [cph], PostgreSQL Global Development Group [cph], The Regents of the University of California [cph], Cameron Desrochers [cph], Victor Zverovich [cph], RAD Game Tools [cph], Valve Software [cph], Rich Geldreich [cph], Tenacious Software LLC [cph], The RE2 Authors [cph], Google Inc. [cph], Facebook Inc. [cph], Steven G. Johnson [cph], Jiahao Chen [cph], Tony Kelman [cph], Jonas Fonseca [cph], Lukas Fittl [cph], Salvatore Sanfilippo [cph], Art.sy, Inc. [cph], Oran Agra [cph], Redis Labs, Inc. [cph], Melissa O'Neill [cph], PCG Project contributors [cph]",
       "Maintainer": "Kirill Müller <kirill@cynkra.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.posit.co/cran/latest"
     },
     "e1071": {
       "Package": "e1071",
@@ -2019,7 +2022,7 @@
       "NeedsCompilation": "no",
       "Author": "Koen Hufkens [aut, cre, cph] (<https://orcid.org/0000-0002-5070-8109>), Reto Stauffer [ctb] (<https://orcid.org/0000-0002-3798-5507>), Elio Campitelli [ctb] (<https://orcid.org/0000-0002-7742-9230>), BlueGreen Labs [fnd]",
       "Maintainer": "Koen Hufkens <koen.hufkens@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "evaluate": {
       "Package": "evaluate",
@@ -2155,7 +2158,7 @@
       "NeedsCompilation": "yes",
       "Author": "Gábor Csárdi [aut, cre], Posit Software, PBC [cph, fnd]",
       "Maintainer": "Gábor Csárdi <csardi.gabor@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "fontawesome": {
       "Package": "fontawesome",
@@ -2381,7 +2384,7 @@
       "License": "GPL (>= 3)",
       "BugReports": "https://github.com/rspatial/geodata/issues/",
       "NeedsCompilation": "no",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "geodist": {
       "Package": "geodist",
@@ -2406,7 +2409,7 @@
       "Config/testthat/parallel": "true",
       "Author": "Mark Padgham [aut, cre], Michael D. Sumner [aut], Charles F.F Karney [cph] (Original author of included code for geodesic distances)",
       "Maintainer": "Mark Padgham <mark.padgham@email.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "gert": {
       "Package": "gert",
@@ -2466,7 +2469,8 @@
       "Maintainer": "Drew Schmidt <wrathematics@gmail.com>",
       "RoxygenNote": "6.0.1",
       "Author": "Drew Schmidt [aut, cre], Wei-Chen Chen [aut], Gabor Csardi [ctb] (Improved terminal detection), Rich FitzJohn [ctb]",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest",
+      "Encoding": "UTF-8"
     },
     "ggforce": {
       "Package": "ggforce",
@@ -2521,7 +2525,7 @@
       "Collate": "'RcppExports.R' 'aaa.R' 'shape.R' 'arc_bar.R' 'arc.R' 'autodensity.R' 'autohistogram.R' 'autopoint.R' 'bezier.R' 'bspline.R' 'bspline_closed.R' 'circle.R' 'diagonal.R' 'diagonal_wide.R' 'ellipse.R' 'errorbar.R' 'facet_grid_paginate.R' 'facet_matrix.R' 'facet_row.R' 'facet_stereo.R' 'facet_wrap_paginate.R' 'facet_zoom.R' 'ggforce-package.R' 'ggproto-classes.R' 'interpolate.R' 'labeller.R' 'link.R' 'mark_circle.R' 'mark_ellipse.R' 'mark_hull.R' 'mark_label.R' 'mark_rect.R' 'parallel_sets.R' 'position-jitternormal.R' 'position_auto.R' 'position_floatstack.R' 'regon.R' 'scale-depth.R' 'scale-unit.R' 'sina.R' 'spiro.R' 'themes.R' 'trans.R' 'trans_linear.R' 'utilities.R' 'voronoi.R' 'zzz.R'",
       "NeedsCompilation": "yes",
       "Author": "Thomas Lin Pedersen [cre, aut] (<https://orcid.org/0000-0002-5147-4711>), RStudio [cph]",
-      "Repository": "RSPM"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "ggplot2": {
       "Package": "ggplot2",
@@ -2639,7 +2643,7 @@
       "NeedsCompilation": "yes",
       "Author": "Kamil Slowikowski [aut, cre] (<https://orcid.org/0000-0002-2843-6370>), Alicia Schep [ctb] (<https://orcid.org/0000-0002-3915-0618>), Sean Hughes [ctb] (<https://orcid.org/0000-0002-9409-9405>), Trung Kien Dang [ctb] (<https://orcid.org/0000-0001-7562-6495>), Saulius Lukauskas [ctb], Jean-Olivier Irisson [ctb] (<https://orcid.org/0000-0003-4920-3880>), Zhian N Kamvar [ctb] (<https://orcid.org/0000-0003-1458-7108>), Thompson Ryan [ctb] (<https://orcid.org/0000-0002-0450-8181>), Dervieux Christophe [ctb] (<https://orcid.org/0000-0003-4474-2498>), Yutani Hiroaki [ctb], Pierre Gramme [ctb], Amir Masoud Abdol [ctb], Malcolm Barrett [ctb] (<https://orcid.org/0000-0003-0299-5825>), Robrecht Cannoodt [ctb] (<https://orcid.org/0000-0003-3641-729X>), Michał Krassowski [ctb] (<https://orcid.org/0000-0002-9638-7785>), Michael Chirico [ctb] (<https://orcid.org/0000-0003-0787-087X>), Pedro Aphalo [ctb] (<https://orcid.org/0000-0003-3385-972X>), Francis Barton [ctb]",
       "Maintainer": "Kamil Slowikowski <kslowikowski@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "gh": {
       "Package": "gh",
@@ -2708,7 +2712,7 @@
       "NeedsCompilation": "yes",
       "Author": "Jeroen Ooms [aut, cre] (<https://orcid.org/0000-0002-4035-0289>), Kornel Lesiński [aut] (Gifski Rust library), Authors of the dependency Rust crates [aut] (see AUTHORS file)",
       "Maintainer": "Jeroen Ooms <jeroenooms@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "gitcreds": {
       "Package": "gitcreds",
@@ -3010,7 +3014,7 @@
       "NeedsCompilation": "no",
       "Author": "Kirill Müller [aut, cre] (<https://orcid.org/0000-0002-1416-3412>), Jennifer Bryan [ctb] (<https://orcid.org/0000-0002-6983-2759>)",
       "Maintainer": "Kirill Müller <krlmlr+r@mailbox.org>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "highr": {
       "Package": "highr",
@@ -3080,7 +3084,7 @@
     "hoardr": {
       "Package": "hoardr",
       "Version": "0.5.5",
-      "Source": "Repository",
+      "Source": "GitHub",
       "Type": "Package",
       "Title": "Manage Cached Files",
       "Description": "Suite of tools for managing cached files, targeting use in other R packages. Uses 'rappdirs' for cross-platform paths. Provides utilities to manage cache directories, including targeting files by path or by key; cached directories can be compressed and uncompressed easily to save disk space.",
@@ -3089,6 +3093,7 @@
       "URL": "https://docs.ropensci.org/hoardr/, https://github.com/ropensci/hoardr",
       "BugReports": "https://github.com/ropensci/hoardr/issues",
       "VignetteBuilder": "knitr",
+      "Roxygen": "list(markdown = TRUE)",
       "Encoding": "UTF-8",
       "Imports": [
         "R6",
@@ -3105,10 +3110,14 @@
       "X-schema.org-keywords": "caching, data, files, xml, pdf",
       "X-schema.org-isPartOf": "https://ropensci.org",
       "Config/testthat/edition": "3",
-      "NeedsCompilation": "no",
-      "Author": "Scott Chamberlain [aut] (<https://orcid.org/0000-0003-2542-2202>), Tamás Stirling [ctb, cre]",
+      "Author": "Scott Chamberlain [aut] (ORCID: <https://orcid.org/0000-0003-2542-2202>), Tamás Stirling [ctb, cre]",
       "Maintainer": "Tamás Stirling <stirling.tamas@gmail.com>",
-      "Repository": "CRAN"
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "ropensci",
+      "RemoteRepo": "hoardr",
+      "RemoteRef": "master",
+      "RemoteSha": "7c42ab6cbd4ce0095ba920ebbfbc0a78e6200eeb"
     },
     "htmltools": {
       "Package": "htmltools",
@@ -3205,7 +3214,7 @@
       "NeedsCompilation": "no",
       "Author": "Scott Chamberlain [aut, cre] (<https://orcid.org/0000-0003-1444-9135>)",
       "Maintainer": "Scott Chamberlain <myrmecocystus@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "httr": {
       "Package": "httr",
@@ -3303,7 +3312,7 @@
       "NeedsCompilation": "no",
       "Author": "Hadley Wickham [aut, cre], Posit Software, PBC [cph, fnd], Maximilian Girlich [ctb]",
       "Maintainer": "Hadley Wickham <hadley@posit.co>",
-      "Repository": "RSPM"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "ids": {
       "Package": "ids",
@@ -3592,7 +3601,7 @@
       "NeedsCompilation": "yes",
       "Author": "Gábor Csárdi [aut, cre], Alec Wong [ctb], Posit Software, PBC [cph, fnd] (ROR: <https://ror.org/03wc8by49>)",
       "Maintainer": "Gábor Csárdi <csardi.gabor@gmail.com>",
-      "Repository": "RSPM"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "knitr": {
       "Package": "knitr",
@@ -3708,7 +3717,7 @@
       "NeedsCompilation": "yes",
       "Author": "Winston Chang [aut, cre], Joe Cheng [aut], Charlie Gao [aut] (<https://orcid.org/0000-0002-0750-061X>), Posit Software, PBC [cph], Marcus Geelnard [ctb, cph] (TinyCThread library, https://tinycthread.github.io/), Evan Nemerson [ctb, cph] (TinyCThread library, https://tinycthread.github.io/)",
       "Maintainer": "Winston Chang <winston@posit.co>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "lattice": {
       "Package": "lattice",
@@ -3899,9 +3908,10 @@
     },
     "mgcv": {
       "Package": "mgcv",
-      "Version": "1.9-3",
+      "Version": "1.9-1",
       "Source": "Repository",
-      "Authors@R": "person(given = \"Simon\", family = \"Wood\", role = c(\"aut\", \"cre\"), email = \"simon.wood@r-project.org\")",
+      "Author": "Simon Wood <simon.wood@r-project.org>",
+      "Maintainer": "Simon Wood <simon.wood@r-project.org>",
       "Title": "Mixed GAM Computation Vehicle with Automatic Smoothness Estimation",
       "Description": "Generalized additive (mixed) models, some of their extensions and  other generalized ridge regression with multiple smoothing  parameter estimation by (Restricted) Marginal Likelihood,  Generalized Cross Validation and similar, or using iterated  nested Laplace approximation for fully Bayesian inference. See  Wood (2017) <doi:10.1201/9781315370279> for an overview.  Includes a gam() function, a wide variety of smoothers, 'JAGS'  support and distributions beyond the exponential family.",
       "Priority": "recommended",
@@ -3926,8 +3936,6 @@
       "ByteCompile": "yes",
       "License": "GPL (>= 2)",
       "NeedsCompilation": "yes",
-      "Author": "Simon Wood [aut, cre]",
-      "Maintainer": "Simon Wood <simon.wood@r-project.org>",
       "Repository": "CRAN"
     },
     "mime": {
@@ -3984,7 +3992,7 @@
       "NeedsCompilation": "no",
       "Author": "Charlie Gao [aut, cre] (ORCID: <https://orcid.org/0000-0002-0750-061X>), Joe Cheng [ctb], Posit Software, PBC [cph, fnd] (ROR: <https://ror.org/03wc8by49>), Hibiki AI Limited [cph]",
       "Maintainer": "Charlie Gao <charlie.gao@posit.co>",
-      "Repository": "RSPM"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "modelr": {
       "Package": "modelr",
@@ -4057,7 +4065,7 @@
       "NeedsCompilation": "yes",
       "Author": "Charlie Gao [aut, cre] (ORCID: <https://orcid.org/0000-0002-0750-061X>), Posit Software, PBC [cph, fnd] (ROR: <https://ror.org/03wc8by49>), Hibiki AI Limited [cph], R Consortium [fnd]",
       "Maintainer": "Charlie Gao <charlie.gao@posit.co>",
-      "Repository": "RSPM"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "nasapower": {
       "Package": "nasapower",
@@ -4099,7 +4107,7 @@
       "Encoding": "UTF-8",
       "Language": "en-US",
       "NeedsCompilation": "no",
-      "Repository": "RSPM",
+      "Repository": "https://packagemanager.rstudio.com/all/latest",
       "RoxygenNote": "7.3.2.9000",
       "X-schema.org-applicationCategory": "Tools",
       "X-schema.org-isPartOf": "https://ropensci.org",
@@ -4208,7 +4216,7 @@
       "NeedsCompilation": "no",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "paws.analytics": {
       "Package": "paws.analytics",
@@ -4232,7 +4240,7 @@
       "NeedsCompilation": "no",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "paws.application.integration": {
       "Package": "paws.application.integration",
@@ -4256,7 +4264,7 @@
       "NeedsCompilation": "no",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "paws.common": {
       "Package": "paws.common",
@@ -4300,7 +4308,7 @@
       "NeedsCompilation": "yes",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "paws.compute": {
       "Package": "paws.compute",
@@ -4324,7 +4332,7 @@
       "NeedsCompilation": "no",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "paws.cost.management": {
       "Package": "paws.cost.management",
@@ -4348,7 +4356,7 @@
       "NeedsCompilation": "no",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "paws.customer.engagement": {
       "Package": "paws.customer.engagement",
@@ -4372,7 +4380,7 @@
       "NeedsCompilation": "no",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "paws.database": {
       "Package": "paws.database",
@@ -4396,7 +4404,7 @@
       "NeedsCompilation": "no",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "paws.developer.tools": {
       "Package": "paws.developer.tools",
@@ -4420,7 +4428,7 @@
       "NeedsCompilation": "no",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "paws.end.user.computing": {
       "Package": "paws.end.user.computing",
@@ -4444,7 +4452,7 @@
       "NeedsCompilation": "no",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "paws.machine.learning": {
       "Package": "paws.machine.learning",
@@ -4468,7 +4476,7 @@
       "NeedsCompilation": "no",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "paws.management": {
       "Package": "paws.management",
@@ -4492,7 +4500,7 @@
       "NeedsCompilation": "no",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "paws.networking": {
       "Package": "paws.networking",
@@ -4516,7 +4524,7 @@
       "NeedsCompilation": "no",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "paws.security.identity": {
       "Package": "paws.security.identity",
@@ -4540,7 +4548,7 @@
       "NeedsCompilation": "no",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "paws.storage": {
       "Package": "paws.storage",
@@ -4564,7 +4572,7 @@
       "NeedsCompilation": "no",
       "Author": "David Kretch [aut], Adam Banker [aut], Dyfan Jones [cre], Amazon.com, Inc. [cph]",
       "Maintainer": "Dyfan Jones <dyfan.r.jones@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "pillar": {
       "Package": "pillar",
@@ -4667,7 +4675,7 @@
       "NeedsCompilation": "no",
       "Author": "Kirill Müller [aut, cre], Sergey Podobry [cph] (Author of the bundled plog library)",
       "Maintainer": "Kirill Müller <krlmlr+r@mailbox.org>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "plyr": {
       "Package": "plyr",
@@ -4725,7 +4733,8 @@
       "Note": "built from Clipper C++ version 6.4.0",
       "NeedsCompilation": "yes",
       "Author": "Angus Johnson [aut] (C++ original, http://www.angusj.com/delphi/clipper.php), Adrian Baddeley [aut, trl, cre], Kurt Hornik [ctb], Brian D. Ripley [ctb], Elliott Sales de Andrade [ctb], Paul Murrell [ctb], Ege Rubak [ctb], Mark Padgham [ctb]",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest",
+      "Encoding": "UTF-8"
     },
     "prettyunits": {
       "Package": "prettyunits",
@@ -4868,7 +4877,7 @@
       "NeedsCompilation": "yes",
       "Author": "Joe Cheng [aut, cre], Posit Software, PBC [cph, fnd] (ROR: <https://ror.org/03wc8by49>)",
       "Maintainer": "Joe Cheng <joe@posit.co>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "proxy": {
       "Package": "proxy",
@@ -5627,7 +5636,7 @@
     "rnaturalearthdata": {
       "Package": "rnaturalearthdata",
       "Version": "1.0.0.9000",
-      "Source": "Repository",
+      "Source": "GitHub",
       "Title": "World Vector Map Data from Natural Earth Used in 'rnaturalearth'",
       "Authors@R": "c( person( family = \"South\", given = \"Andy\", email = \"southandy@gmail.com\", role = c(\"aut\"), comment = c(ORCID = \"0000-0003-4051-6135\") ), person( family = \"Michael\", given = \"Schramm\", email = \"mpschramm@gmail.com\", role = c(\"aut\") ), person( family = \"Massicotte\", given = \"Philippe\", email = \"pmassicotte@hotmail.com\", role = c(\"aut\", \"cre\"), comment = c(ORCID = \"0000-0002-5919-4116\") ))",
       "Description": "Vector map data from <https://www.naturalearthdata.com/>. Access functions are provided in the accompanying package 'rnaturalearth'.",
@@ -5646,18 +5655,19 @@
         "testthat (>= 0.9.1)"
       ],
       "RoxygenNote": "7.3.1",
-      "Repository": "https://ropensci.r-universe.dev",
-      "RemoteUrl": "https://github.com/ropensci/rnaturalearthdata",
-      "RemoteRef": "main",
-      "RemoteSha": "ff4d891f74265473ae2c936dcfeb0c9afeac6631",
-      "NeedsCompilation": "no",
       "Author": "Andy South [aut] (ORCID: <https://orcid.org/0000-0003-4051-6135>), Schramm Michael [aut], Philippe Massicotte [aut, cre] (ORCID: <https://orcid.org/0000-0002-5919-4116>)",
-      "Maintainer": "Philippe Massicotte <pmassicotte@hotmail.com>"
+      "Maintainer": "Philippe Massicotte <pmassicotte@hotmail.com>",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "ropensci",
+      "RemoteRepo": "rnaturalearthdata",
+      "RemoteRef": "main",
+      "RemoteSha": "ff4d891f74265473ae2c936dcfeb0c9afeac6631"
     },
     "rnaturalearthhires": {
       "Package": "rnaturalearthhires",
       "Version": "1.0.0.9000",
-      "Source": "Repository",
+      "Source": "GitHub",
       "Title": "High Resolution World Vector Map Data from Natural Earth used in rnaturalearth",
       "Authors@R": "c( person( family = \"South\", given = \"Andy\", email = \"southandy@gmail.com\", role = c(\"aut\", \"cre\"), comment = c(ORCID = \"0000-0003-4051-6135\") ), person( family = \"Michael\", given = \"Schramm\", email = \"mpschramm@gmail.com\", role = c(\"aut\") ), person( family = \"Massicotte\", given = \"Philippe\", email = \"pmassicotte@hotmail.com\", role = c(\"aut\"), comment = c(ORCID = \"0000-0002-5919-4116\") ))",
       "Description": "Facilitates mapping by making natural earth map data from http:// www.naturalearthdata.com/ more easily available to R users. Focuses on vector data.",
@@ -5674,13 +5684,14 @@
       ],
       "RoxygenNote": "7.3.1",
       "Encoding": "UTF-8",
-      "Repository": "https://ropensci.r-universe.dev",
-      "RemoteUrl": "https://github.com/ropensci/rnaturalearthhires",
-      "RemoteRef": "main",
-      "RemoteSha": "e4736f636baa1c013d77d2ba028dd5bc334defee",
-      "NeedsCompilation": "no",
       "Author": "Andy South [aut, cre] (ORCID: <https://orcid.org/0000-0003-4051-6135>), Schramm Michael [aut], Philippe Massicotte [aut] (ORCID: <https://orcid.org/0000-0002-5919-4116>)",
-      "Maintainer": "Andy South <southandy@gmail.com>"
+      "Maintainer": "Andy South <southandy@gmail.com>",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "ropensci",
+      "RemoteRepo": "rnaturalearthhires",
+      "RemoteRef": "main",
+      "RemoteSha": "153b0ea5113b4d03f6de612e9b09d3a6e7e50ec4"
     },
     "rprojroot": {
       "Package": "rprojroot",
@@ -6311,7 +6322,7 @@
       "NeedsCompilation": "no",
       "Author": "William Michael Landau [aut, cre] (ORCID: <https://orcid.org/0000-0003-1878-3253>), Rudolf Siegel [ctb] (ORCID: <https://orcid.org/0000-0002-6021-804X>), Samantha Oliver [rev] (ORCID: <https://orcid.org/0000-0001-5668-1165>), Tristan Mahr [rev] (ORCID: <https://orcid.org/0000-0002-8890-5116>), Eli Lilly and Company [cph, fnd]",
       "Maintainer": "William Michael Landau <will.landau.oss@gmail.com>",
-      "Repository": "RSPM"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "targets": {
       "Package": "targets",
@@ -6392,7 +6403,7 @@
       "NeedsCompilation": "no",
       "Author": "William Michael Landau [aut, cre] (ORCID: <https://orcid.org/0000-0003-1878-3253>), Matthew T. Warkentin [ctb], Mark Edmondson [ctb] (ORCID: <https://orcid.org/0000-0002-8434-3881>), Samantha Oliver [rev] (ORCID: <https://orcid.org/0000-0001-5668-1165>), Tristan Mahr [rev] (ORCID: <https://orcid.org/0000-0002-8890-5116>), Eli Lilly and Company [cph, fnd]",
       "Maintainer": "William Michael Landau <will.landau.oss@gmail.com>",
-      "Repository": "RSPM"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "terra": {
       "Package": "terra",
@@ -6703,7 +6714,7 @@
       "NeedsCompilation": "no",
       "Author": "Hadley Wickham [aut, cre], RStudio [cph, fnd]",
       "Maintainer": "Hadley Wickham <hadley@rstudio.com>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "timechange": {
       "Package": "timechange",
@@ -6786,7 +6797,7 @@
       "BugReports": "https://github.com/Ironholds/triebeard/issues",
       "Date": "2023-03-04",
       "NeedsCompilation": "yes",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "tweenr": {
       "Package": "tweenr",
@@ -6820,7 +6831,7 @@
       ],
       "NeedsCompilation": "yes",
       "Author": "Thomas Lin Pedersen [aut, cre] (<https://orcid.org/0000-0002-5147-4711>)",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "tzdb": {
       "Package": "tzdb",
@@ -6929,7 +6940,7 @@
         "R (>= 2.10)"
       ],
       "NeedsCompilation": "yes",
-      "Repository": "RSPM"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "usethis": {
       "Package": "usethis",
@@ -7490,7 +7501,7 @@
       ],
       "NeedsCompilation": "yes",
       "Author": "Mike Cheng [aut, cre, cph], Yao Yuan [aut, cph] (Author of bundled yyjson), Murat Tasan [ctb] ('json_verbatim' handling)",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "zigg": {
       "Package": "zigg",
@@ -7509,7 +7520,7 @@
       "NeedsCompilation": "yes",
       "Author": "Dirk Eddelbuettel [aut, cre] (<https://orcid.org/0000-0001-6419-907X>)",
       "Maintainer": "Dirk Eddelbuettel <edd@debian.org>",
-      "Repository": "CRAN"
+      "Repository": "https://packagemanager.rstudio.com/all/latest"
     },
     "zip": {
       "Package": "zip",

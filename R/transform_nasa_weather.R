@@ -168,8 +168,8 @@ transform_nasa_weather <- function(nasa_weather_raw,
   # then join all variables together with consistent spatial and temporal structure
   dat_out <- purrr::map(weather_vars, function(var) {
     purrr::map_dfr(unique(nasa_weather_raw$date),
-                   ~standardize_points_to_raster(nasa_weather_raw |> dplyr::filter(date == .x), 
-                                                 template_raster = .x,
+                   ~standardize_points_to_raster(nasa_weather_raw |> dplyr::filter(date == .x),
+                                                 template_raster = terra::unwrap(continent_raster_template),
                                                  value_col = var,
                                                  fill_na = TRUE) |>
                      terra::as.data.frame(xy = TRUE) |>
