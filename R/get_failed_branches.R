@@ -29,6 +29,3 @@ get_failed_branches <- function(target_name) {
       error_message = error
     )
 }
-
-# Usage:
-failed_branches <- get_failed_branches("ecmwf_forecasts_transformed")

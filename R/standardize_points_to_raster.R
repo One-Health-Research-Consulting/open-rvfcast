@@ -58,37 +58,12 @@ standardize_points_to_raster <- function(points_df,
     points_df <- points_df[!is.na(points_df[[x_col]]) & !is.na(points_df[[y_col]]), ]
   }
   
-  # Create SpatVector from points
-  points <- terra::vect(points_df, geom = c(x_col, y_col), crs = terra::crs(template_raster))
-  
-  # Diagnostic checks (only if verbose)
-  if (verbose) {
-    message(glue::glue("Points CRS: {terra::crs(points)}"))
-    message(glue::glue("Template CRS: {terra::crs(template_raster)}"))
-    message(glue::glue("Points extent: {paste(as.vector(terra::ext(points)), collapse=', ')}"))
-    message(glue::glue("Template extent: {paste(as.vector(terra::ext(template_raster)), collapse=', ')}"))
-    message(glue::glue("Number of points: {nrow(points_df)}"))
-    message(glue::glue("Non-NA values in {value_col}: {sum(!is.na(points_df[[value_col]]))}"))
-    
-    # Check if points overlap with template
-    points_in_template <- terra::is.related(points, template_raster, "intersects")
-    message(glue::glue("Points intersecting template: {sum(points_in_template)}"))
-  }
-  
-  # Convert points to standardized raster grid
-  # This is a two-step process to ensure exact template conformity:
-  # 1. Create an initial rasterization from points (creates sparse raster)
-  initial_rast <- terra::rasterize(points, template_raster, field = value_col)
-  
-  # Check if rasterization worked (only if verbose)
-  if (verbose) {
-    has_values <- !all(is.na(terra::values(initial_rast)))
-    message(glue::glue("Rasterization successful (has values): {has_values}"))
-  }
+  inital_rast <- points_df |> 
+    select(any_of(c(x_col, y_col, value_col))) |> rast(type = "xyz", crs = "EPSG:4326")
   
   # 2. Apply transform_raster to handle NA gaps and ensure perfect grid alignment
   # The fill_na parameter controls whether focal smoothing fills gaps before final interpolation
-  result <- transform_raster(initial_rast,
+  result <- transform_raster(inital_rast,
                             template = template_raster,
                             method = method,
                             fill_na = fill_na,

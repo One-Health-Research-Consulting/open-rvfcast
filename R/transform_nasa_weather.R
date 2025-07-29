@@ -157,19 +157,13 @@ transform_nasa_weather <- function(nasa_weather_raw,
     select(-c(x, y, year, month, day, doy, date)) |>
     names()
   
-  # Check for even spatial and temporal data coverage
-  check_rows <- nasa_weather_raw |> dplyr::group_by(x, y) |> dplyr::count() |> dplyr::ungroup() |> dplyr::distinct(n)
-  assertthat::are_equal(1, nrow(check_rows))
-  check_rows <- nasa_weather_raw |> dplyr::group_by(date) |> dplyr::count() |> dplyr::ungroup() |> dplyr::distinct(n)
-  assertthat::are_equal(1, nrow(check_rows))
-  
   # Transform point data into standardized raster grid format and back to tabular data:
   # Process each variable separately, standardize to template raster for each date,
   # then join all variables together with consistent spatial and temporal structure
   dat_out <- purrr::map(weather_vars, function(var) {
     purrr::map_dfr(unique(nasa_weather_raw$date),
-                   ~standardize_points_to_raster(nasa_weather_raw |> dplyr::filter(date == .x), 
-                                                 template_raster = .x,
+                   ~standardize_points_to_raster(nasa_weather_raw |> dplyr::filter(date == .x),
+                                                 template_raster = terra::unwrap(continent_raster_template),
                                                  value_col = var,
                                                  fill_na = TRUE) |>
                      terra::as.data.frame(xy = TRUE) |>

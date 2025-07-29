@@ -42,8 +42,7 @@ transform_raster <- function(raw_raster,
   }
   
   # Ensure rasters are properly loaded (handles wrapped rasters automatically)
-  raw_raster <- terra::unwrap(raw_raster)
-  template <- terra::rast(template)
+  template <- terra::unwrap(template)
   
   norm_rast <- raw_raster
   

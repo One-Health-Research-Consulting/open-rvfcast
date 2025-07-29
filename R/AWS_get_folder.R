@@ -164,6 +164,7 @@ AWS_put_files <- function(transformed_file_list,
                           local_folder,
                           overwrite = FALSE,
                           ...) {
+
   # Check if AWS credentials and region are set in the environment
   if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
     msg <- paste(
@@ -185,6 +186,7 @@ AWS_put_files <- function(transformed_file_list,
   # Get files from S3 bucket with prefix
   df_bucket_data <- aws.s3::get_bucket(bucket = Sys.getenv("AWS_BUCKET_ID"),
                                         prefix = paste0(local_folder, "/"))
+                                        
   s3_files <- map_chr(df_bucket_data, pluck, "Key")
 
   # Get files in local folder
