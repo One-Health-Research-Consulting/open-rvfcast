@@ -1,33 +1,41 @@
-#' Fetch NASA Weather Data
+#' Fetch and Transform NASA Weather Data
 #'
-#' This function downloads weather data from NASA POWER for a given set of coordinates and time period.
+#' This function downloads daily weather data from NASA POWER for a given month, 
+#' transforms it to match a continental raster template, and saves the processed 
+#' data as a parquet file.
 #'
-#' @author Nathan Layman, Emma Mendelsohn
+#' @author [Your Name]
 #'
-#' @param nasa_weather_coordinates Dataframe. A dataframe containing columns of country and nested coordinates 
-#'        for the bounding box to download weather data.
-#' @param months_to_process Character. The year-month (YYYY-MM format) for which to download weather data.
-#' @param nasa_weather_variables Named character vector. Variables to download from NASA POWER, with names being 
-#'        the column names in the output and values being the NASA POWER parameter codes.
-#'        Default: c("relative_humidity" = "RH2M", "temperature" = "T2M", "precipitation" = "PRECTOTCORR").
-#' @param local_folder Character. The directory where the raw data will be saved.
-#' @param basename_template Character. Template for the output filename. Default: glue::glue("nasa_weather_raw_{months_to_process}.parquet").
-#' @param overwrite Logical. Whether to overwrite existing data files. Default: FALSE.
+#' @param months_to_process Character. The year-month (YYYY-MM format) for which 
+#' to download and transform weather data.
+#' @param nasa_weather_variables Named character vector. Variables to download from 
+#' NASA POWER, with names being the column names in the output and values being the 
+#' NASA POWER parameter codes. Default: c("relative_humidity" = "RH2M", "temperature" = "T2M", "precipitation" = "PRECTOTCORR").
+#' @param continent_raster_template SpatRaster. A wrapped raster template used for 
+#' cropping and resampling the NASA weather data to the desired spatial extent and resolution.
+#' @param local_folder Character. The directory where the transformed data will be saved. 
+#' Default: "data/nasa_weather_transformed".
+#' @param basename_template Character. Template for the output filename. 
+#' Default: glue::glue("nasa_weather_raw_{months_to_process}.parquet").
+#' @param endpoint Character. URL template for downloading NASA POWER NetCDF files. 
+#' Default: "https://power-datastore.s3.amazonaws.com/v10/daily/{year}/{month}/power_10_daily_{yyyymmdd}_merra2_lst.nc".
+#' @param overwrite Logical. Whether to overwrite existing transformed data files. Default: FALSE.
 #' @param ... Additional parameters passed to internal functions.
 #'
-#' @return Character. The file path to the raw NASA weather data parquet file.
-#' 
+#' @return Character. The file path to the transformed NASA weather data parquet file.
+#'
 #' @export
-fetch_nasa_weather <- function(nasa_weather_coordinates,
-                               months_to_process,
-                               nasa_weather_variables = c("relative_humidity" = "RH2M",
-                                                          "temperature" = "T2M",
-                                                          "precipitation" = "PRECTOTCORR"),
-                               local_folder,
-                               basename_template = glue::glue("nasa_weather_raw_{months_to_process}.parquet"),
-                               overwrite = FALSE,
-                               ...) {
-  
+fetch_and_transform_nasa_weather <- function(months_to_process,
+  nasa_weather_variables = c("relative_humidity" = "RH2M", "temperature" = "T2M", "precipitation" = "PRECTOTCORR"),
+  continent_raster_template,
+  local_folder = "data/nasa_weather_transformed",
+  basename_template = "nasa_weather_transformed_{months_to_process}.parquet",
+  endpoint = "https://power-datastore.s3.amazonaws.com/v10/daily/{year}/{month}/power_10_daily_{yyyymmdd}_merra2_lst.nc",
+  overwrite = FALSE,
+  ...) {
+
+  continent_raster_template <- terra::unwrap(continent_raster_template)
+
   # Check that nasa_weather_variables has names
   stopifnot(!is.null(names(nasa_weather_variables)))
   
@@ -43,101 +51,15 @@ fetch_nasa_weather <- function(nasa_weather_coordinates,
     end_date <- Sys.Date()
   }
   
+  # Extract the three variables you need
+  year <- lubridate::year(start_date)
+  month <- format(start_date, "%m")
+  dates <- format(seq(start_date, end_date, by = "day"), "%Y%m%d")
+
   message(glue::glue("Processing NASA weather data for month {months_to_process}"))
-  
+
   # Establish filename
-  raw_file <- file.path(local_folder, basename_template)
-  
-  # Create an error safe way to test if the parquet file can be read, if it exists
-  error_safe_read_parquet <- purrr::possibly(arrow::open_dataset, NULL)
-  
-  existing_data <- error_safe_read_parquet(raw_file)
-  
-  # Check if transformed file already exists and can be loaded. If so return file name and path
-  if(!is.null(existing_data) & overwrite == FALSE) {
-    message("File already exists and can be loaded, skipping processing")
-    return(raw_file)
-  }
-  
-  # Extract the coordinates and prepare to download data from nasapower
-  coords <- nasa_weather_coordinates |> 
-    select(country, coords) |> 
-    unnest(coords) |>
-    unnest_wider(x, names_sep = "_") |> 
-    unnest_wider(y, names_sep = "_")
-  
-  # Download data from nasa power chunking by coordinate blocks and variables
-  # Meteorological data sources are ½° x ⅝° latitude/longitude grid from GMAO MERRA-2
-  nasa_recorded_weather <- map_dfr(1:nrow(coords), .progress = TRUE, function(i) {
-    map(nasa_weather_variables, function(j) {
-      nasapower::get_power(community = "ag",
-                           lonlat = c(coords[i,]$x_1,
-                                      coords[i,]$y_1,
-                                      coords[i,]$x_2,
-                                      coords[i,]$y_2), # xmin (W), ymin (S), xmax (E), ymax (N)
-                           pars = j,
-                           dates = c(start_date, end_date),
-                           temporal_api = "daily")
-    }) |>
-      plyr::join_all() |>
-      as_tibble() |>
-      suppressMessages()
-  })
-  
-  # Rename columns and clean up schema
-  nasa_weather_raw <- nasa_recorded_weather |>
-    distinct() |> # Distinct is necessary because there is a bit of overlap when gridding into 4.5 x 4.5 degree chunks
-    rename_all(tolower) |> 
-    dplyr::rename(!!!setNames(tolower(nasa_weather_variables), names(nasa_weather_variables)),
-           month = mm, day = dd, x = lon, y = lat) |>
-    mutate(across(c(year, month, day, doy), as.integer)) |> 
-    mutate(date = lubridate::make_date(year, month, day)) |> 
-    select(x, y, everything(), -yyyymmdd)
-  
-  # Write the transformed data to parquet
-  nasa_weather_raw |> arrow::write_parquet(raw_file, compression = "gzip", compression_level = 5)
-  
-  # Test if transformed parquet file can be loaded. If not clean up and return NULL
-  if(is.null(error_safe_read_parquet(raw_file))) {
-    file.remove(raw_file)
-    stop(glue::glue("{basename(raw_file)} could not be read."))
-  }
-  
-  # If it can be loaded return file name and path of raw nasa weather parquet file
-  return(raw_file)
-}
-
-
-
-#' Transform NASA Weather Data
-#'
-#' This function transforms NASA weather data based on a continent raster template and saves
-#' the resulting dataset as a parquet file. It checks if the transformed file already exists 
-#' and avoids redundant data processing.
-#'
-#' @author Nathan Layman, Emma Mendelsohn
-#'
-#' @param nasa_weather_raw Character. File path to the raw NASA weather data parquet file from fetch_nasa_weather().
-#' @param continent_raster_template Character. The file path to the template raster used to resample and transform the weather data.
-#' @param local_folder Character. The directory where the transformed data will be saved.
-#' @param overwrite Logical. Whether to overwrite existing transformed data files. Default: FALSE.
-#' @param ... Additional parameters passed to internal functions.
-#'
-#' @return Character. The file path to the transformed NASA weather data parquet file.
-#' 
-#' @export
-transform_nasa_weather <- function(nasa_weather_raw,
-                                   continent_raster_template,
-                                   local_folder,
-                                   overwrite = FALSE,
-                                   ...) {
-  
-  # Check that nasa_weather_raw is only one value
-  stopifnot(length(nasa_weather_raw) == 1)
-  
-  # Establish filename using local_folder and basename
-  transformed_filename <- gsub("raw", "transformed", basename(nasa_weather_raw))
-  transformed_file <- file.path(local_folder, transformed_filename)
+  transformed_file <- file.path(local_folder, glue::glue(basename_template))
   
   # Create an error safe way to test if the parquet file can be read, if it exists
   error_safe_read_parquet <- purrr::possibly(arrow::open_dataset, NULL)
@@ -146,47 +68,54 @@ transform_nasa_weather <- function(nasa_weather_raw,
   
   # Check if transformed file already exists and can be loaded. If so return file name and path
   if(!is.null(existing_data) & overwrite == FALSE) {
-      message("File already exists and can be loaded, skipping processing")
-      return(transformed_file)
+    message("File already exists and can be loaded, skipping processing")
+    return(transformed_file)
   }
-  
-  nasa_weather_raw <- arrow::read_parquet(nasa_weather_raw)
-  
-  # Identify weather variable columns by excluding known coordinate and time columns
-  weather_vars <- nasa_weather_raw |>
-    select(-c(x, y, year, month, day, doy, date)) |>
-    names()
-  
-  # Transform point data into standardized raster grid format and back to tabular data:
-  # Process each variable separately, standardize to template raster for each date,
-  # then join all variables together with consistent spatial and temporal structure
-  dat_out <- purrr::map(weather_vars, function(var) {
-    purrr::map_dfr(unique(nasa_weather_raw$date),
-                   ~standardize_points_to_raster(nasa_weather_raw |> dplyr::filter(date == .x),
-                                                 template_raster = terra::unwrap(continent_raster_template),
-                                                 value_col = var,
-                                                 fill_na = TRUE) |>
-                     terra::as.data.frame(xy = TRUE) |>
-                     dplyr::rename(!!var := names(.)[3]) |>  # Ensure correct column name
-                     dplyr::mutate(date = .x,
-                                   year = lubridate::year(date),
-                                   month = lubridate::month(date),
-                                   day = lubridate::day(date),
-                                   doy = lubridate::yday(date)))  # Add date information
+
+   nasa_recorded_weather <- map_df(dates, .progress = TRUE, function(yyyymmdd) {
+    
+    # Establish NetCDF filename
+    nc_file <- file.path(local_folder, glue::glue(endpoint) |> basename())
+    # Download file from POWER's S3 Bucket
+    curl::curl_download(glue::glue(endpoint), nc_file)
+
+    # Map across variable types
+    results <- imap(nasa_weather_variables, function(var, name) {
+
+      # Read in raw raster of given var and set CRS
+      raw_raster <- terra::rast(nc_file, subds = var)
+      terra::crs(raw_raster) <- "EPSG:4326"
+
+      # Transform and resample raster to template
+      raw_raster <- terra::crop(raw_raster, continent_raster_template)
+      transformed_raster <- transform_raster(raw_raster, continent_raster_template)
+      
+      # Convert to XY table
+      names(transformed_raster) <- name
+      terra::as.data.frame(transformed_raster, xy = TRUE)
+    }) |> 
+      plyr::join_all(by = c("x", "y")) |>
+      mutate(date = lubridate::ymd(yyyymmdd))
+
+      # Clean up file
+      file.remove(nc_file)
+      
+      results
   }) |>
-    plyr::join_all(by = c("x", "y", "date", "year", "month", "day", "doy")) |>  # Include date in join columns
-    dplyr::as_tibble() |>
-    dplyr::select(x, y, date, year, month, day, doy, dplyr::everything())
-  
-  # Write the transformed data to parquet
-  dat_out |> arrow::write_parquet(transformed_file, compression = "gzip", compression_level = 5)
-  
+  mutate(year = year,
+         month = month,
+         day = lubridate::day(date),
+         doy = lubridate::yday(date)) |>
+  dplyr::select(x, y, date, year, month, day, doy, dplyr::everything())
+
+  nasa_recorded_weather |> arrow::write_parquet(transformed_file, compression = "gzip", compression_level = 5)
+
   # Test if transformed parquet file can be loaded. If not clean up and return NULL
   if(is.null(error_safe_read_parquet(transformed_file))) {
     file.remove(transformed_file)
     stop(glue::glue("{basename(transformed_file)} could not be read."))
   }
-  
+
   # If it can be loaded return file name and path of transformed parquet
   return(transformed_file)
 }

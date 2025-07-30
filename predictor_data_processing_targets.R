@@ -584,52 +584,8 @@ dynamic_targets <- tar_plan(
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
   # T2M             MERRA-2 Temperature at 2 Meters (C) ;
   # PRECTOTCORR     MERRA-2 Precipitation Corrected (mm/day)
-  tar_target(nasa_weather_raw_directory,
-    create_data_directory(directory_path = "data/nasa_weather_raw")
-  ),
 
-  tar_target(nasa_weather_coordinates, get_nasa_weather_coordinates(country_bounding_boxes)),
   tar_target(months_to_process, dates_to_process |> format("%Y-%m") |> unique()),
-
-  # Check if nasa_weather file already exists on AWS and can be loaded
-  # The only important one is the directory. The others are there to enforce dependencies.
-  tar_target(nasa_weather_raw_AWS,
-    AWS_get_folder(
-      nasa_weather_raw_directory,
-      skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-      sync_with_remote = TRUE
-    ),
-    error = "null",
-    cue = tar_cue("always")
-  ),
-  
-  # Process the weather data
-  # cue set to 'always' so that current year can be updated.
-  # the rest of the years will respect the overwrite flag.
-  tar_target(nasa_weather_raw,
-    fetch_nasa_weather(nasa_weather_coordinates,
-      months_to_process,
-      nasa_weather_variables = c("relative_humidity" = "RH2M", "temperature" = "T2M", "precipitation" = "PRECTOTCORR"),
-      local_folder = nasa_weather_raw_directory,
-      basename_template = glue::glue("nasa_weather_raw_{months_to_process}.parquet"),
-      overwrite = parse_flag("OVERWRITE_NASA_WEATHER"),
-      nasa_weather_raw_AWS, # Enforce Dependency
-      dates_to_process, # Enforce Dependency
-      ),
-    pattern = map(months_to_process),
-    error = "null",
-    format = "file",
-    # repository = "local"
-  ),
-
-  # Put nasa_weather files on AWS
-  tar_target(nasa_weather_raw_AWS_upload, AWS_put_files(
-    nasa_weather_raw,
-    nasa_weather_raw_directory,
-    overwrite = parse_flag("OVERWRITE_NASA_WEATHER")
-  ),
-  error = "null"
-  ),
 
   tar_target(
     nasa_weather_transformed_directory,
@@ -652,14 +608,17 @@ dynamic_targets <- tar_plan(
   # cue set to 'always' so that current year can be updated.
   # the rest of the years will respect the overwrite flag.
   tar_target(nasa_weather_transformed,
-             transform_nasa_weather(nasa_weather_raw,
-                                    continent_raster_template,
-                                    local_folder = nasa_weather_transformed_directory,
-                                    overwrite = parse_flag("OVERWRITE_NASA_WEATHER"),
-                                    nasa_weather_transformed_AWS, # Enforce Dependency
-                                    dates_to_process, # Enforce Dependency
+             fetch_and_transform_nasa_weather(months_to_process,
+                                              nasa_weather_variables = c("relative_humidity" = "RH2M", "temperature" = "T2M", "precipitation" = "PRECTOTCORR"),
+                                              continent_raster_template,
+                                              local_folder = nasa_weather_transformed_directory,
+                                              basename_template = "nasa_weather_transformed_{months_to_process}.parquet",
+                                              endpoint = "https://power-datastore.s3.amazonaws.com/v10/daily/{year}/{month}/power_10_daily_{yyyymmdd}_merra2_lst.nc",
+                                              overwrite = parse_flag("OVERWRITE_NASA_WEATHER"),
+                                              nasa_weather_transformed_AWS, # Enforce Dependency
+                                              dates_to_process, # Enforce Dependency
              ),
-             pattern = map(nasa_weather_raw),
+             pattern = map(months_to_process),
              error = "null",
              format = "file",
              # repository = "local"
