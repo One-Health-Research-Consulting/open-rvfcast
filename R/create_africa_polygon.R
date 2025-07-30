@@ -17,5 +17,4 @@ create_africa_polygon <- function() {
     select(country = name, country_iso3c = iso_a3, geometry)
   
   africa_countries
-
 }

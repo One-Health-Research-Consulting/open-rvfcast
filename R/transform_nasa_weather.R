@@ -72,12 +72,27 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
     return(transformed_file)
   }
 
-   nasa_recorded_weather <- map_df(dates, .progress = TRUE, function(yyyymmdd) {
+  # Track if any downloads failed
+  failed_downloads <- c()
+  
+  # This errors if any of the files in the month are wrong. 
+  nasa_recorded_weather <- map_df(dates, .progress = TRUE, function(yyyymmdd) {
     
     # Establish NetCDF filename
     nc_file <- file.path(local_folder, glue::glue(endpoint) |> basename())
-    # Download file from POWER's S3 Bucket
-    curl::curl_download(glue::glue(endpoint), nc_file)
+    
+    # Try to download file - returns TRUE if successful, FALSE if failed
+    download <- tryCatch({
+      curl::curl_download(glue::glue(endpoint), nc_file)
+      TRUE
+    }, error = function(e) {
+      FALSE
+    })
+
+    if(!download) {
+      failed_downloads <<- c(failed_downloads, yyyymmdd)
+      return(NULL)
+    }
 
     # Map across variable types
     results <- imap(nasa_weather_variables, function(var, name) {
@@ -116,6 +131,8 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
     stop(glue::glue("{basename(transformed_file)} could not be read."))
   }
 
+  if(length(failed_downloads) > 0) stop(glue::glue("Some NASA POWER netcdf files failed to download: {paste(failed_downloads, collapse = ', ')}"))
+  
   # If it can be loaded return file name and path of transformed parquet
   return(transformed_file)
 }
