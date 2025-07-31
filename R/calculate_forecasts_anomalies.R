@@ -79,7 +79,7 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
   # Get the relevant forecast data. From the most recent base_date that came
   # before the model_date selected.
   forecasts_transformed_dataset <- arrow::open_dataset(ecmwf_forecasts_transformed) |>
-    filter(base_date <= dates_to_process)
+    dplyr::filter(base_date <= dates_to_process)
 
   relevant_base_date <- forecasts_transformed_dataset |>
     select(base_date) |>
@@ -107,7 +107,7 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
       to = dates_to_process + lead_interval_end - 1, by = 1
     )) |>
       mutate(
-        doy = as.integer(lubridate::yday(date)), # Calculate day of year
+        doy = as.numeric(lubridate::yday(date)), # Calculate day of year
         month = as.integer(lubridate::month(date)), # Extract month
         year = as.integer(lubridate::year(date)),
         lead_interval_start = lead_interval_start, # Store lead interval duration
@@ -123,6 +123,8 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
     forecast_anomaly <- forecast_anomaly |>
       left_join(historical_means, by = "doy") |>
       relocate(-matches("precipitation|temperature|humidity"))
+
+    # 1. forecasts_transformed_dataset
 
     # Join in forecast data based on x, y, month, and year.
     # The historical data and forecast data _should_ have the same column

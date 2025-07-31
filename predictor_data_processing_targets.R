@@ -449,8 +449,9 @@ dynamic_targets <- tar_plan(
   tar_target(modis_ndvi_task_id_continent, submit_modis_ndvi_task_request_continent(
     end_date = modis_task_end_dates,
     modis_ndvi_token,
-    bbox_coords = sf::st_bbox(continent_polygon),
-    modis_ndvi_transformed_directory
+    bbox_coords = sf::st_bbox(continent_polygon) + c(0,0,10,0), # Add an extra 10 degrees of width to avoid weird circle that cuts off Somalia. Due to modis's native sinusoidal crs
+    modis_ndvi_transformed_directory,
+    overwrite = parse_flag("OVERWRITE_MODIS_NDVI")
   ),
   pattern = map(modis_task_end_dates),
   cue = tar_cue("always")
@@ -556,6 +557,8 @@ dynamic_targets <- tar_plan(
   # when branching over ndvi_years. I end up with empty parquet files
   # I have no idea why pattern = map(ndvi_years) breaks things.
   # Solution is to not use dynamic branching here.
+  # Note: MODIS and Sentinel raw data need to be scaled. 
+  # MODIS/10000 and Sentinel/200
   tar_target(ndvi_transformed,
     transform_ndvi(modis_ndvi_transformed,
       sentinel_ndvi_transformed,

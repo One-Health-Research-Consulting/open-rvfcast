@@ -27,13 +27,24 @@ transform_ndvi <- function(modis_ndvi_transformed,
   # sources. Current solution is to average them.
   ndvi_transformed_files <- pmap_vec(file_partitions, function(.y, .m) {
       
-    ndvi_transformed_data <- ndvi_transformed_dataset |> 
-      filter(year == .y,
+    ndvi_transformed_data <- ndvi_transformed_dataset |>
+      dplyr::filter(year == .y,
              month == .m) |>
-      select(-source) |>
-      group_by(x, y, date, doy, month, year) |>
-      summarize(ndvi = mean(ndvi), .groups = "drop") |>
-      collect()
+             collect()
+
+    # Scale raw data appropriately.
+    ndvi_transformed_data <- ndvi_transformed_data |>
+      mutate(
+        ndvi = case_when(
+          source == "modis" ~ ndvi / 10000, # MODIS
+          TRUE ~ ndvi / 200  # Sentinel
+        )
+      )         
+      
+      ndvi_transformed_data <- ndvi_transformed_data |>
+        select(-source) |>
+        group_by(x, y, date, doy, month, year) |>
+        summarize(ndvi = mean(ndvi), .groups = "drop")
 
     # Set filename
     save_filename <- file.path(ndvi_transformed_directory, glue::glue(basename_template))

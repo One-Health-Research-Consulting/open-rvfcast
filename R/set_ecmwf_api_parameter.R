@@ -27,9 +27,9 @@ set_ecmwf_api_parameter <- function(start_year = 2005,
                                     bbox_coords = continent_bounding_box,
                                     variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
                                     product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
-                                    lead_months = seq(1,6)) {
+                                    lead_months = seq(1, 6)) {
 
-  
+
   # API details from:
   # https://confluence.ecmwf.int/display/CKB/How+to+use+the+CDS+interactive+forms+and+CDS+API+for+seasonal+forecast+datasets
   
@@ -71,6 +71,7 @@ set_ecmwf_api_parameter <- function(start_year = 2005,
   # Up till last month.
   # dates <- seq.Date(ymd("2017-9-01"), floor_date(today() - months(1), "month"), by = "month")
   dates <- seq.Date(lubridate::ymd(start_year, truncated = 2L), floor_date(today() - months(1), "month"), by = "month")
+  dates <- seq.Date(lubridate::ymd(start_year, truncated = 2L), floor_date(today(), "month") - months(1), by = "month")
 
   seasonal_forecast_parameters <- tibble(year = year(dates), month = month(dates))
   

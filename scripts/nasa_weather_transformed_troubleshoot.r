@@ -2,15 +2,20 @@ library(terra)
 library(tidyverse)
 library(targets)
 
-dat_out <- tar_read(nasa_weather_transformed)[[1]] |> 
-  arrow::read_parquet() |>
-  filter(day == 1)
+dat_out <- arrow::open_dataset("data/modis_ndvi_transformed/transformed_modis_NDVI_2006-09-30.parquet")
 
 dat_out %>% {
-  ggplot(., aes(x, y, z = relative_humidity)) +
-    geom_tile(aes(fill = relative_humidity)) #+
+  ggplot(., aes(x, y, z = ndvi)) +
+    geom_tile(aes(fill = ndvi)) #+
   #scale_x_continuous(limits = c(19, 22)) +
   # scale_y_continuous(limits = c(19, 22))
+}
+
+dat_out %>% {
+  ggplot(., aes(x, y, z = ndvi)) +
+    geom_point(aes(fill = ndvi)) +
+    scale_x_continuous(limits = c(19, 22)) +
+    scale_y_continuous(limits = c(19, 22))
 }
 
 library(terra)
