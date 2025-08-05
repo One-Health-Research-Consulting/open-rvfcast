@@ -65,6 +65,20 @@ get_landcover_data <- function(output_dir,
     # Convert to dataframe
     dat <- as.data.frame(landcover_data, xy = TRUE) |> as_tibble()
     
+    ## Fill empty cells in the desert 
+    dat.c <- dat[complete.cases(dat), ]
+    dat.m <- dat[!complete.cases(dat), ]
+    
+    dat.m <- dat.m %>% 
+      filter(is.na(bare)) %>%
+      mutate(tp = rowSums(select(., -x, -y), na.rm = T), .after = y) %>% 
+      ## ASSUMPTION: Fill in these empty cells in the desert by assuming w/e proportion is missing
+      ## is bare
+      mutate(bare = 1 - tp) %>%
+      replace(is.na(.), 0)
+    
+    dat <- rbind(dat.c, dat.m %>% dplyr::select(-tp)) %>% arrange(x, y)
+    
     # Save as parquet 
     arrow::write_parquet(dat, landcover_filename, compression = "gzip", compression_level = 5)
     

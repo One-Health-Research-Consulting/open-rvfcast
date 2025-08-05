@@ -138,7 +138,15 @@ preprocess_soil <- function(soil_directory,
   #    depths for long periods. Soils have a very shallow water table and are commonly 
   #    in level or depressed sites. 
 
-
+  ## Change NA to UNK so we don't lose cells just because of soil
+  soil_preprocessed <- soil_preprocessed %>% 
+    mutate(
+        soil_drainage = as.character(soil_drainage)
+      , soil_drainage = ifelse(is.na(soil_drainage), "UNK", soil_drainage) %>% as.factor()
+      , soil_texture  = as.character(soil_texture)
+      , soil_texture  = ifelse(is.na(soil_texture), "UNK", soil_texture) %>% as.factor()
+    ) 
+  
   # Save soil data as parquet files
   arrow::write_parquet(soil_preprocessed, soil_preprocessed_file, compression = "gzip", compression_level = 5)
   
