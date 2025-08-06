@@ -803,7 +803,7 @@ derived_data_targets <- tar_plan(
   tar_target(weather_anomalies_AWS_upload, AWS_put_files(
     weather_anomalies,
     weather_anomalies_directory,
-    aws_overwrite = Sys.getenv("OVERWRITE_WEATHER_ANOMALIES") == "TRUE",
+    overwrite = parse_flag("OVERWRITE_WEATHER_ANOMALIES")
   ),
   error = "null"
   ),
@@ -852,12 +852,13 @@ derived_data_targets <- tar_plan(
 
   # Next step put weather_historical_means files on AWS.
   tar_target(forecasts_anomalies_AWS_upload, AWS_put_files(
-    forecasts_anomalies,
-    forecasts_anomalies_directory,
-    overwrite = parse_flag("OVERWRITE_FORECAST_ANOMALIES")
+      forecasts_anomalies,
+      forecasts_anomalies_directory,
+      overwrite = parse_flag("OVERWRITE_FORECAST_ANOMALIES")
+    ),
+    error = "continue"
   ),
-  error = "null"
-  ),
+
   tar_target(
     ndvi_historical_means_directory,
     create_data_directory(directory_path = "data/ndvi_historical_means")
@@ -988,7 +989,8 @@ full_data_targets <- tar_plan(
   ),
   pattern = map(dates_to_process),
   format = "file",
-  repository = "local"
+  repository = "local",
+  cue = tar_cue("never")
   ),
 
   # Next step put combined_anomalies files on AWS.
@@ -997,7 +999,8 @@ full_data_targets <- tar_plan(
     africa_full_predictor_data_directory,
     overwrite = parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA")
   ),
-  error = "null"
+  error = "null",
+  cue = tar_cue("never")
   )
 )
 

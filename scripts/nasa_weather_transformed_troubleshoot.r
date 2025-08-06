@@ -2,11 +2,13 @@ library(terra)
 library(tidyverse)
 library(targets)
 
-dat_out <- arrow::open_dataset("data/modis_ndvi_transformed/transformed_modis_NDVI_2006-09-30.parquet")
+dat_out <- arrow::open_dataset("data/ndvi_transformed/ndvi_transformed_2005_1.parquet")
 
-dat_out %>% {
-  ggplot(., aes(x, y, z = ndvi)) +
-    geom_tile(aes(fill = ndvi)) #+
+dat_out <- arrow::read_parquet(tar_read(forecasts_anomalies)[[1]])
+
+dat_out %>% dplyr::filter(doy == 14) %>% {
+  ggplot(., aes(x, y, z = anomaly_forecast_temperature)) +
+    geom_tile(aes(fill = anomaly_forecast_temperature)) #+
   #scale_x_continuous(limits = c(19, 22)) +
   # scale_y_continuous(limits = c(19, 22))
 }
