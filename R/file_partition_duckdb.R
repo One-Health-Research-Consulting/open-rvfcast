@@ -61,6 +61,10 @@ file_partition_duckdb <- function(sources, # A named, nested list of parquet fil
 
   # For each explanatory variable target create a table filtered appropriately
   purrr::walk2(names(sources), sources, function(table_name, list_of_files) {
+    
+    ## Select out only the needed date
+    filtered_files <- list_of_files[grepl(dates_to_process, list_of_files)]
+    if (length(filtered_files) == 0) { filtered_files <- list_of_files }
 
     file_schemas <- purrr::map(list_of_files, ~ arrow::open_dataset(.x)$schema)
     unified_schema <- all(purrr::map_vec(file_schemas, ~ .x == file_schemas[[1]]))
