@@ -66,7 +66,7 @@ file_partition_duckdb <- function(sources, # A named, nested list of parquet fil
     filtered_files <- list_of_files[grepl(dates_to_process, list_of_files)]
     if (length(filtered_files) == 0) { filtered_files <- list_of_files }
 
-    file_schemas <- purrr::map(list_of_files, ~ arrow::open_dataset(.x)$schema)
+    file_schemas <- purrr::map(filtered_files, ~ arrow::open_dataset(.x)$schema)
     unified_schema <- all(purrr::map_vec(file_schemas, ~ .x == file_schemas[[1]]))
 
     parquet_filter <- c()
@@ -80,13 +80,13 @@ file_partition_duckdb <- function(sources, # A named, nested list of parquet fil
     # Check if all schemas are identical
     if (unified_schema) {
       # If all schema are identical: union all files
-      files_list <- paste0("'", list_of_files, "'", collapse = ", ")
+      files_list <- paste0("'", filtered_files, "'", collapse = ", ")
       parquet_list <- glue::glue("SELECT * FROM read_parquet([{files_list}]) {parquet_filter}")
     } else {
       # If not: inner join all files
-      parquet_list <- glue::glue("SELECT * FROM '{list_of_files}' {parquet_filter}")
+      parquet_list <- glue::glue("SELECT * FROM '{filtered_files}' {parquet_filter}")
       parquet_list <- glue::glue("({parquet_list})")
-      as_names <- gsub("\\..*", "", basename(list_of_files))
+      as_names <- gsub("\\..*", "", basename(filtered_files))
       parquet_list <- glue::glue("{parquet_list} AS {gsub('-', '_', as_names)}")
       parquet_list <- paste0("SELECT * FROM ", paste(parquet_list, collapse = " NATURAL JOIN "))
     }
