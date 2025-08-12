@@ -76,7 +76,7 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
   # Updated notes after discussion with Noam
   # We want current date, current ndvi, forecast amount in days, forecast weather, forecast outbreak history (check this), and all the static layers. So we don't want wide weather forecast but long.
 
-  # Get the relevant forecast data. From the most recent base_date that came
+  # Get the relevant forecast data. Find the most recent base_date that came
   # before the model_date selected.
   forecasts_transformed_dataset <- arrow::open_dataset(ecmwf_forecasts_transformed) |>
     dplyr::filter(base_date <= dates_to_process)
@@ -89,11 +89,10 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
     head(n = 1)
 
   forecasts_transformed_dataset <- forecasts_transformed_dataset |>
-    filter(base_date == relevant_base_date) |>
+    dplyr::filter(base_date == relevant_base_date) |>
     select(-base_date, -month, -year) |>
-    mutate(month = lead_month, year = lead_year)
-
-  historical_means <- arrow::open_dataset(weather_historical_means)
+    mutate(month = lead_month, year = lead_year) |>
+    collect()
 
   forecasts_anomalies <- map_dfr(1:(length(forecast_intervals) - 1), function(i) {
     lead_interval_start <- forecast_intervals[i]
@@ -114,14 +113,16 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
         lead_interval_end = lead_interval_end
       ) # Extract year
 
-    # Much faster to do the joins within an arrow context
-    forecast_anomaly_file <- tempfile()
-    arrow::write_parquet(forecast_anomaly, forecast_anomaly_file)
-    forecast_anomaly <- arrow::open_dataset(forecast_anomaly_file)
+    # Historical_means is 1.3Gb we need to pre-filter only to relevant doys
+    # first before the join.
+    # CHECK
+    historical_means <- arrow::open_dataset(weather_historical_means) |>
+      dplyr::filter(doy %in% forecast_anomaly$doy)
 
     # Join historical means based on day of year (doy)
-    forecast_anomaly <- forecast_anomaly |>
-      left_join(historical_means, by = "doy") |>
+    # CHECK
+    historical_means <- historical_means |>
+      right_join(forecast_anomaly, by = "doy") |>
       relocate(-matches("precipitation|temperature|humidity"))
 
     # 1. forecasts_transformed_dataset
@@ -129,35 +130,35 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
     # Join in forecast data based on x, y, month, and year.
     # The historical data and forecast data _should_ have the same column
     # names so differentiate with a suffix
-    forecast_anomaly <- forecast_anomaly |>
-      left_join(forecasts_transformed_dataset,
+    historical_means <- historical_means |>
+      dplyr::left_join(forecasts_transformed_dataset,
         by = c("x", "y", "month", "year"),
         suffix = c("_historical", "_forecast")
       )
 
     # Summarize by calculating the mean for each variable type (temperature, precipitation, relative_humidity)
     # and across both historical data and forecast data over the days in the model_dates range
-    forecast_anomaly <- forecast_anomaly |>
+    historical_means <- historical_means |>
       group_by(x, y, lead_interval_start, lead_interval_end) |>
       summarize(across(matches("temperature|precipitation|relative_humidity"), ~ mean(.x, na.rm = T)), .groups = "drop")
 
     # Calculate temperature anomalies
     # scaled requires non na values for SD which means there must be variation in temp at that site.
-    forecast_anomaly <- forecast_anomaly |>
+    historical_means <- historical_means |>
       mutate(
         anomaly_forecast_temperature = temperature_forecast - temperature_historical,
         anomaly_forecast_scaled_temperature = anomaly_forecast_temperature / temperature_sd_historical
       )
 
     # Calculate precipitation anomalies
-    forecast_anomaly <- forecast_anomaly |>
+    historical_means <- historical_means |>
       mutate(
         anomaly_forecast_precipitation = precipitation_forecast - precipitation_historical,
         anomaly_forecast_scaled_precipitation = anomaly_forecast_precipitation / precipitation_sd_historical
       )
 
     # Calculate relative_humidity anomalies
-    forecast_anomaly <- forecast_anomaly |>
+    historical_means <- historical_means |>
       mutate(
         anomaly_forecast_relative_humidity = relative_humidity_forecast - relative_humidity_historical,
         anomaly_forecast_scaled_relative_humidity = anomaly_forecast_relative_humidity / relative_humidity_sd_historical
@@ -165,7 +166,7 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
 
     # Clean up intermediate columns
     # Regenerate month and year
-    forecast_anomaly <- forecast_anomaly |>
+    historical_means <- historical_means |>
       mutate(
         date = dates_to_process,
         doy = lubridate::yday(date),
