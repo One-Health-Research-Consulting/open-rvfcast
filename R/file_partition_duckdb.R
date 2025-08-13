@@ -110,10 +110,6 @@ file_partition_duckdb <- function(sources, # A named, nested list of parquet fil
   rows_written <- DBI::dbExecute(con, query)
   message(glue::glue("{rows_written} rows in joined dataset"))
 
-  # Execute the join
-  rows_written <- DBI::dbExecute(con, query)
-  message(glue::glue("{rows_written} rows in joined dataset"))
-
   # Clean up the database connection
   duckdb::dbDisconnect(con)
 

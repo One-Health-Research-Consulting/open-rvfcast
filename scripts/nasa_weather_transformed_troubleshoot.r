@@ -2,13 +2,52 @@ library(terra)
 library(tidyverse)
 library(targets)
 
-dat_out <- arrow::open_dataset("data/ndvi_transformed/ndvi_transformed_2005_1.parquet")
+tar_load(africa_full_predictor_data_sources)
 
-dat_out <- arrow::read_parquet(tar_read(forecasts_anomalies)[[1]])
+first_elements_list <- lapply(africa_full_predictor_data_sources, `[[`, 1) |> map(~arrow::read_parquet(.))
+# Assume 'first_elements_list' is named
+df_names <- names(first_elements_list)
+
+# If it doesn't have names, make some
+if (is.null(df_names)) {
+  df_names <- paste0("df", seq_along(first_elements_list))
+}
+
+# Extract unique x,y from each dataframe
+xy_sets <- lapply(first_elements_list, function(df) {
+  unique(df[c("x", "y")])
+})
+names(xy_sets) <- df_names
+
+# Progressive intersection tracking
+common_xy <- xy_sets[[1]]
+drop_points <- data.frame(
+  dataframe = character(),
+  common_rows = integer(),
+  stringsAsFactors = FALSE
+)
+
+for (i in 2:length(xy_sets)) {
+  common_xy <- merge(common_xy, xy_sets[[i]], by = c("x", "y"))
+  drop_points <- rbind(drop_points, data.frame(
+    dataframe = df_names[i],
+    common_rows = nrow(common_xy)
+  ))
+}
+
+drop_points
+
+
+
+dat_out <- arrow::read_parquet(tar_read(ndvi_anomalies)[[1]])
+dat_out1 <- arrow::read_parquet(tar_read(forecasts_anomalies)[[1]])
+dat_out2 <- arrow::read_parquet(tar_read(weather_anomalies)[[1]])
+dat_out2
+dat_out2
 
 dat_out %>% dplyr::filter(doy == 14) %>% {
-  ggplot(., aes(x, y, z = anomaly_forecast_temperature)) +
-    geom_tile(aes(fill = anomaly_forecast_temperature)) #+
+  ggplot(., aes(x, y, z = anomaly_temperature)) +
+    geom_tile(aes(fill = anomaly_temperature)) #+
   #scale_x_continuous(limits = c(19, 22)) +
   # scale_y_continuous(limits = c(19, 22))
 }

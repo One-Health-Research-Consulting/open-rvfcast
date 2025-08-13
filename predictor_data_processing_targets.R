@@ -980,6 +980,7 @@ full_data_targets <- tar_plan(
   # error needs to be null here because some prsedictors (like wahis_outbreak_sources) aren't
   # present in all times.
   tar_target(africa_full_predictor_data, file_partition_duckdb(
+    # sources = africa_full_predictor_data_sources,
     sources = africa_full_predictor_data_sources,
     dates_to_process,
     local_folder = africa_full_predictor_data_directory,
@@ -989,8 +990,7 @@ full_data_targets <- tar_plan(
   ),
   pattern = map(dates_to_process),
   format = "file",
-  repository = "local",
-  cue = tar_cue("never")
+  repository = "local"
   ),
 
   # Next step put combined_anomalies files on AWS.
