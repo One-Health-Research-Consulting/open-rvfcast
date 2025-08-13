@@ -2,6 +2,14 @@
 # To switch to the modeling pipeline run:
 # Sys.setenv(TAR_PROJECT = "model")
 
+## MPK NOTEs on August 13, 2025. 
+ ## 1) For cleanliness I am removing the huge amount of commented out code. Very well could be 
+  ## that some of this could be useful / important. For this code see commits
+  ## prior to August 13, 2025
+ ## 2) Working for now with one forecast horizon to get an initial pipeline functioning and make sure
+  ## my mental map is in order. To be expanded to all forecast horizons afterward. Aim to make as dynamic
+  ## as possible so that this is not a burden
+
 # Re-record current dependencies for CAPSULE users
 if (Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true"))
   capsule::capshot(c("packages.R",
@@ -24,194 +32,75 @@ parse_flag <- function(flags, cue = F) {
   flags
 }
 
-# Download the data from the S3 bucket and partition into training, validation, and test splits
+## Targets for loading needed data ---------------------------------------------
 model_data_targets <- tar_plan(
-  tar_target(RSA_data, arrow::open_dataset("s3://open-rvfcast/data/RSA_rvf_model_data") |> 
-               collect() |>
-               pivot_wider(names_from = lag_interval, values_from = c("ndvi_anomalies", "weather_anomolies"))),
+
+  ## Eventually will want to download the data from the S3 bucket, but for now load from local
+  tar_target(region_data_path, "data/RSF_cleaned_response_data/RSF_cleaned_response_data.parquet")
+, tar_target(region_data, read_parquet(region_data_path))
+
+  ## Sub-regions of region of interest
+, tar_target(region_districts, rgeoboundaries::geoboundaries("South Africa", "adm2"))
+
+  ## Last date of the training data set (all data beyond this date will be set aside for final model evaluation)
+, tar_target(end_date, "2020-12-19")
+
+  ## As in the comment in the preamble, testing my mental map of the problem and working on code dev for
+   ## one forecast horizon for now
+, tar_target(forecast_horizon, 90)
+
 )
 
-cross_validation_targets <- tar_plan()
+## Targets for preparing for model tuning --------------------------------------
+cross_validation_targets <- tar_plan(
+  
+  ## Best to split the data first then fold on the training data. Can do so on end_date
+   ## Going for name of target as a noun (even if it is a funny nonsense word like it is here)
+   ## and the function as the related verb
+  tar_target(splitted_data, split_data())
+  
+  ## Fold the data
+  tar_target(folded_data, fold_data(
+      data             = region_data %>% filter(forecast_interval == forecast_horizon)
+    , sf_districts     = region_districts
+    , start_date       = "2005-04-07"
+    , end_date         = end_date
+    , forecast_horizon = forecast_horizon
+    ## For now setting this so that the next fold begins the day after the end of the prior
+     ## forecast horizon. This could end up being too computationally demanding, but we shall see
+    , step_size        = forecast_horizon
+    ## 10 Seems sensible to me for a start
+    , n_spatial_folds  = 10
+    , district_id_col  = "shapeName"
+    , seed             = 10001
+  ))
+  
+)
 
-# Model -----------------------------------------------------------
-model_tuning_targets <- tar_plan(
-  tar_target(training_data, RSA_data |> filter(date <= "2017-12-31")),
-  tar_target(holdout_data, RSA_data |> filter(date > "2017-12-31")),
+## Targets for conducting model tuning -----------------------------------------
+model_tuning_targets <- tar_plan()
 
-  tar_target(folds),
-
-  tar_target(xgb_mod),
-
-  tar_target(xgb_grid),
-
-  tar_target(xgb_recipe),
-
-  tar_target(xgb_metrics),
-
+## Fitting of model on holdout data --------------------------------------------
 model_fitting_targets <- tar_plan()
   
-  # # RSA --------------------------------------------------
-  # tar_target(augmented_data_rsa_directory,
-  #            create_data_directory(directory_path = "data/augmented_data_rsa"),
-  #            format = "file"),
-  
-  # # Switch to parquet based to save memory. Arrow left joins automatically.
-  # tar_target(model_data,
-  #            left_join(aggregated_data_rsa,
-  #                      rvf_outbreaks,
-  #                      by = join_by(date, shapeName)) |>
-  #              mutate(outbreak_30 = factor(replace_na(outbreak_30, FALSE))) |>
-  #              left_join(rsa_polygon_spatial_weights, by = "shapeName") |>
-  #              mutate(area = as.numeric(area))
-  # ),
-  # 
-  # tar_target(training_data, training(model_data_split)),
-  # tar_target(holdout_data, testing(model_data_split)),
-  
-  # # Check if combined_anomalies parquet files already exists on AWS and can be loaded
-  # # The only important one is the directory. The others are there to enforce dependencies.
-  # tar_target(augmented_data_rsa_AWS, AWS_get_folder(augmented_data_rsa_directory,
-  #                                                   weather_anomalies, # Enforce dependency
-  #                                                   ndvi_anomalies, # Enforce dependency
-  #                                                   dates_to_process),
-  #            error = "null",
-  #            cue = tar_cue("always")), # Enforce dependency
-  #
-  # tar_target(aggregated_data_rsa,
-  #            aggregate_augmented_data_by_adm(augmented_data,
-  #                                            rsa_polygon,
-  #                                            dates_to_process),
-  #            pattern = dates_to_process),
-  #
-  # tar_target(rsa_polygon_spatial_weights, rsa_polygon |>
-  #              mutate(area = sf::st_area(rsa_polygon)) |>
-  #              as_tibble() |>
-  #              select(shapeName, area)),
-  
-  # # Switch to parquet based to save memory. Arrow left joins automatically.
-  # tar_target(model_data,
-  #            left_join(aggregated_data_rsa,
-  #                      rvf_outbreaks,
-  #                      by = join_by(date, shapeName)) |>
-  #              mutate(outbreak_30 = factor(replace_na(outbreak_30, FALSE))) |>
-  #              left_join(rsa_polygon_spatial_weights, by = "shapeName") |>
-  #              mutate(area = as.numeric(area))
-  # ),
-  
-  # 
-  # # Splitting --------------------------------------------------
-  # # Initial train and test (ie holdout)
-  # tar_target(split_prop, nrow(model_data[model_data$date <= "2017-12-31",])/nrow(model_data)),
-  # tar_target(model_data_split, initial_time_split(model_data, prop = split_prop)), 
-  # tar_target(training_data, training(model_data_split)),
-  # tar_target(holdout_data, testing(model_data_split)),
-  # 
-  # # formula/recipe 
-  # tar_target(rec, model_recipe(training_data)),
-  # tar_target(rec_juiced, juice(prep(rec))),
-  # 
-  # # xgboost settings
-  # tar_target(base_score, sum(training_data$outbreak_30==TRUE)/nrow(training_data)),
-  # tar_target(interaction_constraints, '[[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], [15]]'), # area is the 16th col in rec_juiced
-  # tar_target(monotone_constraints, c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)), # enforce positive relationship for area
-  # 
-  # # tuning
-  # tar_target(spec, model_specs(base_score, interaction_constraints, monotone_constraints)),
-  # tar_target(grid, model_grid(training_data)),
-  # 
-  # # workflow
-  # tar_target(wf, workflows::workflow(rec, spec)),
-  # 
-  # # splits
-  # tar_target(rolling_n, n_distinct(model_data$shapeName)),
-  # tar_target(splits, rolling_origin(training_data, 
-  #                                   initial = rolling_n, 
-  #                                   assess = rolling_n, 
-  #                                   skip = rolling_n - 1)),
-  # 
-  # # tuning
-  # tar_target(tuned, model_tune(wf, splits, grid)),
-  
-  # final model
-  # tar_target(final, {
-  #   final_wf <- finalize_workflow(
-  #     wf,
-  #     tuned[5,]
-  #   )
-  #   
-  #   library(DALEX)
-  #   library(ceterisParibus)
-  #   
-  #   # DALEX Explainer
-  #   tuned_model <- final_wf |> fit(training_data)
-  #   tuned_model_xg <- extract_fit_parsnip(tuned_model)
-  #   training_data_mx <- extract_mold(tuned_model)$predictors %>%
-  #     as.matrix()
-  #   
-  #   y <- extract_mold(tuned_model)$outcomes %>%
-  #     mutate(outbreak_30 = as.integer(outbreak_30 == "1")) %>%
-  #     pull(outbreak_30)
-  #   
-  #   explainer <- DALEX::explain(
-  #     model = tuned_model_xg,
-  #     data = training_data_mx,
-  #     y = y,
-  #     predict_function = predict_raw,
-  #     label = "RVF-EWS",
-  #     verbose = TRUE
-  #   )
-  #   
-  #   # CP plots
-  #   predictors <- extract_mold(tuned_model)$predictors |> colnames()
-  #   holdout_small <- as.data.frame(select_sample(training_data, 20)) |> 
-  #     select(all_of(predictors), outbreak_30) |> 
-  #     mutate(area = as.numeric(area)) |> 
-  #     mutate(outbreak_30 = as.integer(outbreak_30 == "1"))
-  # 
-  #   
-  #   
-  # 
-  #   cPplot <- ceterisParibus::ceteris_paribus(explainer, 
-  #                                             observation = holdout_small |> select(-outbreak_30),
-  #                                             y = holdout_small |>  pull(outbreak_30)#,
-  #                                             #variables = "area"
-  #                                             )
-  #   plot(cPplot)+
-  #     ceteris_paribus_layer(cPplot, show_rugs = TRUE)
-  #   
-  #   
-  # }),  
-  
-  #TODO fit final model
-  #TODO test that interaction constraints worked - a) extract model object b) cp - 
-  # need the conditional effect - area is x, y is effect, should not change when you change other stuff
-  # ceteris parabus plots - should be parallel - points can differ but profile should be the same - expectation is that it is linear if doing it on area
-)
+## Asses model performance -----------------------------------------------------
+model_evaluation_targets <- tar_plan()
 
-# Reports -----------------------------------------------------------
-# The goal is to compare model performance. 
-# We want a plot with ROC curves for every different model specification
-model_evaluation_targets <- tar_plan(
-  
-)
+## Reports ---------------------------------------------------------------------
+report_targets <- tar_plan()
 
-# Reports -----------------------------------------------------------
-report_targets <- tar_plan(
-  
-)
-
-# Documentation -----------------------------------------------------------
+## Documentation ---------------------------------------------------------------
 documentation_targets <- tar_plan(
-  # tar_target(readme, rmarkdown::render("README.Rmd"))
   tar_render(readme, path = here::here("README.Rmd"))
 )
 
 # List targets -----------------------------------------------------------------
-# all_targets() doesn't work with tarchetypes like tar_change().
-list(model_data_targets,
-     cross_validation_targets,
-     model_tuning_targets,
-     model_fitting_targets,
-     model_evaluation_targets,
-     report_targets,
-     documentation_targets)
+list(
+  model_data_targets
+, cross_validation_targets
+, model_tuning_targets
+, model_fitting_targets
+, model_evaluation_targets
+, report_targets
+, documentation_targets
+)
