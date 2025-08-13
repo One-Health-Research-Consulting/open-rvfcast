@@ -15,7 +15,7 @@ raster_crs <- terra::crs(continent_raster_template)
 continent_bounding_box <- targets::tar_read(continent_bounding_box, store = targets_store)
 
 # load selected model dates - user will be able to select from these
-model_dates_selected <- targets::tar_read(model_dates_selected, store = targets_store)
+dates_to_process <- targets::tar_read(dates_to_process, store = targets_store)
 
 # leaflet base
 leafmap <- leaflet::leaflet() |>
@@ -136,7 +136,7 @@ ui <- fluidPage(
     
     column(4, shinyWidgets::sliderTextInput("selected_date", 
                                             "",
-                                            choices = model_dates_selected,
+                                            choices = dates_to_process,
                                             animate = TRUE)), # animationOptions to set faster but data load cant keep up
   ),
   

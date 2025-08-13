@@ -1,27 +1,26 @@
-#' Calculate Outbreak Distance Matrix
+#' Compute the Outbreak Distance Matrix
 #'
-#' This function calculates a distance matrix for outbreaks based on given parameters. The function takes
-#' outbreak data, a raster template, a distance in kilometers, and a beta distribution values as arguments.
-#' It then calculates the distance values, applies conditions, and returns a matrix of distances.
+#' This function computes the geographical distance between outbreak locations and 
+#' raster grid cells, transforming these distances into a connectivity matrix.
 #'
 #' @author Nathan C. Layman
 #'
-#' @param wahis_outbreaks Dataframe containing outbreak data.
-#' @param wahis_raster_template A raster template for structuring the data.
-#' @param within_km The maximum distance in kilometers to be considered for the matrix. Default is 500.
-#' @param beta_dist A value defining beta distribution. Default is 0.01.
+#' @param wahis_outbreaks A dataframe of outbreak locations with columns 'longitude' and 'latitude'.
+#' @param wahis_raster_template A raster template on which the function calculates distances.
+#' @param within_km Numeric, the radius within which to calculate distances. Defaults to 500.
+#' @param beta_dist Numeric, a coefficient used to transform distances into a connectivity matrix. Defaults to 0.01.
 #'
-#' @return A matrix containing calculated distance values based on outbreak data.
+#' @return A matrix with rows representing grid cells and columns representing outbreak locations,
+#'         where each cell's value is a transformed measure of its distance from the outbreak.
 #'
-#' @note This function calculates distance values based on vincenty measure, applies conditions, and returns a 
-#' matrix of distances. If the distance is larger than a given threshold, it is set as NA. Distance values are then adjusted
-#' based on a beta distribution, and NA values are set as 0.
+#' @note Distances are calculated with the Vincenty measure, 
+#'       transformed using an exponential decay function, and outside of the specified radius are set to zero.
 #'
 #' @examples
-#' get_outbreak_distance_matrix(wahis_outbreaks = outbreak_data,
+#' get_outbreak_distance_matrix(wahis_outbreaks = wahis_df,
 #'                    wahis_raster_template = raster_template,
-#'                    within_km = 100,
-#' beta_dist = 0.05)
+#'                    within_km = 500,
+#'                    beta_dist = 0.01)
 #'
 #' @export
 get_outbreak_distance_matrix <- function(wahis_outbreaks, wahis_raster_template, within_km = 500, beta_dist = 0.01) {

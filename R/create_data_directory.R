@@ -20,7 +20,8 @@
 create_data_directory <- function(directory_path) {
   
   dir.create(directory_path, recursive = TRUE, showWarnings = FALSE)
-  file.create(file.path(directory_path, ".gitkeep"))
+  gitkeep <- file.path(directory_path, ".gitkeep")
+  file.create(gitkeep)
 
-  return(file.path(directory_path))
+  return(directory_path)
 }

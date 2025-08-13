@@ -8,8 +8,13 @@
 #' @author Emma Mendelsohn
 #' @export
 create_africa_polygon <- function() {
-
-  rnaturalearth::ne_countries(continent = "Africa", returnclass = "sf") |> 
-    select(featurecla, country = name, country_iso3c = sov_a3)
-
+  
+  # Get all countries as sf
+  africa_countries <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf") |>
+    dplyr::filter(continent == "Africa" | 
+             name %in% c("Seychelles", "Mauritius", "Comoros", "Cape Verde", 
+                         "São Tomé and Príncipe")) |>
+    select(country = name, country_iso3c = iso_a3, geometry)
+  
+  africa_countries
 }

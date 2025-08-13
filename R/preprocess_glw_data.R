@@ -35,7 +35,7 @@ preprocess_glw_data <- function(glw_directory_dataset,
   continent_raster_template <- terra::unwrap(continent_raster_template)
   
   # Set up safe way to read parquet files
-  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
   
   # GLW filenames
   glw_filenames <- file.path(glw_directory_dataset, paste0(names(glw_urls), ".parquet"))

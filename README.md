@@ -18,301 +18,438 @@ CC0-1.0](https://img.shields.io/badge/License%20(for%20data)-CC0_1.0-lightgrey.s
 CC-BY-4.0](https://img.shields.io/badge/License%20(for%20text)-CC_BY_4.0-blue.svg)](http://creativecommons.org/publicdomain/zero/1.0/)
 <!-- badges: end -->
 
-### OpenRVFcast
+# Overview of OpenRVFcast
 
-EcoHealth Alliance’s ongoing OpenRVFcast project is developing a
-generalizable, open-source modeling framework for predicting Rift Valley
-Fever (RVF) outbreaks in Africa, funded by the Wellcome Trust’s
-climate-sensitive infectious disease [modeling
+The goal of EcoHealth Alliance’s ongoing OpenRVFcast project the
+development of a generalizable, open-source modeling framework for
+predicting Rift Valley Fever (RVF) outbreaks in Africa, funded by the
+Wellcome Trust’s climate-sensitive infectious disease [modeling
 initiative](https://wellcome.org/news/digital-tools-climate-sensitive-infectious-disease).
 We aim to integrate open data sets of climatic and vegetation data with
 internationally-reported outbreak data to build an modeling pipeline
 that can be adapted to varying local conditions in RVF-prone regions
 across the continent.
 
-### Repository Structure and Reproducibility
+This project is a collaborative effort between [EcoHealth
+Alliance](https://www.ecohealthalliance.org/), \[INSERT PARTNER LINKS\]
+
+### Pipeline Structure
+
+The project pipeline is organized into two distinct modules: 1) the
+**Data Acquisition Module** and 2) the **Modeling Framework Module**.
+Both modules are orchestrated using the `targets` package in R, a
+powerful tool for creating reproducible and efficient data analysis
+workflows. By defining a workflow of interdependent tasks, known as
+‘targets’, this package ensures that each step in the workflow is only
+executed when its inputs or code change, thereby optimizing
+computational efficiency. A modular, scalable, and transparent design
+makes `targets` an ideal choice for managing pipelines in reproducible
+research and production environments. An introduction to workflow
+management using `targets` can be found
+[here](https://books.ropensci.org/targets/). This project also uses the
+[{renv}](https://rstudio.github.io/renv/) framework to track R package
+dependencies and versions which are recorded in the `renv.lock` file.
+Code used to manage dependencies is in `renv/` and other files in the
+root project directory. On starting an R session in the working
+directory, run \``renv::hydrate()` and `renv::restore()` to install
+required R packags and dependencies.
+
+### Repository Structure
+
+Project code is available on the
+[open-rvfcast](https://github.com/ecohealthalliance/open-rvfcast) GitHub
+repository which is organized with the following structure:
 
 - `data/` contains downloaded and transformed data sources. These data
-  are .gitignored and non-EHA users will need to download the data.
+  are .gitignored and are available with access to the EHA open-rvf S3
+  bucket or the raw data can be download and processed.
 - `R/` contains functions used in this analysis.
 - `reports/` contains literate code for R Markdown reports generated in
-  the analysis
+  the analysis.
 - `outputs/` contains compiled reports and figures.
-- This project uses the [{renv}](https://rstudio.github.io/renv/)
-  framework to record R package dependencies and versions. Packages and
-  versions used are recorded in `renv.lock` and code used to manage
-  dependencies is in `renv/` and other files in the root project
-  directory. On starting an R session in the working directory, run
-  `renv::restore()` to install R package dependencies.
-- This project uses the
-  [{targets}](https://wlandau.github.io/targets-manual/) framework to
-  organize build steps for analysis pipeline. The schematic figure below
-  summarizes the steps. (The figure is generated using `mermaid.js`
-  syntax and should display as a graph on GitHub. It can also be viewed
-  by pasting the code into <https://mermaid.live>.)
 
-Warning messages: 1: package ‘rmarkdown’ was built under R version 4.3.3
-2: package ‘paws’ was built under R version 4.3.3 3: package ‘terra’ was
-built under R version 4.3.3
+### Data Storage
 
-``` mermaid
-graph LR
-subgraph Project Workflow
-  subgraph Graph
-    direction LR
-    x5130788afbe32544["modis_ndvi_transformed"]:::queued --> xddb5620937cdbc01(["nasa_weather_transformed_AWS_upload"]):::queued
-    xdc843e2504e22144(["modis_ndvi_transformed_directory"]):::skipped --> xddb5620937cdbc01(["nasa_weather_transformed_AWS_upload"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::queued
-    x73599238bfebd1c5(["ecmwf_forecasts_api_parameters"]):::queued --> x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::queued
-    x16ce463b7b647c1e(["ecmwf_forecasts_transformed_directory"]):::skipped --> x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::queued
-    x32725338020380f8(["get_ecmwf_forecasts_AWS"]):::queued --> x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::queued
-    x0381132b9136146c(["elevation_directory"]):::skipped --> xd9f5e6274aef515b(["elevation_preprocessed_AWS_upload"]):::queued
-    x0dffb1605751d1b1(["elevation_preprocessed"]):::queued --> xd9f5e6274aef515b(["elevation_preprocessed_AWS_upload"]):::queued
-    x24983cd244fff5db(["modis_ndvi_bundle_request_file"]):::queued --> xcfc776190ac6b73c(["modis_ndvi_bundle_request"]):::queued
-    xa5bc51cd67d5e6c0(["modis_ndvi_task_id_continent"]):::queued --> xcfc776190ac6b73c(["modis_ndvi_bundle_request"]):::queued
-    x3f3ba2f9e89a9591(["modis_ndvi_token"]):::completed --> xcfc776190ac6b73c(["modis_ndvi_bundle_request"]):::queued
-    xe3c4533ec81ef618(["continent_polygon"]):::skipped --> x39ef63e4c3553f78(["wahis_raster_template"]):::queued
-    xb06c08f4a8f21445(["lag_intervals"]):::skipped --> x8d58a79e9d066b5d(["ndvi_anomalies_AWS"]):::queued
-    xc61c34839fb8c873(["model_dates_selected"]):::queued --> x8d58a79e9d066b5d(["ndvi_anomalies_AWS"]):::queued
-    xe2329877730e44b5(["ndvi_anomalies_directory"]):::skipped --> x8d58a79e9d066b5d(["ndvi_anomalies_AWS"]):::queued
-    x92b237aaa434cba4(["ndvi_date_lookup"]):::queued --> x8d58a79e9d066b5d(["ndvi_anomalies_AWS"]):::queued
-    x44345ceb9b3d4a81["ndvi_historical_means"]:::queued --> x8d58a79e9d066b5d(["ndvi_anomalies_AWS"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x4110b36142c7dd5b(["soil_AWS"]):::queued
-    x9c14f0532ee1f83c(["soil_directory"]):::skipped --> x4110b36142c7dd5b(["soil_AWS"]):::queued
-    x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::queued --> x680f7450837c9229["forecasts_anomalies"]:::queued
-    x16ce463b7b647c1e(["ecmwf_forecasts_transformed_directory"]):::skipped --> x680f7450837c9229["forecasts_anomalies"]:::queued
-    x259885b5bdbd7dfc(["forecasts_anomalies_AWS"]):::queued --> x680f7450837c9229["forecasts_anomalies"]:::queued
-    x8ff15aa322c64802(["forecasts_anomalies_directory"]):::skipped --> x680f7450837c9229["forecasts_anomalies"]:::queued
-    x021b0407fd88c849(["lead_intervals"]):::skipped --> x680f7450837c9229["forecasts_anomalies"]:::queued
-    xc61c34839fb8c873(["model_dates_selected"]):::queued --> x680f7450837c9229["forecasts_anomalies"]:::queued
-    xbd6b5d8fe3154d5a["weather_historical_means"]:::queued --> x680f7450837c9229["forecasts_anomalies"]:::queued
-    x1f222a4448edddc4(["days_of_year"]):::skipped --> xbd6b5d8fe3154d5a["weather_historical_means"]:::queued
-    xb06c08f4a8f21445(["lag_intervals"]):::skipped --> xbd6b5d8fe3154d5a["weather_historical_means"]:::queued
-    x021b0407fd88c849(["lead_intervals"]):::skipped --> xbd6b5d8fe3154d5a["weather_historical_means"]:::queued
-    x0548e231345702f7["nasa_weather_transformed"]:::queued --> xbd6b5d8fe3154d5a["weather_historical_means"]:::queued
-    x711dc87df29f0a9c(["nasa_weather_transformed_directory"]):::skipped --> xbd6b5d8fe3154d5a["weather_historical_means"]:::queued
-    xce069f3121e32dfb(["weather_historical_means_AWS"]):::queued --> xbd6b5d8fe3154d5a["weather_historical_means"]:::queued
-    x4407a62768444c3e(["weather_historical_means_directory"]):::skipped --> xbd6b5d8fe3154d5a["weather_historical_means"]:::queued
-    x049b29595ee19108(["aspect_AWS"]):::queued --> x155e2f0b29a20e05(["aspect_preprocessed"]):::queued
-    x42a5375a64b48216(["aspect_directory"]):::skipped --> x155e2f0b29a20e05(["aspect_preprocessed"]):::queued
-    x213d1d2657d00cd0(["aspect_urls"]):::skipped --> x155e2f0b29a20e05(["aspect_preprocessed"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x155e2f0b29a20e05(["aspect_preprocessed"]):::queued
-    x1f222a4448edddc4(["days_of_year"]):::skipped --> x44345ceb9b3d4a81["ndvi_historical_means"]:::queued
-    xb06c08f4a8f21445(["lag_intervals"]):::skipped --> x44345ceb9b3d4a81["ndvi_historical_means"]:::queued
-    x92b237aaa434cba4(["ndvi_date_lookup"]):::queued --> x44345ceb9b3d4a81["ndvi_historical_means"]:::queued
-    x42d785b9e0106385(["ndvi_historical_means_AWS"]):::queued --> x44345ceb9b3d4a81["ndvi_historical_means"]:::queued
-    x7fef416d6ce259f3(["ndvi_historical_means_directory"]):::skipped --> x44345ceb9b3d4a81["ndvi_historical_means"]:::queued
-    xe8b8ca5535fe5f2a(["bioclim_directory"]):::skipped --> xe2930fde1049416f(["bioclim_AWS"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> xe2930fde1049416f(["bioclim_AWS"]):::queued
-    xa33032ce29b67c7f(["wahis_distance_matrix"]):::queued --> x200daf9f58e96ac5(["wahis_outbreak_history_AWS"]):::queued
-    x50043477563454fd(["wahis_outbreak_dates"]):::queued --> x200daf9f58e96ac5(["wahis_outbreak_history_AWS"]):::queued
-    xcc02e30ec90a7edd(["wahis_outbreak_history_directory"]):::skipped --> x200daf9f58e96ac5(["wahis_outbreak_history_AWS"]):::queued
-    x659aa62eded9787b(["wahis_outbreaks"]):::queued --> x200daf9f58e96ac5(["wahis_outbreak_history_AWS"]):::queued
-    x39ef63e4c3553f78(["wahis_raster_template"]):::queued --> x200daf9f58e96ac5(["wahis_outbreak_history_AWS"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x955e49f3e0c22510(["landcover_AWS"]):::queued
-    x8894af119fe2eaa1(["landcover_directory"]):::skipped --> x955e49f3e0c22510(["landcover_AWS"]):::queued
-    x42a5375a64b48216(["aspect_directory"]):::skipped --> x7039ba6fde7353f3(["soil_preprocessed_AWS_upload"]):::queued
-    xd70b16641fa1b4ef(["soil_preprocessed"]):::queued --> x7039ba6fde7353f3(["soil_preprocessed_AWS_upload"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::queued
-    xa9eddcdb0d1f1d02(["get_sentinel_ndvi_AWS"]):::queued --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::queued
-    x6e1924e349d8e6e8(["sentinel_ndvi_api_parameters"]):::skipped --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::queued
-    x3ea733d22e9c32e7(["sentinel_ndvi_transformed_directory"]):::skipped --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::queued
-    xe3c4533ec81ef618(["continent_polygon"]):::skipped --> xba6244832b5285ba(["continent_raster_template"]):::queued
-    x97fc33c6215703a3(["rsa_polygon"]):::skipped --> x8367f94bdb991b08(["rsa_polygon_spatial_weights"]):::queued
-    x4847fdb918188b25(["country_polygons"]):::skipped --> x53c4b2fb80542353(["country_bounding_boxes"]):::queued
-    xb06c08f4a8f21445(["lag_intervals"]):::skipped --> xf9b79e824823a870["ndvi_anomalies"]:::queued
-    xc61c34839fb8c873(["model_dates_selected"]):::queued --> xf9b79e824823a870["ndvi_anomalies"]:::queued
-    x8d58a79e9d066b5d(["ndvi_anomalies_AWS"]):::queued --> xf9b79e824823a870["ndvi_anomalies"]:::queued
-    xe2329877730e44b5(["ndvi_anomalies_directory"]):::skipped --> xf9b79e824823a870["ndvi_anomalies"]:::queued
-    x92b237aaa434cba4(["ndvi_date_lookup"]):::queued --> xf9b79e824823a870["ndvi_anomalies"]:::queued
-    x44345ceb9b3d4a81["ndvi_historical_means"]:::queued --> xf9b79e824823a870["ndvi_anomalies"]:::queued
-    x3ea733d22e9c32e7(["sentinel_ndvi_transformed_directory"]):::skipped --> xa9eddcdb0d1f1d02(["get_sentinel_ndvi_AWS"]):::queued
-    x53c4b2fb80542353(["country_bounding_boxes"]):::queued --> xc54ffbea58c4afd9(["nasa_weather_coordinates"]):::queued
-    xa72a356ab8b0f2e4["forecasts_anomalies_validate"]:::queued --> x705cc9e765652376(["forecasts_anomalies_validate_AWS_upload"]):::queued
-    x309ea01959a83a5a(["forecasts_validate_directory"]):::skipped --> x705cc9e765652376(["forecasts_anomalies_validate_AWS_upload"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x5130788afbe32544["modis_ndvi_transformed"]:::queued
-    xcfc776190ac6b73c(["modis_ndvi_bundle_request"]):::queued --> x5130788afbe32544["modis_ndvi_transformed"]:::queued
-    x3f3ba2f9e89a9591(["modis_ndvi_token"]):::completed --> x5130788afbe32544["modis_ndvi_transformed"]:::queued
-    xf36f13d6d1345340(["modis_ndvi_transformed_AWS"]):::queued --> x5130788afbe32544["modis_ndvi_transformed"]:::queued
-    xdc843e2504e22144(["modis_ndvi_transformed_directory"]):::skipped --> x5130788afbe32544["modis_ndvi_transformed"]:::queued
-    x44345ceb9b3d4a81["ndvi_historical_means"]:::queued --> x1be60916d37ebe0f(["ndvi_historical_means_AWS_upload"]):::queued
-    x7fef416d6ce259f3(["ndvi_historical_means_directory"]):::skipped --> x1be60916d37ebe0f(["ndvi_historical_means_AWS_upload"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> xdecc37cc7e708cec(["landcover_preprocessed"]):::queued
-    x955e49f3e0c22510(["landcover_AWS"]):::queued --> xdecc37cc7e708cec(["landcover_preprocessed"]):::queued
-    x8894af119fe2eaa1(["landcover_directory"]):::skipped --> xdecc37cc7e708cec(["landcover_preprocessed"]):::queued
-    x684d7fe78b0e841d(["landcover_types"]):::skipped --> xdecc37cc7e708cec(["landcover_preprocessed"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x32725338020380f8(["get_ecmwf_forecasts_AWS"]):::queued
-    x73599238bfebd1c5(["ecmwf_forecasts_api_parameters"]):::queued --> x32725338020380f8(["get_ecmwf_forecasts_AWS"]):::queued
-    x16ce463b7b647c1e(["ecmwf_forecasts_transformed_directory"]):::skipped --> x32725338020380f8(["get_ecmwf_forecasts_AWS"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x0dffb1605751d1b1(["elevation_preprocessed"]):::queued
-    x98b1351d966647f6(["elevation_AWS"]):::queued --> x0dffb1605751d1b1(["elevation_preprocessed"]):::queued
-    x0381132b9136146c(["elevation_directory"]):::skipped --> x0dffb1605751d1b1(["elevation_preprocessed"]):::queued
-    x5130788afbe32544["modis_ndvi_transformed"]:::queued --> xe90a7836ba709288(["modis_ndvi_transformed_AWS_upload"]):::queued
-    xdc843e2504e22144(["modis_ndvi_transformed_directory"]):::skipped --> xe90a7836ba709288(["modis_ndvi_transformed_AWS_upload"]):::queued
-    xb06c08f4a8f21445(["lag_intervals"]):::skipped --> x01b9e03cb52b7b05["weather_anomalies"]:::queued
-    xc61c34839fb8c873(["model_dates_selected"]):::queued --> x01b9e03cb52b7b05["weather_anomalies"]:::queued
-    x0548e231345702f7["nasa_weather_transformed"]:::queued --> x01b9e03cb52b7b05["weather_anomalies"]:::queued
-    x711dc87df29f0a9c(["nasa_weather_transformed_directory"]):::skipped --> x01b9e03cb52b7b05["weather_anomalies"]:::queued
-    x0df1395319c2f010(["weather_anomalies_AWS"]):::queued --> x01b9e03cb52b7b05["weather_anomalies"]:::queued
-    xf94f7486eed9869c(["weather_anomalies_directory"]):::skipped --> x01b9e03cb52b7b05["weather_anomalies"]:::queued
-    xbd6b5d8fe3154d5a["weather_historical_means"]:::queued --> x01b9e03cb52b7b05["weather_anomalies"]:::queued
-    xe8b8ca5535fe5f2a(["bioclim_directory"]):::skipped --> xe4be5b46895c0f8c(["bioclim_preprocessed_AWS_upload"]):::queued
-    x1c7b6e6a1c101e59(["bioclim_preprocessed"]):::queued --> xe4be5b46895c0f8c(["bioclim_preprocessed_AWS_upload"]):::queued
-    x680f7450837c9229["forecasts_anomalies"]:::queued --> xa72a356ab8b0f2e4["forecasts_anomalies_validate"]:::queued
-    xcc18535b953bde28(["forecasts_anomalies_validate_AWS"]):::queued --> xa72a356ab8b0f2e4["forecasts_anomalies_validate"]:::queued
-    x309ea01959a83a5a(["forecasts_validate_directory"]):::skipped --> xa72a356ab8b0f2e4["forecasts_anomalies_validate"]:::queued
-    x021b0407fd88c849(["lead_intervals"]):::skipped --> xa72a356ab8b0f2e4["forecasts_anomalies_validate"]:::queued
-    xc61c34839fb8c873(["model_dates_selected"]):::queued --> xa72a356ab8b0f2e4["forecasts_anomalies_validate"]:::queued
-    x0548e231345702f7["nasa_weather_transformed"]:::queued --> xa72a356ab8b0f2e4["forecasts_anomalies_validate"]:::queued
-    xbd6b5d8fe3154d5a["weather_historical_means"]:::queued --> xa72a356ab8b0f2e4["forecasts_anomalies_validate"]:::queued
-    x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::queued --> x259885b5bdbd7dfc(["forecasts_anomalies_AWS"]):::queued
-    x8ff15aa322c64802(["forecasts_anomalies_directory"]):::skipped --> x259885b5bdbd7dfc(["forecasts_anomalies_AWS"]):::queued
-    x021b0407fd88c849(["lead_intervals"]):::skipped --> x259885b5bdbd7dfc(["forecasts_anomalies_AWS"]):::queued
-    xc61c34839fb8c873(["model_dates_selected"]):::queued --> x259885b5bdbd7dfc(["forecasts_anomalies_AWS"]):::queued
-    xbd6b5d8fe3154d5a["weather_historical_means"]:::queued --> x259885b5bdbd7dfc(["forecasts_anomalies_AWS"]):::queued
-    x1f222a4448edddc4(["days_of_year"]):::skipped --> xce069f3121e32dfb(["weather_historical_means_AWS"]):::queued
-    xb06c08f4a8f21445(["lag_intervals"]):::skipped --> xce069f3121e32dfb(["weather_historical_means_AWS"]):::queued
-    x021b0407fd88c849(["lead_intervals"]):::skipped --> xce069f3121e32dfb(["weather_historical_means_AWS"]):::queued
-    x0548e231345702f7["nasa_weather_transformed"]:::queued --> xce069f3121e32dfb(["weather_historical_means_AWS"]):::queued
-    x4407a62768444c3e(["weather_historical_means_directory"]):::skipped --> xce069f3121e32dfb(["weather_historical_means_AWS"]):::queued
-    x6bae1f342f811d0b(["wahis_rvf_controls_raw"]):::skipped --> x2668bdb7843be979(["wahis_rvf_controls_preprocessed"]):::queued
-    x165085d61327782d(["slope_directory"]):::skipped --> x5aa9efa15ecd03d0(["slope_preprocessed_AWS_upload"]):::queued
-    x680370f9b58b9f6d(["slope_preprocessed"]):::queued --> x5aa9efa15ecd03d0(["slope_preprocessed_AWS_upload"]):::queued
-    xdc843e2504e22144(["modis_ndvi_transformed_directory"]):::skipped --> x24983cd244fff5db(["modis_ndvi_bundle_request_file"]):::queued
-    xb49d77ffc5b097ae(["continent_bounding_box"]):::queued --> x73599238bfebd1c5(["ecmwf_forecasts_api_parameters"]):::queued
-    x680f7450837c9229["forecasts_anomalies"]:::queued --> x72d065c3b2ed1267(["forecasts_anomalies_AWS_upload"]):::queued
-    x8ff15aa322c64802(["forecasts_anomalies_directory"]):::skipped --> x72d065c3b2ed1267(["forecasts_anomalies_AWS_upload"]):::queued
-    xa4eb23442420052a["sentinel_ndvi_transformed"]:::queued --> x6db823df8cb78984(["sentinel_ndvi_transformed_AWS_upload"]):::queued
-    x3ea733d22e9c32e7(["sentinel_ndvi_transformed_directory"]):::skipped --> x6db823df8cb78984(["sentinel_ndvi_transformed_AWS_upload"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> xd70b16641fa1b4ef(["soil_preprocessed"]):::queued
-    x4110b36142c7dd5b(["soil_AWS"]):::queued --> xd70b16641fa1b4ef(["soil_preprocessed"]):::queued
-    x9c14f0532ee1f83c(["soil_directory"]):::skipped --> xd70b16641fa1b4ef(["soil_preprocessed"]):::queued
-    xe8b8ca5535fe5f2a(["bioclim_directory"]):::skipped --> x1c7b6e6a1c101e59(["bioclim_preprocessed"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x1c7b6e6a1c101e59(["bioclim_preprocessed"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x71c93c84792ad529(["glw_AWS"]):::queued
-    x5448b80c3909d641(["glw_directory"]):::skipped --> x71c93c84792ad529(["glw_AWS"]):::queued
-    x42a5375a64b48216(["aspect_directory"]):::skipped --> x890a8fc59a28f6b2(["slope_AWS"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x890a8fc59a28f6b2(["slope_AWS"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x680370f9b58b9f6d(["slope_preprocessed"]):::queued
-    x890a8fc59a28f6b2(["slope_AWS"]):::queued --> x680370f9b58b9f6d(["slope_preprocessed"]):::queued
-    x165085d61327782d(["slope_directory"]):::skipped --> x680370f9b58b9f6d(["slope_preprocessed"]):::queued
-    x1ef0d1881ff89dbd(["slope_urls"]):::skipped --> x680370f9b58b9f6d(["slope_preprocessed"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> xf36f13d6d1345340(["modis_ndvi_transformed_AWS"]):::queued
-    xcfc776190ac6b73c(["modis_ndvi_bundle_request"]):::queued --> xf36f13d6d1345340(["modis_ndvi_transformed_AWS"]):::queued
-    x3f3ba2f9e89a9591(["modis_ndvi_token"]):::completed --> xf36f13d6d1345340(["modis_ndvi_transformed_AWS"]):::queued
-    xdc843e2504e22144(["modis_ndvi_transformed_directory"]):::skipped --> xf36f13d6d1345340(["modis_ndvi_transformed_AWS"]):::queued
-    x2b83f10567783884(["wahis_rvf_outbreaks_preprocessed"]):::queued --> x50043477563454fd(["wahis_outbreak_dates"]):::queued
-    xa33032ce29b67c7f(["wahis_distance_matrix"]):::queued --> x27dbf0f2484063f3["wahis_outbreak_history"]:::queued
-    x50043477563454fd(["wahis_outbreak_dates"]):::queued --> x27dbf0f2484063f3["wahis_outbreak_history"]:::queued
-    x200daf9f58e96ac5(["wahis_outbreak_history_AWS"]):::queued --> x27dbf0f2484063f3["wahis_outbreak_history"]:::queued
-    xcc02e30ec90a7edd(["wahis_outbreak_history_directory"]):::skipped --> x27dbf0f2484063f3["wahis_outbreak_history"]:::queued
-    x659aa62eded9787b(["wahis_outbreaks"]):::queued --> x27dbf0f2484063f3["wahis_outbreak_history"]:::queued
-    x39ef63e4c3553f78(["wahis_raster_template"]):::queued --> x27dbf0f2484063f3["wahis_outbreak_history"]:::queued
-    xe3c4533ec81ef618(["continent_polygon"]):::skipped --> xb49d77ffc5b097ae(["continent_bounding_box"]):::queued
-    x50d291d42ebde68c(["combined_anomalies_directory"]):::skipped --> x439c9f5bc1e96cd5(["combined_anomalies_AWS"]):::queued
-    xc61c34839fb8c873(["model_dates_selected"]):::queued --> x439c9f5bc1e96cd5(["combined_anomalies_AWS"]):::queued
-    xf9b79e824823a870["ndvi_anomalies"]:::queued --> x439c9f5bc1e96cd5(["combined_anomalies_AWS"]):::queued
-    x01b9e03cb52b7b05["weather_anomalies"]:::queued --> x439c9f5bc1e96cd5(["combined_anomalies_AWS"]):::queued
-    xf9b79e824823a870["ndvi_anomalies"]:::queued --> x144f59a0db036a4b(["ndvi_anomalies_AWS_upload"]):::queued
-    xe2329877730e44b5(["ndvi_anomalies_directory"]):::skipped --> x144f59a0db036a4b(["ndvi_anomalies_AWS_upload"]):::queued
-    x680f7450837c9229["forecasts_anomalies"]:::queued --> xcc18535b953bde28(["forecasts_anomalies_validate_AWS"]):::queued
-    x309ea01959a83a5a(["forecasts_validate_directory"]):::skipped --> xcc18535b953bde28(["forecasts_anomalies_validate_AWS"]):::queued
-    x021b0407fd88c849(["lead_intervals"]):::skipped --> xcc18535b953bde28(["forecasts_anomalies_validate_AWS"]):::queued
-    xc61c34839fb8c873(["model_dates_selected"]):::queued --> xcc18535b953bde28(["forecasts_anomalies_validate_AWS"]):::queued
-    x0548e231345702f7["nasa_weather_transformed"]:::queued --> xcc18535b953bde28(["forecasts_anomalies_validate_AWS"]):::queued
-    xbd6b5d8fe3154d5a["weather_historical_means"]:::queued --> xcc18535b953bde28(["forecasts_anomalies_validate_AWS"]):::queued
-    x27dbf0f2484063f3["wahis_outbreak_history"]:::queued --> x53890e32519c2cdc(["wahis_outbreak_history_AWS_upload"]):::queued
-    x338ce62055c4090f(["wahis_outbreak_history_animations_directory"]):::skipped --> x53890e32519c2cdc(["wahis_outbreak_history_AWS_upload"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x0548e231345702f7["nasa_weather_transformed"]:::queued
-    x84fbc80b775022e1(["nasa_weather_AWS"]):::queued --> x0548e231345702f7["nasa_weather_transformed"]:::queued
-    xc54ffbea58c4afd9(["nasa_weather_coordinates"]):::queued --> x0548e231345702f7["nasa_weather_transformed"]:::queued
-    x711dc87df29f0a9c(["nasa_weather_transformed_directory"]):::skipped --> x0548e231345702f7["nasa_weather_transformed"]:::queued
-    x0c2748f0f39a3907(["nasa_weather_years"]):::skipped --> x0548e231345702f7["nasa_weather_transformed"]:::queued
-    x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::queued --> xe017ffc3bafa162a(["ecmwf_forecasts_transformed_AWS_upload"]):::queued
-    x16ce463b7b647c1e(["ecmwf_forecasts_transformed_directory"]):::skipped --> xe017ffc3bafa162a(["ecmwf_forecasts_transformed_AWS_upload"]):::queued
-    x2b83f10567783884(["wahis_rvf_outbreaks_preprocessed"]):::queued --> x659aa62eded9787b(["wahis_outbreaks"]):::queued
-    xb49d77ffc5b097ae(["continent_bounding_box"]):::queued --> xa5bc51cd67d5e6c0(["modis_ndvi_task_id_continent"]):::queued
-    x3f3ba2f9e89a9591(["modis_ndvi_token"]):::completed --> xa5bc51cd67d5e6c0(["modis_ndvi_task_id_continent"]):::queued
-    x16e1cc582647deec["wahis_outbreak_history_animations"]:::queued --> x3a8830b5def8250b(["wahis_outbreak_history_animations_AWS_upload"]):::queued
-    x338ce62055c4090f(["wahis_outbreak_history_animations_directory"]):::skipped --> x3a8830b5def8250b(["wahis_outbreak_history_animations_AWS_upload"]):::queued
-    x5448b80c3909d641(["glw_directory"]):::skipped --> x01e625a4f1dd2c42(["glw_preprocessed_AWS_upload"]):::queued
-    x82990a83bfa4db45(["glw_preprocessed"]):::queued --> x01e625a4f1dd2c42(["glw_preprocessed_AWS_upload"]):::queued
-    xc61c34839fb8c873(["model_dates_selected"]):::queued --> xcfd8f1e8f3ea9117["aggregated_data_rsa"]:::queued
-    x97fc33c6215703a3(["rsa_polygon"]):::skipped --> xcfd8f1e8f3ea9117["aggregated_data_rsa"]:::queued
-    x1f222a4448edddc4(["days_of_year"]):::skipped --> x42d785b9e0106385(["ndvi_historical_means_AWS"]):::queued
-    xb06c08f4a8f21445(["lag_intervals"]):::skipped --> x42d785b9e0106385(["ndvi_historical_means_AWS"]):::queued
-    x92b237aaa434cba4(["ndvi_date_lookup"]):::queued --> x42d785b9e0106385(["ndvi_historical_means_AWS"]):::queued
-    x7fef416d6ce259f3(["ndvi_historical_means_directory"]):::skipped --> x42d785b9e0106385(["ndvi_historical_means_AWS"]):::queued
-    x5130788afbe32544["modis_ndvi_transformed"]:::queued --> x92b237aaa434cba4(["ndvi_date_lookup"]):::queued
-    xa4eb23442420052a["sentinel_ndvi_transformed"]:::queued --> x92b237aaa434cba4(["ndvi_date_lookup"]):::queued
-    x659aa62eded9787b(["wahis_outbreaks"]):::queued --> xa33032ce29b67c7f(["wahis_distance_matrix"]):::queued
-    x39ef63e4c3553f78(["wahis_raster_template"]):::queued --> xa33032ce29b67c7f(["wahis_distance_matrix"]):::queued
-    x27dbf0f2484063f3["wahis_outbreak_history"]:::queued --> x16e1cc582647deec["wahis_outbreak_history_animations"]:::queued
-    x338ce62055c4090f(["wahis_outbreak_history_animations_directory"]):::skipped --> x16e1cc582647deec["wahis_outbreak_history_animations"]:::queued
-    x27dbf0f2484063f3["wahis_outbreak_history"]:::queued --> x2b50e7687b4412ab(["wahis_outbreak_history_animations_AWS"]):::queued
-    x338ce62055c4090f(["wahis_outbreak_history_animations_directory"]):::skipped --> x2b50e7687b4412ab(["wahis_outbreak_history_animations_AWS"]):::queued
-    x8894af119fe2eaa1(["landcover_directory"]):::skipped --> xbc982b2f29054bd9(["landcover_preprocessed_AWS_upload"]):::queued
-    xdecc37cc7e708cec(["landcover_preprocessed"]):::queued --> xbc982b2f29054bd9(["landcover_preprocessed_AWS_upload"]):::queued
-    x42a5375a64b48216(["aspect_directory"]):::skipped --> xfe5a910dc093a019(["aspect_preprocessed_AWS_upload"]):::queued
-    x155e2f0b29a20e05(["aspect_preprocessed"]):::queued --> xfe5a910dc093a019(["aspect_preprocessed_AWS_upload"]):::queued
-    x439c9f5bc1e96cd5(["combined_anomalies_AWS"]):::queued --> xfde5ff2681c50d89(["combined_anomalies"]):::queued
-    x50d291d42ebde68c(["combined_anomalies_directory"]):::skipped --> xfde5ff2681c50d89(["combined_anomalies"]):::queued
-    x680f7450837c9229["forecasts_anomalies"]:::queued --> xfde5ff2681c50d89(["combined_anomalies"]):::queued
-    xf9b79e824823a870["ndvi_anomalies"]:::queued --> xfde5ff2681c50d89(["combined_anomalies"]):::queued
-    x01b9e03cb52b7b05["weather_anomalies"]:::queued --> xfde5ff2681c50d89(["combined_anomalies"]):::queued
-    x42a5375a64b48216(["aspect_directory"]):::skipped --> x049b29595ee19108(["aspect_AWS"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x049b29595ee19108(["aspect_AWS"]):::queued
-    x9c9060069417a49a(["wahis_rvf_outbreaks_raw"]):::skipped --> x2b83f10567783884(["wahis_rvf_outbreaks_preprocessed"]):::queued
-    xfde5ff2681c50d89(["combined_anomalies"]):::queued --> xba5d6169ff0233fa(["combined_anomalies_AWS_upload"]):::queued
-    x50d291d42ebde68c(["combined_anomalies_directory"]):::skipped --> xba5d6169ff0233fa(["combined_anomalies_AWS_upload"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x82990a83bfa4db45(["glw_preprocessed"]):::queued
-    x71c93c84792ad529(["glw_AWS"]):::queued --> x82990a83bfa4db45(["glw_preprocessed"]):::queued
-    x5448b80c3909d641(["glw_directory"]):::skipped --> x82990a83bfa4db45(["glw_preprocessed"]):::queued
-    x4d4a15b2f0f1851f(["glw_urls"]):::skipped --> x82990a83bfa4db45(["glw_preprocessed"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x98b1351d966647f6(["elevation_AWS"]):::queued
-    x0381132b9136146c(["elevation_directory"]):::skipped --> x98b1351d966647f6(["elevation_AWS"]):::queued
-    xb06c08f4a8f21445(["lag_intervals"]):::skipped --> xc61c34839fb8c873(["model_dates_selected"]):::queued
-    x01b9e03cb52b7b05["weather_anomalies"]:::queued --> xc567f473073bf453(["weather_anomalies_AWS_upload"]):::queued
-    xf94f7486eed9869c(["weather_anomalies_directory"]):::skipped --> xc567f473073bf453(["weather_anomalies_AWS_upload"]):::queued
-    xbd6b5d8fe3154d5a["weather_historical_means"]:::queued --> xf8b72b30842f6a3c(["weather_historical_means_AWS_upload"]):::queued
-    x4407a62768444c3e(["weather_historical_means_directory"]):::skipped --> xf8b72b30842f6a3c(["weather_historical_means_AWS_upload"]):::queued
-    xba6244832b5285ba(["continent_raster_template"]):::queued --> x84fbc80b775022e1(["nasa_weather_AWS"]):::queued
-    xc54ffbea58c4afd9(["nasa_weather_coordinates"]):::queued --> x84fbc80b775022e1(["nasa_weather_AWS"]):::queued
-    x711dc87df29f0a9c(["nasa_weather_transformed_directory"]):::skipped --> x84fbc80b775022e1(["nasa_weather_AWS"]):::queued
-    x0c2748f0f39a3907(["nasa_weather_years"]):::skipped --> x84fbc80b775022e1(["nasa_weather_AWS"]):::queued
-    xb06c08f4a8f21445(["lag_intervals"]):::skipped --> x0df1395319c2f010(["weather_anomalies_AWS"]):::queued
-    xc61c34839fb8c873(["model_dates_selected"]):::queued --> x0df1395319c2f010(["weather_anomalies_AWS"]):::queued
-    x0548e231345702f7["nasa_weather_transformed"]:::queued --> x0df1395319c2f010(["weather_anomalies_AWS"]):::queued
-    xf94f7486eed9869c(["weather_anomalies_directory"]):::skipped --> x0df1395319c2f010(["weather_anomalies_AWS"]):::queued
-    xbd6b5d8fe3154d5a["weather_historical_means"]:::queued --> x0df1395319c2f010(["weather_anomalies_AWS"]):::queued
-    x30a742f54b518a5f(["augmented_data_rsa_directory"]):::skipped --> x30a742f54b518a5f(["augmented_data_rsa_directory"]):::skipped
-    xdc94d22b863438a5(["nasa_weather_variables"]):::skipped --> xdc94d22b863438a5(["nasa_weather_variables"]):::skipped
-  end
-linkStyle 0 stroke-width:0px;
-```
+We utilized parquet files and the `arrow` package in R as our primary
+method of storing data. Parquet files are optimized for
+high-performance, out-of-memory data processing, making it well-suited
+for efficiently handling and processing large, complex datasets.
+Additionally, `arrow::open_dataset()` supports seamless integration with
+cloud storage, enabling direct access to remote datasets, which improves
+workflow efficiency and scalability when working with large, distributed
+data sources. While the data acquisition module requires the processing
+of large datasets, the final cleaned data can be accessed directly from
+the cloud by opening the following connection:
 
-Many of the computational steps can be time consuming and either depend
-on or produce large files. In order to speed up the pipeline,
-intermediate files can be stored on the cloud for rapid retrieval and
-portability between pipeline instances. We currently use an AWS [S3
+    dataset <- open_dataset("s3://open-rvfcast/data/africa_full_model_data")
+    dataset$schema
+
+As parquet files are a columnar format with structured metadata
+available in each file, some operations, such as filtering, summarizing,
+and inspecting the data schema can be applied directly to remote
+datasets without having to first download the full data. Calling
+collect() on the dataset will initiate the download. For example, the
+following will filter the data and then download the model data for a
+single day:
+
+    dataset <- open_dataset("s3://open-rvfcast/data/africa_full_model_data") |> 
+    filter(date == "2023-12-14") |> 
+    collect()
+
+However, due to computational demands of such large data, the model
+analysis pipeline will download the data in entirety before analysis. In
+addition, the dataset has been subsetted to two randomly chosen days per
+month between 2007 and 2024.
+
+## 1. Data Acquisition Module
+
+### Cloud Storage
+
+Many of the computational steps in the first module can be time
+consuming and either depend on or produce large files. In order to speed
+up the pipeline, intermediate files can be stored on the cloud for
+portability. We currently use an AWS [S3
 bucket](https://aws.amazon.com/s3/) for this purpose. The pipeline will
-still run without access to cloud storage but the user can benefit from
-adapt the `_targets.R` file to use their own object storage repository.
-AWS access keys and bucket ID are stored in the `.env` file.
+still run without access to cloud storage, but users can add their own
+AWS access keys and bucket ID to the `.env` file to enable cloud
+storage.
 
-For handling gridded binary weather data, this pipeline uses the
-[ecCodes](https://confluence.ecmwf.int/display/ECC) package which can be
-installed on OSX using `homebrew`:
+Environment variables to add to the .env file:
 
-    brew install eccodes
+    AWS_DEFAULT_REGION=
+    AWS_REGION=
+    AWS_BUCKET_ID=
+    AWS_ACCESS_KEY_ID=
+    AWS_SECRET_ACCESS_KEY=
 
-and on Ubuntu using apt-get
+### Data Access
 
-    sudo apt update
-    sudo apt install eccodes
+Acquiring the raw source data stores involves first obtaining
+authentication credentials, such as API keys, tokens, and certificates.
+There are three primary sources of data that require access
+credentials 1. [ECMWF](https://www.ecmwf.int/): for accessing monthly
+weather forecasts from the European Centre for Medium-Range Weather
+Forecasts (ECMWF). 2. [COPERNICUS](https://dataspace.copernicus.eu/):
+for accessing Normalized Difference Vegetation Index (NDVI) data derived
+from the European Space Agency’s Sentinel-3 satellite. 3.
+[APPEEARS](https://appeears.earthdatacloud.nasa.gov/api/): for accessing
+historical NDVI data prior to the Sentinel-3 mission from NASA MODIS
+satellites.
 
-EHA users: see the `stripts/` repository to be able to directly download
-data from AWS outside of the targets workflow.
+Before running the data acquisition pipeline, credentials for all three
+sources must be added to the .env file
+
+Environment variables to add to the .env file:
+
+    ECMWF_USERID=
+    ECMWF_TOKEN=
+    COPERNICUS_USERNAME=
+    COPERNICUS_PASSWORD=
+    APPEEARS_USERNAME=
+    APPEEARS_PASSWORD=
+    APPEEARS_TOKEN=
+
+### Data Sources
+
+All spatial data were interpolated to a resolution of 0.1° across Africa
+and standardized to the WGS 84 coordinate reference system. All temporal
+data layers were joined by date.
+
+If data files become corrupted they can be re-generated from the raw
+sources by setting the `OVERWRITE_X` flags to TRUE in the .env file.
+This will prevent the pipeline from first downloading the data on AWS,
+re-download and process the raw data from the original sources, and
+upload the processed files to AWS for future use. Note that, under
+normal use, these should always be set to FALSE. The pipeline will
+automatically download any missing data without having to change these
+settings. This is only to replace data that has already been downloaded
+and processed mainly for pipeline development purposes.
+
+#### The Response Variable
+
+The goal of this project is to evaluate the potential for an outbreak of
+Rift Valley fever (RVF) to occur across Africa. The model was trained
+against a binary variable representing whether or not an outbreak
+occurred at each spatial location 0-30 days, 30-60 days, 60-90 days,
+90-120 days, and 120-150 days after every date. RVF outbreak data was
+provided by the [World Animal Health Information System
+(WOAH)](https://www.woah.org/en/home/) and accessed via a
+[database](https://www.dolthub.com/csv/ecohealthalliance/wahisdb/main/wahis_outbreaks)
+of cleaned outbreak data managed by EcoHealth Alliance.
+
+1.  RVF_occurance: A binary factor reflecting RVF occurance at each
+    location across the 5 forecast intervals.
+
+#### Static Data
+
+The following data sources are static, or time-invariant. Raw static
+data was downloaded from the linked sources and joined with dynamic
+data, such as temperature, which varied by day.
+
+2.  [Soil
+    types](https://www.fao.org/soils-portal/data-hub/soil-maps-and-databases/harmonized-world-soil-database-v20/en/):
+    Soil types based on the Food and Agriculture Organization of the
+    United Nations ([FAO](https://www.fao.org/home/en)) Harmonized World
+    Soil Database v2.0 (HWSD) with soil types aggregated into 8
+    categories: clay (heavy) + clay loam (1), silt loam + silty clay
+    (2), sandy clay + clay (3), loam + silty clay loam (4), sandy clay
+    loam (5), sandy loam + silt (6), loamy sand + silt loam (7), and
+    sand (8) based on similarity in the USDA sand-silt-clay ternary
+    texture class diagram ([Figure
+    2](https://www.fao.org/soils-portal/data-hub/soil-maps-and-databases/harmonized-world-soil-database-v20/en/)).
+    Data was aggregated by identifying the most common slope or aspect
+    within each 0.1 degree grid cell.
+3.  [Slope and Aspect](Global%20Terrain%20Slope%20and%20Aspect%20Data):
+    Slope and aspect data from the FAO Global Terrain Slope and Aspect
+4.  [Gridded Livestock of the World 3
+    (GLW3)](https://www.nature.com/articles/sdata2018227): Global
+    distribution data included
+    [cattle](https://dataverse.harvard.edu/api/access/datafile/6769710),
+    [sheep](https://dataverse.harvard.edu/api/access/datafile/6769629),
+    and
+    [goats](https://dataverse.harvard.edu/api/access/datafile/6769692)
+    censused in 2010 and available at a native resolution of 5
+    arc-minutes. Data was accessed via the [Harvard
+    dataverse](https://dataverse.harvard.edu/).
+5.  [Elevation](https://srtm.csi.cgiar.org/): Elevation data accessed
+    via the `elevation_global()` function of the
+    [geodata](https://rdrr.io/cran/geodata/man/elevation.html) package
+    in R, drawn from the Shuttle Radar Topography Mission (SRTM) at
+    resolution of 0.5 minutes of a degree.
+6.  [Bioclimatic data\*](https://www.worldclim.org/data/bioclim.html):
+    Bioclimactic data from the WorldClim version 2.1 accessed via the
+    `worldclim_global()` function of the
+    [geodata](https://rdrr.io/cran/geodata/man/worldclim.html) package
+    in R and represent the global mean values across the period of
+    1970-2000 at a 2.5m resolution.
+7.  [Landcover
+    type](https://search.r-project.org/CRAN/refmans/geodata/html/landcover.html):
+    Landcover data was accessed via the `landcover()` function of
+    [geodata](https://rdrr.io/cran/geodata/man/elevation.html) package
+    in R, drawn from the ESA WorldCover Database with a spatial
+    resolution of 30 arc-seconds. Values for each landcover type (trees,
+    grassland, shrubs, cropland, built, bare, snow, water, wetland,
+    mangroves, and moss), reflect the fraction of each a landcover class
+    at each location.
+
+<small>\* Bioclimactic variables included: Annual_Mean_Temperature,
+Mean_Diurnal_Range, Isothermality, Temperature_Seasonality,
+Max_Temperature_of_Warmest_Month, Min_Temperature_of_Coldest_Month,
+Temperature_Annual_Range, Mean_Temperature_of_Wettest_Quarter,
+Mean_Temperature_of_Driest_Quarter, Mean_Temperature_of_Warmest_Quarter,
+Mean_Temperature_of_Coldest_Quarter, Annual_Precipitation,
+Precipitation_of_Wettest_Month, Precipitation_of_Driest_Month,
+Precipitation_Seasonality, Precipitation_of_Wettest_Quarter,
+Precipitation_of_Driest_Quarter, Precipitation_of_Warmest_Quarter, and
+Precipitation_of_Coldest_Quarter</small>
+
+#### Dynamic Data
+
+Dynamic data sources are those that vary with time. Dynamic predictors
+can be highly conflated with each other due to a shared dependence on
+time, to account for this shared dependence, we used calculated the
+anomaly, or difference between current values and historical means,
+instead of using the raw values. Anomalies were calculated by first
+determining the difference between the current value and its historical
+mean for that day-of-year (DOY) and scaled by dividing by the standard
+deviation for that DOY. Focusing on anomalous values helped mitigate the
+strong correlation with time that naturally exists in environmental
+variables like temperature and NDVI. Seasonality was then accounted for
+by including year and day-of-year (DOY) as predictors in the model. The
+following sources make up the dynamic layers:
+
+8.  [weather_anomalies](): NASA weather data was acquired across Africa
+    using the `get_power()` function of the
+    [nasapower](https://docs.ropensci.org/nasapower/) package in R which
+    provides access to NASA meteorological data from the
+    [NASAPOWER](https://power.larc.nasa.gov/) project. The difference,
+    or anomaly value, was then found by subtracting each weather value
+    from the average value for that day-of-year (DOY).
+9.  ndvi_anomalies: NDVI data was sourced from both the NASA’s Moderate
+    Resolution Imaging Spectroradiometer
+    ([MODIS](https://modis.gsfc.nasa.gov/data/dataprod/mod13.php)) and
+    the European Space Agency’s Copernicus
+    [Sentinel-3](https://user.eumetsat.int/catalogue/EO:EUM:DAT:0340)
+    missions. MODIS is due to be retired in 2025 while Sentinel-3 NDVI
+    data is available from September 2018. MODIS and Sentinel-3 NDVI
+    values were interpolated to a daily interval from their native 16
+    day (MODIS) and \~10 day (Sentinel-3) intervals using a
+    step-function and NDVI averaged when data from both sources were
+    available. The difference, or anomaly value, was then found by
+    subtracting NDVI from the average value for that day-of-year (DOY).
+
+##### Weather Forecasts
+
+10. [ecmwf_forecasts](https://cds.climate.copernicus.eu/datasets/seasonal-monthly-single-levels?tab=overview)
+    We also included long-range projections of future weather provided
+    by the European Centre for Medium-Range Weather Forecasts (ECMWF)
+    and accessed through the [Copernicus Climate Data Store
+    (CDS)](https://cds.climate.copernicus.eu/). The projected data
+    represent the mean of a 51-member ensemble and include the expected
+    average temperature, precipitation, and relative humidity for each
+    location across different forecast intervals. Historical forecasts
+    were available through hindcasts, which apply the current
+    forecasting methods to historical data to simulate what forecasts
+    would have been available at those times based on past conditions.
+
+##### Lagged Dynamic Data
+
+Outbreak occurrence is not always directly influenced by the immediately
+preceding conditions. Biological systems often involve delayed
+responses. For example, heavy precipitation may promote a mosquito
+hatch, which can lead to an outbreak only after a delay. To account for
+the influence of past environmental conditions, we included lagged
+weather and NDVI data, specifically the average values from 0-30, 30-60,
+60-90, 90-120, and 120-150 days prior.
+
+11. weather_anomalies: Average weather anomaly values lagged over the
+    previous 1-5 months
+12. ndvi_anomalies_lagged: Average NDVI anomaly values lagged over the
+    previous 1-5 months
+
+##### Historical Outbreak Data
+
+An important factor in evaluating the potential for a future outbreak is
+the history of outbreaks in a region. Recent nearby outbreaks can
+amplify the likelihood of an outbreak occurring at a given location,
+while older outbreaks might reduce the risk by influencing the
+resistance landscape, reflecting a history of prior exposure to the
+disease.
+
+To account for the influence of outbreak history, we generated outbreak
+exposure weights for both recent and historical outbreaks. These weights
+were determined using a function that decreases with distance from the
+source, modeling exposure as declining exponentially outward to a
+maximum distance of 500 km with an exponential rate of decay of
+0.01km<sup>-1</sup>. Similarly, the effects of an outbreak were assumed
+to fade over time, with influence declining as time elapsed since the
+outbreak increased out to a maximum of 10 years at an exponential rate
+of decay of 0.5year<sup>-1</sup>. Outbreaks that occurred within the
+last 3 months were classified as ‘recent’ and included as a separate
+predictor in the model allowing them to have a different effect on the
+model outcome compared to the older outbreak exposures.
+
+13. outbreak_history: Outbreak history was calculated using the data
+    provided from same data described in the response section (item 1)
+    above. As outbreak history contains information about the state of
+    variable being predicted, special care was taken when splitting the
+    data into test and training datasets to prevent data leakage
+    described further below.
+
+### Targets Pipeline
+
+A visualization of the data acquisition module can be found below.
+Additional targets not shown are responsible for fetching and storing
+intermediate datasets on the cloud. To run the data acquisition module,
+download the repository from github and run the following command. Note,
+without access to the common S3 bucket store this pipeline will take a
+significant amount of time and space to run. In addition, without access
+to the remote data store, the data acquisition module must be run before
+running the modeling module.
+
+    tar_make(script = "data_acquisition_targets.R")
+
+The schematic figure below summarizes the steps of the data acquisition
+module. The figure is generated using `mermaid.js` syntax and should
+display as a graph on GitHub. It can also be viewed by pasting the code
+into <https://mermaid.live>.)
+
+<!-- # ```{r, echo=FALSE, message = FALSE, results='asis'} -->
+<!-- # mer <- targets::tar_mermaid(targets_only = TRUE,  -->
+<!-- #                             outdated = FALSE,  -->
+<!-- #                             legend = FALSE,  -->
+<!-- #                             color = FALSE,  -->
+<!-- #                             script = "data_acquisition_targets.R", -->
+<!-- #                             exclude = c("readme", contains("AWS"))) -->
+<!-- # cat( -->
+<!-- #   "```mermaid", -->
+<!-- #   mer[1],  -->
+<!-- #   #'Objects([""Objects""]) --- Functions>""Functions""]', -->
+<!-- #   'subgraph Project Workflow', -->
+<!-- #   mer[3:length(mer)], -->
+<!-- #   'linkStyle 0 stroke-width:0px;', -->
+<!-- #   "```", -->
+<!-- #   sep = "\n" -->
+<!-- # ) -->
+<!-- # ``` -->
+
+## 2. Rift Valley Fever (RVF) risk model pipeline
+
+### Data Partitioning
+
+Splitting data into training, validation, and test sets is an important
+step for building robust and reliable models. The training set is used
+to learn model parameters, the validation set helps fine-tune
+hyperparameters and prevent overfitting, and the test set provides an
+unbiased evaluation of the model’s performance on unseen data. Proper
+splitting ensures the model generalizes well to new data, avoiding
+issues like data leakage or over-optimistic performance estimates.
+
+However, splitting outbreak data can be particularly challenging due to
+spatial and temporal clustering, which can lead to imbalanced or
+non-representative splits. Ensuring that all three splits contain
+representative data, including both outbreak presence and absence, is
+critical for robust model evaluation.
+
+#### Spatial splitting
+
+Spatial splitting was accomplished by [spatial
+blocking](https://nsojournals.onlinelibrary.wiley.com/doi/10.1111/ecog.02881)
+using the spatial_block_cv() function of the
+[spatialsample](https://spatialsample.tidymodels.org/) to create spatial
+cross-validation folds. This ensures that each split contains distinct
+spatial regions, at the level of municipality that contain representive
+information in all three splits.
+
+#### Temporal splitting
+
+In addition to spatial clustering, outbreak data is time-series by
+nature, necessitating techniques like expanding window splitting where
+the training set grows incrementally over time as more data becomes
+available. This approach is particularly suited for scenarios where
+temporal dependencies exist, and models must be evaluated on their
+ability to generalize to future, unseen data. When outbreaks are rare,
+subdividing the limited positive detections can exacerbate the
+imbalance, making it harder to accurately assess the model’s performance
+and generalizability.
+
+### Model Structure
+
+### Evaluating Model Performance
+
+### Generating Dynamic Documentation and Reports
+
+### Targets Pipeline
+
+A visualization of the data acquisition module can be found below.
+
+    tar_make(script = "model_framework_targets.R")
+
+The schematic figure below summarizes the steps of the data acquisition
+module. The figure is generated using `mermaid.js` syntax and should
+display as a graph on GitHub. It can also be viewed by pasting the code
+into <https://mermaid.live>.)
+
+<!-- # ```{r, echo=FALSE, message = FALSE, results='asis'} -->
+<!-- # mer <- targets::tar_mermaid(targets_only = TRUE,  -->
+<!-- #                             outdated = FALSE,  -->
+<!-- #                             legend = FALSE,  -->
+<!-- #                             color = FALSE,  -->
+<!-- #                             script = "model_framework_targets.R", -->
+<!-- #                             exclude = c("readme", contains("AWS"))) -->
+<!-- # cat( -->
+<!-- #   "```mermaid", -->
+<!-- #   mer[1],  -->
+<!-- #   #'Objects([""Objects""]) --- Functions>""Functions""]', -->
+<!-- #   'subgraph Project Workflow', -->
+<!-- #   mer[3:length(mer)], -->
+<!-- #   'linkStyle 0 stroke-width:0px;', -->
+<!-- #   "```", -->
+<!-- #   sep = "\n" -->
+<!-- # ) -->
+<!-- # ``` -->
+
+[Waywiser](https://github.com/ropensci/waywiser)
 
 Follow the links for more information about:
 

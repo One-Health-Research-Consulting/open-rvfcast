@@ -1,0 +1,44 @@
+---
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    embed-resources: true
+    page-layout: full
+---
+
+# Thursday, February 13, 2025
+
+## Data acquisition
+
+### Bugs
+-   [ ] It seems like `ndvi_anomalies` might have been left of the most recent full data acquisition pipeline run. Re-running to bring in 2025 data and fix that.
+-   [ ] Remind myself why `Calculating ECMWF anomalies on 2025-11-18 for 0-30 day forecast` when that date hasn't happened?
+-   [ ] Create issue for each type of diagnostic plot and link to [106](https://github.com/ecohealthalliance/open-rvfcast/issues/106). Make it bite sized.
+-   [ ] nasapower now seems to only accept 1 parameter per request `HTTP (422) - The request was well-formed but was unable to be followed due to semantic errors
+  (WebDAV; RFC 4918) A maximum of 1 parameters are can currently be requested in one submission.` Tried installing the development version via `install.packages("nasapower", repos = "https://ropensci.r-universe.dev")`, Fixed by requesting one at a time and using `plyr::join_all()` and raising an issue on nasapower's site. Probably an API issue so they won't be able to fix.
+  
+
+## Cross-validation and model fitting
+
+1.  Now that we have a draft approach for the tidymodels workflow ([106](https://github.com/ecohealthalliance/open-rvfcast/issues/106); [spatiotemporal_cv.R](scripts/spatiotemporal_cv.R)), implement it in targets on actual data.
+2.  
+
+## Issue backlog
+
+I think my major problem with issues is that they have been too large in the past. Change to more atomic issues so they can be checked off in an afternoon. This should help both keep the project moving and give me a sense of accomplishment at the end of the day. Working on large, nebulous issues is demoralizing.
+
+1.  Started a new issue and branch, [#107](https://github.com/ecohealthalliance/open-rvfcast/issues/107), to come up with quarto document for evaluating model performance and some light EDA.
+2.  Created a quarto [report](reports/model_performance_report.qmd) that gets generated every time the modeling pipeline is run. The report should be named based on the date and include the code commit hash in the header.
+
+## General
+
+-   [ ] Ask Noam what he did with this: https://discuss.ropensci.org/t/associating-an-rmd-file-with-a-commit/273/17
+-   [ ] Still problems with radian and the dreaded ['invalid alignment'](https://github.com/randy3k/radian/issues/439) error.
+
+```         
+   *** caught bus error ***
+address 0x104dce5e8, cause 'invalid alignment'
+```
+
+-   [ ] Strange problem with terminal not showing anything. Fixed after reboot.

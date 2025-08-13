@@ -3,7 +3,7 @@
 
 input <- list()
 input$selected_dataset <- "temperature"
-input$selected_date <- model_dates_selected[[4]]
+input$selected_date <- dates_to_process[[4]]
 input$selected_period <- c(29, 59, 89)
 input$data_options <- "comparison"
 

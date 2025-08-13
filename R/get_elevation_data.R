@@ -38,7 +38,7 @@ get_elevation_data <- function(output_dir,
   continent_raster_template <- terra::unwrap(continent_raster_template)
   
   # Set up safe way to read parquet files
-  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
   
   # GLW filenames
   elevation_filename <- file.path(output_dir, output_filename)

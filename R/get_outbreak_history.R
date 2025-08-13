@@ -5,7 +5,7 @@
 #'
 #' @author Nathan C. Layman
 #'
-#' @param dates_df A dataframe of the dates for which the outbreak history is to be calculated
+#' @param wahis_outbreak_dates A dataframe of the dates for which the outbreak history is to be calculated
 #' @param wahis_outbreaks The outbreak naming convention
 #' @param wahis_distance_matrix The inter locality distance matrix
 #' @param wahis_raster_template The template for the raster mapping
@@ -24,7 +24,7 @@
 #' FALSE, it simply returns the filepath of the existing file.
 #'
 #' @examples
-#' get_daily_outbreak_history(dates_df = dates,
+#' get_daily_outbreak_history(wahis_outbreak_dates = dates,
 #'                            wahis_outbreaks = outbreaks,
 #'                            wahis_distance_matrix = distance_matrix,
 #'                            wahis_raster_template = raster_template,
@@ -33,7 +33,7 @@
 #'                            beta_time = 0.5, max_years = 10, recent = 3/12, overwrite = FALSE)
 #'
 #' @export
-get_daily_outbreak_history <- function(dates_df,
+get_daily_outbreak_history <- function(wahis_outbreak_dates,
                                        wahis_outbreaks,
                                        wahis_distance_matrix,
                                        wahis_raster_template,
@@ -45,10 +45,12 @@ get_daily_outbreak_history <- function(dates_df,
                                        overwrite = FALSE,
                                        ...) {
   
-  # Ensure only one year in dates provided
-  year <- unique(dates_df$year)
-  stopifnot(length(year) == 1)
+  message("out")
+  year <- wahis_outbreak_dates$year |> unique()
+  month <- wahis_outbreak_dates$month |> unique()
   
+  stopifnot(length(year) == 1)
+  stopifnot(length(month) == 1)
   # Create directory if it does not yet exist
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   
@@ -56,10 +58,10 @@ get_daily_outbreak_history <- function(dates_df,
   wahis_raster_template <- terra::unwrap(wahis_raster_template)
   
   # Set up safe way to read parquet files
-  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
   
   # Check if output file already exists and can be loaded
-  outbreak_history_filename <- file.path(output_dir, glue::glue("{tools::file_path_sans_ext(output_filename)}_{year}.{tools::file_ext(output_filename)}"))
+  outbreak_history_filename <- file.path(output_dir, glue::glue("{tools::file_path_sans_ext(output_filename)}_{year}_{month}.{tools::file_ext(output_filename)}"))
   
   # Check if outbreak_history file exist and can be read and that we don't want to overwrite them.
   if(!is.null(error_safe_read_parquet(outbreak_history_filename)) & !overwrite & year != year(Sys.time())) {
@@ -68,7 +70,7 @@ get_daily_outbreak_history <- function(dates_df,
   }
   
   # This is the computationally intensive step get_outbreak_history()
-  daily_outbreak_history <- map_dfr(dates_df$date, ~get_outbreak_history(date = .x,
+  daily_outbreak_history <- map_dfr(wahis_outbreak_dates$date, ~get_outbreak_history(date = .x,
                                                                          wahis_outbreaks,
                                                                          wahis_distance_matrix,
                                                                          wahis_raster_template,
@@ -81,15 +83,20 @@ get_daily_outbreak_history <- function(dates_df,
   
   recent_xy <- as.data.frame(daily_recent_outbreak_history, xy = TRUE) |> 
     as_tibble() |> 
-    pivot_longer(-c(x,y), names_to = "date", values_to = "weight") |> 
-    mutate(time_frame = "recent")
+    pivot_longer(-c(x,y), names_to = "date", values_to = "outbreak_history_weight_recent")
   
   old_xy <- as.data.frame(daily_old_outbreak_history, xy = TRUE) |> 
     as_tibble() |> 
-    pivot_longer(-c(x,y), names_to = "date", values_to = "weight") |> 
-    mutate(time_frame = "old")
+    pivot_longer(-c(x,y), names_to = "date", values_to = "outbreak_history_weight_old")
   
-  arrow::write_parquet(bind_rows(recent_xy, old_xy), outbreak_history_filename, compression = "gzip", compression_level = 5)
+  outbreak_history <- inner_join(recent_xy, old_xy) |>
+    mutate(date = as.Date(date),
+           doy = as.integer(lubridate::yday(date)),
+           month = as.integer(lubridate::month(date)),
+           year = as.integer(lubridate::year(date))) |>
+    relocate(-contains("weight"))
+  
+  arrow::write_parquet(outbreak_history, outbreak_history_filename, compression = "gzip", compression_level = 5)
   
   return(outbreak_history_filename)
   
@@ -98,7 +105,7 @@ get_daily_outbreak_history <- function(dates_df,
 #' Extracting Outbreak History from WAHIS Data
 #'
 #' This function extracts outbreak history from World Animal Health Information System (WAHIS). 
-#' It uses the end_date of each outbreak, logarithm of the number of cases (if available), and exponential of the years since the end_date to weight the outbreak 
+#' It uses the start_date of each outbreak, logarithm of the number of cases (if available), and exponential of the years since the start_date to weight the outbreak 
 #' and generate rasters for recent and old outbreaks based on the provided recent period.
 #'
 #' @author Nathan C. Layman
@@ -134,9 +141,9 @@ get_outbreak_history <- function(date,
   
   outbreak_history <- wahis_outbreaks |> 
     arrange(outbreak_id) |>
-    mutate(end_date = pmin(date, end_date, na.rm = T),
-           years_since = as.numeric(as.duration(date - end_date), "years")) |>
-    filter(date > end_date, years_since < max_years & years_since >= 0) |>
+    mutate(start_date = pmin(date, start_date, na.rm = T),
+           years_since = as.numeric(as.duration(date - start_date), "years")) |>
+    filter(date > start_date, years_since < max_years & years_since >= 0) |>
     mutate(time_weight = ifelse(is.na(cases), 1, log10(cases + 1))*exp(-beta_time*years_since))
   
   old_outbreaks <- outbreak_history |> filter(years_since >= recent) |> 
@@ -184,7 +191,7 @@ combine_weights <- function(outbreaks,
   # Multiply time weights by distance weights
   
   # Super fast matrix multiplication step. This is the secret sauce.
-  # Performs sweep(outbreaks$time_weight, "*") and rowsums() all in once go
+  # Performs sweep(outbreaks$time_weight, "*") and rowsums() all in one go
   # and indexes the wahis_distance_matrix (which was calculated only once)
   # instead of re-calculating distances every day. These changes
   # sped it up from needing 7 hours to calculate the daily history for

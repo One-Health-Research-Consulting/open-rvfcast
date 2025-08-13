@@ -1,14 +1,27 @@
-#' .. content for \description{} (no empty lines) ..
+#' Create NDVI Date Lookup
 #'
-#' .. content for \details{} ..
+#' This function converts two ndvi transformed Datasets into a lookup format 
+#' which includes a sequence of each day between start_date and end_date for 
+#' each satellite's dataframe of distinct start_date and end_date. A column 
+#' lookup_day_of_year is added. It contains the day number of each date in 
+#' lookup_dates. The row binding function bind_rows() is used to combine MODIS 
+#' and Sentinel datasets.
 #'
-#' @title
-#' @param sentinel_ndvi_transformed
-#' @param sentinel_ndvi_transformed_directory
-#' @param modis_ndvi_transformed
-#' @param modis_ndvi_transformed_directory
-#' @return
-#' @author Emma Mendelsohn
+#' @authorEmma Mendelsohn
+#' 
+#' @param sentinel_ndvi_transformed Path to a directory containing the sentinel_ndvi_transformed dataset.
+#' @param modis_ndvi_transformed Path to a directory containing the modis_ndvi_transformed dataset.
+#'
+#' @return A tibble containing the following columns: satellite, start_date, filename, lookup_dates, lookup_day_of_year.
+#'
+#' @note Only the dates of sentinel dataset after 2018 is considered.
+#' Functions from the following packages are used: dplyr, arrow, purrr, bindrows.
+#'
+#' @examples
+#' sentinel_ndvi_path <- "./data/sentinel_ndvi_transformed/"
+#' modis_ndvi_path <- "./data/modis_ndvi_transformed/"
+#' create_ndvi_date_lookup(sentinel_ndvi_path, modis_ndvi_path)
+#'
 #' @export
 create_ndvi_date_lookup <- function(sentinel_ndvi_transformed,
                                     modis_ndvi_transformed) {

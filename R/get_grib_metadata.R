@@ -1,23 +1,27 @@
-#' Get and parse gdalinfo metadata from a grib file without relying on grib_ls
+#' Extract and Format GRIB Metadata without relying on grib_ls
 #'
-#' @author Nathan Layman
+#' This function extracts and prepares the metadata from a GRIB file for further data analysis. It's crucial for any
+#' data preprocessing involving GRIB files.
 #'
-#' @param raw_file 
+#' @author Nathan C. Layman
 #'
-#' @return
-#' @export
+#' @param source A string indicating the location/path of the raw GRIB file. This file should exist before the function is called.
+#'
+#' @return Returns a wide form dataframe of the metadata. Each row represents a band's metadata with their respective details.
+#'
+#' @note The function uses the 'terra' package to describe the file, 'stringr' for string manipulation, and 'tidyverse' for efficient dataset processing.
 #'
 #' @examples
-get_grib_metadata <- function(raw_file) {
+#' metadata_df <- get_grib_metadata(source = "./data/grib_file.grb")
+#'
+#' @export
+get_grib_metadata <- function(grib_file) {
   
-  # options = "json" works in targets but not during live testing
-  # I have no idea why I can't get it to work in the console.
-  # It's a path problem linking terra to an old version of gdal.
-  # Since options="json" only works for newer gdal go with the 
-  # conservative option. Even though it would be super nice!
-  # gdalinfo_text <- terra::describe(raw_file, options = "json") 
+  # terra::describe(source, options = "json") only works for newer versions of
+  # gdal so going with manual reshaping here. For newer gdal use:
+  # gdalinfo_text <- terra::describe(source, options = "json") 
   
-  gdalinfo_text <- terra::describe(raw_file) 
+  gdalinfo_text <- terra::describe(grib_file) 
   
   # Remove all text up to first BAND ^GEOGCRS
   metadata_start_index <- grep("^Band|^BAND", gdalinfo_text)[1]

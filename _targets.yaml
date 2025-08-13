@@ -1,6 +1,9 @@
-main:
-  store: _targets
-  script: _targets.R
-sandbox:
-  store: _targets_sandbox
-  script: _targets_sandbox.R
+base:
+  store: predictor_data_processing_targets
+  script: predictor_data_processing_targets.R
+rvf:
+  store: rvf_data_processing_targets
+  script: rvf_data_processing_targets.R
+model:
+  store: model_framework_targets
+  script: model_framework_targets.R

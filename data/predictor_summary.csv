@@ -1,0 +1,61 @@
+﻿var,aggregating_function,units,notes,source
+x,,degrees longtitude,WGS84,
+y,,degrees latitude,WGS84,
+cases,SUM,count,,
+date,,date,Date format in R,
+forecast_interval,,days,An interval representing the forecast window,
+doy,,day_of_year,,
+month,,month,,
+year,,year,,
+anomaly_forecast_temperature,AVG,degrees C,,ECMWF ERA5 monthly mean forecast data; 2 metre temperature
+anomaly_forecast_scaled_temperature,AVG,unitless; scaled,,ECMWF ERA5 monthly mean forecast data; 2 metre temperature
+anomaly_forecast_precipitation,AVG,mm/day,,ECMWF ERA5 monthly mean forecast data; tprate
+anomaly_forecast_scaled_precipitation,AVG,unitless; scaled,,ECMWF ERA5 monthly mean forecast data; tprate
+anomaly_forecast_relative_humidity,AVG,%,,ECMWF ERA5 monthly mean forecast data; 2 metre dewpoint temperature
+anomaly_forecast_scaled_relative_humidity,AVG,unitless; scaled,,ECMWF ERA5 monthly mean forecast data; 2 metre dewpoint temperature
+anomaly_temperature,AVG,degrees C,,ECMWF ERA5 monthly mean forecast data; 2 metre temperature
+anomaly_scaled_temperature,AVG,unitless; scaled,,ECMWF ERA5 monthly mean forecast data; 2 metre temperature
+anomaly_precipitation,AVG,mm,,ECMWF ERA5 monthly mean forecast data; tprate
+anomaly_scaled_precipitation,AVG,unitless; scaled,,ECMWF ERA5 monthly mean forecast data; tprate
+anomaly_relative_humidity,AVG,%,,ECMWF ERA5 monthly mean forecast data; 2 metre dewpoint temperature
+anomaly_scaled_relative_humidity,AVG,unitless; scaled,,ECMWF ERA5 monthly mean forecast data; 2 metre dewpoint temperature
+anomaly_ndvi,AVG,NDVI,,MODIS and Sentinel data
+anomaly_scaled_ndvi,AVG,unitless; scaled,,MODIS and Sentinel data
+soil_drainage,MODE,categorical,,Harmonized World Soil Database v 1.2
+soil_texture,MODE,categorical,,Harmonized World Soil Database v 1.2
+aspect,MODE,categorical,Most common aspect in each grid cell. 1 = N; 2 = E; 3 = S; 4 = W; 5 = undefined,Harmonized World Soil Database v 1.2
+slope,MODE,categorical,up to 0; 0.5; 2; 5; 10; 15; 30; 45 degrees of slope,Harmonized World Soil Database v 1.2
+glw_cattle,SUM,count / km,Average animals per square kilometer,Gridded Livestock of the World
+glw_sheep,SUM,count / km,Average animals per square kilometer,Gridded Livestock of the World
+glw_goats,SUM,count / km,Average animals per square kilometer,Gridded Livestock of the World
+wc2.1_30s_elev,AVG,meters,Based on SRTM Topography Data,WorldClim version 2.1 climate data
+Annual_Mean_Temperature,AVG,degrees C,,nasapower
+Mean_Diurnal_Range,AVG,degrees C,,WorldClim data with 2.5 arcminute resolution
+Isothermality,AVG,unitless; ratio,The ratio of the difference between the maximum and minimum monthly temperature to the annual temperature range,WorldClim data with 2.5 arcminute resolution
+Temperature_Seasonality,AVG,unitless; ratio,Coefficient of variation of monthly mean temperatures for each year,WorldClim data with 2.5 arcminute resolution
+Max_Temperature_of_Warmest_Month,AVG,degrees C,,WorldClim data with 2.5 arcminute resolution
+Min_Temperature_of_Coldest_Month,AVG,degrees C,,WorldClim data with 2.5 arcminute resolution
+Temperature_Annual_Range,AVG,degrees C,,WorldClim data with 2.5 arcminute resolution
+Mean_Temperature_of_Wettest_Quarter,AVG,degrees C,,WorldClim data with 2.5 arcminute resolution
+Mean_Temperature_of_Driest_Quarter,AVG,degrees C,,WorldClim data with 2.5 arcminute resolution
+Mean_Temperature_of_Warmest_Quarter,AVG,degrees C,,WorldClim data with 2.5 arcminute resolution
+Mean_Temperature_of_Coldest_Quarter,AVG,degrees C,,WorldClim data with 2.5 arcminute resolution
+Annual_Precipitation,AVG,mm,,WorldClim data with 2.5 arcminute resolution
+Precipitation_of_Wettest_Month,AVG,mm,,WorldClim data with 2.5 arcminute resolution
+Precipitation_of_Driest_Month,AVG,mm,,WorldClim data with 2.5 arcminute resolution
+Precipitation_Seasonality,AVG,mm,,WorldClim data with 2.5 arcminute resolution
+Precipitation_of_Wettest_Quarter,AVG,mm,,WorldClim data with 2.5 arcminute resolution
+Precipitation_of_Driest_Quarter,AVG,mm,,WorldClim data with 2.5 arcminute resolution
+Precipitation_of_Warmest_Quarter,AVG,mm,,WorldClim data with 2.5 arcminute resolution
+Precipitation_of_Coldest_Quarter,AVG,mm,,WorldClim data with 2.5 arcminute resolution
+trees,AVG,%,fraction of a landcover class in each grid cell,ESA WorldCover data
+grassland,AVG,%,fraction of a landcover class in each grid cell,ESA WorldCover data
+shrubs,AVG,%,fraction of a landcover class in each grid cell,ESA WorldCover data
+cropland,AVG,%,fraction of a landcover class in each grid cell,ESA WorldCover data
+built,AVG,%,fraction of a landcover class in each grid cell,ESA WorldCover data
+bare,AVG,%,fraction of a landcover class in each grid cell,ESA WorldCover data
+snow,AVG,%,fraction of a landcover class in each grid cell,ESA WorldCover data
+water,AVG,%,fraction of a landcover class in each grid cell,ESA WorldCover data
+wetland,AVG,%,fraction of a landcover class in each grid cell,ESA WorldCover data
+mangroves,AVG,%,fraction of a landcover class in each grid cell,ESA WorldCover data
+moss,AVG,%,fraction of a landcover class in each grid cell,ESA WorldCover data

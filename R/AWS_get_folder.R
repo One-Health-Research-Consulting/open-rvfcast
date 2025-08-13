@@ -1,34 +1,35 @@
-#' Download files from an AWS S3 bucket to a local folder
+#' Fetch Files from AWS Bucket
 #'
-#' This function downloads files from a specified S3 bucket and prefix to a local folder.
-#' It only downloads files that are not already present in the local folder.
-#' Additionally, it ensures that AWS credentials and region are set in the environment.
+#' This function fetches files from a specified AWS S3 bucket and downloads them to a local directory.
+#' If skip_fetch is TRUE, the function will only return the names of the files available for download
+#' in the S3 bucket without actually downloading them.
 #'
-#' @author Nathan Layman
+#' @author Nathan C. Layman
 #'
-#' @param local_folder Character. The path to the local folder where files should be downloaded and the AWS prefix
-#' @param ... 
+#' @param local_folder String specifying the local directory where the files will be downloaded.
+#' @param skip_fetch Boolean indicating whether to download the files. If TRUE, no files will be downloaded.
+#' @param sync_with_remote Boolean indicating whether to delete corrupted files from AWS S3 to maintain consistency. Local corrupted files are always removed. Default is TRUE.
+#' @param ... Additional arguments not used by this function but included for generic function compatibility.
 #'
-#' @return A list of files downloaded from AWS
-#' 
-#' @note
-#' The AWS environment variables `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, and `AWS_BUCKET_ID`
-#' must be set correctly in order to access the S3 bucket. If any of these are missing, the function will stop with an error.
-#' Files in the S3 bucket will be deleted if they cannot be successfully read as parquet files.
+#' @return A vector of strings containing the paths to the downloaded files. If skip_fetch is TRUE
+#' this will instead contain the names of available files in the S3 bucket.
 #'
+#' @note This function requires the AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION environment variables
+#' to be set. These are typically set in the .env file or system environment. The function will stop and display
+#' an error message if these environment variables are not set.
 #'
 #' @examples
-#' \dontrun{
-#'   # Ensure the AWS environment variables are set in your system or .env file:
-#'   # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, and AWS_BUCKET_ID
+#' AWS_get_folder(
+#'   local_folder = "local/directory",
+#'   skip_fetch = FALSE,
+#'   sync_with_remote = TRUE
+#' )
 #'
-#'   # Download files from an S3 bucket folder to a local directory
-#'   downloaded_files <- AWS_get_folder("my/local/folder")
-#' }
-#' 
 #' @export
-AWS_get_folder <- function(local_folder, ...) {
-  
+AWS_get_folder <- function(local_folder,
+                           skip_fetch = FALSE,
+                           sync_with_remote = FALSE,
+                           ...) {
   # Check if AWS credentials and region are set in the environment
   if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
     msg <- paste(
@@ -38,101 +39,132 @@ AWS_get_folder <- function(local_folder, ...) {
     )
     stop(msg)
   }
-  
-  # Create an S3 client
-  s3 <- paws::s3()
-  
-  # List all objects in the S3 bucket, handling pagination
-  s3_files <- c()  # Initialize an empty list to hold all files
-  continuation_token <- NULL
-  
-  repeat {
-    response <- s3$list_objects_v2(
-      Bucket = Sys.getenv("AWS_BUCKET_ID"),
-      Prefix = local_folder,
-      ContinuationToken = continuation_token)
-    
-    # Append the files from this response to the main list
-    s3_files <- c(s3_files, map_vec(response$Contents, ~.x$Key))
-    
-    # Check if there's a continuation token for further pages
-    if (!length(response$NextContinuationToken)) break  # No more pages to fetch, exit the loop
-    continuation_token <- response$NextContinuationToken
-  }
-  
+
+  # Create an error safe way to test if the parquet file can be read
+  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+
+  # Get files from S3 bucket with prefix
+  df_bucket_data <- aws.s3::get_bucket(bucket = Sys.getenv("AWS_BUCKET_ID"),
+                                        prefix = paste0(local_folder, "/"))
+  s3_files <- map_chr(df_bucket_data, pluck, "Key")
+
   # Check if S3 has files to download
   if (length(s3_files) == 0) {
     cat("No files found in the specified S3 bucket and prefix.\n")
     return(NULL)
   }
-  
+
   # List local files in your folder
   local_files <- list.files(local_folder, recursive = TRUE, full.names = TRUE)
   downloaded_files <- c()
-  
-  # Loop through S3 files and download if they don't exist locally
+
+  # Loop through S3 files and download if needed
   for (file in s3_files) {
-    
-    # Check if file already exists locally
-    if (!file %in% local_files) {
-      
-      # Download the file from S3
-      s3_download <- s3$get_object(
-        Bucket = Sys.getenv("AWS_BUCKET_ID"),
-        Key = file)
-      
-      # Write output to file
-      writeBin(s3_download$Body, con = file)
-      
-      cat("Downloaded:", file, "\n")
-      
-      # Create an error safe way to test if the parquet file can be read
-      error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
-      
-      # Check if transformed file can be loaded. 
-      # If not clean it up and also remove it from AWS
-      # It'll be picked up next time.
-      if(is.null(error_safe_read_parquet(file))) {
-        unlist(file)
-        s3$delete_object(
-          Bucket = Sys.getenv("AWS_BUCKET_ID"),
-          Key = file)
+    # Only download if file doesn't exist locally AND skip_fetch is FALSE
+    if (!(file %in% local_files || skip_fetch)) {
+      # Download the file from S3 using aws.s3
+      aws.s3::save_object(
+        object = file,
+        bucket = Sys.getenv("AWS_BUCKET_ID"),
+        file = file
+      )
+
+      cat("Downloaded AWS file:", file, "\n")
+
+      # Check if transformed file can be loaded
+      if (is.null(error_safe_read_parquet(file))) {
+        # Clean up local corrupted files
+        unlink(file)
+        cat("Removed local corrupted file:", basename(file), "\n")
+
+        # Only remove from AWS if sync_with_remote is TRUE
+        if (sync_with_remote) {
+          aws.s3::delete_object(
+            object = file,
+            bucket = Sys.getenv("AWS_BUCKET_ID")
+          )
+          cat("Synced by removing corrupt file from AWS bucket\n")
+        }
       } else {
-        downloaded_files <- c(downloaded_files, file) 
+        # Add to downloaded_files if file was successfully downloaded and readable
+        downloaded_files <- c(downloaded_files, file)
       }
+    } else {
+      cat("Skipped file:", basename(file), "\n")
     }
   }
-  
+
   downloaded_files
 }
 
 
-#' Upload and Sync Files with AWS S3
+#' Upload Transformed Files to AWS S3
 #'
-#' This function synchronizes a local folder with an AWS S3 bucket. It checks for AWS credentials, 
-#' lists existing files in the S3 bucket, and compares them with the local files to upload new files
-#' or remove files that are no longer needed.
-#' 
-#' @author Nathan Layman
+#' This function uploads transformed files to an AWS S3 bucket, handling large file quantities 
+#' through pagination and providing comprehensive file management capabilities.
 #'
-#' @param transformed_file_list A character vector of file paths that should be present on AWS S3.
-#' @param local_folder A character string specifying the path to the local folder to be synced with AWS S3.
+#' @details The function performs several key operations:
+#' \itemize{
+#'   \item Checks for existing AWS credentials
+#'   \item Verifies file schemas before uploading
+#'   \item Supports selective file upload based on schema matching
+#'   \item Optionally overwrites existing files on AWS
+#'   \item Cleans up dangling files from the S3 bucket
+#' }
+#'
+#' @author Nathan C. Layman
+#'
+#' @param transformed_file_list A character vector of filenames to be uploaded to AWS S3.
+#'   These should be base filenames (not full paths) that have been transformed and are 
+#'   ready for upload.
+#' @param local_folder A character string specifying the local directory containing 
+#'   the transformed files to be uploaded to AWS S3.
+#' @param overwrite Logical. If \code{TRUE}, files will be uploaded even if they 
+#'   already exist in the S3 bucket with matching schemas. Defaults to \code{FALSE}.
+#' @param ... Additional arguments (currently unused).
+#'
+#' @return A character vector of messages describing the outcomes of file upload attempts, 
+#'   including successful uploads, skipped files, and cleanup operations.
+#'
+#' @note 
+#' Required environment variables:
+#' \itemize{
+#'   \item \code{AWS_ACCESS_KEY_ID}: AWS access key
+#'   \item \code{AWS_SECRET_ACCESS_KEY}: AWS secret access key
+#'   \item \code{AWS_REGION}: AWS region
+#'   \item \code{AWS_BUCKET_ID}: S3 bucket identifier
+#' }
+#' These environment variables must be set prior to calling the function, typically 
+#' in a .env file or system environment.
 #'
 #' @examples
 #' \dontrun{
-#'   AWS_put_files(transformed_file_list = c("file1.parquet", "file2.parquet"), 
-#'                  local_folder = "path/to/local/folder")
+#' # Upload transformed CSV files from a local directory
+#' AWS_put_files(
+#'   transformed_file_list = c("file1.csv", "file2.csv"),
+#'   local_folder = "./transformed_data"
+#' )
+#' 
+#' # Upload with overwrite option
+#' AWS_put_files(
+#'   transformed_file_list = c("file1.csv", "file2.csv"),
+#'   local_folder = "./transformed_data",
+#'   overwrite = TRUE
+#' )
 #' }
 #'
-#' @return A list of actions taken
+#' @importFrom aws.s3 get_bucket put_object delete_object
+#' @importFrom arrow open_dataset
+#' @importFrom glue glue
+#' @importFrom purrr possibly
+#' @importFrom dplyr pull
 #'
 #' @export
 AWS_put_files <- function(transformed_file_list,
                           local_folder,
+                          overwrite = FALSE,
                           ...) {
-  
-  transformed_file_list <- basename(transformed_file_list |> unlist())
-  
+
   # Check if AWS credentials and region are set in the environment
   if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
     msg <- paste(
@@ -142,72 +174,69 @@ AWS_put_files <- function(transformed_file_list,
     )
     stop(msg)
   }
-  
-  # Create an S3 client
-  s3 <- paws::s3()
-  
-  # List all objects in the S3 bucket, handling pagination
-  s3_files <- c()  # Initialize an empty list to hold all files
-  continuation_token <- NULL
-  
-  repeat {
-    response <- s3$list_objects_v2(
-      Bucket = Sys.getenv("AWS_BUCKET_ID"),
-      Prefix = local_folder,
-      ContinuationToken = continuation_token)
-    
-    # Append the files from this response to the main list
-    s3_files <- c(s3_files, map_vec(response$Contents, ~.x$Key))
-    
-    # Check if there's a continuation token for further pages
-    if (!length(response$NextContinuationToken)) break  # No more pages to fetch, exit the loop
-    continuation_token <- response$NextContinuationToken
-  }
-  
+
+  # Create a possibly-wrapped version of the function
+  error_safe_open_dataset <- possibly(
+    function(file) {
+      arrow::open_dataset(file)$schema
+    },
+    otherwise = NULL
+  )
+
+  # Get files from S3 bucket with prefix
+  df_bucket_data <- aws.s3::get_bucket(bucket = Sys.getenv("AWS_BUCKET_ID"),
+                                        prefix = paste0(local_folder, "/"))
+                                        
+  s3_files <- map_chr(df_bucket_data, pluck, "Key")
+
   # Get files in local folder
-  local_folder_files <- list.files(path = local_folder, recursive = TRUE)
-  
+  local_folder_files <- list.files(path = local_folder, recursive = TRUE, full.names = TRUE)
+
   # Collect outcomes
-  outcome <- c()
-  
+  outcomes <- c()
+
   # Walk through local_folder_files
-  for(file in local_folder_files) {
-    
+  for (file in local_folder_files) {
     # Is the file in the transformed_file_list?
-    if(file %in% transformed_file_list) {
-      
-      # Is the file already on AWS?
-      if(file %in% s3_files) {
-        
-        outcome <- c(outcome, glue::glue("{file} already present on AWS"))
-        
+    if (file %in% transformed_file_list) {
+      # Check that schemas match
+      remote_file <- paste0("s3://", Sys.getenv("AWS_BUCKET_ID"), "/", file)
+      remote_schema <- error_safe_open_dataset(remote_file)
+      local_schema <- error_safe_open_dataset(file)
+
+      if (is.null(remote_schema) || !remote_schema$Equals(local_schema) || overwrite == TRUE) {
+        # Put the file on S3 using aws.s3
+        aws.s3::put_object(
+          file = file,
+          object = file,
+          multipart = TRUE,
+          part_size = 10485760,
+          bucket = Sys.getenv("AWS_BUCKET_ID")
+        )
+
+        outcome <- glue::glue("Uploading {basename(file)} to AWS")
       } else {
-        
-        outcome <- c(outcome, glue::glue("Uploading {file} to AWS"))
-        
-        # Put the file on S3
-        s3_upload <- s3$put_object(
-          Bucket = Sys.getenv("AWS_BUCKET_ID"),
-          Key = file.path(local_folder, file))
+        outcome <- glue::glue("{basename(file)} with matching schema already present on AWS and overwrite set to FALSE")
       }
     } else {
-      
       # Remove the file from AWS if it's present in the folder and on AWS
       # but not in the list of successfully transformed files. This file is
       # not relevant to the pipeline
-      if(file %in% s3_files) {
-        
-        outcome <- c(outcome, glue::glue("Cleaning up dangling file {file} from AWS"))
-        
-        # Remove the file from AWS
-        s3_download <- s3$delete_object(
-          Bucket = Sys.getenv("AWS_BUCKET_ID"),
-          Prefix = local_folder,
-          Key = file)
+      if (file %in% s3_files) {
+        outcome <- glue::glue("Cleaning up dangling file {basename(file)} from AWS")
+
+        # Remove the file from AWS using aws.s3
+        aws.s3::delete_object(
+          object = file.path(file),
+          bucket = Sys.getenv("AWS_BUCKET_ID")
+        )
+      } else {
+        next
       }
     }
+    message(outcome)
+    outcomes <- c(outcomes, outcome)
   }
-  
-  outcome
-  
+
+  outcomes
 }

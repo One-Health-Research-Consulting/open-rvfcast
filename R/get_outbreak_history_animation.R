@@ -23,37 +23,38 @@
 #'
 #' @export
 get_outbreak_history_animation <- function(wahis_outbreak_history,
+                                           wahis_outbreak_history_animation_metadata,
                                            wahis_outbreak_history_animations_directory,
                                            num_cores = 1,
                                            overwrite = FALSE,
                                            ...) {
   
-  output_basename = tools::file_path_sans_ext(basename(wahis_outbreak_history))
+  assertthat::are_equal(nrow(wahis_outbreak_history_animation_metadata), 1)
+  output_basename = glue::glue("outbreak_history_{wahis_outbreak_history_animation_metadata$year}")
   
   # Load the data
-  outbreak_history_dataset <- arrow::open_dataset(wahis_outbreak_history)
+  outbreak_history_dataset <- arrow::open_dataset(wahis_outbreak_history) |> 
+    filter(year == wahis_outbreak_history_animation_metadata$year) |>
+    collect() |>
+    pivot_longer(contains("weight"), 
+                 names_to = "time_frame", 
+                 values_to = "weight",
+                 names_pattern = ".*_(.*)")
   
-  # Fastest way to use parquet files is to do as many opperations before collect or pull
-  min_weight <- outbreak_history_dataset |>
-    summarise(min_weight = min(weight, na.rm = TRUE)) |>
-    pull(min_weight, as_vector = TRUE)
-  
-  max_weight <- outbreak_history_dataset |>
-    summarise(max_weight = max(weight, na.rm = TRUE)) |>
-    pull(max_weight, as_vector = TRUE)
+  min_weight <- wahis_outbreak_history_animation_metadata$min
+  max_weight <- wahis_outbreak_history_animation_metadata$max
   
   # Identify limits (used to calibrate the color scale)
   lims <- c(min_weight, max_weight)
-  
-  # Keep as much as possible out of memory and on disk. Arrow permits fast access.
-  time_frames <- outbreak_history_dataset |> select(time_frame) |> distinct() |> pull(time_frame, as_vector = TRUE)
   
   # Create temporary directory if it does not yet exist
   tmp_dir <- paste(wahis_outbreak_history_animations_directory, output_basename, sep = "/")
   dir.create(tmp_dir, recursive = TRUE, showWarnings = FALSE)
   
+  time_frames <- unique(pull(outbreak_history_dataset, time_frame))
+  
   # Make animations for both recent and old outbreaks
-  output_files <- map(time_frames, function(tf) {
+  output_files <- map_vec(time_frames, function(tf) {
       
     output_filename = file.path(wahis_outbreak_history_animations_directory, glue::glue("{basename(output_basename)}_{tf}.gif"))
     
@@ -65,7 +66,7 @@ get_outbreak_history_animation <- function(wahis_outbreak_history,
     
     message(paste("Animating", basename(output_filename))) 
     
-    dates <- outbreak_history_dataset |> filter(time_frame == tf) |> select(date) |> distinct() |> pull(date, as_vector = TRUE)
+    dates <- outbreak_history_dataset |> filter(time_frame == tf) |> select(date) |> distinct() |> pull(date)
     
     # This function makes a png for each date which will then get stiched together
     # into the animation. Saving each png is faster than trying to do everything
@@ -74,8 +75,7 @@ get_outbreak_history_animation <- function(wahis_outbreak_history,
                                     dates, 
                                     function(d) plot_outbreak_history(outbreak_history_dataset |> 
                                                                         filter(date == d) |>
-                                                                        filter(time_frame == tf) |>
-                                                                        collect(),
+                                                                        filter(time_frame == tf),
                                                                       tmp_dir = tmp_dir,
                                                                       write_frame = TRUE,
                                                                       lims = lims)) |> 

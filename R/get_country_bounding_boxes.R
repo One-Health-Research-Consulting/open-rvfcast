@@ -10,14 +10,8 @@
 get_country_bounding_boxes <- function(country_polygons) {
   
   country_polygons |> 
-    rowwise() |> 
-    group_split() |> 
-    map_dfr(function(x){
-      tibble(country = x$country, 
-             country_iso3c = x$country_iso3c,
-             bounding_box = list(sf::st_bbox(x)))
-      
-    })
-
+    mutate(bounding_box = map(geometry, sf::st_bbox)) |>
+    sf::st_drop_geometry() |>  # Remove geometry column to get regular data frame
+    select(country, country_iso3c, bounding_box)
 
 }

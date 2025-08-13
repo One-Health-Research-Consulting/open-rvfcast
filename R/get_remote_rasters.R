@@ -1,34 +1,31 @@
-#' @title get_remote_rasters
+#' Downloads and Preprocesses Global Elevation Raster Data
 #'
-#' @description Retrieves and processes remote raster data based on provided URLs.
+#' This function retrieves global elevation raster data from specified URLs, processes it according to specified resampling and aggregation methods, and saves the resulting processed rasters to a local directory.
 #'
 #' @author Nathan C. Layman
 #'
-#' @param urls A list of URLs where the raster data can be retrieved.
-#' @param output_dir The directory where the retrieved and processed raster data is saved.
-#' @param output_filename The filename of the output raster data file.
-#' @param continent_raster_template A template raster on which retrieved raster data is matched to.
-#' @param aggregate_method The method to aggregate the raster data. Default is NULL.
-#' @param resample_method The method to resample the raster data to match to the template raster. Default is NULL.
-#' @param overwrite A flag to indicate if existing files should be overwritten. Default is FALSE.
-#' @param ... Additional parameters not captured by the function parameters.
+#' @param urls A vector of URLs from which the raster data will be downloaded.
+#' @param output_dir The directory where the processed rasters will be saved.
+#' @param output_filename The filename to be assigned to the output rasters.
+#' @param continent_raster_template A raster template of the target continent.
+#' @param aggregate_method The method to be used for raster aggregation (Optional).
+#' @param resample_method The method to be used for raster resampling (Optional).
+#' @param overwrite A boolean flag indicating whether existing processed files should be overwritten. Default is FALSE.
+#' @param ... Additional arguments not used by this function but included for generic function compatibility.
 #'
-#' @return The full path to the saved raster data file. 
+#' @return A string containing the filepath to the saved processed rasters.
 #'
-#' @note This function fails if the output filename extension is not .tif or .parquet. 
+#' @note This function requires the terra, arrow, and here packages among others.
 #'
-#' @examples 
-#' # Define the URLs  
-#' urls <- list("http://example.com/raster1.tif", "http://example.com/raster2.tif") 
-#' 
-#' # Define the output directory 
-#' output_dir <- "./data" 
-#' 
-#' # Define the output filename
-#' output_filename <- "combined_raster.tif" 
-#'
-#' # Run the function
-#' get_remote_rasters(urls, output_dir, output_filename)
+#' @examples
+#' test_urls <- c("http://example.com/test1.tif", "http://example.com/test2.tif")
+#' get_remote_rasters(urls = test_urls,
+#'                    output_dir = '/path/to/output_dir',
+#'                    output_filename = 'test.tif',
+#'                    continent_raster_template = continent_template,
+#'                    aggregate_method = "mean",
+#'                    resample_method = "bilinear",
+#'                    overwrite = TRUE)
 #'
 #' @export
 get_remote_rasters <- function(urls, 
@@ -37,6 +34,7 @@ get_remote_rasters <- function(urls,
                                continent_raster_template,
                                aggregate_method = NULL,
                                resample_method = NULL,
+                               factorize = TRUE,
                                overwrite = FALSE,
                                ...) {
   
@@ -47,7 +45,7 @@ get_remote_rasters <- function(urls,
   continent_raster_template <- terra::unwrap(continent_raster_template)
   
   # Set up safe way to read parquet files
-  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
   
   save_filename <- file.path(output_dir, output_filename)
   
@@ -91,7 +89,8 @@ get_remote_rasters <- function(urls,
     }
     
     # Extract the raster file to a temporary directory
-    system2("unrar", c("e", "-o+", rar_file, here::here(output_dir), ">/dev/null"))    
+    # Capture persistent File CRC error. If it's truly corrupted it won't open in the next step
+    try(archive::archive_extract(rar_file, output_dir), silent = T)
     
     # Load the raster data
     unpacked_raster <- terra::rast(raster_file)
@@ -122,16 +121,16 @@ get_remote_rasters <- function(urls,
   
   # Pre-process raster prior to normalization  
   # For example aggregate_method="which.max" identifies the layer with the highest value for each pixel
-  if(!is.null(aggregate_method)) combined_raster <- terra::app(combined_raster, fun = aggregate_method, na.rm = TRUE)
+  if(!is.null(aggregate_method)) combined_raster <- terra::app(combined_raster, fun = aggregate_method, na.rm = TRUE) |> setNames(tools::file_path_sans_ext(output_filename))
   
   # Re-sample raster to match template
   # Can change behavior with 'method' argument.
   # 'Mode' is most common value within cell. 
   # The default is bilinear interpolation for continuous data
   if(is.null(resample_method)) {
-    combined_raster <- terra::resample(combined_raster, continent_raster_template)  
+    combined_raster <- combined_raster |> terra::project(continent_raster_template)  
   } else {
-    combined_raster <- terra::resample(combined_raster, continent_raster_template, method = resample_method)  
+    combined_raster <- combined_raster |> terra::project(continent_raster_template, method = resample_method)  
   }
   
   # Save as parquet if appropriate
@@ -139,6 +138,8 @@ get_remote_rasters <- function(urls,
     
     # Convert to dataframe
     dat <- as.data.frame(combined_raster, xy = TRUE) |> as_tibble()
+    
+    if(factorize) dat <- dat |> mutate(across(-c(x,y), ~as.factor(.x)))
     
     # Save as parquet 
     arrow::write_parquet(dat, here::here(output_dir, output_filename), compression = "gzip", compression_level = 5)
