@@ -15,9 +15,14 @@ tar_option_set(
 if (Sys.getenv("NPROC", unset = "1") != "1") {
   tar_option_set(
     controller = crew::crew_controller_local(
-      name = "local",
-      reset_globals = FALSE,
-      workers = as.integer(Sys.getenv("NPROC", unset = "1"))
+      name = "local"
+    , reset_globals = FALSE
+    , workers = as.integer(Sys.getenv("NPROC", unset = "1"))
+    , seconds_timeout  = 120
+    , seconds_interval = 5
+    , seconds_launch = 120
+    , retry_tasks = TRUE
+    , tasks_max = 1
     )
   )
 }

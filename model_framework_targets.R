@@ -138,29 +138,37 @@ model_tuning_targets <- tar_plan(
       , size = 40 
       )
     )
-  )  
-
-, tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
-    data             = folded_data_training$inner_folds
-  , tuning_grid      = tuning_grid
   )
-  , pattern = map(folded_data_training$inner_folds)
+
+, tar_target(id_cols, c("shapeName","date"))
+
+  ## Extract out inner folds for mapping as "you cannot branch over branches or global objects"
+, tar_target(extracted_inner_folds, folded_data_training$inner_folds)
+, tar_target(extracted_outer_folds, folded_data_training$outer_folds)
+
+  ## Fit across tuning_grid across all inner folds of all outer folds
+, tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
+      inner_data  = extracted_inner_folds
+    , outer_data  = extracted_outer_folds
+    , tuning_grid = tuning_grid
+    , id_cols     = id_cols
+    )
+  , pattern = map(extracted_inner_folds)
  )
 
 , tar_target(tuned_results_across_outer_folds, tune_results_across_outer_folds(
-    data           = folded_data_training$outer_folds
+    data           = extracted_outer_folds
   , hyperparm_sets = tuned_results_per_outer_fold
+  , id_cols        = id_cols
   )
-  , pattern = map(folded_data_training$outer_folds)
+  , pattern = map(extracted_outer_folds)
  )
 
   
 )
 
 ## Fitting of model on holdout data --------------------------------------------
-model_fitting_targets <- tar_plan(
-  
-)
+model_fitting_targets <- tar_plan()
   
 ## Asses model performance -----------------------------------------------------
 model_evaluation_targets <- tar_plan()
