@@ -26,6 +26,7 @@ fold_data <- function(
   , n_spatial_folds   = 10
   , district_id_col   = "shapeName"
   , seed              = 10001
+  , ...
   ) {
   
   if (type %notin% c("train_data", "test_data")) {
@@ -39,6 +40,8 @@ fold_data <- function(
   ## Ensure date column is Date type
   data <- data %>% mutate(date = as.Date(date))
   
+  if (type == "train_data") {
+  
   ## Beginning date for which CV folds will be generated
   start_date <- min(unique(data$date))
   
@@ -48,8 +51,8 @@ fold_data <- function(
   ## Generate fold start dates
   fold_starts <- seq.Date(
     from = as.Date(start_date)
-  , to   = as.Date(end_date)
-  , by   = paste(step_size, "days")
+    , to   = as.Date(end_date)
+    , by   = paste(step_size, "days")
   )
   
   outer_folds <- map_df(seq_along(fold_starts), function(i) {
@@ -62,22 +65,52 @@ fold_data <- function(
     training  <- data %>% filter(date <= train_end)
     assessing <- data %>% filter(date >= assess_start & date <= assess_end)
     
-    if (type == "train_data") {
-      train_range <- paste(min(data$date), train_end)
-    } else {
-      train_range <- train_end
-      training    <- training %>% filter(date == max(date))
-    }
+    tibble(
+      outer_fold_id = i
+      , train_data    = training %>% list()
+      , assess_data   = assessing %>% list()
+      , train_range   = paste(min(data$date), train_end)
+      , assess_range  = paste(assess_start, assess_end)
+    )
+    
+  })
+  
+  } else {
+    
+  start_date <- min(unique(data$date))
+  end_date   <- max(unique(data$date)) - step_size
+  
+  other_parms <- list(...)
+  
+  ## Generate fold start dates
+  fold_ends <- seq.Date(
+      from = as.Date(other_parms$holdout_start)
+    , to   = as.Date(end_date)
+    , by   = paste(step_size, "days")
+  )
+  
+  outer_folds <- map_df(seq_along(fold_ends), function(i) {
+    
+    train_end    <- fold_ends[i]
+    assess_start <- train_end + 1
+    assess_end   <- train_end + assess_time_chunk
+    
+    training  <- data %>% filter(date <= train_end)
+    assessing <- data %>% filter(date >= assess_start & date <= assess_end)
     
     tibble(
       outer_fold_id = i
-    , train_data    = training %>% list()
-    , assess_data   = assessing %>% list()
-    , train_range   = train_range
-    , assess_range  = paste(assess_start, assess_end)
+      , train_data    = training %>% list()
+      , assess_data   = assessing %>% list()
+      , train_range   = paste(min(data$date), train_end)
+      , assess_range  = paste(assess_start, assess_end)
     )
-  
+    
   })
+    
+  }
+  
+
   
   if (type == "test_data") {
     return(outer_folds %>% mutate(type = "test_data", .before = 1))

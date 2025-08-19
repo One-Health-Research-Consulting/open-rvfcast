@@ -7,11 +7,13 @@
 #' @param outer_data outer folds
 #' @param tuning_grid set of potential hyperparameters
 #' @param id_cols Columns that define a unique data point
+#' @param out_dir Where to save output
+#' @param overwrite Boolean to recalculate and save over a previously saved file or not
 #' @return Tibble of folds
 #' @author Morgan Kain
 #' @export
 
-tune_results_per_outer_fold <- function(inner_data, outer_data, tuning_grid, id_cols) {
+tune_results_per_outer_fold <- function(inner_data, outer_data, tuning_grid, id_cols, out_dir, overwrite) {
 
   ## Extract the needed data
   inner_tbl_train  <- inner_data$train_inner[[1]] %>% 
@@ -26,6 +28,23 @@ tune_results_per_outer_fold <- function(inner_data, outer_data, tuning_grid, id_
   outer_tbl_train <- outer_tbl_train %>% 
     dplyr::select(-c(forecast_interval, cases)) %>%
     mutate(outbreak = as.factor(outbreak))
+  
+  ## Set filename
+  save_filename <- paste(
+      out_dir
+    , "/"
+    , "inner_tuning_"
+    , paste(c(inner_data$outer_fold_id, inner_data$inner_fold_id), collapse = "_")
+    , ".csv"
+    , sep = ""
+  )
+  
+  error_safe_read_file <- possibly(read.csv, NULL)
+  
+  if (!is.null(error_safe_read_file(save_filename)) & !overwrite) {
+    message("file already exists and can be loaded, skipping processing")
+    return(save_filename)
+  }
   
   ## Get class imbalance ratio
   neg_pos_ratio <- sum(inner_tbl_train$outbreak == 0) / sum(inner_tbl_train$outbreak == 1)
@@ -62,11 +81,41 @@ tune_results_per_outer_fold <- function(inner_data, outer_data, tuning_grid, id_
   best <- select_best(tuned, metric = "mn_log_loss")
   
   ## Return the best for this inner fold
-  best %>% mutate(
+  this_best <- best %>% mutate(
      outer_fold_id = inner_data$outer_fold_id
    , inner_fold_id = inner_data$inner_fold_id
    , .before = 1
   )
+  
+  write.csv(this_best, save_filename)
+  
+  return(save_filename)
+  
+}
+
+
+#' Load in and combine saved output from all inner folds
+#'
+#'
+#' @title join_tuned_inner_folds
+
+#' @param inner_folds list of file paths for all tuned hyperparameter sets across all inner folds of all outer folds
+#' @return Tibble of best parameter sets
+#' @author Morgan Kain
+#' @export
+
+join_tuned_inner_folds <- function(inner_folds) {
+  
+  joined_files <- apply(inner_folds %>% matrix(), 1, FUN = function(x) {
+    read.csv(x)
+  }) %>% do.call("rbind", .) %>% 
+    dplyr::select(-X) %>%
+    group_by(outer_fold_id) %>% 
+    filter(loss_reduction == min(loss_reduction)) %>%
+    dplyr::slice(1) %>%
+    ungroup()
+  
+  joined_files
   
 }
 
@@ -85,11 +134,13 @@ tune_results_per_outer_fold <- function(inner_data, outer_data, tuning_grid, id_
 
 tune_results_across_outer_folds <- function(data, hyperparm_sets, id_cols) {
   
+  all_out <- lapply(data %>% split_tibble(., "outer_fold_id"), FUN = function(this_outer) {
+  
   ## Extract the needed data
-  outer_tbl_train  <- data$train_data[[1]] %>% 
+  outer_tbl_train  <- this_outer$train_data[[1]] %>% 
     dplyr::select(-c(forecast_interval, cases)) %>%
     mutate(outbreak = factor(outbreak, levels = c(1, 0)))
-  outer_tbl_assess <- data$assess_data[[1]] %>% 
+  outer_tbl_assess <- this_outer$assess_data[[1]] %>% 
     dplyr::select(-c(forecast_interval, cases)) %>%
     mutate(outbreak = factor(outbreak, levels = c(1, 0)))
   
@@ -97,9 +148,7 @@ tune_results_across_outer_folds <- function(data, hyperparm_sets, id_cols) {
   outer_metric_set <- metric_set(mn_log_loss, pr_auc, roc_auc, recall, precision)
   
   ## Select the param set for this outer fold
-  this_param_set   <- hyperparm_sets %>% filter(outer_fold_id == outer_tbl_train)
-  best_set         <- this_param_set %>% arrange(loss_reduction) %>% dplyr::slice(1) %>%
-    dplyr::select(-outer_fold_id, inner_fold_id)
+  best_set <- hyperparm_sets %>% filter(outer_fold_id == this_outer$outer_fold_id)
   
   ## Get the neg/pos ratio for this outer set
   neg_pos_ratio    <- sum(outer_tbl_train$outbreak == 0) / sum(outer_tbl_train$outbreak == 1)
@@ -118,7 +167,7 @@ tune_results_across_outer_folds <- function(data, hyperparm_sets, id_cols) {
     bind_cols(outer_tbl_assess %>% select(outbreak)) %>%
     mutate(
       outbreak    = factor(outbreak, levels = c("1", "0"))
-    , .pred_class = factor(.pred_class, levels = c("1", "0"))
+   , .pred_class = factor(.pred_class, levels = c("1", "0"))
     )
   
   ## Evaluate metrics on assessment data
@@ -132,9 +181,45 @@ tune_results_across_outer_folds <- function(data, hyperparm_sets, id_cols) {
   
   ## Return
   tibble(
-    fit     = model_fit %>% list()
-  , metrics = metric_evals %>% list()
+    outer_fold  = this_outer$outer_fold_id
+  , fit         = model_fit %>% list()
+  , hyperparams = best_set %>% list()
+  , metrics     = metric_evals %>% list()
   )
   
+  }) %>% do.call("rbind", .)
+  
+  return(all_out)
+  
 }
+
+
+#' Across all outer folds select the single best hyperparameter set for fitting the complete data
+#'
+#'
+#' @title finalize_hyperparameters
+
+#' @param outer_folds Tibble of output across all outer folds 
+#' @param chosen_metric Metric used for selection
+#' @return Set of best hyperparameters
+#' @author Morgan Kain
+#' @export
+
+finalize_hyperparameters <- function(outer_folds, chosen_metric) { 
+  
+  opt_set <- lapply(outer_folds %>% split_tibble(., "outer_fold"), FUN = function(this_outer) {
+  
+    cbind(
+      this_outer$hyperparams[[1]]
+    , this_outer$metrics[[1]] %>% filter(.metric == chosen_metric)
+    )
+    
+  }) %>% do.call("rbind", .) %>% 
+    arrange(desc(.estimate)) %>% 
+    slice(1)
+  
+  return(opt_set)
+  
+}
+
   

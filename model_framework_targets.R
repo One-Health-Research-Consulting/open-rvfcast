@@ -2,14 +2,6 @@
 # To switch to the modeling pipeline run:
 # Sys.setenv(TAR_PROJECT = "model")
 
-## MPK NOTEs on August 13, 2025. 
- ## 1) For cleanliness I am removing the huge amount of commented out code. Very well could be 
-  ## that some of this could be useful / important. For this code see commits
-  ## prior to August 13, 2025
- ## 2) Working for now with one forecast horizon to get an initial pipeline functioning and make sure
-  ## my mental map is in order. To be expanded to all forecast horizons afterward. Aim to make as dynamic
-  ## as possible so that this is not a burden
-
 # Re-record current dependencies for CAPSULE users
 if (Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true"))
   capsule::capshot(c("packages.R",
@@ -93,7 +85,7 @@ cross_validation_targets <- tar_plan(
 
  ## Generate test cases for assessing model performance
 , tar_target(folded_data_testing, fold_data(
-    data              = splitted_data
+    data              = tibble(test_data = region_data %>% list())
   , type              = "test_data"
   , sf_districts      = region_districts
   , assess_time_chunk = forecast_horizon + max_lag_period
@@ -101,7 +93,8 @@ cross_validation_targets <- tar_plan(
   , n_spatial_folds   = NULL
   , district_id_col   = "shapeName"
   , seed              = 10001
-))
+  , holdout_start     = end_date
+  ))
 
 )
 
@@ -146,29 +139,59 @@ model_tuning_targets <- tar_plan(
 , tar_target(extracted_inner_folds, folded_data_training$inner_folds)
 , tar_target(extracted_outer_folds, folded_data_training$outer_folds)
 
+  ## Set up location for saving intermediate output
+, tar_target(region_name, "RSF")
+, tar_target(outer_folds_dir, create_data_directory(
+    directory_path = paste("outputs/", region_name, "_model_tuning_inner", sep = "")
+  ))
+
   ## Fit across tuning_grid across all inner folds of all outer folds
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
       inner_data  = extracted_inner_folds
     , outer_data  = extracted_outer_folds
     , tuning_grid = tuning_grid
     , id_cols     = id_cols
+    , out_dir     = outer_folds_dir
+    , overwrite   = FALSE
     )
   , pattern = map(extracted_inner_folds)
  )
 
+  ## Join together all tuned inner folds and select the best per outer fold
+, tar_target(tuned_results_joined, join_tuned_inner_folds(
+    inner_folds = tuned_results_per_outer_fold
+  ))
+
+  ## Take the tuned inner folds and fit 
 , tar_target(tuned_results_across_outer_folds, tune_results_across_outer_folds(
     data           = extracted_outer_folds
-  , hyperparm_sets = tuned_results_per_outer_fold
+  , hyperparm_sets = tuned_results_joined
   , id_cols        = id_cols
   )
-  , pattern = map(extracted_outer_folds)
  )
 
-  
+  ## Extract the best parameter set
+, tar_target(finalized_hyperparameters, finalize_hyperparameters(
+    outer_folds = tuned_results_across_outer_folds
+  ))
+
 )
 
 ## Fitting of model on holdout data --------------------------------------------
-model_fitting_targets <- tar_plan()
+model_fitting_targets <- tar_plan(
+  
+  ## Fit all of the data using the best set of hyperparameters.
+   ## NOTE: Have not written this function yet, but it will be an extremely similar 
+   ## function to tune_results_across_outer_folds but with
+   ## a few additional steps for predictions and saving predictions and no filtering
+   ## of parameter set to outer_fold_id
+  tar_target(fitted_model, tune_results_across_outer_folds(
+    data           = folded_data_testing
+  , hyperparm_sets = finalized_hyperparameters
+  , id_cols        = id_cols
+  ))
+  
+)
   
 ## Asses model performance -----------------------------------------------------
 model_evaluation_targets <- tar_plan()
