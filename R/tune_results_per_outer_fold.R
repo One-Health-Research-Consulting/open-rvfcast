@@ -128,13 +128,32 @@ join_tuned_inner_folds <- function(inner_folds) {
 #' @param data outer fold
 #' @param hyperparm_sets maximized hyperparameter sets across all inner folds of all outer folds
 #' @param id_cols Columns that define a unique data point
+#' @param out_dir Where to save output
+#' @param overwrite Boolean to recalculate and save over a previously saved file or not
 #' @return Tibble of folds
 #' @author Morgan Kain
 #' @export
 
-tune_results_across_outer_folds <- function(data, hyperparm_sets, id_cols) {
+tune_results_across_outer_folds <- function(data, hyperparm_sets, id_cols, out_dir, overwrite) {
   
   all_out <- lapply(data %>% split_tibble(., "outer_fold_id"), FUN = function(this_outer) {
+    
+  ## Set filename
+  save_filename <- paste(
+      out_dir
+    , "/"
+    , "outer_tuning_"
+    , this_outer$outer_fold_id
+    , ".csv"
+    , sep = ""
+  )
+  
+  error_safe_read_file <- possibly(read.csv, NULL)
+  
+  if (!is.null(error_safe_read_file(save_filename)) & !overwrite) {
+    message("file already exists and can be loaded, skipping processing")
+    return(save_filename)
+  }
   
   ## Extract the needed data
   outer_tbl_train  <- this_outer$train_data[[1]] %>% 
@@ -179,15 +198,20 @@ tune_results_across_outer_folds <- function(data, hyperparm_sets, id_cols) {
   , event_level = "first" 
   )
   
-  ## Return
-  tibble(
-    outer_fold  = this_outer$outer_fold_id
-  , fit         = model_fit %>% list()
-  , hyperparams = best_set %>% list()
-  , metrics     = metric_evals %>% list()
-  )
+  outer_out <- best_set %>% 
+    mutate(outer_fold = this_outer$outer_fold_id, .before = 1) %>%
+    cbind(
+      .
+    , metric_evals %>% 
+      pivot_wider(id_cols = .estimator, values_from = .estimate, names_from = .metric) %>% 
+      dplyr::select(-.estimator))
   
-  }) %>% do.call("rbind", .)
+  write.csv(outer_out, save_filename)
+  
+  ## Return
+  save_filename
+  
+  }) %>% unlist()
   
   return(all_out)
   
@@ -201,25 +225,26 @@ tune_results_across_outer_folds <- function(data, hyperparm_sets, id_cols) {
 
 #' @param outer_folds Tibble of output across all outer folds 
 #' @param chosen_metric Metric used for selection
+#' @param direction maximize or minimize corresponding to chosen_metric
 #' @return Set of best hyperparameters
 #' @author Morgan Kain
 #' @export
 
-finalize_hyperparameters <- function(outer_folds, chosen_metric) { 
+finalize_hyperparameters <- function(outer_folds, chosen_metric, direction) { 
   
-  opt_set <- lapply(outer_folds %>% split_tibble(., "outer_fold"), FUN = function(this_outer) {
-  
-    cbind(
-      this_outer$hyperparams[[1]]
-    , this_outer$metrics[[1]] %>% filter(.metric == chosen_metric)
-    )
-    
+  joined_files <- apply(outer_folds %>% matrix(), 1, FUN = function(x) {
+    read.csv(x)
   }) %>% do.call("rbind", .) %>% 
-    arrange(desc(.estimate)) %>% 
-    slice(1)
+    dplyr::select(-X)
   
-  return(opt_set)
-  
+  if (direction == "maximize") {
+    joined_files %>% arrange(desc(get(chosen_metric))) %>% slice(1)
+  } else if (direction == "minimize") {
+    joined_files %>% arrange(get(chosen_metric)) %>% slice(1)
+  } else {
+    stop("choose minimize or maximize for direction")
+  }
+
 }
 
   

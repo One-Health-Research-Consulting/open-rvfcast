@@ -144,6 +144,12 @@ model_tuning_targets <- tar_plan(
 , tar_target(outer_folds_dir, create_data_directory(
     directory_path = paste("outputs/", region_name, "_model_tuning_inner", sep = "")
   ))
+, tar_target(outer_folds_dir2, create_data_directory(
+  directory_path = paste("outputs/", region_name, "_model_tuning_outer", sep = "")
+  ))
+, tar_target(outer_folds_dir3, create_data_directory(
+  directory_path = paste("outputs/", region_name, "_final_model_fits", sep = "")
+))
 
   ## Fit across tuning_grid across all inner folds of all outer folds
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
@@ -167,12 +173,16 @@ model_tuning_targets <- tar_plan(
     data           = extracted_outer_folds
   , hyperparm_sets = tuned_results_joined
   , id_cols        = id_cols
+  , out_dir        = outer_folds_dir2
+  , overwrite      = FALSE
   )
  )
 
   ## Extract the best parameter set
 , tar_target(finalized_hyperparameters, finalize_hyperparameters(
-    outer_folds = tuned_results_across_outer_folds
+    outer_folds   = tuned_results_across_outer_folds
+  , chosen_metric = "mn_log_loss"
+  , direction     = "minimize"
   ))
 
 )
@@ -180,16 +190,17 @@ model_tuning_targets <- tar_plan(
 ## Fitting of model on holdout data --------------------------------------------
 model_fitting_targets <- tar_plan(
   
-  ## Fit all of the data using the best set of hyperparameters.
-   ## NOTE: Have not written this function yet, but it will be an extremely similar 
-   ## function to tune_results_across_outer_folds but with
-   ## a few additional steps for predictions and saving predictions and no filtering
-   ## of parameter set to outer_fold_id
-  tar_target(fitted_model, tune_results_across_outer_folds(
-    data           = folded_data_testing
-  , hyperparm_sets = finalized_hyperparameters
-  , id_cols        = id_cols
-  ))
+  ## Could maybe parallelize, but with no tune_grid this should be reasonably quick
+   ## even with the refits
+  tar_target(fitted_model, fit_model(
+    final_hyper_set = finalized_hyperparameters
+  , full_data       = folded_data_testing
+  , id_cols         = id_cols
+  , out_dir         = outer_folds_dir3
+  , overwrite       = FALSE
+  )
+  , pattern = map(folded_data_testing)
+  )
   
 )
   
