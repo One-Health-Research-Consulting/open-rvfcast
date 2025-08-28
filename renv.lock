@@ -1,6 +1,6 @@
 {
   "R": {
-    "Version": "4.5.0",
+    "Version": "4.5.1",
     "Repositories": [
       {
         "Name": "CRAN",
@@ -1073,6 +1073,7 @@
         "stats",
         "utils"
       ],
+      "Remotes": "anthonynorth/using",
       "RoxygenNote": "7.3.1",
       "Roxygen": "list(markdown = TRUE)",
       "Suggests": [
@@ -1082,14 +1083,12 @@
       "Copyright": "2022 Miles McBain, unless noted. Some MIT licensed code taken from RStudio bears Copyright in comments.",
       "Config/pak/sysreqs": "git make",
       "Repository": "https://milesmcbain.r-universe.dev",
-      "NeedsCompilation": "no",
-      "Author": "Miles McBain [aut, cre] (ORCID: <https://orcid.org/0000-0003-2865-2548>), Garrick Aden-Buie [aut]",
-      "Maintainer": "Miles McBain <miles.mcbain@gmail.com>",
-      "RemoteType": "repository",
-      "Remotes": "anthonynorth/using",
       "RemoteUrl": "https://github.com/milesmcbain/capsule",
       "RemoteRef": "master",
-      "RemoteSha": "7a40d61447e2f497574746bcfefff34f5a496bde"
+      "RemoteSha": "7a40d61447e2f497574746bcfefff34f5a496bde",
+      "NeedsCompilation": "no",
+      "Author": "Miles McBain [aut, cre] (ORCID: <https://orcid.org/0000-0003-2865-2548>), Garrick Aden-Buie [aut]",
+      "Maintainer": "Miles McBain <miles.mcbain@gmail.com>"
     },
     "cellranger": {
       "Package": "cellranger",
@@ -4046,11 +4045,12 @@
       "X-schema.org-keywords": "NASA, meteorological-data, weather, global, weather, weather-data, meteorology, NASA-POWER, agroclimatology, earth-science, data-access, climate-data",
       "Config/pak/sysreqs": "libssl-dev libx11-dev",
       "Repository": "https://ropensci.r-universe.dev",
+      "Author": "Adam H. Sparks [aut, cre] (ORCID: <https://orcid.org/0000-0002-0061-8359>), Scott Chamberlain [rev] (ORCID: <https://orcid.org/0000-0003-1444-9135>, Scott Chamberlain reviewed nasapower for rOpenSci, see <https://github.com/ropensci/software-review/issues/155>.), Hazel Kavili [rev] (Hazel Kavili reviewed nasapower for rOpenSci, see <https://github.com/ropensci/software-review/issues/155>.), Alison Boyer [rev] (Alison Boyer reviewed nasapower for rOpenSci, see <https://github.com/ropensci/software-review/issues/155>.), Fernando Miguez [ctb] (ORCID: <https://orcid.org/0000-0002-4627-8329>, Fernando Miguez provided assistance in identifying improper missing value handling in the POWER data, see <https://github.com/femiguez/apsimx/pull/26>.), Maëlle Salmon [ctb] (ORCID: <https://orcid.org/0000-0002-2815-0399>, Maëlle Salmon contributed a patch to fix issues with using the R package, 'vcr', for testing the API queries, see <https://github.com/ropensci/nasapower/pull/64>.), Phillip D. Alderman [ctb] (ORCID: <https://orcid.org/0000-0003-1467-2337>, Phillip Alderman contributed a patch to fix an issue with, 'The `file` argument of `vroom()` must use `I()` for literal data as of vroom 1.5.0.', see <https://github.com/ropensci/nasapower/pull/67>.), Aleksandar Blagotić [ctb, cph] (Author of the CRAN package 'rapportools', from which the '.is_boolean()' was taken.), Gergely Daróczi [ctb, cph] (Author of the CRAN package 'rapportools', from which the '.is_boolean()' was taken.), Curtin University [cph] (Supported the development of 'nasapower' through Adam H.  Sparks' time.), James J. Balamuta [ctb, cph] (Author of the GitHub package 'rops', from which the '%notin%' function was taken.)",
+      "Maintainer": "Adam H. Sparks <adamhsparks@gmail.com>",
+      "RemoteType": "repository",
       "RemoteUrl": "https://github.com/ropensci/nasapower",
       "RemoteRef": "main",
-      "RemoteSha": "9ea0808ea399130f57c0b74214f126d5d8980eb3",
-      "Author": "Adam H. Sparks [aut, cre] (ORCID: <https://orcid.org/0000-0002-0061-8359>), Scott Chamberlain [rev] (ORCID: <https://orcid.org/0000-0003-1444-9135>, Scott Chamberlain reviewed nasapower for rOpenSci, see <https://github.com/ropensci/software-review/issues/155>.), Hazel Kavili [rev] (Hazel Kavili reviewed nasapower for rOpenSci, see <https://github.com/ropensci/software-review/issues/155>.), Alison Boyer [rev] (Alison Boyer reviewed nasapower for rOpenSci, see <https://github.com/ropensci/software-review/issues/155>.), Fernando Miguez [ctb] (ORCID: <https://orcid.org/0000-0002-4627-8329>, Fernando Miguez provided assistance in identifying improper missing value handling in the POWER data, see <https://github.com/femiguez/apsimx/pull/26>.), Maëlle Salmon [ctb] (ORCID: <https://orcid.org/0000-0002-2815-0399>, Maëlle Salmon contributed a patch to fix issues with using the R package, 'vcr', for testing the API queries, see <https://github.com/ropensci/nasapower/pull/64>.), Phillip D. Alderman [ctb] (ORCID: <https://orcid.org/0000-0003-1467-2337>, Phillip Alderman contributed a patch to fix an issue with, 'The `file` argument of `vroom()` must use `I()` for literal data as of vroom 1.5.0.', see <https://github.com/ropensci/nasapower/pull/67>.), Aleksandar Blagotić [ctb, cph] (Author of the CRAN package 'rapportools', from which the '.is_boolean()' was taken.), Gergely Daróczi [ctb, cph] (Author of the CRAN package 'rapportools', from which the '.is_boolean()' was taken.), Curtin University [cph] (Supported the development of 'nasapower' through Adam H.  Sparks' time.), James J. Balamuta [ctb, cph] (Author of the GitHub package 'rops', from which the '%notin%' function was taken.)",
-      "Maintainer": "Adam H. Sparks <adamhsparks@gmail.com>"
+      "RemoteSha": "a54d712aea72533dd419de0bc3444ba9c8539a6d"
     },
     "nlme": {
       "Package": "nlme",
@@ -5599,12 +5599,13 @@
       ],
       "RoxygenNote": "7.3.1",
       "Repository": "https://ropensci.r-universe.dev",
-      "RemoteUrl": "https://github.com/ropensci/rnaturalearthdata",
-      "RemoteRef": "main",
-      "RemoteSha": "ff4d891f74265473ae2c936dcfeb0c9afeac6631",
       "NeedsCompilation": "no",
       "Author": "Andy South [aut] (ORCID: <https://orcid.org/0000-0003-4051-6135>), Schramm Michael [aut], Philippe Massicotte [aut, cre] (ORCID: <https://orcid.org/0000-0002-5919-4116>)",
-      "Maintainer": "Philippe Massicotte <pmassicotte@hotmail.com>"
+      "Maintainer": "Philippe Massicotte <pmassicotte@hotmail.com>",
+      "RemoteType": "repository",
+      "RemoteUrl": "https://github.com/ropensci/rnaturalearthdata",
+      "RemoteRef": "main",
+      "RemoteSha": "ff4d891f74265473ae2c936dcfeb0c9afeac6631"
     },
     "rnaturalearthhires": {
       "Package": "rnaturalearthhires",
@@ -5627,12 +5628,13 @@
       "RoxygenNote": "7.3.1",
       "Encoding": "UTF-8",
       "Repository": "https://ropensci.r-universe.dev",
-      "RemoteUrl": "https://github.com/ropensci/rnaturalearthhires",
-      "RemoteRef": "main",
-      "RemoteSha": "e4736f636baa1c013d77d2ba028dd5bc334defee",
       "NeedsCompilation": "no",
       "Author": "Andy South [aut, cre] (ORCID: <https://orcid.org/0000-0003-4051-6135>), Schramm Michael [aut], Philippe Massicotte [aut] (ORCID: <https://orcid.org/0000-0002-5919-4116>)",
-      "Maintainer": "Andy South <southandy@gmail.com>"
+      "Maintainer": "Andy South <southandy@gmail.com>",
+      "RemoteType": "repository",
+      "RemoteUrl": "https://github.com/ropensci/rnaturalearthhires",
+      "RemoteRef": "main",
+      "RemoteSha": "e4736f636baa1c013d77d2ba028dd5bc334defee"
     },
     "rprojroot": {
       "Package": "rprojroot",
@@ -6350,14 +6352,13 @@
       "Config/testthat/edition": "3",
       "Roxygen": "list(markdown = TRUE)",
       "RoxygenNote": "7.3.2",
-      "Config/pak/sysreqs": "libglpk-dev libxml2-dev",
-      "Repository": "https://ropensci.r-universe.dev",
+      "Author": "William Michael Landau [aut, cre] (ORCID: <https://orcid.org/0000-0003-1878-3253>), Matthew T. Warkentin [ctb], Mark Edmondson [ctb] (ORCID: <https://orcid.org/0000-0002-8434-3881>), Samantha Oliver [rev] (ORCID: <https://orcid.org/0000-0001-5668-1165>), Tristan Mahr [rev] (ORCID: <https://orcid.org/0000-0002-8890-5116>), Eli Lilly and Company [cph, fnd]",
+      "Maintainer": "William Michael Landau <will.landau.oss@gmail.com>",
+      "RemoteType": "repository",
       "RemoteUrl": "https://github.com/ropensci/targets",
       "RemoteRef": "main",
       "RemoteSha": "13e6f38793ebcd570b9d30f23a35766efc35188c",
-      "NeedsCompilation": "no",
-      "Author": "William Michael Landau [aut, cre] (ORCID: <https://orcid.org/0000-0003-1878-3253>), Matthew T. Warkentin [ctb], Mark Edmondson [ctb] (ORCID: <https://orcid.org/0000-0002-8434-3881>), Samantha Oliver [rev] (ORCID: <https://orcid.org/0000-0001-5668-1165>), Tristan Mahr [rev] (ORCID: <https://orcid.org/0000-0002-8890-5116>), Eli Lilly and Company [cph, fnd]",
-      "Maintainer": "William Michael Landau <will.landau.oss@gmail.com>"
+      "Repository": "ROPENSCI"
     },
     "terra": {
       "Package": "terra",

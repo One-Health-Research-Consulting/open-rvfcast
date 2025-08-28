@@ -40,8 +40,24 @@ AWS_get_folder <- function(local_folder,
     stop(msg)
   }
 
-  # Create an error safe way to test if the parquet file can be read
-  error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
+  # Create a comprehensive validation function that checks both readability and row count
+  error_safe_validate_file <- possibly(
+    function(file) {
+      # Try to open as dataset (more memory efficient for large files)
+      dataset <- arrow::open_dataset(file)
+      row_count <- dataset |> 
+        arrow::compute_count() |> 
+        arrow::as_vector()
+      
+      # Return row count if successful and has data
+      if (row_count > 0) {
+        return(row_count)
+      } else {
+        return(0)  # Empty file
+      }
+    },
+    otherwise = NULL
+  )
 
   # Get files from S3 bucket with prefix
   df_bucket_data <- aws.s3::get_bucket(bucket = Sys.getenv("AWS_BUCKET_ID"),
@@ -71,11 +87,16 @@ AWS_get_folder <- function(local_folder,
 
       cat("Downloaded AWS file:", file, "\n")
 
-      # Check if transformed file can be loaded
-      if (is.null(error_safe_read_parquet(file))) {
-        # Clean up local corrupted files
+      # Validate file - check if it's readable and has rows > 0
+      validation_result <- error_safe_validate_file(file)
+      if (is.null(validation_result) || validation_result == 0) {
+        # Clean up local corrupted or empty files
         unlink(file)
-        cat("Removed local corrupted file:", basename(file), "\n")
+        if (is.null(validation_result)) {
+          cat("Removed local corrupted file:", basename(file), "\n")
+        } else {
+          cat("Removed local empty file:", basename(file), "\n")
+        }
 
         # Only remove from AWS if sync_with_remote is TRUE
         if (sync_with_remote) {
@@ -83,11 +104,12 @@ AWS_get_folder <- function(local_folder,
             object = file,
             bucket = Sys.getenv("AWS_BUCKET_ID")
           )
-          cat("Synced by removing corrupt file from AWS bucket\n")
+          cat("Synced by removing corrupt/empty file from AWS bucket\n")
         }
       } else {
-        # Add to downloaded_files if file was successfully downloaded and readable
+        # Add to downloaded_files if file was successfully downloaded and has data
         downloaded_files <- c(downloaded_files, file)
+        cat("Validated file with", validation_result, "rows\n")
       }
     } else {
       cat("Skipped file:", basename(file), "\n")

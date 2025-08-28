@@ -7,9 +7,9 @@
 #'
 #' @author Emma Mendelsohn and Nathan C. Layman
 #'
-#' @param ecmwf_forecasts_transformed_directory Directory containing the transformed forecasts.
+#' @param ecmwf_forecast_transformed_directory Directory containing the transformed forecasts.
 #' @param weather_historical_means Filepath to the historical weather means data.
-#' @param forecasts_anomalies_directory Directory in which to save the anomalies data.
+#' @param forecast_anomalies_directory Directory in which to save the anomalies data.
 #' @param dates_to_process Dates for models that have been selected.
 #' @param lead_intervals Lead times for forecasts, which will determine the interval over which anomalies are averaged.
 #' @param overwrite Boolean flag indicating whether existing file should be overwritten. Default is FALSE.
@@ -21,8 +21,8 @@
 #' or to a newly created file with calculated anomalies (when overwrite is TRUE or the file didn't exist).
 #'
 #' @examples
-#' calculate_forecasts_anomalies(
-#'   ecmwf_forecasts_transformed_directory = "./forecasts",
+#' calculate_forecast_anomalies(
+#'   ecmwf_forecast_transformed_directory = "./forecasts",
 #'   weather_historical_means = "./historical_means.parquet",
 #'   forecast_anomalies_directory = "./anomalies",
 #'   dates_to_process = as.Date("2000-01-01"),
@@ -31,9 +31,9 @@
 #' )
 #'
 #' @export
-calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
+calculate_forecast_anomalies <- function(ecmwf_forecast_transformed,
                                           weather_historical_means,
-                                          forecasts_anomalies_directory,
+                                          forecast_anomalies_directory,
                                           basename_template = "forecast_anomaly_{dates_to_process}.parquet",
                                           dates_to_process,
                                           forecast_intervals,
@@ -43,7 +43,7 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
   stopifnot(length(dates_to_process) == 1)
 
   # Set filename
-  save_filename <- file.path(forecasts_anomalies_directory, glue::glue(basename_template))
+  save_filename <- file.path(forecast_anomalies_directory, glue::glue(basename_template))
 
   # Check if file already exists and can be read
   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
@@ -67,7 +67,7 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
 
   # An easier way to do this is to just make a list of every day from start to
   # start + 30 - 1. Figure out the year and month and join to forecast month from
-  # ecmwf_forecasts_transformed. That way we could do all the things at once.
+  # ecmwf_forecast_transformed. That way we could do all the things at once.
   # Then group by x, y, and summarize average of data columns. Map over each
   # lead interval and done. A benefit of this approach is that it makes
   # comparing to historical means easy. Just find the historical means for each
@@ -78,23 +78,23 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
 
   # Get the relevant forecast data. Find the most recent base_date that came
   # before the model_date selected.
-  forecasts_transformed_dataset <- arrow::open_dataset(ecmwf_forecasts_transformed) |>
+  forecast_transformed_dataset <- arrow::open_dataset(ecmwf_forecast_transformed) |>
     dplyr::filter(base_date <= dates_to_process)
 
-  relevant_base_date <- forecasts_transformed_dataset |>
+  relevant_base_date <- forecast_transformed_dataset |>
     select(base_date) |>
     distinct() |>
     arrange(desc(base_date)) |>
     pull(base_date, as_vector = TRUE) |>
     head(n = 1)
 
-  forecasts_transformed_dataset <- forecasts_transformed_dataset |>
+  forecast_transformed_dataset <- forecast_transformed_dataset |>
     dplyr::filter(base_date == relevant_base_date) |>
     select(-base_date, -month, -year) |>
     mutate(month = lead_month, year = lead_year) |>
     collect()
 
-  forecasts_anomalies <- map_dfr(1:(length(forecast_intervals) - 1), function(i) {
+  forecast_anomalies <- map_dfr(1:(length(forecast_intervals) - 1), function(i) {
     lead_interval_start <- forecast_intervals[i]
     lead_interval_end <- forecast_intervals[i + 1]
 
@@ -125,13 +125,13 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
       right_join(forecast_anomaly, by = "doy") |>
       relocate(-matches("precipitation|temperature|humidity"))
 
-    # 1. forecasts_transformed_dataset
+    # 1. forecast_transformed_dataset
 
     # Join in forecast data based on x, y, month, and year.
     # The historical data and forecast data _should_ have the same column
     # names so differentiate with a suffix
     historical_means <- historical_means |>
-      dplyr::left_join(forecasts_transformed_dataset,
+      dplyr::left_join(forecast_transformed_dataset,
         by = c("x", "y", "month", "year"),
         suffix = c("_historical", "_forecast")
       )
@@ -179,9 +179,9 @@ calculate_forecasts_anomalies <- function(ecmwf_forecasts_transformed,
   })
 
   # Write output to a parquet file
-  arrow::write_parquet(forecasts_anomalies, save_filename, compression = "gzip", compression_level = 5)
+  arrow::write_parquet(forecast_anomalies, save_filename, compression = "gzip", compression_level = 5)
 
-  rm(forecasts_anomalies)
+  rm(forecast_anomalies)
 
   return(save_filename)
 }
