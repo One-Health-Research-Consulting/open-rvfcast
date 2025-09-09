@@ -23,4 +23,5 @@ data/slope_aspect/*
 data/soil/*
 notes/*
 *.token
+**/*.SEN3
 
