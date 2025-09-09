@@ -39,13 +39,16 @@ AWS_get_folder <- function(local_folder,
     )
     stop(msg)
   }
+  
+  aws_region = if (Sys.getenv("AWS_REGION") == "auto") "" else Sys.getenv("AWS_REGION")
 
   # Create an error safe way to test if the parquet file can be read
   error_safe_read_parquet <- possibly(arrow::read_parquet, NULL)
 
   # Get files from S3 bucket with prefix
   df_bucket_data <- aws.s3::get_bucket(bucket = Sys.getenv("AWS_BUCKET_ID"),
-                                        prefix = paste0(local_folder, "/"))
+                                        prefix = paste0(local_folder, "/"),
+                                       region = aws_region)
   s3_files <- map_chr(df_bucket_data, pluck, "Key")
 
   # Check if S3 has files to download
@@ -66,6 +69,7 @@ AWS_get_folder <- function(local_folder,
       aws.s3::save_object(
         object = file,
         bucket = Sys.getenv("AWS_BUCKET_ID"),
+        region = aws_region,
         file = file
       )
 
@@ -185,7 +189,8 @@ AWS_put_files <- function(transformed_file_list,
 
   # Get files from S3 bucket with prefix
   df_bucket_data <- aws.s3::get_bucket(bucket = Sys.getenv("AWS_BUCKET_ID"),
-                                        prefix = paste0(local_folder, "/"))
+                                        prefix = paste0(local_folder, "/"),
+                                       region = aws_region)
                                         
   s3_files <- map_chr(df_bucket_data, pluck, "Key")
 
@@ -211,7 +216,8 @@ AWS_put_files <- function(transformed_file_list,
           object = file,
           multipart = TRUE,
           part_size = 10485760,
-          bucket = Sys.getenv("AWS_BUCKET_ID")
+          bucket = Sys.getenv("AWS_BUCKET_ID"),
+          region = aws_region
         )
 
         outcome <- glue::glue("Uploading {basename(file)} to AWS")
@@ -228,7 +234,8 @@ AWS_put_files <- function(transformed_file_list,
         # Remove the file from AWS using aws.s3
         aws.s3::delete_object(
           object = file.path(file),
-          bucket = Sys.getenv("AWS_BUCKET_ID")
+          bucket = Sys.getenv("AWS_BUCKET_ID"),
+          region = aws_region
         )
       } else {
         next
