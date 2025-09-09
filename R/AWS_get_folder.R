@@ -209,9 +209,11 @@ AWS_put_files <- function(transformed_file_list,
     otherwise = NULL
   )
 
+  aws_region = if (Sys.getenv("AWS_REGION") == "auto") "" else Sys.getenv("AWS_REGION")
+
   # Get files from S3 bucket with prefix
   df_bucket_data <- aws.s3::get_bucket(bucket = Sys.getenv("AWS_BUCKET_ID"),
-                                        prefix = paste0(local_folder, "/"),
+                                       prefix = paste0(local_folder, "/"),
                                        region = aws_region)
                                         
   s3_files <- map_chr(df_bucket_data, pluck, "Key")
