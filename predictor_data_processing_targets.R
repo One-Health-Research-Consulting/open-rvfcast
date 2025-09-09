@@ -760,8 +760,7 @@ derived_data_targets <- tar_plan(
   tar_target(weather_historical_means_AWS_upload, AWS_put_files(
     weather_historical_means,
     weather_historical_means_directory,
-    overwrite = T,
-    # overwrite = parse_flag("OVERWRITE_HISTORICAL_MEANS")
+    overwrite = parse_flag("OVERWRITE_HISTORICAL_MEANS")
   ),
   error = "null"
   ),
@@ -836,6 +835,7 @@ derived_data_targets <- tar_plan(
   # scratch.
 
   tar_target(forecast_anomalies,
+  
     calculate_forecast_anomalies(ecmwf_forecasts_transformed,
       weather_historical_means,
       forecast_anomalies_directory,
@@ -856,8 +856,7 @@ derived_data_targets <- tar_plan(
   tar_target(forecast_anomalies_AWS_upload, AWS_put_files(
       forecast_anomalies,
       forecast_anomalies_directory,
-      overwrite = T,
-      # overwrite = parse_flag("OVERWRITE_FORECAST_ANOMALIES")
+      overwrite = parse_flag("OVERWRITE_FORECAST_ANOMALIES")
     ),
     error = "continue"
   ),
@@ -1003,7 +1002,6 @@ full_data_targets <- tar_plan(
     overwrite = parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA")
   ),
   error = "null",
-  cue = tar_cue("never")
   )
 )
 
