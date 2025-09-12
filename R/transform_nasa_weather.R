@@ -81,16 +81,13 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
     # Establish NetCDF filename. This uses glue to inject yyyymmdd.
     nc_file <- file.path(local_folder, glue::glue(endpoint) |> basename())
     
-    # Try to download file - returns TRUE if successful, FALSE if failed
-    download <- tryCatch({
-      curl::curl_download(glue::glue(endpoint), nc_file)
-      TRUE
-    }, error = function(e) {
-      message(glue::glue("Failed to download {yyyymmdd}: {e$message}"))
-      FALSE
-    })
+    response <- request(glue::glue(endpoint)) |>
+      req_error(is_error = \(resp) FALSE) |>  # Handle errors gracefully
+      req_perform(path = nc_file)  # Automatically writes to fileSE
 
-    if(!download) {
+    if(httr2::resp_is_error(response)) {
+      message(glue::glue("Failed to fetch {basename(file)}. Reponse: {response$status_code}"))
+      if(response$status_code == 404) message("404 errors generally mean Nasa hasn't added the data for that date to the S3 bucket yet")
       failed_downloads <<- c(failed_downloads, yyyymmdd)
       return(NULL)
     }
@@ -117,7 +114,14 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
       file.remove(nc_file)
       
       results
-  }) |>
+  }) 
+  
+  if(!nrow(nasa_recorded_weather) > 0) {
+    message(glue::glue("No data found for {months_to_process}")) 
+    return(NULL)
+  } 
+  
+  nasa_recorded_weather |>
   mutate(year = year,
          month = month,
          day = lubridate::day(date),
