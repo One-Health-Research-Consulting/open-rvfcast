@@ -57,7 +57,7 @@ set_model_dates <- function(start_year, end_year, n_per_month = NULL, seed = 123
                                                replace = FALSE) - 1) |> unlist() |> as.Date()
   
   # Remove dates earlier than today
-  model_dates <- model_dates[model_dates <= Sys.Date()]
+  model_dates <- model_dates[model_dates <= Sys.Date()] |> sort()
   
   return(model_dates)
 }

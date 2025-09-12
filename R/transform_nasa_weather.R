@@ -78,7 +78,7 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
   # This errors if any of the files in the month are wrong. 
   nasa_recorded_weather <- map_df(dates, .progress = TRUE, function(yyyymmdd) {
     
-    # Establish NetCDF filename
+    # Establish NetCDF filename. This uses glue to inject yyyymmdd.
     nc_file <- file.path(local_folder, glue::glue(endpoint) |> basename())
     
     # Try to download file - returns TRUE if successful, FALSE if failed

@@ -834,7 +834,7 @@ derived_data_targets <- tar_plan(
   # scratch.
 
   tar_target(forecasts_anomalies,
-    calculate_forecasts_anomalies(ecmwf_forecasts_transformed,
+    calculate_forecasts_anomalie(ecmwf_forecasts_transformed,
       weather_historical_means,
       forecasts_anomalies_directory,
       basename_template = "forecast_anomaly_{dates_to_process}.parquet",
