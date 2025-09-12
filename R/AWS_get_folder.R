@@ -63,8 +63,10 @@ AWS_get_folder <- function(local_folder,
 
   # Get files from S3 bucket with prefix
   df_bucket_data <- aws.s3::get_bucket(bucket = Sys.getenv("AWS_BUCKET_ID"),
-                                        prefix = paste0(local_folder, "/"),
-                                       region = aws_region)
+                                       prefix = paste0(local_folder, "/"),
+                                       region = aws_region,
+                                       base_url = Sys.getenv("AWS_S3_ENDPOINT"))
+                                       
   s3_files <- map_chr(df_bucket_data, pluck, "Key")
 
   # Check if S3 has files to download
@@ -214,7 +216,8 @@ AWS_put_files <- function(transformed_file_list,
   # Get files from S3 bucket with prefix
   df_bucket_data <- aws.s3::get_bucket(bucket = Sys.getenv("AWS_BUCKET_ID"),
                                        prefix = paste0(local_folder, "/"),
-                                       region = aws_region)
+                                       region = aws_region,
+                                       base_url = Sys.getenv("AWS_S3_ENDPOINT"))
                                         
   s3_files <- map_chr(df_bucket_data, pluck, "Key")
 
@@ -229,11 +232,21 @@ AWS_put_files <- function(transformed_file_list,
     # Is the file in the transformed_file_list?
     if (file %in% transformed_file_list) {
       # Check that schemas match
-      remote_file <- paste0("s3://", Sys.getenv("AWS_BUCKET_ID"), "/", file)
-      remote_schema <- error_safe_open_dataset(remote_file)
+    fs <- arrow::s3_bucket(
+      bucket = Sys.getenv("AWS_BUCKET_ID"),
+      endpoint_override = Sys.getenv("AWS_S3_ENDPOINT"),
+      region = "auto"
+    )
+
+      # Open the Parquet file without reading all data
+      pf <- arrow::ParquetFileReader$create(fs$OpenInputFile(file))
+
+      # Get schema and heck number of rows > 0 
+      remote_schema <- pf$GetSchema()
+      remote_rows <- pf$num_rows
       local_schema <- error_safe_open_dataset(file)
 
-      if (is.null(remote_schema) || !remote_schema$Equals(local_schema) || overwrite == TRUE) {
+      if (is.null(remote_schema) || !remote_schema$Equals(local_schema) || overwrite == TRUE || remote_rows == 0) {
         # Put the file on S3 using aws.s3
         aws.s3::put_object(
           file = file,

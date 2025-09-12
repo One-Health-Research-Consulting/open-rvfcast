@@ -30,7 +30,7 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
   continent_raster_template,
   local_folder = "data/nasa_weather_transformed",
   basename_template = "nasa_weather_transformed_{months_to_process}.parquet",
-  endpoint = "https://power-datastore.s3.amazonaws.com/v10/daily/{year}/{month}/power_10_daily_{yyyymmdd}_merra2_lst.nc",
+  endpoint = "https://power-datastore.s3.us-west-2.amazonaws.com/v10/daily/{year}/{month}/power_10_daily_{yyyymmdd}_merra2_lst.nc",
   overwrite = FALSE,
   ...) {
 
@@ -86,6 +86,7 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
       curl::curl_download(glue::glue(endpoint), nc_file)
       TRUE
     }, error = function(e) {
+      message(glue::glue("Failed to download {yyyymmdd}: {e$message}"))
       FALSE
     })
 
