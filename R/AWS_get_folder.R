@@ -134,63 +134,73 @@ AWS_get_folder <- function(local_folder,
 #' @details The function performs several key operations:
 #' \itemize{
 #'   \item Checks for existing AWS credentials
-#'   \item Verifies file schemas before uploading
-#'   \item Supports selective file upload based on schema matching
+#'   \item Verifies file schemas and row counts before uploading
+#'   \item Supports selective file upload based on schema matching and data changes
 #'   \item Optionally overwrites existing files on AWS
-#'   \item Cleans up dangling files from the S3 bucket
+#'   \item Cleans up dangling files from the S3 bucket when requested
 #' }
 #'
 #' @author Nathan C. Layman
 #'
 #' @param transformed_file_list A character vector of filenames to be uploaded to AWS S3.
-#'   These should be base filenames (not full paths) that have been transformed and are 
-#'   ready for upload.
+#'   These should be full file paths that have been transformed and are ready for upload.
 #' @param local_folder A character string specifying the local directory containing 
 #'   the transformed files to be uploaded to AWS S3.
 #' @param overwrite Logical. If \code{TRUE}, files will be uploaded even if they 
-#'   already exist in the S3 bucket with matching schemas. Defaults to \code{FALSE}.
+#'   already exist in the S3 bucket with matching schemas and row counts. Defaults to \code{FALSE}.
+#' @param clean_remote Logical. If \code{TRUE}, files present on AWS but not in the 
+#'   \code{transformed_file_list} will be deleted from the S3 bucket. Defaults to \code{FALSE}.
+#'   Use with caution as this can delete files during testing.
 #' @param ... Additional arguments (currently unused).
 #'
 #' @return A character vector of messages describing the outcomes of file upload attempts, 
-#'   including successful uploads, skipped files, and cleanup operations.
+#'   including successful uploads, failed uploads, skipped files, and cleanup operations.
 #'
 #' @note 
 #' Required environment variables:
 #' \itemize{
 #'   \item \code{AWS_ACCESS_KEY_ID}: AWS access key
 #'   \item \code{AWS_SECRET_ACCESS_KEY}: AWS secret access key
-#'   \item \code{AWS_REGION}: AWS region
+#'   \item \code{AWS_REGION}: AWS region (can be "auto" for automatic detection)
 #'   \item \code{AWS_BUCKET_ID}: S3 bucket identifier
+#'   \item \code{AWS_S3_ENDPOINT}: S3 endpoint URL (optional, for custom S3-compatible services)
 #' }
 #' These environment variables must be set prior to calling the function, typically 
 #' in a .env file or system environment.
 #'
 #' @examples
 #' \dontrun{
-#' # Upload transformed CSV files from a local directory
+#' # Upload transformed Parquet files from a local directory
 #' AWS_put_files(
-#'   transformed_file_list = c("file1.csv", "file2.csv"),
-#'   local_folder = "./transformed_data"
+#'   transformed_file_list = c("./data/file1.parquet", "./data/file2.parquet"),
+#'   local_folder = "./data"
 #' )
 #' 
 #' # Upload with overwrite option
 #' AWS_put_files(
-#'   transformed_file_list = c("file1.csv", "file2.csv"),
-#'   local_folder = "./transformed_data",
+#'   transformed_file_list = c("./data/file1.parquet", "./data/file2.parquet"),
+#'   local_folder = "./data",
 #'   overwrite = TRUE
+#' )
+#' 
+#' # Upload and clean remote files not in the transformed list
+#' AWS_put_files(
+#'   transformed_file_list = c("./data/file1.parquet"),
+#'   local_folder = "./data",
+#'   clean_remote = TRUE
 #' )
 #' }
 #'
 #' @importFrom aws.s3 get_bucket put_object delete_object
-#' @importFrom arrow open_dataset
+#' @importFrom arrow open_dataset s3_bucket ParquetFileReader
 #' @importFrom glue glue
-#' @importFrom purrr possibly
-#' @importFrom dplyr pull
+#' @importFrom purrr possibly map_chr pluck
 #'
 #' @export
 AWS_put_files <- function(transformed_file_list,
                           local_folder,
                           overwrite = FALSE,
+                          clean_remote = FALSE, # Remove files on AWS that aren't in transformed file target?
                           ...) {
 
   # Check if AWS credentials and region are set in the environment
@@ -229,26 +239,34 @@ AWS_put_files <- function(transformed_file_list,
 
   # Walk through local_folder_files
   for (file in local_folder_files) {
+
     # Is the file in the transformed_file_list?
     if (file %in% transformed_file_list) {
+      
       # Check that schemas match
-    fs <- arrow::s3_bucket(
-      bucket = Sys.getenv("AWS_BUCKET_ID"),
-      endpoint_override = Sys.getenv("AWS_S3_ENDPOINT"),
-      region = "auto"
-    )
+      fs <- arrow::s3_bucket(
+        bucket = Sys.getenv("AWS_BUCKET_ID"),
+        endpoint_override = Sys.getenv("AWS_S3_ENDPOINT"),
+        region = "auto"
+      )
+      remote_schema <- tryCatch({
+        pf <- arrow::ParquetFileReader$create(fs$OpenInputFile(file))
+        pf$GetSchema()
+      }, error = function(e) NULL)
 
-      # Open the Parquet file without reading all data
-      pf <- arrow::ParquetFileReader$create(fs$OpenInputFile(file))
-
-      # Get schema and heck number of rows > 0 
-      remote_schema <- pf$GetSchema()
-      remote_rows <- pf$num_rows
+      remote_rows <- 0
+      if(!is.null(remote_schema)) remote_rows <- pf$num_rows
+      
       local_schema <- error_safe_open_dataset(file)
+      # Get local row count
+      local_rows <- tryCatch({
+        local_ds <- arrow::open_dataset(file) # Open_dataset because faster than read_data wich collects()
+        local_ds$num_rows
+      }, error = function(e) 0)
 
-      if (is.null(remote_schema) || !remote_schema$Equals(local_schema) || overwrite == TRUE || remote_rows == 0) {
+      if (is.null(remote_schema) || !remote_schema$Equals(local_schema) || remote_rows != 0 || overwrite == TRUE) {
         # Put the file on S3 using aws.s3
-        aws.s3::put_object(
+        upload_result <- aws.s3::put_object(
           file = file,
           object = file,
           multipart = TRUE,
@@ -257,7 +275,11 @@ AWS_put_files <- function(transformed_file_list,
           region = aws_region
         )
 
-        outcome <- glue::glue("Uploading {basename(file)} to AWS")
+        if (upload_result) {
+          outcome <- glue::glue("Successfully uploaded {basename(file)} to AWS")
+        } else {
+          outcome <- glue::glue("Failed to upload {basename(file)} to AWS")
+        }
       } else {
         outcome <- glue::glue("{basename(file)} with matching schema already present on AWS and overwrite set to FALSE")
       }
@@ -265,7 +287,9 @@ AWS_put_files <- function(transformed_file_list,
       # Remove the file from AWS if it's present in the folder and on AWS
       # but not in the list of successfully transformed files. This file is
       # not relevant to the pipeline
-      if (file %in% s3_files) {
+      # NOTE: This can delete a bunch of stuff if you're testing the function with only
+      # one file in transformed_file_list
+      if (file %in% s3_files & clean_remote == TRUE) {
         outcome <- glue::glue("Cleaning up dangling file {basename(file)} from AWS")
 
         # Remove the file from AWS using aws.s3
