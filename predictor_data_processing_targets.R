@@ -761,7 +761,8 @@ derived_data_targets <- tar_plan(
     weather_historical_means_directory,
     overwrite = parse_flag("OVERWRITE_HISTORICAL_MEANS")
   ),
-  error = "null"
+  error = "null",
+  cue = tar_cue("always")
   ),
   
   tar_target(

@@ -54,7 +54,8 @@ AWS_get_folder <- function(local_folder,
       # Return row count if successful and has data
       if (row_count > 0) {
         return(row_count)
-      } else {
+ 
+     } else {
         return(0)  # Empty file
       }
     },
@@ -216,7 +217,7 @@ AWS_put_files <- function(transformed_file_list,
   # Create a possibly-wrapped version of the function
   error_safe_open_dataset <- possibly(
     function(file) {
-      arrow::open_dataset(file)$schema
+      arrow::open_dataset(file)
     },
     otherwise = NULL
   )
@@ -243,28 +244,11 @@ AWS_put_files <- function(transformed_file_list,
     # Is the file in the transformed_file_list?
     if (file %in% transformed_file_list) {
       
-      # Check that schemas match
-      fs <- arrow::s3_bucket(
-        bucket = Sys.getenv("AWS_BUCKET_ID"),
-        endpoint_override = Sys.getenv("AWS_S3_ENDPOINT"),
-        region = "auto"
-      )
-      remote_schema <- tryCatch({
-        pf <- arrow::ParquetFileReader$create(fs$OpenInputFile(file))
-        pf$GetSchema()
-      }, error = function(e) NULL)
+      # Get dataset object
+      remote_dataset <- error_safe_open_dataset(paste0("s3://", Sys.getenv("AWS_BUCKET_ID"), "/", file))
+      local_dataset <- error_safe_open_dataset(file)
 
-      remote_rows <- 0
-      if(!is.null(remote_schema)) remote_rows <- pf$num_rows
-      
-      local_schema <- error_safe_open_dataset(file)
-      # Get local row count
-      local_rows <- tryCatch({
-        local_ds <- arrow::open_dataset(file) # Open_dataset because faster than read_data wich collects()
-        local_ds$num_rows
-      }, error = function(e) 0)
-
-      if (is.null(remote_schema) || !remote_schema$Equals(local_schema) || remote_rows != 0 || overwrite == TRUE) {
+      if (is.null(remote_dataset) || !remote_dataset$schema$Equals(local_dataset$schema) || remote_dataset$num_rows != local_dataset$num_rows || overwrite == TRUE) {
         # Put the file on S3 using aws.s3
         upload_result <- aws.s3::put_object(
           file = file,
@@ -281,7 +265,7 @@ AWS_put_files <- function(transformed_file_list,
           outcome <- glue::glue("Failed to upload {basename(file)} to AWS")
         }
       } else {
-        outcome <- glue::glue("{basename(file)} with matching schema already present on AWS and overwrite set to FALSE")
+        outcome <- glue::glue("{basename(file)} with the same number of rows and a matching schema already present on AWS and overwrite set to FALSE")
       }
     } else {
       # Remove the file from AWS if it's present in the folder and on AWS
