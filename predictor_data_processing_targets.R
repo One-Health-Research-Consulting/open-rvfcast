@@ -1014,7 +1014,7 @@ REMIT_targets <- tar_plan(
                ## analogs elsewhere in the dataset  
                #   "solar_rad"        = "ALLSKY_SFC_SW_DWN"
                # , "clouds"           = "CLOUD_AMT"
-               "evapotrans"       = "EVPTRNS"
+                 "evapotrans"       = "EVPTRNS"
                , "soil_moisture"    = "GWETPROF"
                , "precipitation"    = "PRECTOTCORR"
                , "spec_humid_2m"    = "QV2M"
@@ -1027,12 +1027,13 @@ REMIT_targets <- tar_plan(
                , "surface_temp_avg" = "TS"
                , "wind_speed_10m"   = "WS10M"
                , "wind_speed_2m"    = "WS2M"))
-  , tar_target(nasa_weather_transformed_REMIT
+  , tar_target(REMIT_weather_vars_N, c("evap_land" = "EVLAND", "surface_wetness" = "GWETTOP"))
+  , tar_target(nasa_weather_transformed_REMIT_N
                , fetch_and_transform_nasa_weather(
-                 months_to_process
-                 , REMIT_weather_vars
+                   months_to_process
+                 , REMIT_weather_vars_N
                  , continent_raster_template
-                 , local_folder = "data/nasa_weather_transformed_REMIT"
+                 , local_folder = "data/nasa_weather_transformed_REMIT_N"
                  , basename_template = "nasa_weather_transformed_{months_to_process}.parquet"
                  , endpoint = "https://power-datastore.s3.amazonaws.com/v10/daily/{year}/{month}/power_10_daily_{yyyymmdd}_merra2_lst.nc"
                  , overwrite = FALSE
@@ -1043,7 +1044,7 @@ REMIT_targets <- tar_plan(
                , format = "file")
   , tar_target(nasa_weather_summarized_REMIT
                , summarize_REMIT_weather_data(
-                 dat          = nasa_weather_transformed_REMIT
+                   dat          = nasa_weather_transformed_REMIT
                  , weather_vars = REMIT_weather_vars
                  , yrs          = seq(2005, 2025)
                  , path_to_out  = "data/nasa_weather_summarized_REMIT")

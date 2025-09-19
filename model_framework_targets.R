@@ -28,11 +28,23 @@ parse_flag <- function(flags, cue = F) {
 model_data_targets <- tar_plan(
 
   ## Eventually will want to download the data from the S3 bucket, but for now load from local
-  tar_target(region_data_path, "data/RSF_cleaned_response_data/RSF_cleaned_response_data.parquet")
-, tar_target(region_data, read_parquet(region_data_path) %>% ungroup())
+   ## Sub Region (e.g., Country) and Sub-Sub Regions (e.g., adm2 -- i.e., district or county) of interest
+  tar_target(region_name, "pan")
+, tar_target(region_data_path
+             , paste("data/", region_name, "_joined_response_data/"
+               , region_name, "_joined_response_data_final.parquet"
+               , sep = "")
+  )
+, tar_target(region_data, read_parquet(region_data_path) %>% ungroup() %>%
+               mutate(index = seq(n()), .before = 1)
+  )
 
-  ## Sub-regions of region of interest
-, tar_target(region_districts, rgeoboundaries::geoboundaries("South Africa", "adm2"))
+  ## Pulls all African countries. Alternatively can just provide a single country
+   ## directly to get_region_districts below
+, tar_target(which_countries, unique(region_data$Country))
+
+  ## Sub-regions of region[s] of interest
+, tar_target(region_districts, get_region_districts(which_countries))
 
   ## Last date of the training data set (all data beyond this date will be set aside for final model evaluation)
 , tar_target(end_date, as.Date("2020-12-19"))
@@ -55,7 +67,6 @@ cross_validation_targets <- tar_plan(
     ## Prevent overlap in training and test, so start test after the end of the forecast horizon 
      ## from the last training date
   , end_date         = end_date
-  , forecast_horizon = forecast_horizon
   ))
   
   ## Generate CV folds for training data
@@ -71,21 +82,22 @@ cross_validation_targets <- tar_plan(
      ## the 3 month lag for the variables for no overlap
     , step_size         = max_lag_period 
     ## 10 Seems sensible to me for a start
-    , n_spatial_folds   = 10
+    , n_spatial_folds   = 20
     , district_id_col   = "shapeName"
     , seed              = 10001
     ))
     
   ## Collapse these based on some criteria of "information content" 
 , tar_target(folded_data_training, clean_folded_data(
-     data                     = folded_data_training_raw
+     raw_data                 = splitted_data$train_data
+   , folded_data              = folded_data_training_raw
    , epidemic_threshold_total = 10
    , epidemic_threshold_space = 3
   ))
 
  ## Generate test cases for assessing model performance
 , tar_target(folded_data_testing, fold_data(
-    data              = tibble(test_data = region_data %>% list())
+    data              = tibble(test_data = region_data %>% dplyr::filter(forecast_interval == forecast_horizon) %>% list())
   , type              = "test_data"
   , sf_districts      = region_districts
   , assess_time_chunk = forecast_horizon + max_lag_period
@@ -126,21 +138,17 @@ model_tuning_targets <- tar_plan(
       , min_n(range          = c(minn_min, minn_max))
       , loss_reduction(range = c(loss_red_min, loss_red_max))
       ## Arbitrary choice here in which train_inner, shouldn't really matter
-      , finalize(mtry()      , folded_data_training$inner_folds$train_inner[[10]])
+      , finalize(mtry()      , folded_data_training$inner_folds[[20]] %>% 
+                   left_join(., splitted_data$train_data[[1]], by = "index") %>% filter(cluster != 1))
       ## Total number of combinations of hyperparameters
       , size = 40 
       )
-    )
+    ) %>% mutate(index = seq(n()), .before = 1)
   )
 
-, tar_target(id_cols, c("shapeName","date"))
-
-  ## Extract out inner folds for mapping as "you cannot branch over branches or global objects"
-, tar_target(extracted_inner_folds, folded_data_training$inner_folds)
-, tar_target(extracted_outer_folds, folded_data_training$outer_folds)
+, tar_target(id_cols, c("shapeName", "Country", "date", "index"))
 
   ## Set up location for saving intermediate output
-, tar_target(region_name, "RSF")
 , tar_target(outer_folds_dir, create_data_directory(
     directory_path = paste("outputs/", region_name, "_model_tuning_inner", sep = "")
   ))
@@ -151,16 +159,23 @@ model_tuning_targets <- tar_plan(
   directory_path = paste("outputs/", region_name, "_final_model_fits", sep = "")
 ))
 
+  ## NOTE: temp check for debugging purposes
+, tar_target(folded_data_training_debug, folded_data_training[c(1, 10, 21), ])
+, tar_target(tuning_grid_debug, tuning_grid[1:3, ])
+, tar_target(folded_data_testing_debug, folded_data_testing[1:3, ])
+
   ## Fit across tuning_grid across all inner folds of all outer folds
+  ## NOTE: temporary minimal for working on downstream pipeline
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
-      inner_data  = extracted_inner_folds
-    , outer_data  = extracted_outer_folds
-    , tuning_grid = tuning_grid
+      folded_data = folded_data_training_debug
+    , raw_data    = splitted_data
+    , tuning_grid = tuning_grid_debug
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
     , overwrite   = FALSE
+    , debugging   = TRUE
     )
-  , pattern = map(extracted_inner_folds)
+  , pattern = cross(folded_data_training_debug, tuning_grid_debug)
  )
 
   ## Join together all tuned inner folds and select the best per outer fold
@@ -168,14 +183,16 @@ model_tuning_targets <- tar_plan(
     inner_folds = tuned_results_per_outer_fold
   ))
 
-  ## Take the tuned inner folds and fit 
+  ## Fit each outer fold with the best inner fold hyperparameter for each of these outer folds
 , tar_target(tuned_results_across_outer_folds, tune_results_across_outer_folds(
-    data           = extracted_outer_folds
+    outer_data     = folded_data_training_debug
+  , raw_data       = splitted_data
   , hyperparm_sets = tuned_results_joined
   , id_cols        = id_cols
   , out_dir        = outer_folds_dir2
   , overwrite      = FALSE
   )
+  , pattern = map(folded_data_training_debug)
  )
 
   ## Extract the best parameter set
@@ -190,16 +207,17 @@ model_tuning_targets <- tar_plan(
 ## Fitting of model on holdout data --------------------------------------------
 model_fitting_targets <- tar_plan(
   
-  ## Could maybe parallelize, but with no tune_grid this should be reasonably quick
-   ## even with the refits
+  ## Use the finalized hyperparameters to fit the model for all of the chunks of time that
+   ## make up the testing phase
   tar_target(fitted_model, fit_model(
     final_hyper_set = finalized_hyperparameters
-  , full_data       = folded_data_testing
+  , full_data       = folded_data_testing_debug
+  , raw_data        = splitted_data
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
   , overwrite       = FALSE
   )
-  , pattern = map(folded_data_testing)
+  , pattern = map(folded_data_testing_debug)
   )
   
 )

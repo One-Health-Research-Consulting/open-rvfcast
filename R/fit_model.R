@@ -5,6 +5,7 @@
 
 #' @param final_hyper_set The choice of hyperparameters for final model fitting
 #' @param full_data Full training set and test data
+#' @param raw_data complete set of raw data
 #' @param id_cols Columns that define a unique data point
 #' @param out_dir Where to save output
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
@@ -12,7 +13,7 @@
 #' @author Morgan Kain
 #' @export
 
-fit_model <- function(final_hyper_set, full_data, id_cols, out_dir, overwrite) {
+fit_model <- function(final_hyper_set, full_data, raw_data, id_cols, out_dir, overwrite) {
   
   ## Set filename
   save_filename <- paste(
@@ -32,10 +33,23 @@ fit_model <- function(final_hyper_set, full_data, id_cols, out_dir, overwrite) {
   }
   
   ## Extract the needed data
-  outer_tbl_train  <- full_data$train_data[[1]] %>% 
+  ## 1) full amount of training data (all the stuff from the hyperparameter tuning step)
+  outer_tbl_train_train   <- raw_data$train_data[[1]] %>% 
+    dplyr::filter(index %in% full_data$train_data[[1]]) %>% 
     dplyr::select(-c(forecast_interval, cases)) %>%
     mutate(outbreak = factor(outbreak, levels = c(1, 0)))
-  outer_tbl_assess <- full_data$assess_data[[1]] %>% 
+  
+  ## 2) some portion of the data from the left-out period depending on what forecast window
+   ## is being predicted
+  outer_tbl_train_assess  <- raw_data$test_data[[1]] %>% 
+    dplyr::filter(index %in% full_data$train_data[[1]]) %>% 
+    dplyr::select(-c(forecast_interval, cases)) %>%
+    mutate(outbreak = factor(outbreak, levels = c(1, 0)))
+  
+  outer_tbl_train <- rbind(outer_tbl_train_train, outer_tbl_train_assess)
+  
+  outer_tbl_assess  <- raw_data$test_data[[1]] %>% 
+    dplyr::filter(index %in% full_data$assess_data[[1]]) %>% 
     dplyr::select(-c(forecast_interval, cases)) %>%
     mutate(outbreak = factor(outbreak, levels = c(1, 0)))
   
@@ -75,7 +89,7 @@ fit_model <- function(final_hyper_set, full_data, id_cols, out_dir, overwrite) {
   model_fit <- tibble(
     fit         = model_fit %>% list()
   , preds       = preds %>% list()
-  , hyperparams = best_set %>% list()
+  , hyperparams = final_hyper_set %>% list()
   , metrics     = metric_evals %>% list()
   )
   

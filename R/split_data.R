@@ -5,17 +5,16 @@
 
 #' @param dat Complete region_data
 #' @param end_date last day of training data
-#' @param forecast_horizon window of prediction
 #' @return Tibble containing training and test data
 #' @author Morgan Kain
 #' @export
 
-split_data <- function(dat, end_date, forecast_horizon) {
+split_data <- function(dat, end_date) {
   
   #### Split data into training and test sets -------------------------------------
   
-  train_data <- dat %>% filter(date <= end_date)
-  test_data  <- dat %>% filter(date >= (end_date + forecast_horizon))
+  train_data <- dat %>% filter(date <= end_date) 
+  test_data  <- dat %>% filter(date > end_date)
   
   ## Alternative using tidymodels
   #first_date_of_test <- unique(dat$date)[which(unique(dat$date) >= end_date)[1]]
@@ -24,7 +23,6 @@ split_data <- function(dat, end_date, forecast_horizon) {
   #train_data <- data_split %>% training()
   #test_data  <- data_split %>% testing()
 
-  
   return(
     tibble(
       train_data = train_data %>% ungroup() %>% list()
