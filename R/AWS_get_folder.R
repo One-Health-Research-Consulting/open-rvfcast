@@ -204,6 +204,8 @@ AWS_put_files <- function(transformed_file_list,
                           clean_remote = FALSE, # Remove files on AWS that aren't in transformed file target?
                           ...) {
 
+  library(arrow)
+
   # Check if AWS credentials and region are set in the environment
   if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
     msg <- paste(
@@ -214,13 +216,16 @@ AWS_put_files <- function(transformed_file_list,
     stop(msg)
   }
 
-  # Create a possibly-wrapped version of the function
-  error_safe_open_dataset <- possibly(
-    function(file) {
-      arrow::open_dataset(file)
-    },
-    otherwise = NULL
-  )
+  # Create a error tolerant version of the function
+  error_safe_open_dataset <- function(file, fs = NULL) {
+    tryCatch({
+      arrow::open_dataset(file, filesystem = fs)
+    }, error = function(e) {
+      cat("Error opening dataset for file:", file, "\n")
+      cat("Error message:", e$message, "\n")
+      return(NULL)
+    })
+  }
 
   aws_region = if (Sys.getenv("AWS_REGION") == "auto") "" else Sys.getenv("AWS_REGION")
 
@@ -231,6 +236,13 @@ AWS_put_files <- function(transformed_file_list,
                                        base_url = Sys.getenv("AWS_S3_ENDPOINT"))
                                         
   s3_files <- map_chr(df_bucket_data, pluck, "Key")
+
+  s3_fs <- arrow::S3FileSystem$create(
+    endpoint_override = Sys.getenv("AWS_S3_ENDPOINT"),
+    region = aws_region,
+    access_key = Sys.getenv("AWS_ACCESS_KEY_ID"),
+    secret_key = Sys.getenv("AWS_SECRET_ACCESS_KEY")
+  )
 
   # Get files in local folder
   local_folder_files <- list.files(path = local_folder, recursive = TRUE, full.names = TRUE)
@@ -245,10 +257,11 @@ AWS_put_files <- function(transformed_file_list,
     if (file %in% transformed_file_list) {
       
       # Get dataset object
-      remote_dataset <- error_safe_open_dataset(paste0("s3://", Sys.getenv("AWS_BUCKET_ID"), "/", file))
+      remote_dataset <- error_safe_open_dataset(paste0(Sys.getenv("AWS_BUCKET_ID"), "/", file), fs = s3_fs)
       local_dataset <- error_safe_open_dataset(file)
 
       if (is.null(remote_dataset) || !remote_dataset$schema$Equals(local_dataset$schema) || remote_dataset$num_rows != local_dataset$num_rows || overwrite == TRUE) {
+
         # Put the file on S3 using aws.s3
         upload_result <- aws.s3::put_object(
           file = file,
