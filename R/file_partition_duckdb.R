@@ -50,10 +50,17 @@ file_partition_duckdb <- function(sources, # A named, nested list of parquet fil
 
   # Check if file already exists and can be read
   error_safe_read_parquet <- purrr::possibly(arrow::open_dataset, NULL)
+  existing_dataset <- error_safe_read_parquet(save_filename)
 
-  if (!is.null(error_safe_read_parquet(save_filename)) & !overwrite) {
-    message("file already exists and can be loaded, skipping download")
-    return(save_filename)
+  if(!is.null(existing_dataset) & !overwrite) {
+    # Check if file has data - if zero rows, overwrite anyway
+    row_count <- existing_dataset |> count() |> collect() |> pull(n)
+    if(row_count > 0) {
+      message("file already exists and can be loaded, skipping download")
+      return(save_filename)
+    } else {
+      message("file exists but has zero rows, overwriting")
+    }
   }
 
   # Create a connect to a DuckDB database

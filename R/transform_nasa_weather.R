@@ -76,24 +76,24 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
   failed_downloads <- c()
   
   # This errors if any of the files in the month are wrong. 
-  nasa_recorded_weather <- map_df(dates, .progress = TRUE, function(yyyymmdd) {
+  nasa_recorded_weather <- purrr::map_df(dates, .progress = TRUE, function(yyyymmdd) {
     
     # Establish NetCDF filename. This uses glue to inject yyyymmdd.
     nc_file <- file.path(local_folder, glue::glue(endpoint) |> basename())
     
-    response <- request(glue::glue(endpoint)) |>
-      req_error(is_error = \(resp) FALSE) |>  # Handle errors gracefully
-      req_perform(path = nc_file)  # Automatically writes to fileSE
+    response <- httr2::request(glue::glue(endpoint)) |>
+      httr2::req_error(is_error = \(resp) FALSE) |>  # Handle errors gracefully
+      httr2::req_perform(path = nc_file)  # Automatically writes to file
 
     if(httr2::resp_is_error(response)) {
-      message(glue::glue("Failed to fetch {basename(file)}. Reponse: {response$status_code}"))
+      message(glue::glue("Failed to fetch {basename(nc_file)}. Response: {response$status_code}"))
       if(response$status_code == 404) message("404 errors generally mean Nasa hasn't added the data for that date to the S3 bucket yet")
       failed_downloads <<- c(failed_downloads, yyyymmdd)
       return(NULL)
     }
 
     # Map across variable types
-    results <- imap(nasa_weather_variables, function(var, name) {
+    results <- purrr::imap(nasa_weather_variables, function(var, name) {
 
       # Read in raw raster of given var and set CRS
       raw_raster <- terra::rast(nc_file, subds = var)
@@ -108,7 +108,7 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
       terra::as.data.frame(transformed_raster, xy = TRUE)
     }) |> 
       plyr::join_all(by = c("x", "y")) |>
-      mutate(date = lubridate::ymd(yyyymmdd))
+      dplyr::mutate(date = lubridate::ymd(yyyymmdd))
 
       # Clean up file
       file.remove(nc_file)
@@ -121,8 +121,8 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
     return(NULL)
   } 
   
-  nasa_recorded_weather |>
-  mutate(year = year,
+  nasa_recorded_weather <- nasa_recorded_weather |>
+  dplyr::mutate(year = year,
          month = month,
          day = lubridate::day(date),
          doy = lubridate::yday(date)) |>

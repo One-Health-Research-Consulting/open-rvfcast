@@ -33,7 +33,7 @@
 calculate_weather_anomalies <- function(nasa_weather_transformed,
                                         weather_historical_means,
                                         weather_anomalies_directory,
-                                        basename_template = "weather_anomaly_{dates_to_process.parquet",
+                                        basename_template = "weather_anomaly_{dates_to_process}.parquet",
                                         dates_to_process,
                                         overwrite = FALSE,
                                         ...) {
@@ -47,22 +47,29 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
 
   # Check if file already exists and can be read
   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
+  existing_dataset <- error_safe_read_parquet(save_filename)
 
-  if (!is.null(error_safe_read_parquet(save_filename)) & !overwrite) {
-    message("file already exists and can be loaded, skipping download")
-    return(save_filename)
+  if(!is.null(existing_dataset) & !overwrite) {
+    # Check if file has data - if zero rows, overwrite anyway
+    row_count <- existing_dataset |> count() |> collect() |> pull(n)
+    if(row_count > 0) {
+      message("file already exists and can be loaded, skipping download")
+      return(save_filename)
+    } else {
+      message("file exists but has zero rows, overwriting")
+    }
   }
 
   # Open dataset to transformed data
   weather_transformed_dataset <- arrow::open_dataset(nasa_weather_transformed) |>
-    filter(date == dates_to_process) |>
-    collect()
+    dplyr::filter(date == dates_to_process) |>
+    dplyr::collect()
 
   doy_to_process <- as.numeric(lubridate::yday(dates_to_process))
   
   # Open dataset to historical weather data
   historical_means <- arrow::open_dataset(weather_historical_means) |>
-    filter(doy == doy_to_process) |>
+    dplyr::filter(doy == doy_to_process) |>
     collect() |>
     drop_na()
 

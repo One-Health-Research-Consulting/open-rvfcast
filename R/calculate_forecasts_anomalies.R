@@ -47,10 +47,17 @@ calculate_forecast_anomalies <- function(ecmwf_forecast_transformed,
 
   # Check if file already exists and can be read
   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
+  existing_dataset <- error_safe_read_parquet(save_filename)
 
-  if (!is.null(error_safe_read_parquet(save_filename)) & !overwrite) {
-    message("file already exists and can be loaded, skipping download")
-    return(save_filename)
+  if(!is.null(existing_dataset) & !overwrite) {
+    # Check if file has data - if zero rows, overwrite anyway
+    row_count <- existing_dataset |> count() |> collect() |> pull(n)
+    if(row_count > 0) {
+      message("file already exists and can be loaded, skipping download")
+      return(save_filename)
+    } else {
+      message("file exists but has zero rows, overwriting")
+    }
   }
 
   # Notes:

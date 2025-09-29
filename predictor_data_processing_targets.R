@@ -369,6 +369,30 @@ static_targets <- tar_plan(
 # Dynamic Data Download -----------------------------------------------------------
 dynamic_targets <- tar_plan(
 
+
+  # NCL: This function produces a random sampling of n_per_month dates for every month
+  # in every year between start_year and end_year. If a new year is added, the
+  # random draws for the previous years won't change unless the seed is updated.
+  # Ideally we want to make the full dataset for every day and store it then subset
+  # only right before fitting the model.
+  tar_target(dates_to_process, set_model_dates(
+    start_year = 2005,
+    end_year = lubridate::year(Sys.time()),
+    n_per_month = NULL,
+    seed = 212
+  ),
+  iteration = "list",
+  cue = tar_cue("always")),
+
+ tar_target(months_to_process,
+    tibble(month = dates_to_process |>
+             format("%Y-%m") |>
+             unique()) |>
+      group_by(month) |>
+      tar_group(),
+    iteration = "group"),
+
+
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
   # 10 day period
@@ -564,13 +588,13 @@ dynamic_targets <- tar_plan(
       sentinel_ndvi_transformed,
       ndvi_transformed_directory,
       basename_template = "ndvi_transformed_{.y}_{.m}.parquet",
-      ndvi_years,
-      ndvi_months = 1:12,
+      months_to_process$month,
       overwrite = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED"))
     ),
+    pattern = map(months_to_process),
     format = "file",
-    repository = "local",
-    error = "null"
+    error = "null",
+    repository = "local"
   ),
 
   # Put ndvi_transformed files on AWS
@@ -587,8 +611,6 @@ dynamic_targets <- tar_plan(
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
   # T2M             MERRA-2 Temperature at 2 Meters (C) ;
   # PRECTOTCORR     MERRA-2 Precipitation Corrected (mm/day)
-
-  tar_target(months_to_process, dates_to_process |> format("%Y-%m") |> unique()),
 
   tar_target(
     nasa_weather_transformed_directory,
@@ -611,7 +633,7 @@ dynamic_targets <- tar_plan(
   # cue set to 'always' so that current year can be updated.
   # the rest of the years will respect the overwrite flag.
   tar_target(nasa_weather_transformed,
-             fetch_and_transform_nasa_weather(months_to_process,
+             fetch_and_transform_nasa_weather(months_to_process$month,
                                               nasa_weather_variables = c("relative_humidity" = "RH2M", "temperature" = "T2M", "precipitation" = "PRECTOTCORR"),
                                               continent_raster_template,
                                               local_folder = nasa_weather_transformed_directory,
@@ -623,8 +645,7 @@ dynamic_targets <- tar_plan(
              ),
              pattern = map(months_to_process),
              error = "null",
-             format = "file",
-             # repository = "local"
+             format = "file"
   ),
   
   # Put nasa_weather files on AWS
@@ -695,7 +716,7 @@ dynamic_targets <- tar_plan(
     repository = "local"
   ),
 
-  # Next step put modis_ndvi_transformed files on AWS.
+  # Next step put ecmwf_forecasts files on AWS.
   tar_target(ecmwf_forecasts_transformed_AWS_upload, AWS_put_files(
       ecmwf_forecasts_transformed,
       ecmwf_forecasts_transformed_directory,
@@ -712,19 +733,6 @@ derived_data_targets <- tar_plan(
   # 0-30, 30-60, 60-90 days out ect...
   # Right now 5 months foreward
   tar_target(forecast_intervals, c(0, 30, 60, 90, 120, 150)),
-
-  # NCL: This function produces a random sampling of n_per_month dates for every month
-  # in every year between start_year and end_year. If a new year is added, the
-  # random draws for the previous years won't change unless the seed is updated.
-  # Ideally we want to make the full dataset for every day and store it then subset
-  # only right before fitting the model.
-  tar_target(dates_to_process, set_model_dates(
-    start_year = 2005,
-    end_year = lubridate::year(Sys.time()),
-    n_per_month = NULL,
-    seed = 212
-  ),
-  cue = tar_cue("always")),
 
   # Recorded weather anomalies --------------------------------------------------
   tar_target(
