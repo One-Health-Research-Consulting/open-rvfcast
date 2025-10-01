@@ -30,6 +30,11 @@ AWS_get_folder <- function(local_folder,
                            skip_fetch = FALSE,
                            sync_with_remote = FALSE,
                            ...) {
+  # Return immediately if skip_fetch is TRUE
+  if (skip_fetch) {
+    return(character(0))
+  }
+
   # Check if AWS credentials and region are set in the environment
   if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
     msg <- paste(
@@ -39,7 +44,7 @@ AWS_get_folder <- function(local_folder,
     )
     stop(msg)
   }
-  
+
   aws_region = if (Sys.getenv("AWS_REGION") == "auto") "" else Sys.getenv("AWS_REGION")
 
   # Create a comprehensive validation function that checks both readability and row count
@@ -278,7 +283,7 @@ AWS_put_files <- function(transformed_file_list,
           outcome <- glue::glue("Failed to upload {basename(file)} to AWS")
         }
       } else {
-        outcome <- glue::glue("{basename(file)} with the same number of rows and a matching schema already present on AWS and overwrite set to FALSE")
+        outcome <- glue::glue("{basename(file)} already exists on AWS with matching rows and schema and overwrite is not TRUE, skipping upload")
       }
     } else {
       # Remove the file from AWS if it's present in the folder and on AWS

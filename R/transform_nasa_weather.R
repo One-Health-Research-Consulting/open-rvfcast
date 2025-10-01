@@ -68,7 +68,7 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
   
   # Check if transformed file already exists and can be loaded. If so return file name and path
   if(!is.null(existing_data) & overwrite == FALSE) {
-    message("File already exists and can be loaded, skipping processing")
+    message(glue::glue("{basename(transformed_file)} already exists, has rows, and overwrite is not TRUE, skipping"))
     return(transformed_file)
   }
 

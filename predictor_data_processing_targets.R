@@ -381,17 +381,9 @@ dynamic_targets <- tar_plan(
     n_per_month = NULL,
     seed = 212
   ),
-  iteration = "list",
   cue = tar_cue("always")),
 
- tar_target(months_to_process,
-    tibble(month = dates_to_process |>
-             format("%Y-%m") |>
-             unique()) |>
-      group_by(month) |>
-      tar_group(),
-    iteration = "group"),
-
+  tar_target(months_to_process, dates_to_process |> format("%Y-%m") |> unique()),
 
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
@@ -428,7 +420,6 @@ dynamic_targets <- tar_plan(
       sentinel_ndvi_token_file,
       basename_template = "transformed_sentinel_NDVI_{start_date}_to_{end_date}.parquet",
       overwrite = parse_flag("OVERWRITE_SENTINEL_NDVI"),
-      get_sentinel_ndvi_AWS
     ),
     pattern = map(sentinel_ndvi_api_parameters),
     error = "null", # Keep going if error. It will be caught next time the pipeline is run.
@@ -576,22 +567,28 @@ dynamic_targets <- tar_plan(
 
   tar_target(ndvi_years, lubridate::year(modis_task_end_dates)),
 
-  # Combine modis and sentinel datasets into a single source for lagging
-  # There is some kind of bug between targets and arrow which interferes
-  # when branching over ndvi_years. I end up with empty parquet files
-  # I have no idea why pattern = map(ndvi_years) breaks things.
-  # Solution is to not use dynamic branching here.
-  # Note: MODIS and Sentinel raw data need to be scaled. 
+  # Create intermediary target pairing each month with relevant MODIS and Sentinel files
+  tar_target(ndvi_transformed_sources,
+    create_ndvi_transformed_sources(
+      modis_ndvi_transformed,
+      sentinel_ndvi_transformed,
+      months_to_process
+    ) |>
+      group_by(month) |>
+      tar_group(),
+    iteration = "group"
+  ),
+
+  # Note: MODIS and Sentinel raw data need to be scaled.
   # MODIS/10000 and Sentinel/200
   tar_target(ndvi_transformed,
-    transform_ndvi(modis_ndvi_transformed,
-      sentinel_ndvi_transformed,
+    transform_ndvi(
+      ndvi_transformed_sources,
       ndvi_transformed_directory,
       basename_template = "ndvi_transformed_{.y}_{.m}.parquet",
-      months_to_process$month,
       overwrite = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED"))
     ),
-    pattern = map(months_to_process),
+    pattern = map(ndvi_transformed_sources),
     format = "file",
     error = "null",
     repository = "local"
@@ -633,7 +630,7 @@ dynamic_targets <- tar_plan(
   # cue set to 'always' so that current year can be updated.
   # the rest of the years will respect the overwrite flag.
   tar_target(nasa_weather_transformed,
-             fetch_and_transform_nasa_weather(months_to_process$month,
+             fetch_and_transform_nasa_weather(months_to_process,
                                               nasa_weather_variables = c("relative_humidity" = "RH2M", "temperature" = "T2M", "precipitation" = "PRECTOTCORR"),
                                               continent_raster_template,
                                               local_folder = nasa_weather_transformed_directory,
@@ -641,7 +638,6 @@ dynamic_targets <- tar_plan(
                                               endpoint = "https://power-datastore.s3.amazonaws.com/v10/daily/{year}/{month}/power_10_daily_{yyyymmdd}_merra2_lst.nc",
                                               overwrite = parse_flag("OVERWRITE_NASA_WEATHER"),
                                               nasa_weather_transformed_AWS, # Enforce Dependency
-                                              dates_to_process, # Enforce Dependency
              ),
              pattern = map(months_to_process),
              error = "null",
@@ -760,7 +756,11 @@ derived_data_targets <- tar_plan(
     weather_historical_means_AWS # Enforce dependency
   ),
   format = "file",
-  repository = "local"
+  repository = "local",
+  cue = tar_cue_age(
+    name = weather_historical_means,
+    age = as.difftime(180, units = "days")  # Recalculate every 6 months
+  )
   ),
 
   # Next step put weather_historical_means files on AWS.
@@ -790,17 +790,18 @@ derived_data_targets <- tar_plan(
   ),
 
   # Weather anomalies are deviations from the historical mean
+  # Branch over months (nasa_weather_transformed) instead of dates
+  # Each branch processes all dates within that month
   tar_target(weather_anomalies,
     calculate_weather_anomalies(
       nasa_weather_transformed,
       weather_historical_means,
       weather_anomalies_directory,
-      basename_template = "weather_anomaly_{dates_to_process}.parquet",
-      dates_to_process,
+      basename_template = "weather_anomaly_{date}.parquet",
       overwrite = parse_flag("OVERWRITE_WEATHER_ANOMALIES"),
-      weather_anomalies_AWS
-    ), # Enforce dependency
-    pattern = map(dates_to_process),
+      weather_anomalies_AWS  # Enforce dependency
+    ),
+    pattern = map(nasa_weather_transformed),
     error = "null",
     format = "file",
     repository = "local"
@@ -840,18 +841,31 @@ derived_data_targets <- tar_plan(
   # on an M1 mac. Expect to take a day to regenerate the data if re-building from
   # scratch.
 
+  # Create intermediary target pairing each date with most recent forecast file
+  # Only includes dates up to the latest forecast month
+  tar_target(forecasts_anomalies_sources,
+    create_forecasts_anomalies_sources(
+      ecmwf_forecasts_transformed,
+      dates_to_process
+    ) |>
+      group_by(date) |>
+      tar_group(),
+    iteration = "group"
+  ),
+
+  # Forecast anomalies - branch over dates
+  # Each branch gets one row from forecasts_anomalies_sources (date + forecast file)
   tar_target(forecasts_anomalies,
-    calculate_forecast_anomalies(ecmwf_forecasts_transformed,
+    calculate_forecast_anomalies(
+      forecasts_anomalies_sources,
       weather_historical_means,
       forecasts_anomalies_directory,
-      basename_template = "forecast_anomaly_{dates_to_process}.parquet",
-      dates_to_process,
+      basename_template = "forecast_anomaly_{date}.parquet",
       forecast_intervals,
       overwrite = parse_flag("OVERWRITE_FORECAST_ANOMALIES"),
-      ecmwf_forecasts_transformed, # Enforce dependency
-      forecasts_anomalies_AWS
-    ), # Enforce dependency
-    pattern = map(dates_to_process),
+      forecasts_anomalies_AWS # Enforce dependency
+    ),
+    pattern = map(forecasts_anomalies_sources),
     error = "null",
     format = "file",
     repository = "local"
@@ -859,10 +873,10 @@ derived_data_targets <- tar_plan(
 
   # Next step put weather_historical_means files on AWS.
   tar_target(forecasts_anomalies_AWS_upload, AWS_put_files(
-      forecasts_anomalies,
-      forecasts_anomalies_directory,
-      overwrite = parse_flag("OVERWRITE_FORECAST_ANOMALIES")
-      ),
+    forecasts_anomalies,
+    forecasts_anomalies_directory,
+    overwrite = parse_flag("OVERWRITE_FORECAST_ANOMALIES")
+    ),
     error = "null"
   ),
 
@@ -892,7 +906,11 @@ derived_data_targets <- tar_plan(
       ndvi_historical_means_AWS # Enforce dependency
     ),
     format = "file",
-    repository = "local"
+    repository = "local",
+    cue = tar_cue_age(
+      name = ndvi_historical_means,
+      age = as.difftime(180, units = "days")  # Recalculate every 6 months
+    )
   ),
 
   # Next step put ndvi_historical_means files on AWS.
@@ -921,16 +939,18 @@ derived_data_targets <- tar_plan(
     cue = tar_cue("always")
   ),
 
+  # NDVI anomalies - branch over months (ndvi_transformed) instead of dates
+  # Each branch processes all dates within that month
   tar_target(ndvi_anomalies,
-    calculate_ndvi_anomalies(ndvi_transformed,
+    calculate_ndvi_anomalies(
+      ndvi_transformed,
       ndvi_historical_means,
       ndvi_anomalies_directory,
-      basename_template = "ndvi_anomaly_{dates_to_process}.parquet",
-      dates_to_process,
+      basename_template = "ndvi_anomaly_{date}.parquet",
       overwrite = parse_flag("OVERWRITE_NDVI_ANOMALIES"),
-      ndvi_anomalies_AWS
-    ), # Enforce dependency
-    pattern = map(dates_to_process),
+      ndvi_anomalies_AWS # Enforce dependency
+    ),
+    pattern = map(ndvi_transformed),
     error = "null",
     format = "file",
     repository = "local"
@@ -968,37 +988,45 @@ full_data_targets <- tar_plan(
     cue = tar_cue("always")
   ),
 
-  # Combine all static and dynamic data layers.
-  # Partition into separate parquet files by month and year.
-  # Why NO WAY to deparse substitute a list of variables?
-  tar_target(africa_full_predictor_data_sources, list(
-    forecasts_anomalies = forecasts_anomalies,
-    weather_anomalies = weather_anomalies,
-    ndvi_anomalies = ndvi_anomalies,
-    soil_preprocessed = soil_preprocessed,
-    aspect_preprocessed = aspect_preprocessed,
-    slope_preprocessed = slope_preprocessed,
-    glw_preprocessed = glw_preprocessed,
-    elevation_preprocessed = elevation_preprocessed,
-    bioclim_preprocessed = bioclim_preprocessed,
-    landcover_preprocessed = landcover_preprocessed
-  )),
+  tar_target(africa_full_predictor_data_sources_static,
+    list(
+      soil_preprocessed = soil_preprocessed,
+      aspect_preprocessed = aspect_preprocessed,
+      slope_preprocessed = slope_preprocessed,
+      glw_preprocessed = glw_preprocessed,
+      elevation_preprocessed = elevation_preprocessed,
+      bioclim_preprocessed = bioclim_preprocessed,
+      landcover_preprocessed = landcover_preprocessed
+    )
+  ),
+
+  tar_target(africa_full_predictor_data_sources_temporal,
+    tibble(
+      date = dates_to_process,
+      forecasts_anomalies = forecasts_anomalies,
+      weather_anomalies = weather_anomalies,
+      ndvi_anomalies = ndvi_anomalies
+    ) |>
+    group_by(date) |>
+    tar_group(),
+    iteration = "group"
+  ),
 
   # Join all explanatory variable data sources using file based partitioning instead of hive
-  # error needs to be null here because some prsedictors (like wahis_outbreak_sources) aren't
+  # error needs to be null here because some predictors (like wahis_outbreak_sources) aren't
   # present in all times.
   tar_target(africa_full_predictor_data, file_partition_duckdb(
-    # sources = africa_full_predictor_data_sources,
-    sources = africa_full_predictor_data_sources,
-    dates_to_process,
+    temporal_sources = africa_full_predictor_data_sources_temporal,
+    static_sources = africa_full_predictor_data_sources_static,
     local_folder = africa_full_predictor_data_directory,
-    basename_template = "africa_full_predictor_data_{dates_to_process}.parquet",
+    basename_template = "africa_full_predictor_data_{date}.parquet",
     overwrite = parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA"),
     africa_full_predictor_data_AWS # Enforce dependency
   ),
-  pattern = map(dates_to_process),
+  pattern = map(africa_full_predictor_data_sources_temporal),
   format = "file",
-  repository = "local"
+  repository = "local",
+  error = "null"
   ),
 
   # Next step put combined_anomalies files on AWS.
@@ -1011,88 +1039,11 @@ full_data_targets <- tar_plan(
   )
 )
 
-# Separate pipeline for building dataset for REMIT project ---------------------
-REMIT_targets <- tar_plan(
-  tar_target(REMIT_weather_vars,
-             c(
-               ## Theoretically can obtain these as well, but have to use nasapower::get_power and for that
-               ## have to provide small regions of the map at a time. So if we want these two variables would
-               ## have to jump through quite a few hoops which may not be worth it as these covariates have similar
-               ## analogs elsewhere in the dataset  
-               #   "solar_rad"        = "ALLSKY_SFC_SW_DWN"
-               # , "clouds"           = "CLOUD_AMT"
-               "evapotrans"       = "EVPTRNS"
-               , "soil_moisture"    = "GWETPROF"
-               , "precipitation"    = "PRECTOTCORR"
-               , "spec_humid_2m"    = "QV2M"
-               , "rel_humid_2m"     = "RH2M"
-               , "air_temp_avg"     = "T2M"
-               , "air_temp_max"     = "T2M_MAX"
-               , "air_temp_min"     = "T2M_MIN"
-               , "air_temp_range"   = "T2M_RANGE"
-               , "dewpoint"         = "T2MDEW"
-               , "surface_temp_avg" = "TS"
-               , "wind_speed_10m"   = "WS10M"
-               , "wind_speed_2m"    = "WS2M"))
-  , tar_target(nasa_weather_transformed_REMIT
-               , fetch_and_transform_nasa_weather(
-                 months_to_process
-                 , REMIT_weather_vars
-                 , continent_raster_template
-                 , local_folder = "data/nasa_weather_transformed_REMIT"
-                 , basename_template = "nasa_weather_transformed_{months_to_process}.parquet"
-                 , endpoint = "https://power-datastore.s3.amazonaws.com/v10/daily/{year}/{month}/power_10_daily_{yyyymmdd}_merra2_lst.nc"
-                 , overwrite = FALSE
-                 , NULL
-                 , dates_to_process)
-               , pattern = map(months_to_process)
-               , error = "null"
-               , format = "file")
-  , tar_target(nasa_weather_summarized_REMIT
-               , summarize_REMIT_weather_data(
-                 dat          = nasa_weather_transformed_REMIT
-                 , weather_vars = REMIT_weather_vars
-                 , yrs          = seq(2005, 2025)
-                 , path_to_out  = "data/nasa_weather_summarized_REMIT")
-               , pattern = map(REMIT_weather_vars)
-               , error   = "null"
-               , format  = "file")
-  , tar_target(nasa_weather_REMIT_combined
-               , combine_REMIT_weather_data(
-                 nasa_weather_summarized_REMIT
-                 , "data/nasa_weather_combined_REMIT"))
-  , tar_target(nasa_weather_REMIT_cleaned
-               , impute_REMIT_weather_data(
-                 nasa_weather_REMIT_combined
-                 , "data/nasa_weather_combined_REMIT"))
-  , tar_target(africa_full_predictor_data_sources_REMIT, list(
-    nasa_weather_REMIT_cleaned = nasa_weather_REMIT_cleaned,
-    bioclim_preprocessed = bioclim_preprocessed,
-    soil_preprocessed = soil_preprocessed,
-    aspect_preprocessed = aspect_preprocessed,
-    slope_preprocessed = slope_preprocessed,
-    glw_preprocessed = glw_preprocessed,
-    elevation_preprocessed = elevation_preprocessed,
-    landcover_preprocessed = landcover_preprocessed))
-  , tar_target(africa_full_predictor_data_REMIT, {
-    joined_df <- map(africa_full_predictor_data_sources_REMIT %>% unlist()
-                     , .f = function(this_file) { arrow::read_parquet(this_file) }) %>% 
-      reduce(., left_join, by = c("x", "y")) 
-    joined_df <- joined_df[complete.cases(joined_df), ]
-    joined_df %>% arrow::write_parquet(
-      "data/africa_full_predictor_data_REMIT/REMIT_data.parquet"
-      , compression = "gzip", compression_level = 5)
-    return("data/africa_full_predictor_data_REMIT/REMIT_data.parquet")
-  })
-)
-
-
 # List targets -----------------------------------------------------------------
 # all_targets() doesn't work with tarchetypes like tar_change().
 list(
   static_targets,
   dynamic_targets,
   derived_data_targets,
-  full_data_targets,
-  REMIT_targets
+  full_data_targets
 )

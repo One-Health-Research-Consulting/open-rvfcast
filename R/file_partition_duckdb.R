@@ -7,10 +7,10 @@
 #'
 #' @author Nathan C. Layman
 #'
-#' @param sources A named list of fully qualified file paths to parquet files.
-#' @param dates_to_process A character vector of dates to filter data. Only one date is allowed in this vector.
+#' @param temporal_sources A single-row tibble with a 'date' column and columns containing file paths for temporal data sources.
+#' @param static_sources A named list of fully qualified file paths to static parquet files.
 #' @param local_folder A character string indicating the data output directory. Default is 'data/africa_full_data'.
-#' @param basename_template A character string that will be used to create the output file name along with the selected date. Default is 'africa_full_data_{dates_to_process}.parquet'.
+#' @param basename_template A character string that will be used to create the output file name along with the date. Default is 'africa_full_data_{date}.parquet'.
 #' @param overwrite A logical indicating whether to overwrite an existing file if found. Default is FALSE.
 #' @param ... Additional arguments not used by this function but included for generic function compatibility.
 #'
@@ -21,32 +21,43 @@
 #'
 #' @examples
 #' file_partition_duckdb(
-#'   sources = list(s1 = "data/s1.parquet", s2 = "data/s2.parquet"),
-#'   dates_to_process = "2022-01-01",
+#'   temporal_sources = tibble(date = "2022-01-01", forecasts = "file1.parquet"),
+#'   static_sources = list(soil = "soil.parquet", elevation = "elevation.parquet"),
 #'   local_folder = "output",
-#'   basename_template = "output_{dates_to_process}.parquet",
+#'   basename_template = "output_{date}.parquet",
 #'   overwrite = TRUE
 #' )
 #'
 #' @export
-file_partition_duckdb <- function(sources, # A named, nested list of parquet files
-                                  dates_to_process,
+file_partition_duckdb <- function(temporal_sources,
+                                  static_sources,
                                   local_folder = "data/africa_full_data",
-                                  basename_template = "africa_full_data_{dates_to_process}.parquet",
+                                  basename_template = "africa_full_data_{date}.parquet",
                                   overwrite = FALSE,
                                   ...) {
-  # NCL change to branch off of model date for combo
-  # This approach does work. Only writing complete datasets
-  # 2005 doesn't have any outbreak history so what do we input?
-  # Next step is lagged data.
-  # JOINING ON dates_to_process means going back and changing 'base_date' to 'date' in ecmwf_transformed and anomaly
+  # Extract the date from temporal_sources (single row tibble)
+  stopifnot(nrow(temporal_sources) == 1)
+  date <- temporal_sources$date
 
-  # Check that we're only working on one date at a time
-  stopifnot(length(dates_to_process) == 1)
+  # Validate temporal source files exist
+  temporal_files <- as.list(temporal_sources[, -1, drop = FALSE])
+  for (source_name in names(temporal_files)) {
+    file_path <- temporal_files[[source_name]]
+
+    # Check if file is NA
+    if (length(file_path) == 0 || is.na(file_path)) {
+      stop(glue::glue("No {source_name} file available for date {date}"))
+    }
+
+    # Check if file exists
+    if (!file.exists(file_path)) {
+      stop(glue::glue("{source_name} file does not exist: {file_path}"))
+    }
+  }
 
   # Set filename
   save_filename <- file.path(local_folder, glue::glue(basename_template))
-  message(paste0("Combining explanatory variables for ", dates_to_process))
+  message(paste0("Combining explanatory variables for ", date))
 
   # Check if file already exists and can be read
   error_safe_read_parquet <- purrr::possibly(arrow::open_dataset, NULL)
@@ -56,28 +67,33 @@ file_partition_duckdb <- function(sources, # A named, nested list of parquet fil
     # Check if file has data - if zero rows, overwrite anyway
     row_count <- existing_dataset |> count() |> collect() |> pull(n)
     if(row_count > 0) {
-      message("file already exists and can be loaded, skipping download")
+      message(glue::glue("{basename(save_filename)} already exists, has rows, and overwrite is not TRUE, skipping"))
       return(save_filename)
     } else {
-      message("file exists but has zero rows, overwriting")
+      message(glue::glue("{basename(save_filename)} exists but has zero rows, overwriting"))
     }
   }
 
   # Create a connect to a DuckDB database
   con <- duckdb::dbConnect(duckdb::duckdb())
 
+  # Combine temporal and static sources into a single named list
+  # Extract temporal file paths from the tibble (excluding the date column)
+  temporal_files <- as.list(temporal_sources[, -1, drop = FALSE])
+  all_sources <- c(temporal_files, static_sources)
+
   # For each explanatory variable target create a table filtered appropriately
-  purrr::walk2(names(sources), sources, function(table_name, list_of_files) {
-    
-    ## Select out only the needed date
-    filtered_files <- list_of_files[grepl(dates_to_process, list_of_files)]
-    if (length(filtered_files) == 0) { filtered_files <- list_of_files }
+  purrr::walk2(names(all_sources), all_sources, function(table_name, list_of_files) {
+
+    ## For temporal files, they should already be filtered to the correct date
+    ## For static files, use them as-is
+    filtered_files <- list_of_files
 
     file_schemas <- purrr::map(filtered_files, ~ arrow::open_dataset(.x)$schema)
     unified_schema <- all(purrr::map_vec(file_schemas, ~ .x == file_schemas[[1]]))
 
     parquet_filter <- c()
-    if (!is.null(file_schemas[[1]]$date)) parquet_filter <- c(parquet_filter, paste("date = '", dates_to_process, "'"))
+    if (!is.null(file_schemas[[1]]$date)) parquet_filter <- c(parquet_filter, paste("date = '", date, "'"))
     if (length(parquet_filter)) {
       parquet_filter <- paste("WHERE", paste(parquet_filter, collapse = " AND "))
     } else {
@@ -108,7 +124,7 @@ file_partition_duckdb <- function(sources, # A named, nested list of parquet fil
 
   # Set up a natural inner join for all the tables and output the result to file(s)
   # Ensure that there are NO duplicates and that all rows with NULL value have been dropped
-  query <- glue::glue("SELECT DISTINCT * FROM {paste(names(sources), collapse = ' NATURAL JOIN ')}")
+  query <- glue::glue("SELECT DISTINCT * FROM {paste(names(all_sources), collapse = ' NATURAL JOIN ')}")
   query <- paste0("COPY (",
                   query,
                   glue::glue(" WHERE COLUMNS(*) IS NOT NULL) TO '{save_filename}' (FORMAT PARQUET, COMPRESSION 'GZIP');"))

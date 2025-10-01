@@ -7,3 +7,6 @@ rvf:
 model:
   store: model_framework_targets
   script: model_framework_targets.R
+remit:
+  store: REMIT_targets
+  script: REMIT_targets.R

@@ -4,6 +4,9 @@
 .Ruserdata
 .DS_Store
 .env_user
+.claude
+.vscode
+.lintr
 _targets/
 _targets/*
 !_targets/meta/meta

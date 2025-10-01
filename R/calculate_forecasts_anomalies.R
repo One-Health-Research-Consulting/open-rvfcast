@@ -7,11 +7,10 @@
 #'
 #' @author Emma Mendelsohn and Nathan C. Layman
 #'
-#' @param ecmwf_forecast_transformed_directory Directory containing the transformed forecasts.
+#' @param forecasts_anomalies_sources A single-row tibble with 'date' and 'forecast_file' columns.
 #' @param weather_historical_means Filepath to the historical weather means data.
 #' @param forecast_anomalies_directory Directory in which to save the anomalies data.
-#' @param dates_to_process Dates for models that have been selected.
-#' @param lead_intervals Lead times for forecasts, which will determine the interval over which anomalies are averaged.
+#' @param forecast_intervals Lead times for forecasts, which will determine the interval over which anomalies are averaged.
 #' @param overwrite Boolean flag indicating whether existing file should be overwritten. Default is FALSE.
 #' @param ... Additional unused arguments for future extensibility and function compatibility.
 #'
@@ -22,42 +21,57 @@
 #'
 #' @examples
 #' calculate_forecast_anomalies(
-#'   ecmwf_forecast_transformed_directory = "./forecasts",
+#'   forecasts_anomalies_sources = tibble(
+#'     date = as.Date("2000-01-01"),
+#'     forecast_file = "./forecasts/ecmwf_seasonal_forecast_2000_01.parquet"
+#'   ),
 #'   weather_historical_means = "./historical_means.parquet",
 #'   forecast_anomalies_directory = "./anomalies",
-#'   dates_to_process = as.Date("2000-01-01"),
-#'   lead_intervals = c(1, 10),
+#'   forecast_intervals = c(0, 30, 60, 90, 120, 150),
 #'   overwrite = TRUE
 #' )
 #'
 #' @export
-calculate_forecast_anomalies <- function(ecmwf_forecast_transformed,
-                                          weather_historical_means,
-                                          forecast_anomalies_directory,
-                                          basename_template = "forecast_anomaly_{dates_to_process}.parquet",
-                                          dates_to_process,
-                                          forecast_intervals,
-                                          overwrite = FALSE,
-                                          ...) {
-  # Check that we're only working on one date at a time
-  stopifnot(length(dates_to_process) == 1)
+calculate_forecast_anomalies <- function(forecasts_anomalies_sources,
+                                         weather_historical_means,
+                                         forecast_anomalies_directory,
+                                         basename_template = "forecast_anomaly_{date}.parquet",
+                                         forecast_intervals,
+                                         overwrite = FALSE,
+                                         ...) {
+  # Extract date and forecast file from the single-row tibble
+  stopifnot(nrow(forecasts_anomalies_sources) == 1)
+  date <- forecasts_anomalies_sources$date
+  ecmwf_forecast_transformed <- forecasts_anomalies_sources$forecast_file
+
+  # If no forecast file available for this date, return NA
+  if(is.na(ecmwf_forecast_transformed)) {
+    message(glue::glue("No forecast file available for {date}, skipping"))
+    return(NA_character_)
+  }
 
   # Set filename
   save_filename <- file.path(forecast_anomalies_directory, glue::glue(basename_template))
 
   # Check if file already exists and can be read
-  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
+  error_safe_read_parquet <- purrr::possibly(arrow::open_dataset, NULL)
   existing_dataset <- error_safe_read_parquet(save_filename)
 
   if(!is.null(existing_dataset) & !overwrite) {
     # Check if file has data - if zero rows, overwrite anyway
     row_count <- existing_dataset |> count() |> collect() |> pull(n)
     if(row_count > 0) {
-      message("file already exists and can be loaded, skipping download")
+      message(glue::glue("{basename(save_filename)} already exists, has rows, and overwrite is not TRUE, skipping"))
       return(save_filename)
     } else {
-      message("file exists but has zero rows, overwriting")
+      message(glue::glue("{basename(save_filename)} exists but has zero rows, overwriting"))
     }
+  } else if(!is.null(existing_dataset) & overwrite) {
+    # File exists and overwrite is TRUE
+    message(glue::glue("Overwriting existing {basename(save_filename)} for ", date))
+  } else {
+    # File doesn't exist - we're calculating
+    message(paste0("Calculating forecast anomalies for ", date))
   }
 
   # Notes:
@@ -86,7 +100,7 @@ calculate_forecast_anomalies <- function(ecmwf_forecast_transformed,
   # Get the relevant forecast data. Find the most recent base_date that came
   # before the model_date selected.
   forecast_transformed_dataset <- arrow::open_dataset(ecmwf_forecast_transformed) |>
-    dplyr::filter(base_date <= dates_to_process)
+    dplyr::filter(base_date <= !!date)
 
   relevant_base_date <- forecast_transformed_dataset |>
     select(base_date) |>
@@ -105,12 +119,12 @@ calculate_forecast_anomalies <- function(ecmwf_forecast_transformed,
     lead_interval_start <- forecast_intervals[i]
     lead_interval_end <- forecast_intervals[i + 1]
 
-    message(glue::glue("Calculating ECMWF anomalies on {dates_to_process} for {lead_interval_start}-{lead_interval_end} day forecast"))
+    message(glue::glue("Calculating ECMWF anomalies on {date} for {lead_interval_start}-{lead_interval_end} day forecast"))
 
     # Get a tibble of all the dates in the anomaly forecast range for the given lead interval
     forecast_anomaly <- tibble(date = seq(
-      from = dates_to_process + lead_interval_start,
-      to = dates_to_process + lead_interval_end - 1, by = 1
+      from = date + lead_interval_start,
+      to = date + lead_interval_end - 1, by = 1
     )) |>
       mutate(
         doy = as.numeric(lubridate::yday(date)), # Calculate day of year
@@ -175,7 +189,7 @@ calculate_forecast_anomalies <- function(ecmwf_forecast_transformed,
     # Regenerate month and year
     historical_means <- historical_means |>
       mutate(
-        date = dates_to_process,
+        date = !!date,
         doy = lubridate::yday(date),
         month = lubridate::month(date),
         year = lubridate::year(date),

@@ -1,11 +1,33 @@
-transform_ndvi <- function(modis_ndvi_transformed,
-                           sentinel_ndvi_transformed,
+transform_ndvi <- function(ndvi_transformed_sources,
                            ndvi_transformed_directory,
                            basename_template = "ndvi_transformed_{.y}_{.m}.parquet",
-                           months_to_process,
                            overwrite = FALSE,
                            ...) {
 
+  # Extract month and file lists from the single-row tibble
+  stopifnot(nrow(ndvi_transformed_sources) == 1)
+  months_to_process <- ndvi_transformed_sources$month
+
+  # Extract and unlist file paths, handling NULL values
+  modis_files <- ndvi_transformed_sources$modis_files[[1]]
+  sentinel_files <- ndvi_transformed_sources$sentinel_files[[1]]
+
+  # Combine files, removing any NAs or NULLs
+  all_ndvi_files <- c(
+    if(!is.null(modis_files)) modis_files else character(0),
+    if(!is.null(sentinel_files)) sentinel_files else character(0)
+  )
+  all_ndvi_files <- all_ndvi_files[!is.na(all_ndvi_files)]
+
+  if (length(all_ndvi_files) == 0) {
+    stop(glue::glue("No NDVI files available for month {months_to_process}"))
+  }
+
+  # Validate that files exist
+  missing_files <- all_ndvi_files[!file.exists(all_ndvi_files)]
+  if (length(missing_files) > 0) {
+    stop(glue::glue("NDVI files do not exist: {paste(missing_files, collapse=', ')}"))
+  }
 
   # NCL I noticed some issues with duplicates in modis_transformed. Check why.
   # There is a duplicate filename in the modis_ndvi_transformed target. WHY?
@@ -23,7 +45,6 @@ transform_ndvi <- function(modis_ndvi_transformed,
 
   # Set filename
   save_filename <- file.path(ndvi_transformed_directory, glue::glue(basename_template))
-  message(paste("Combining ndvi sources for", .y, "month", .m))
 
   # Check if file already exists and can be read
   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
@@ -33,15 +54,21 @@ transform_ndvi <- function(modis_ndvi_transformed,
     # Check if file has data - if zero rows, overwrite anyway
     row_count <- existing_dataset |> count() |> collect() |> pull(n)
     if(row_count > 0) {
-      message("file already exists and can be loaded, skipping")
+      message(glue::glue("{basename(save_filename)} already exists, has rows, and overwrite is not TRUE, skipping"))
       return(save_filename)
     } else {
-      message("file exists but has zero rows, overwriting")
+      message(glue::glue("{basename(save_filename)} exists but has zero rows, overwriting"))
     }
+  } else if(!is.null(existing_dataset) & overwrite) {
+    # File exists and overwrite is TRUE
+    message(glue::glue("Overwriting existing {basename(save_filename)} for {months_to_process}"))
+  } else {
+    # File doesn't exist - we're transforming
+    message(paste("Combining ndvi sources for", .y, "month", .m))
   }
 
-  # Open dataset fresh for this month to reduce memory pressure
-  ndvi_transformed_dataset <- arrow::open_dataset(c(sentinel_ndvi_transformed, modis_ndvi_transformed))
+  # Open dataset for this month
+  ndvi_transformed_dataset <- arrow::open_dataset(all_ndvi_files)
 
   # Process single month instead of all months
   ndvi_transformed_data <- ndvi_transformed_dataset |>
