@@ -88,11 +88,18 @@ tar_target(ndvi_transformed_AWS_upload,
     ndvi_transformed_directory,
     overwrite = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED"))
   ),
+  pattern = map(ndvi_transformed),
   error = "null"
 )
 ```
 
 **Purpose:** Syncs new/updated files to S3-compatible storage. Compares schema and row counts to avoid redundant uploads.
+
+**Key settings:**
+- `pattern = map(...)` - Creates one upload branch per file
+- Only branches with changed files re-run
+- Enables parallel uploads with `NPROC > 1`
+- `AWS_put_files()` skips files that already exist with matching schema and row counts
 
 ## Source Pairing Targets
 
@@ -106,9 +113,10 @@ When combining multiple upstream datasets (e.g., MODIS + Sentinel → NDVI):
 - Can't afford to invalidate all branches when one upstream file is added
 
 **The solution:** These lightweight targets:
-- Create tibble mappings in seconds (just tibble operations, no data processing)
+- Create tibble mappings in seconds/minutes (just reading file metadata, no data processing)
+- Use fast Arrow dataset approach with `arrow:::add_filename()` for efficient metadata reading
 - Preserve branch identity so only affected branches re-run
-- Invalidate frequently but rebuild quickly
+- Invalidate frequently but rebuild quickly (much faster than re-running downstream branches)
 
 ### Pattern
 
@@ -149,18 +157,20 @@ Each row = one branch. Processing target receives single-row tibble per branch.
 When `dates_to_process` expands from 2005-2024 to 2005-2025 (adding 65 dates):
 
 **What re-runs:**
-- `dates_to_process` / `months_to_process` ⚡ *instant*
-- S3 storage check targets ⚡ *seconds* (always run)
-- Source creation targets ⚡ *seconds* (rebuild tibble mappings)
-- Processing branches 🐌 *hours* (ONLY new 2025 branches)
-  - 2005-2024 branches: **CACHED** ✅
-  - 2025 branches: **NEW** 🔄
-- Upload targets ⚡ *minutes*
+- `dates_to_process` / `months_to_process` - *instant*
+- S3 storage check targets - *seconds* (always run)
+- Source creation targets - *seconds* (rebuild tibble mappings)
+- Processing branches - *hours* (ONLY new 2025 branches)
+  - 2005-2024 branches: **CACHED** (no re-run)
+  - 2025 branches: **NEW** (must compute)
+- Upload branches - *minutes* (ONLY new 2025 branches)
+  - 2005-2024 uploads: **SKIPPED** (unchanged)
+  - 2025 uploads: **NEW** (parallel upload with NPROC > 1)
 
 **What doesn't re-run:**
-- ✅ Any processing for 2005-2024 data
-- ✅ Static datasets (soil, elevation, etc.)
-- ✅ Historical means (unless 180+ days old)
+- Any processing for 2005-2024 data
+- Static datasets (soil, elevation, etc.)
+- Historical means (unless 180+ days old)
 
 ## Dependency Management: The Ellipsis Pattern
 

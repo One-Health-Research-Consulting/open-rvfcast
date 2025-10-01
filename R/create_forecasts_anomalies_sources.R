@@ -1,8 +1,8 @@
 #' Create Forecast Anomalies Sources Lookup
 #'
 #' Creates a tibble pairing each date with its most recent available forecast file.
-#' Only includes dates up to the latest forecast month to avoid processing dates
-#' beyond forecast coverage.
+#' Uses left join to preserve all dates and maintain consistent branch identity.
+#' Dates beyond forecast coverage will have NA for forecast_file.
 #'
 #' @author Assistant and Nathan Layman
 #'
@@ -14,27 +14,36 @@
 #' @export
 create_forecasts_anomalies_sources <- function(ecmwf_forecasts_transformed,
                                                dates_to_process) {
-  # Extract base_date from forecast filenames and create lookup
-  forecast_dates <- tibble(
-    file = ecmwf_forecasts_transformed,
-    base_date = as.Date(paste0(
-      gsub(".*_(\\d+)_(\\d{4})\\.parquet", "\\2-\\1", ecmwf_forecasts_transformed),
-      "-01"
-    ))
-  ) |>
-    filter(!is.na(base_date)) |>
-    arrange(desc(base_date))
+  # Build basename lookup for converting absolute paths to relative paths
+  basename_lookup <- tibble::tibble(
+    original_path = ecmwf_forecasts_transformed,
+    basename = basename(ecmwf_forecasts_transformed)
+  )
 
-  # Only process dates up to the latest forecast month
-  max_forecast_month <- format(max(forecast_dates$base_date), "%Y-%m")
-  valid_dates <- dates_to_process[format(dates_to_process, "%Y-%m") <= max_forecast_month]
+  # Read actual base_date from files using fast dataset approach
+  # Opens all files as one dataset for efficient metadata reading
+  forecast_files <- arrow::open_dataset(ecmwf_forecasts_transformed) |>
+    dplyr::select(base_date) |>
+    dplyr::mutate(file = arrow:::add_filename()) |>
+    dplyr::group_by(file, base_date) |>
+    dplyr::summarise(.groups = "drop") |>
+    dplyr::collect() |>
+    dplyr::mutate(basename = basename(file)) |>
+    dplyr::left_join(basename_lookup, by = "basename") |>
+    dplyr::select(-basename, -file) |>
+    dplyr::rename(file = original_path) |>
+    dplyr::arrange(desc(base_date))
 
-  # For each date, find most recent forecast file
-  tibble(
-    date = valid_dates,
-    forecast_file = map_chr(valid_dates, ~{
-      idx <- which(forecast_dates$base_date <= .x)
-      if (length(idx) > 0) forecast_dates$file[idx[1]] else NA_character_
+  # For each date, find most recent forecast file available at that date
+  forecast_lookup <- tibble::tibble(
+    date = dates_to_process,
+    forecast_file = purrr::map_chr(dates_to_process, ~{
+      idx <- which(forecast_files$base_date <= .x)
+      if (length(idx) > 0) forecast_files$file[idx[1]] else NA_character_
     })
   )
+
+  # Return all dates with left join to preserve branch identity
+  tibble::tibble(date = dates_to_process) |>
+    dplyr::left_join(forecast_lookup, by = "date")
 }

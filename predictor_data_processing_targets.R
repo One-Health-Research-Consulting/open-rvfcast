@@ -813,6 +813,7 @@ derived_data_targets <- tar_plan(
       weather_anomalies_directory,
       overwrite = parse_flag("OVERWRITE_WEATHER_ANOMALIES")
     ),
+    pattern = map(weather_anomalies),
     error = "null"
   ),
 
@@ -877,6 +878,7 @@ derived_data_targets <- tar_plan(
     forecasts_anomalies_directory,
     overwrite = parse_flag("OVERWRITE_FORECAST_ANOMALIES")
     ),
+    pattern = map(forecasts_anomalies),
     error = "null"
   ),
 
@@ -962,6 +964,7 @@ derived_data_targets <- tar_plan(
       ndvi_anomalies_directory,
       overwrite = parse_flag("OVERWRITE_NDVI_ANOMALIES")
     ),
+    pattern = map(ndvi_anomalies),
     error = "null"
   )
 )
@@ -1000,15 +1003,16 @@ full_data_targets <- tar_plan(
     )
   ),
 
+  # Create intermediary target pairing each date with its predictor files
   tar_target(africa_full_predictor_data_sources_temporal,
-    tibble(
-      date = dates_to_process,
-      forecasts_anomalies = forecasts_anomalies,
-      weather_anomalies = weather_anomalies,
-      ndvi_anomalies = ndvi_anomalies
+    create_africa_full_predictor_data_sources(
+      forecasts_anomalies,
+      weather_anomalies,
+      ndvi_anomalies,
+      dates_to_process
     ) |>
-    group_by(date) |>
-    tar_group(),
+      group_by(date) |>
+      tar_group(),
     iteration = "group"
   ),
 
@@ -1035,6 +1039,7 @@ full_data_targets <- tar_plan(
       africa_full_predictor_data_directory,
       overwrite = parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA")
     ),
+    pattern = map(africa_full_predictor_data),
     error = "null"
   )
 )

@@ -17,41 +17,34 @@ create_ndvi_anomalies_sources <- function(modis_ndvi_transformed,
                                           sentinel_ndvi_transformed,
                                           dates_to_process) {
 
-  # Build MODIS lookup table with date ranges
-  modis_lookup <- purrr::map_dfr(modis_ndvi_transformed, ~{
-    ds <- arrow::open_dataset(.x)
-    dates <- ds |>
+  # Reusable function to build date range lookup
+  # Opens all files as a single dataset for faster metadata reading
+  # Uses basename matching to convert absolute paths back to relative paths
+  build_date_range_lookup <- function(file_list, column_name) {
+    # Create lookup table: basename → original relative path
+    basename_lookup <- tibble::tibble(
+      original_path = file_list,
+      basename = basename(file_list)
+    )
+
+    arrow::open_dataset(file_list) |>
       dplyr::select(date) |>
+      dplyr::mutate(!!column_name := arrow:::add_filename()) |>
+      dplyr::group_by(!!sym(column_name)) |>
       dplyr::summarise(
         start_date = min(date),
         end_date = max(date)
       ) |>
-      dplyr::collect()
+      dplyr::collect() |>
+      dplyr::mutate(basename = basename(!!sym(column_name))) |>
+      dplyr::left_join(basename_lookup, by = "basename") |>
+      dplyr::select(-basename, -!!sym(column_name)) |>
+      dplyr::rename(!!column_name := original_path)
+  }
 
-    tibble::tibble(
-      modis_file = .x,
-      start_date = dates$start_date,
-      end_date = dates$end_date
-    )
-  })
-
-  # Build Sentinel lookup table with date ranges
-  sentinel_lookup <- purrr::map_dfr(sentinel_ndvi_transformed, ~{
-    ds <- arrow::open_dataset(.x)
-    dates <- ds |>
-      dplyr::select(date) |>
-      dplyr::summarise(
-        start_date = min(date),
-        end_date = max(date)
-      ) |>
-      dplyr::collect()
-
-    tibble::tibble(
-      sentinel_file = .x,
-      start_date = dates$start_date,
-      end_date = dates$end_date
-    )
-  })
+  # Build lookup tables with date ranges
+  modis_lookup <- build_date_range_lookup(modis_ndvi_transformed, "modis_file")
+  sentinel_lookup <- build_date_range_lookup(sentinel_ndvi_transformed, "sentinel_file")
 
   # Non-equi join: match dates to files based on date ranges
   tibble::tibble(date = dates_to_process) |>

@@ -40,9 +40,10 @@ file_partition_duckdb <- function(temporal_sources,
   date <- temporal_sources$date
 
   # Validate temporal source files exist
-  temporal_files <- as.list(temporal_sources[, -1, drop = FALSE])
+  # Exclude date and tar_group columns, keep only file path columns
+  temporal_files <- as.list(temporal_sources[, !names(temporal_sources) %in% c('date', 'tar_group'), drop = FALSE])
   for (source_name in names(temporal_files)) {
-    file_path <- temporal_files[[source_name]]
+    file_path <- unname(temporal_files[[source_name]])
 
     # Check if file is NA
     if (length(file_path) == 0 || is.na(file_path)) {
@@ -78,8 +79,9 @@ file_partition_duckdb <- function(temporal_sources,
   con <- duckdb::dbConnect(duckdb::duckdb())
 
   # Combine temporal and static sources into a single named list
-  # Extract temporal file paths from the tibble (excluding the date column)
-  temporal_files <- as.list(temporal_sources[, -1, drop = FALSE])
+  # Extract temporal file paths from the tibble (excluding date and tar_group columns)
+  # Remove names from file paths (targets with format = "file" add names)
+  temporal_files <- lapply(as.list(temporal_sources[, !names(temporal_sources) %in% c('date', 'tar_group'), drop = FALSE]), unname)
   all_sources <- c(temporal_files, static_sources)
 
   # For each explanatory variable target create a table filtered appropriately
@@ -87,7 +89,7 @@ file_partition_duckdb <- function(temporal_sources,
 
     ## For temporal files, they should already be filtered to the correct date
     ## For static files, use them as-is
-    filtered_files <- list_of_files
+    filtered_files <- unname(list_of_files)
 
     file_schemas <- purrr::map(filtered_files, ~ arrow::open_dataset(.x)$schema)
     unified_schema <- all(purrr::map_vec(file_schemas, ~ .x == file_schemas[[1]]))
