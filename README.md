@@ -79,13 +79,29 @@ for efficiently handling and processing large, complex datasets.
 Additionally, `arrow::open_dataset()` supports seamless integration with
 S3-compatible cloud storage (including Cloudflare R2), enabling direct
 access to remote datasets, which improves workflow efficiency and
-scalability when working with large, distributed data sources. While the
-data acquisition module requires the processing of large datasets, the
-final cleaned data can be accessed directly from the cloud by opening
-the following connection:
+scalability when working with large, distributed data sources.
+
+#### Accessing the Complete Dataset
+
+The final cleaned data can be accessed directly from the cloud by
+opening the following connection. **Important**: The
+`africa_full_predictor_data` dataset only contains dates for which data
+was successfully retrieved from **all** predictor sources. If any
+predictor is missing for a given date, that date will not be included in
+the final dataset. This ensures data completeness - if a file is present
+in the `africa_full_predictor_data` folder, it is guaranteed to contain
+all predictors for that date.
+
+For more details on how the pipeline handles data dependencies and
+incremental updates, see
+[`docs/dynamic_branching_guide.md`](docs/dynamic_branching_guide.md).
+
+While the data acquisition module requires the processing of large
+datasets, the final cleaned data can be accessed directly from the
+cloud:
 
     dataset <- arrow::open_dataset(arrow::s3_bucket(
-      "rvfcast/data/africa_full_data/",
+      "rvfcast/data/africa_full_predictor_data/",
       endpoint_override = "https://85b2883dde6f6150134acd170f842c81.r2.cloudflarestorage.com",
       anonymous = TRUE
     ))
@@ -100,7 +116,7 @@ following will filter the data and then download the model data for a
 single day:
 
     dataset <- arrow::open_dataset(arrow::s3_bucket(
-      "rvfcast/data/africa_full_data/",
+      "rvfcast/data/africa_full_predictor_data/",
       endpoint_override = "https://85b2883dde6f6150134acd170f842c81.r2.cloudflarestorage.com",
       anonymous = TRUE
     )) |>
@@ -115,7 +131,10 @@ addition, the dataset has been subsetted to two randomly chosen days per
 month between 2007 and 2024. Future work will provide the entire dataset
 for every day between 2005 and the current year.
 
-The current full africa predictor dataset is ~56 Gb
+The current full africa predictor dataset is ~1.9 TB. Note that the data
+could be stored in a more compact format, but is provided in this
+analysis-ready structure to minimize processing time when used in
+modeling workflows.
 
 The data targets that are subsetted this way are:
 
@@ -140,7 +159,7 @@ storage). The pipeline will still run without access to cloud storage,
 but users can add their own S3-compatible storage credentials to the
 `.env` file to enable cloud storage and collaboration with team members.
 
-Environment variables to add to the .env file:
+**S3-compatible cloud storage credentials** to add to the .env file:
 
     AWS_DEFAULT_REGION=auto
     AWS_REGION=auto
@@ -171,9 +190,9 @@ historical NDVI data prior to the Sentinel-3 mission from NASA MODIS
 satellites.
 
 Before running the data acquisition pipeline, credentials for all three
-sources must be added to the .env file
+sources must be added to the .env file.
 
-Environment variables to add to the .env file:
+**Data source API credentials** to add to the .env file:
 
     ECMWF_USERID=
     ECMWF_TOKEN=
@@ -191,13 +210,13 @@ data layers were joined by date.
 
 If data files become corrupted they can be re-generated from the raw
 sources by setting the `OVERWRITE_X` flags to TRUE in the .env file.
-This will prevent the pipeline from first downloading the data on AWS,
-re-download and process the raw data from the original sources, and
-upload the processed files to AWS for future use. Note that, under
-normal use, these should always be set to FALSE. The pipeline will
-automatically download any missing data without having to change these
-settings. This is only to replace data that has already been downloaded
-and processed mainly for pipeline development purposes.
+This will prevent the pipeline from first downloading the data from
+cloud storage, re-download and process the raw data from the original
+sources, and upload the processed files to cloud storage for future use.
+Note that, under normal use, these should always be set to FALSE. The
+pipeline will automatically download any missing data without having to
+change these settings. This is only to replace data that has already
+been downloaded and processed mainly for pipeline development purposes.
 
 #### The Response Variable
 
@@ -372,6 +391,42 @@ model outcome compared to the older outbreak exposures.
 
 ### Targets Pipeline
 
+#### Error Handling and Pipeline Resilience
+
+The pipeline is designed to be resilient to temporary data source
+issues. Many targets include `error = "null"` in their configuration,
+which allows the pipeline to continue running even when individual data
+sources are temporarily unavailable. This is **expected behavior** and
+not a cause for concern.
+
+Common scenarios where errors may occur include:
+
+- **NASA MERRA-2 satellite data delays**: NASA weather data is sometimes
+  delayed in posting, causing temporary download failures
+- **ECMWF API downtime**: The ECMWF forecast API may be temporarily
+  unavailable during maintenance ([check
+  status](https://status.ecmwf.int/))
+- **Copernicus/Sentinel-3 processing delays**: Satellite imagery
+  processing can be delayed
+- **MODIS/AppEEARS bundle processing**: Bundle requests may take time to
+  process or fail temporarily
+
+When a target fails with `error = "null"`:
+
+1.  The error is logged but the pipeline continues
+2.  The failed target will be automatically retried the next time the
+    pipeline runs
+3.  Downstream targets that depend on the failed data will skip or use
+    cached data
+4.  The pipeline will eventually succeed once the data source becomes
+    available
+
+This design ensures that temporary API issues or data delays don’t block
+the entire pipeline. Simply re-run the pipeline periodically to capture
+any previously failed targets once their data sources are available.
+
+#### Running the Pipeline
+
 A visualization of the data acquisition module can be found below.
 Additional targets not shown are responsible for fetching and storing
 intermediate datasets on the cloud. To run the data acquisition module,
@@ -382,18 +437,15 @@ to the remote data store, the data acquisition module must be run before
 running the modeling module.
 
 The output of the data acquisition pipeline is an Africa wide dataset
-produced by joining every source above together. There are two versions.
-`africa_full_data` and `africa_full_rvf_model_data`. The first is the
-full dataset of explanatory variables and the second pairs that with RVF
-outbreak data as the response variable. The following command will start
-the data acquisition pipeline, either downloading pre-processed files
-from an AWS bucket or other cloud based resource or re-generating the
-data from the raw sources. The expected size of the full pipeline is
-\>200Gb and so will require significant storage and time to run. Each
-day in the africa_ful_rvf_model_data is saved as a separate parquet file
-of ~500Mb.
+(`africa_full_predictor_data`) produced by joining every source above
+together. The following command will start the data acquisition
+pipeline, either downloading pre-processed files from cloud storage or
+re-generating the data from the raw sources. The expected size of the
+full pipeline is ~1.9 TB and so will require significant storage and
+time to run. Each day in the africa_full_predictor_data is saved as a
+separate parquet file of ~500Mb.
 
-    tar_make(africa_full_rvf_model_data, script = "predictor_data_processing_targets.R")
+    tar_make(africa_full_predictor_data, script = "predictor_data_processing_targets.R")
 
 For detailed documentation on the pipeline’s dynamic branching
 implementation and how incremental updates work, see
@@ -406,41 +458,95 @@ module. The figure is generated using `mermaid.js` syntax and should
 display as a graph on GitHub. It can also be viewed by pasting the code
 into <https://mermaid.live>.)
 
-<!-- # ```{r, echo=FALSE, message = FALSE, results='asis'} -->
-
-<!-- # mer <- targets::tar_mermaid(targets_only = TRUE,  -->
-
-<!-- #                             outdated = FALSE,  -->
-
-<!-- #                             legend = FALSE,  -->
-
-<!-- #                             color = FALSE,  -->
-
-<!-- #                             script = "data_acquisition_targets.R", -->
-
-<!-- #                             exclude = c("readme", contains("AWS"))) -->
-
-<!-- # cat( -->
-
-<!-- #   "```mermaid", -->
-
-<!-- #   mer[1],  -->
-
-<!-- #   #'Objects([""Objects""]) --- Functions>""Functions""]', -->
-
-<!-- #   'subgraph Project Workflow', -->
-
-<!-- #   mer[3:length(mer)], -->
-
-<!-- #   'linkStyle 0 stroke-width:0px;', -->
-
-<!-- #   "```", -->
-
-<!-- #   sep = "\n" -->
-
-<!-- # ) -->
-
-<!-- # ``` -->
+``` mermaid
+graph LR
+  style Graph fill:#FFFFFF00,stroke:#000000;
+  subgraph Graph
+    direction LR
+    x308dbc26c1784375(["africa_full_predictor_data_directory"]):::skipped --> x29f706fde685a66b["africa_full_predictor_data"]:::errored
+    x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped --> x29f706fde685a66b["africa_full_predictor_data"]:::errored
+    x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::completed --> x29f706fde685a66b["africa_full_predictor_data"]:::errored
+    x155e2f0b29a20e05(["aspect_preprocessed"]):::skipped --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped
+    xd70b16641fa1b4ef(["soil_preprocessed"]):::skipped --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped
+    x680370f9b58b9f6d(["slope_preprocessed"]):::skipped --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped
+    xdecc37cc7e708cec(["landcover_preprocessed"]):::skipped --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped
+    x1c7b6e6a1c101e59(["bioclim_preprocessed"]):::skipped --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped
+    x0dffb1605751d1b1(["elevation_preprocessed"]):::skipped --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped
+    x82990a83bfa4db45(["glw_preprocessed"]):::skipped --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped
+    x18d8fc5297d7838e(["dates_to_process"]):::completed --> x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::completed
+    x680f7450837c9229["forecasts_anomalies"]:::completed --> x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::completed
+    xf9b79e824823a870["ndvi_anomalies"]:::errored --> x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::completed
+    x01b9e03cb52b7b05["weather_anomalies"]:::errored --> x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::completed
+    x42a5375a64b48216(["aspect_directory"]):::skipped --> x155e2f0b29a20e05(["aspect_preprocessed"]):::skipped
+    x213d1d2657d00cd0(["aspect_urls"]):::skipped --> x155e2f0b29a20e05(["aspect_preprocessed"]):::skipped
+    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x155e2f0b29a20e05(["aspect_preprocessed"]):::skipped
+    xe8b8ca5535fe5f2a(["bioclim_directory"]):::skipped --> x1c7b6e6a1c101e59(["bioclim_preprocessed"]):::skipped
+    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x1c7b6e6a1c101e59(["bioclim_preprocessed"]):::skipped
+    xe3c4533ec81ef618(["continent_polygon"]):::skipped --> xba6244832b5285ba(["continent_raster_template"]):::skipped
+    xe3c4533ec81ef618(["continent_polygon"]):::skipped --> x53c4b2fb80542353(["country_bounding_boxes"]):::skipped
+    x8d531cfe4886deda(["ecmwf_lead_months"]):::skipped --> x73599238bfebd1c5(["ecmwf_forecasts_api_parameters"]):::completed
+    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x73599238bfebd1c5(["ecmwf_forecasts_api_parameters"]):::completed
+    x73599238bfebd1c5(["ecmwf_forecasts_api_parameters"]):::completed --> x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::skipped
+    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::skipped
+    x16ce463b7b647c1e(["ecmwf_forecasts_transformed_directory"]):::skipped --> x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::skipped
+    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x0dffb1605751d1b1(["elevation_preprocessed"]):::skipped
+    x0381132b9136146c(["elevation_directory"]):::skipped --> x0dffb1605751d1b1(["elevation_preprocessed"]):::skipped
+    x2cc4f7a921353fe4(["forecasts_anomalies_sources"]):::completed --> x680f7450837c9229["forecasts_anomalies"]:::completed
+    xbd6b5d8fe3154d5a(["weather_historical_means"]):::skipped --> x680f7450837c9229["forecasts_anomalies"]:::completed
+    x8ff15aa322c64802(["forecasts_anomalies_directory"]):::skipped --> x680f7450837c9229["forecasts_anomalies"]:::completed
+    xdac479b8154aa4e0(["forecast_intervals"]):::skipped --> x680f7450837c9229["forecasts_anomalies"]:::completed
+    x18d8fc5297d7838e(["dates_to_process"]):::completed --> x2cc4f7a921353fe4(["forecasts_anomalies_sources"]):::completed
+    x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::skipped --> x2cc4f7a921353fe4(["forecasts_anomalies_sources"]):::completed
+    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x82990a83bfa4db45(["glw_preprocessed"]):::skipped
+    x4d4a15b2f0f1851f(["glw_urls"]):::skipped --> x82990a83bfa4db45(["glw_preprocessed"]):::skipped
+    x5448b80c3909d641(["glw_directory"]):::skipped --> x82990a83bfa4db45(["glw_preprocessed"]):::skipped
+    xba6244832b5285ba(["continent_raster_template"]):::skipped --> xdecc37cc7e708cec(["landcover_preprocessed"]):::skipped
+    x8894af119fe2eaa1(["landcover_directory"]):::skipped --> xdecc37cc7e708cec(["landcover_preprocessed"]):::skipped
+    x684d7fe78b0e841d(["landcover_types"]):::skipped --> xdecc37cc7e708cec(["landcover_preprocessed"]):::skipped
+    x3f3ba2f9e89a9591(["modis_ndvi_token"]):::completed --> xcfc776190ac6b73c["modis_ndvi_bundle_request"]:::skipped
+    xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::completed --> xcfc776190ac6b73c["modis_ndvi_bundle_request"]:::skipped
+    xcfc776190ac6b73c["modis_ndvi_bundle_request"]:::skipped --> xb64343d9bc0ef12e(["modis_ndvi_requests"]):::skipped
+    xe3c4533ec81ef618(["continent_polygon"]):::skipped --> xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::completed
+    xb406dc4c2762194f(["modis_task_end_dates"]):::skipped --> xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::completed
+    xdc843e2504e22144(["modis_ndvi_transformed_directory"]):::skipped --> xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::completed
+    x3f3ba2f9e89a9591(["modis_ndvi_token"]):::completed --> xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::completed
+    xb64343d9bc0ef12e(["modis_ndvi_requests"]):::skipped --> x5130788afbe32544["modis_ndvi_transformed"]:::skipped
+    xdc843e2504e22144(["modis_ndvi_transformed_directory"]):::skipped --> x5130788afbe32544["modis_ndvi_transformed"]:::skipped
+    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x5130788afbe32544["modis_ndvi_transformed"]:::skipped
+    x3f3ba2f9e89a9591(["modis_ndvi_token"]):::completed --> x5130788afbe32544["modis_ndvi_transformed"]:::skipped
+    x18d8fc5297d7838e(["dates_to_process"]):::completed --> x63a0e22e7393f7fe(["months_to_process"]):::completed
+    x63a0e22e7393f7fe(["months_to_process"]):::completed --> x0548e231345702f7["nasa_weather_transformed"]:::skipped
+    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x0548e231345702f7["nasa_weather_transformed"]:::skipped
+    x711dc87df29f0a9c(["nasa_weather_transformed_directory"]):::skipped --> x0548e231345702f7["nasa_weather_transformed"]:::skipped
+    xe2329877730e44b5(["ndvi_anomalies_directory"]):::skipped --> xf9b79e824823a870["ndvi_anomalies"]:::errored
+    x44345ceb9b3d4a81(["ndvi_historical_means"]):::skipped --> xf9b79e824823a870["ndvi_anomalies"]:::errored
+    xb8d88361e3190fbf["ndvi_transformed"]:::errored --> xf9b79e824823a870["ndvi_anomalies"]:::errored
+    x5130788afbe32544["modis_ndvi_transformed"]:::skipped --> x44345ceb9b3d4a81(["ndvi_historical_means"]):::skipped
+    xa4eb23442420052a["sentinel_ndvi_transformed"]:::skipped --> x44345ceb9b3d4a81(["ndvi_historical_means"]):::skipped
+    x7fef416d6ce259f3(["ndvi_historical_means_directory"]):::skipped --> x44345ceb9b3d4a81(["ndvi_historical_means"]):::skipped
+    x704a24502f5bfcb5(["ndvi_transformed_directory"]):::skipped --> xb8d88361e3190fbf["ndvi_transformed"]:::errored
+    x40d4d27d6a4a2824(["ndvi_transformed_sources"]):::skipped --> xb8d88361e3190fbf["ndvi_transformed"]:::errored
+    xa4eb23442420052a["sentinel_ndvi_transformed"]:::skipped --> x40d4d27d6a4a2824(["ndvi_transformed_sources"]):::skipped
+    x5130788afbe32544["modis_ndvi_transformed"]:::skipped --> x40d4d27d6a4a2824(["ndvi_transformed_sources"]):::skipped
+    x63a0e22e7393f7fe(["months_to_process"]):::completed --> x40d4d27d6a4a2824(["ndvi_transformed_sources"]):::skipped
+    xb406dc4c2762194f(["modis_task_end_dates"]):::skipped --> x5173ee721c44ebc0(["ndvi_years"]):::skipped
+    x3ea733d22e9c32e7(["sentinel_ndvi_transformed_directory"]):::skipped --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::skipped
+    xba6244832b5285ba(["continent_raster_template"]):::skipped --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::skipped
+    x6e1924e349d8e6e8(["sentinel_ndvi_api_parameters"]):::skipped --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::skipped
+    x45b75d590706329f(["sentinel_ndvi_token_file"]):::completed --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::skipped
+    x1ef0d1881ff89dbd(["slope_urls"]):::skipped --> x680370f9b58b9f6d(["slope_preprocessed"]):::skipped
+    x165085d61327782d(["slope_directory"]):::skipped --> x680370f9b58b9f6d(["slope_preprocessed"]):::skipped
+    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x680370f9b58b9f6d(["slope_preprocessed"]):::skipped
+    xba6244832b5285ba(["continent_raster_template"]):::skipped --> xd70b16641fa1b4ef(["soil_preprocessed"]):::skipped
+    x9c14f0532ee1f83c(["soil_directory"]):::skipped --> xd70b16641fa1b4ef(["soil_preprocessed"]):::skipped
+    x0548e231345702f7["nasa_weather_transformed"]:::skipped --> x01b9e03cb52b7b05["weather_anomalies"]:::errored
+    xf94f7486eed9869c(["weather_anomalies_directory"]):::skipped --> x01b9e03cb52b7b05["weather_anomalies"]:::errored
+    xbd6b5d8fe3154d5a(["weather_historical_means"]):::skipped --> x01b9e03cb52b7b05["weather_anomalies"]:::errored
+    x0548e231345702f7["nasa_weather_transformed"]:::skipped --> xbd6b5d8fe3154d5a(["weather_historical_means"]):::skipped
+    x4407a62768444c3e(["weather_historical_means_directory"]):::skipped --> xbd6b5d8fe3154d5a(["weather_historical_means"]):::skipped
+    x4847fdb918188b25(["country_polygons"]):::skipped
+  end
+```
 
 ## 2. Rift Valley Fever (RVF) risk model pipeline
 
@@ -494,46 +600,48 @@ A visualization of the data acquisition module can be found below.
 
     targets::tar_make(script = "model_framework_targets.R")
 
-The schematic figure below summarizes the steps of the data acquisition
+The schematic figure below summarizes the steps of the model framework
 module. The figure is generated using `mermaid.js` syntax and should
 display as a graph on GitHub. It can also be viewed by pasting the code
 into <https://mermaid.live>.)
 
-<!-- # ```{r, echo=FALSE, message = FALSE, results='asis'} -->
+<!-- NOTE: Temporarily commented out due to syntax error in model_framework_targets.R -->
 
-<!-- # mer <- targets::tar_mermaid(targets_only = TRUE,  -->
+<!-- ```{r, echo=FALSE, message = FALSE, results='asis'} -->
 
-<!-- #                             outdated = FALSE,  -->
+<!-- mer <- targets::tar_mermaid(targets_only = TRUE, -->
 
-<!-- #                             legend = FALSE,  -->
+<!--                             outdated = FALSE, -->
 
-<!-- #                             color = FALSE,  -->
+<!--                             legend = FALSE, -->
 
-<!-- #                             script = "model_framework_targets.R", -->
+<!--                             color = FALSE, -->
 
-<!-- #                             exclude = c("readme", contains("AWS"))) -->
+<!--                             script = "model_framework_targets.R", -->
 
-<!-- # cat( -->
+<!--                             exclude = c("readme", contains("AWS"))) -->
 
-<!-- #   "```mermaid", -->
+<!-- cat( -->
 
-<!-- #   mer[1],  -->
+<!--   "```mermaid", -->
 
-<!-- #   #'Objects([""Objects""]) --- Functions>""Functions""]', -->
+<!--   mer[1], -->
 
-<!-- #   'subgraph Project Workflow', -->
+<!--   #'Objects([""Objects""]) --- Functions>""Functions""]', -->
 
-<!-- #   mer[3:length(mer)], -->
+<!--   'subgraph Project Workflow', -->
 
-<!-- #   'linkStyle 0 stroke-width:0px;', -->
+<!--   mer[3:length(mer)], -->
 
-<!-- #   "```", -->
+<!--   'linkStyle 0 stroke-width:0px;', -->
 
-<!-- #   sep = "\n" -->
+<!--   "```", -->
 
-<!-- # ) -->
+<!--   sep = "\n" -->
 
-<!-- # ``` -->
+<!-- ) -->
+
+<!-- ``` -->
 
 [`Waywiser`](https://github.com/ropensci/waywiser)
 

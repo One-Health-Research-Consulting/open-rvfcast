@@ -43,11 +43,19 @@ Project code is available on the [open-rvfcast](https://github.com/ecohealthalli
   
 ### Data Storage
 
-We utilized parquet files and the `arrow` package in R as our primary method of storing data. Parquet files are optimized for high-performance, out-of-memory data processing, making it well-suited for efficiently handling and processing large, complex datasets. Additionally, `arrow::open_dataset()` supports seamless integration with S3-compatible cloud storage (including Cloudflare R2), enabling direct access to remote datasets, which improves workflow efficiency and scalability when working with large, distributed data sources. While the data acquisition module requires the processing of large datasets, the final cleaned data can be accessed directly from the cloud by opening the following connection:
+We utilized parquet files and the `arrow` package in R as our primary method of storing data. Parquet files are optimized for high-performance, out-of-memory data processing, making it well-suited for efficiently handling and processing large, complex datasets. Additionally, `arrow::open_dataset()` supports seamless integration with S3-compatible cloud storage (including Cloudflare R2), enabling direct access to remote datasets, which improves workflow efficiency and scalability when working with large, distributed data sources.
+
+#### Accessing the Complete Dataset
+
+The final cleaned data can be accessed directly from the cloud by opening the following connection. **Important**: The `africa_full_predictor_data` dataset only contains dates for which data was successfully retrieved from **all** predictor sources. If any predictor is missing for a given date, that date will not be included in the final dataset. This ensures data completeness - if a file is present in the `africa_full_predictor_data` folder, it is guaranteed to contain all predictors for that date.
+
+For more details on how the pipeline handles data dependencies and incremental updates, see [`docs/dynamic_branching_guide.md`](docs/dynamic_branching_guide.md).
+
+While the data acquisition module requires the processing of large datasets, the final cleaned data can be accessed directly from the cloud:
 
 ```
 dataset <- arrow::open_dataset(arrow::s3_bucket(
-  "rvfcast/data/africa_full_data/",
+  "rvfcast/data/africa_full_predictor_data/",
   endpoint_override = "https://85b2883dde6f6150134acd170f842c81.r2.cloudflarestorage.com",
   anonymous = TRUE
 ))
@@ -58,7 +66,7 @@ As parquet files are a columnar format with structured metadata available in eac
 
 ```
 dataset <- arrow::open_dataset(arrow::s3_bucket(
-  "rvfcast/data/africa_full_data/",
+  "rvfcast/data/africa_full_predictor_data/",
   endpoint_override = "https://85b2883dde6f6150134acd170f842c81.r2.cloudflarestorage.com",
   anonymous = TRUE
 )) |>
@@ -70,7 +78,7 @@ dataset
 
 However, due to computational demands of such large data, the model analysis pipeline will download the data in entirety before analysis. In addition, the dataset has been subsetted to two randomly chosen days per month between 2007 and 2024. Future work will provide the entire dataset for every day between 2005 and the current year.
 
-The current full africa predictor dataset is ~56 Gb
+The current full africa predictor dataset is ~1.9 TB. Note that the data could be stored in a more compact format, but is provided in this analysis-ready structure to minimize processing time when used in modeling workflows.
 
 The data targets that are subsetted this way are:
 
@@ -89,7 +97,7 @@ The data targets that are subsetted this way are:
 
 Many of the computational steps in the first module can be time consuming and either depend on or produce large files. In order to speed up the pipeline, intermediate files can be stored in S3-compatible cloud storage for portability. We currently use Cloudflare R2 (S3-compatible storage). The pipeline will still run without access to cloud storage, but users can add their own S3-compatible storage credentials to the `.env` file to enable cloud storage and collaboration with team members.
 
-Environment variables to add to the .env file:
+**S3-compatible cloud storage credentials** to add to the .env file:
 ```
 AWS_DEFAULT_REGION=auto
 AWS_REGION=auto
@@ -109,9 +117,9 @@ Acquiring the raw source data stores involves first obtaining authentication cre
 2. [COPERNICUS](https://dataspace.copernicus.eu/): for accessing Normalized Difference Vegetation Index (NDVI) data derived from the European Space Agency's  Sentinel-3 satellite.
 3. [APPEEARS](https://appeears.earthdatacloud.nasa.gov/api/): for accessing historical NDVI data prior to the Sentinel-3 mission from NASA MODIS satellites.
 
-Before running the data acquisition pipeline, credentials for all three sources must be added to the .env file
+Before running the data acquisition pipeline, credentials for all three sources must be added to the .env file.
 
-Environment variables to add to the .env file:
+**Data source API credentials** to add to the .env file:
 ```
 ECMWF_USERID=
 ECMWF_TOKEN=
@@ -126,7 +134,7 @@ APPEEARS_TOKEN=
 
 All spatial data were interpolated to a resolution of 0.1° across Africa and standardized to the WGS 84 coordinate reference system. All temporal data layers were joined by date.
 
-If data files become corrupted they can be re-generated from the raw sources by setting the `OVERWRITE_X` flags to TRUE in the .env file. This will prevent the pipeline from first downloading the data on AWS, re-download and process the raw data from the original sources, and upload the processed files to AWS for future use. Note that, under normal use, these should always be set to FALSE. The pipeline will automatically download any missing data without having to change these settings. This is only to replace data that has already been downloaded and processed mainly for pipeline development purposes.
+If data files become corrupted they can be re-generated from the raw sources by setting the `OVERWRITE_X` flags to TRUE in the .env file. This will prevent the pipeline from first downloading the data from cloud storage, re-download and process the raw data from the original sources, and upload the processed files to cloud storage for future use. Note that, under normal use, these should always be set to FALSE. The pipeline will automatically download any missing data without having to change these settings. This is only to replace data that has already been downloaded and processed mainly for pipeline development purposes.
 
 #### The Response Variable
 
@@ -175,36 +183,54 @@ To account for the influence of outbreak history, we generated outbreak exposure
 
 ### Targets Pipeline
 
+#### Error Handling and Pipeline Resilience
+
+The pipeline is designed to be resilient to temporary data source issues. Many targets include `error = "null"` in their configuration, which allows the pipeline to continue running even when individual data sources are temporarily unavailable. This is **expected behavior** and not a cause for concern.
+
+Common scenarios where errors may occur include:
+
+- **NASA MERRA-2 satellite data delays**: NASA weather data is sometimes delayed in posting, causing temporary download failures
+- **ECMWF API downtime**: The ECMWF forecast API may be temporarily unavailable during maintenance ([check status](https://status.ecmwf.int/))
+- **Copernicus/Sentinel-3 processing delays**: Satellite imagery processing can be delayed
+- **MODIS/AppEEARS bundle processing**: Bundle requests may take time to process or fail temporarily
+
+When a target fails with `error = "null"`:
+
+1. The error is logged but the pipeline continues
+2. The failed target will be automatically retried the next time the pipeline runs
+3. Downstream targets that depend on the failed data will skip or use cached data
+4. The pipeline will eventually succeed once the data source becomes available
+
+This design ensures that temporary API issues or data delays don't block the entire pipeline. Simply re-run the pipeline periodically to capture any previously failed targets once their data sources are available.
+
+#### Running the Pipeline
+
 A visualization of the data acquisition module can be found below. Additional targets not shown are responsible for fetching and storing intermediate datasets on the cloud. To run the data acquisition module, download the repository from github and run the following command. Note, without access to the common S3 bucket store this pipeline will take a significant amount of time and space to run. In addition, without access to the remote data store, the data acquisition module must be run before running the modeling module.
 
-The output of the data acquisition pipeline is an Africa wide dataset produced by joining every source above together. There are two versions. `africa_full_data` and `africa_full_rvf_model_data`. The first is the full dataset of explanatory variables and the second pairs that with RVF outbreak data as the response variable. The following command will start the data acquisition pipeline, either downloading pre-processed files from an AWS bucket or other cloud based resource or re-generating the data from the raw sources. The expected size of the full pipeline is >200Gb and so will require significant storage and time to run. Each day in the africa_ful_rvf_model_data is saved as a separate parquet file of ~500Mb. 
+The output of the data acquisition pipeline is an Africa wide dataset (`africa_full_predictor_data`) produced by joining every source above together. The following command will start the data acquisition pipeline, either downloading pre-processed files from cloud storage or re-generating the data from the raw sources. The expected size of the full pipeline is ~1.9 TB and so will require significant storage and time to run. Each day in the africa_full_predictor_data is saved as a separate parquet file of ~500Mb.
 
 ```
-tar_make(africa_full_rvf_model_data, script = "predictor_data_processing_targets.R")
+tar_make(africa_full_predictor_data, script = "predictor_data_processing_targets.R")
 ```
 
 For detailed documentation on the pipeline's dynamic branching implementation and how incremental updates work, see [`docs/dynamic_branching_guide.md`](docs/dynamic_branching_guide.md). For operational usage instructions, see [`docs/manual.md`](docs/manual.md).
 
 The schematic figure below summarizes the steps of the data acquisition module. The figure is generated using `mermaid.js` syntax and should display as a graph on GitHub.  It can also be viewed by pasting the code into <https://mermaid.live>.)
 
-<!-- # ```{r, echo=FALSE, message = FALSE, results='asis'} -->
-<!-- # mer <- targets::tar_mermaid(targets_only = TRUE,  -->
-<!-- #                             outdated = FALSE,  -->
-<!-- #                             legend = FALSE,  -->
-<!-- #                             color = FALSE,  -->
-<!-- #                             script = "data_acquisition_targets.R", -->
-<!-- #                             exclude = c("readme", contains("AWS"))) -->
-<!-- # cat( -->
-<!-- #   "```mermaid", -->
-<!-- #   mer[1],  -->
-<!-- #   #'Objects([""Objects""]) --- Functions>""Functions""]', -->
-<!-- #   'subgraph Project Workflow', -->
-<!-- #   mer[3:length(mer)], -->
-<!-- #   'linkStyle 0 stroke-width:0px;', -->
-<!-- #   "```", -->
-<!-- #   sep = "\n" -->
-<!-- # ) -->
-<!-- # ``` -->
+```{r, echo=FALSE, message = FALSE, results='asis'}
+mer <- targets::tar_mermaid(targets_only = TRUE,
+                            outdated = FALSE,
+                            legend = FALSE,
+                            color = FALSE,
+                            script = "predictor_data_processing_targets.R",
+                            exclude = c("readme", contains("AWS")))
+cat(
+  "```mermaid",
+  mer,
+  "```",
+  sep = "\n"
+)
+```
 
 
 ## 2. Rift Valley Fever (RVF) risk model pipeline
@@ -235,26 +261,27 @@ A visualization of the data acquisition module can be found below.
 targets::tar_make(script = "model_framework_targets.R")
 ```
 
-The schematic figure below summarizes the steps of the data acquisition module. The figure is generated using `mermaid.js` syntax and should display as a graph on GitHub.  It can also be viewed by pasting the code into <https://mermaid.live>.)
+The schematic figure below summarizes the steps of the model framework module. The figure is generated using `mermaid.js` syntax and should display as a graph on GitHub.  It can also be viewed by pasting the code into <https://mermaid.live>.)
 
-<!-- # ```{r, echo=FALSE, message = FALSE, results='asis'} -->
-<!-- # mer <- targets::tar_mermaid(targets_only = TRUE,  -->
-<!-- #                             outdated = FALSE,  -->
-<!-- #                             legend = FALSE,  -->
-<!-- #                             color = FALSE,  -->
-<!-- #                             script = "model_framework_targets.R", -->
-<!-- #                             exclude = c("readme", contains("AWS"))) -->
-<!-- # cat( -->
-<!-- #   "```mermaid", -->
-<!-- #   mer[1],  -->
-<!-- #   #'Objects([""Objects""]) --- Functions>""Functions""]', -->
-<!-- #   'subgraph Project Workflow', -->
-<!-- #   mer[3:length(mer)], -->
-<!-- #   'linkStyle 0 stroke-width:0px;', -->
-<!-- #   "```", -->
-<!-- #   sep = "\n" -->
-<!-- # ) -->
-<!-- # ``` -->
+<!-- NOTE: Temporarily commented out due to syntax error in model_framework_targets.R -->
+<!-- ```{r, echo=FALSE, message = FALSE, results='asis'} -->
+<!-- mer <- targets::tar_mermaid(targets_only = TRUE, -->
+<!--                             outdated = FALSE, -->
+<!--                             legend = FALSE, -->
+<!--                             color = FALSE, -->
+<!--                             script = "model_framework_targets.R", -->
+<!--                             exclude = c("readme", contains("AWS"))) -->
+<!-- cat( -->
+<!--   "```mermaid", -->
+<!--   mer[1], -->
+<!--   #'Objects([""Objects""]) --- Functions>""Functions""]', -->
+<!--   'subgraph Project Workflow', -->
+<!--   mer[3:length(mer)], -->
+<!--   'linkStyle 0 stroke-width:0px;', -->
+<!--   "```", -->
+<!--   sep = "\n" -->
+<!-- ) -->
+<!-- ``` -->
 
 [`Waywiser`](https://github.com/ropensci/waywiser)
 
