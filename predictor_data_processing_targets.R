@@ -1,6 +1,6 @@
 # This repository uses targets projects.
 # To switch to the data acquisition adn cleaning pipeline run:
-# `Sys.setenv(TAR_PROJECT = "data")` 
+# `Sys.setenv(TAR_PROJECT = "data")`
 
 # Re-record current dependencies for CAPSULE users
 if (Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true")) {
@@ -101,11 +101,11 @@ static_targets <- tar_plan(
   ),
   
   tar_target(soil_preprocessed_AWS_upload, AWS_put_files(
-    soil_preprocessed,
-    soil_directory,
-    overwrite = parse_flag("OVERWRITE_STATIC_DATA")
-  ),
-  error = "null" # Continue the pipeline even on error
+      soil_preprocessed,
+      soil_directory,
+      overwrite = parse_flag("OVERWRITE_STATIC_DATA")
+    ),
+    error = "null" # Continue the pipeline even on error
   ),
 
   # ASPECT -------------------------------------------------
@@ -149,11 +149,11 @@ static_targets <- tar_plan(
   ),
   
   tar_target(aspect_preprocessed_AWS_upload, AWS_put_files(
-    aspect_preprocessed,
-    aspect_directory,
-    overwrite = parse_flag("OVERWRITE_STATIC_DATA")
-  ),
-  error = "null"
+      aspect_preprocessed,
+      aspect_directory,
+      overwrite = parse_flag("OVERWRITE_STATIC_DATA")
+    ),
+    error = "null"
   ), # Continue the pipeline even on error
 
   # SLOPE -------------------------------------------------
@@ -200,11 +200,11 @@ static_targets <- tar_plan(
   ),
   
   tar_target(slope_preprocessed_AWS_upload, AWS_put_files(
-    slope_preprocessed,
-    slope_directory,
-    overwrite = parse_flag("OVERWRITE_STATIC_DATA")
-  ),
-  error = "null"
+      slope_preprocessed,
+      slope_directory,
+      overwrite = parse_flag("OVERWRITE_STATIC_DATA")
+    ),
+    error = "null"
   ), # Continue the pipeline even on error
 
   # Gridded Livestock of the world -----------------------------------------------------------
@@ -242,11 +242,11 @@ static_targets <- tar_plan(
   ), # Enforce dependency
 
   tar_target(glw_preprocessed_AWS_upload, AWS_put_files(
-    glw_preprocessed,
-    glw_directory,
-    overwrite = parse_flag("OVERWRITE_STATIC_DATA")
-  ),
-  error = "null"
+      glw_preprocessed,
+      glw_directory,
+      overwrite = parse_flag("OVERWRITE_STATIC_DATA")
+    ),
+    error = "null"
   ), # Continue the pipeline even on error
 
   # ELEVATION -----------------------------------------------------------
@@ -280,11 +280,11 @@ static_targets <- tar_plan(
   ),
   
   tar_target(elevation_preprocessed_AWS_upload, AWS_put_files(
-    elevation_preprocessed,
-    elevation_directory,
-    overwrite = parse_flag("OVERWRITE_STATIC_DATA")
-  ),
-  error = "null"
+      elevation_preprocessed,
+      elevation_directory,
+      overwrite = parse_flag("OVERWRITE_STATIC_DATA")
+    ),
+    error = "null"
   ), # Continue the pipeline even on error
 
   # BIOCLIM -----------------------------------------------------------
@@ -318,11 +318,11 @@ static_targets <- tar_plan(
   ),
   
   tar_target(bioclim_preprocessed_AWS_upload, AWS_put_files(
-    bioclim_preprocessed,
-    bioclim_directory,
-    overwrite = parse_flag("OVERWRITE_STATIC_DATA")
-  ),
-  error = "null"
+      bioclim_preprocessed,
+      bioclim_directory,
+      overwrite = parse_flag("OVERWRITE_STATIC_DATA")
+    ),
+    error = "null"
   ), # Continue the pipeline even on error
 
   # LANDCOVER -----------------------------------------------------------
@@ -358,16 +358,32 @@ static_targets <- tar_plan(
   ),
   
   tar_target(landcover_preprocessed_AWS_upload, AWS_put_files(
-    landcover_preprocessed,
-    landcover_directory,
-    overwrite = parse_flag("OVERWRITE_STATIC_DATA")
-  ),
-  error = "null"
+      landcover_preprocessed,
+      landcover_directory,
+      overwrite = parse_flag("OVERWRITE_STATIC_DATA")
+    ),
+    error = "null"
   ), # Continue the pipeline even on error
 )
 
 # Dynamic Data Download -----------------------------------------------------------
 dynamic_targets <- tar_plan(
+
+
+  # NCL: This function produces a random sampling of n_per_month dates for every month
+  # in every year between start_year and end_year. If a new year is added, the
+  # random draws for the previous years won't change unless the seed is updated.
+  # Ideally we want to make the full dataset for every day and store it then subset
+  # only right before fitting the model.
+  tar_target(dates_to_process, set_model_dates(
+    start_year = 2005,
+    end_year = lubridate::year(Sys.time()),
+    n_per_month = NULL,
+    seed = 212
+  ),
+  cue = tar_cue("always")),
+
+  tar_target(months_to_process, dates_to_process |> format("%Y-%m") |> unique()),
 
   # SENTINEL NDVI -----------------------------------------------------------
   # 2018-present
@@ -404,7 +420,6 @@ dynamic_targets <- tar_plan(
       sentinel_ndvi_token_file,
       basename_template = "transformed_sentinel_NDVI_{start_date}_to_{end_date}.parquet",
       overwrite = parse_flag("OVERWRITE_SENTINEL_NDVI"),
-      get_sentinel_ndvi_AWS
     ),
     pattern = map(sentinel_ndvi_api_parameters),
     error = "null", # Keep going if error. It will be caught next time the pipeline is run.
@@ -413,11 +428,11 @@ dynamic_targets <- tar_plan(
   ),
   
   tar_target(sentinel_ndvi_transformed_AWS_upload, AWS_put_files(
-    sentinel_ndvi_transformed,
-    sentinel_ndvi_transformed_directory,
-    overwrite = parse_flag("OVERWRITE_SENTINEL_NDVI")
-  ),
-  error = "null"
+      sentinel_ndvi_transformed,
+      sentinel_ndvi_transformed_directory,
+      overwrite = parse_flag("OVERWRITE_SENTINEL_NDVI")
+    ),
+    error = "null"
   ), # Continue the pipeline even on error
 
   # MODIS NDVI -----------------------------------------------------------
@@ -525,11 +540,11 @@ dynamic_targets <- tar_plan(
 
   # Put modis_ndvi_transformed files on AWS
   tar_target(modis_ndvi_transformed_AWS_upload, AWS_put_files(
-    modis_ndvi_transformed,
-    modis_ndvi_transformed_directory,
-    overwrite = parse_flag("OVERWRITE_MODIS_NDVI")
-  ),
-  error = "null"
+      modis_ndvi_transformed,
+      modis_ndvi_transformed_directory,
+      overwrite = parse_flag("OVERWRITE_MODIS_NDVI")
+    ),
+    error = "null"
   ),
 
   # Combine Sentinel an MODIS ndvi data and interopolate to daily interval
@@ -552,34 +567,40 @@ dynamic_targets <- tar_plan(
 
   tar_target(ndvi_years, lubridate::year(modis_task_end_dates)),
 
-  # Combine modis and sentinel datasets into a single source for lagging
-  # There is some kind of bug between targets and arrow which interferes
-  # when branching over ndvi_years. I end up with empty parquet files
-  # I have no idea why pattern = map(ndvi_years) breaks things.
-  # Solution is to not use dynamic branching here.
-  # Note: MODIS and Sentinel raw data need to be scaled. 
+  # Create intermediary target pairing each month with relevant MODIS and Sentinel files
+  tar_target(ndvi_transformed_sources,
+    create_ndvi_transformed_sources(
+      modis_ndvi_transformed,
+      sentinel_ndvi_transformed,
+      months_to_process
+    ) |>
+      group_by(month) |>
+      tar_group(),
+    iteration = "group"
+  ),
+
+  # Note: MODIS and Sentinel raw data need to be scaled.
   # MODIS/10000 and Sentinel/200
   tar_target(ndvi_transformed,
-    transform_ndvi(modis_ndvi_transformed,
-      sentinel_ndvi_transformed,
+    transform_ndvi(
+      ndvi_transformed_sources,
       ndvi_transformed_directory,
       basename_template = "ndvi_transformed_{.y}_{.m}.parquet",
-      ndvi_years,
-      ndvi_months = 1:12,
       overwrite = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED"))
     ),
+    pattern = map(ndvi_transformed_sources),
     format = "file",
-    repository = "local",
-    error = "null"
+    error = "null",
+    repository = "local"
   ),
 
   # Put ndvi_transformed files on AWS
   tar_target(ndvi_transformed_AWS_upload, AWS_put_files(
-    ndvi_transformed,
-    ndvi_transformed_directory,
-    overwrite = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED"))
-  ),
-  error = "null"
+      ndvi_transformed,
+      ndvi_transformed_directory,
+      overwrite = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED"))
+    ),
+    error = "null"
   ),
 
 
@@ -587,8 +608,6 @@ dynamic_targets <- tar_plan(
   # RH2M            MERRA-2 Relative Humidity at 2 Meters (%) ;
   # T2M             MERRA-2 Temperature at 2 Meters (C) ;
   # PRECTOTCORR     MERRA-2 Precipitation Corrected (mm/day)
-
-  tar_target(months_to_process, dates_to_process |> format("%Y-%m") |> unique()),
 
   tar_target(
     nasa_weather_transformed_directory,
@@ -600,8 +619,7 @@ dynamic_targets <- tar_plan(
   tar_target(nasa_weather_transformed_AWS,
              AWS_get_folder(
                nasa_weather_transformed_directory,
-               # skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
-               skip_fetch = TRUE,
+               skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
                sync_with_remote = TRUE
              ),
              error = "null",
@@ -620,21 +638,19 @@ dynamic_targets <- tar_plan(
                                               endpoint = "https://power-datastore.s3.amazonaws.com/v10/daily/{year}/{month}/power_10_daily_{yyyymmdd}_merra2_lst.nc",
                                               overwrite = parse_flag("OVERWRITE_NASA_WEATHER"),
                                               nasa_weather_transformed_AWS, # Enforce Dependency
-                                              dates_to_process, # Enforce Dependency
              ),
              pattern = map(months_to_process),
              error = "null",
-             format = "file",
-             # repository = "local"
+             format = "file"
   ),
   
   # Put nasa_weather files on AWS
   tar_target(nasa_weather_transformed_AWS_upload, AWS_put_files(
-    nasa_weather_transformed,
-    nasa_weather_transformed_directory,
-    overwrite = parse_flag("OVERWRITE_NASA_WEATHER")
-  ),
-  error = "null"
+      nasa_weather_transformed,
+      nasa_weather_transformed_directory,
+      overwrite = parse_flag("OVERWRITE_NASA_WEATHER")
+    ),
+    error = "null"
   ),
 
 
@@ -696,13 +712,13 @@ dynamic_targets <- tar_plan(
     repository = "local"
   ),
 
-  # Next step put modis_ndvi_transformed files on AWS.
+  # Next step put ecmwf_forecasts files on AWS.
   tar_target(ecmwf_forecasts_transformed_AWS_upload, AWS_put_files(
-    ecmwf_forecasts_transformed,
-    ecmwf_forecasts_transformed_directory,
-    overwrite = parse_flag("OVERWRITE_ECMWF_FORECASTS")
-  ),
-  error = "null"
+      ecmwf_forecasts_transformed,
+      ecmwf_forecasts_transformed_directory,
+      overwrite = parse_flag("OVERWRITE_ECMWF_FORECASTS")
+    ),
+    error = "null"
   ),
 )
 
@@ -713,19 +729,6 @@ derived_data_targets <- tar_plan(
   # 0-30, 30-60, 60-90 days out ect...
   # Right now 5 months foreward
   tar_target(forecast_intervals, c(0, 30, 60, 90, 120, 150)),
-
-  # NCL: This function produces a random sampling of n_per_month dates for every month
-  # in every year between start_year and end_year. If a new year is added, the
-  # random draws for the previous years won't change unless the seed is updated.
-  # Ideally we want to make the full dataset for every day and store it then subset
-  # only right before fitting the model.
-  tar_target(dates_to_process, set_model_dates(
-    start_year = 2005,
-    end_year = lubridate::year(Sys.time()),
-    n_per_month = NULL,
-    seed = 212
-  ),
-  cue = tar_cue("always")),
 
   # Recorded weather anomalies --------------------------------------------------
   tar_target(
@@ -753,16 +756,20 @@ derived_data_targets <- tar_plan(
     weather_historical_means_AWS # Enforce dependency
   ),
   format = "file",
-  repository = "local"
+  repository = "local",
+  cue = tar_cue_age(
+    name = weather_historical_means,
+    age = as.difftime(180, units = "days")  # Recalculate every 6 months
+  )
   ),
 
   # Next step put weather_historical_means files on AWS.
   tar_target(weather_historical_means_AWS_upload, AWS_put_files(
-    weather_historical_means,
-    weather_historical_means_directory,
-    overwrite = parse_flag("OVERWRITE_HISTORICAL_MEANS")
-  ),
-  error = "null"
+      weather_historical_means,
+      weather_historical_means_directory,
+      overwrite = parse_flag("OVERWRITE_HISTORICAL_MEANS")
+    ),
+    error = "null",
   ),
   
   tar_target(
@@ -783,43 +790,44 @@ derived_data_targets <- tar_plan(
   ),
 
   # Weather anomalies are deviations from the historical mean
+  # Branch over months (nasa_weather_transformed) instead of dates
+  # Each branch processes all dates within that month
   tar_target(weather_anomalies,
     calculate_weather_anomalies(
       nasa_weather_transformed,
       weather_historical_means,
       weather_anomalies_directory,
-      basename_template = "weather_anomaly_{dates_to_process}.parquet",
-      dates_to_process,
+      basename_template = "weather_anomaly_{date}.parquet",
       overwrite = parse_flag("OVERWRITE_WEATHER_ANOMALIES"),
-      weather_anomalies_AWS
-    ), # Enforce dependency
-    pattern = map(dates_to_process),
+      weather_anomalies_AWS  # Enforce dependency
+    ),
+    pattern = map(nasa_weather_transformed),
     error = "null",
     format = "file",
-    # cue = tar_cue("always"),
     repository = "local"
   ),
 
   # Next step put weather_historical_means files on AWS.
   tar_target(weather_anomalies_AWS_upload, AWS_put_files(
-    weather_anomalies,
-    weather_anomalies_directory,
-    overwrite = parse_flag("OVERWRITE_WEATHER_ANOMALIES")
-  ),
-  error = "null"
+      weather_anomalies,
+      weather_anomalies_directory,
+      overwrite = parse_flag("OVERWRITE_WEATHER_ANOMALIES")
+    ),
+    pattern = map(weather_anomalies),
+    error = "null"
   ),
 
   # forecast weather anomalies ----------------------------------------------------------------------
   tar_target(
-    forecast_anomalies_directory,
+    forecasts_anomalies_directory,
     create_data_directory(directory_path = "data/forecast_anomalies")
   ),
 
-  # Check if forecast_anomalies parquet files already exists on AWS and can be loaded
+  # Check if forecasts_anomalies parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
-  tar_target(forecast_anomalies_AWS,
+  tar_target(forecasts_anomalies_AWS,
     AWS_get_folder(
-      forecast_anomalies_directory,
+      forecasts_anomalies_directory,
       skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE",
       sync_with_remote = TRUE
     ),
@@ -834,31 +842,44 @@ derived_data_targets <- tar_plan(
   # on an M1 mac. Expect to take a day to regenerate the data if re-building from
   # scratch.
 
-  tar_target(forecast_anomalies,
-  
-    calculate_forecast_anomalies(ecmwf_forecasts_transformed,
+  # Create intermediary target pairing each date with most recent forecast file
+  # Only includes dates up to the latest forecast month
+  tar_target(forecasts_anomalies_sources,
+    create_forecasts_anomalies_sources(
+      ecmwf_forecasts_transformed,
+      dates_to_process
+    ) |>
+      group_by(date) |>
+      tar_group(),
+    iteration = "group"
+  ),
+
+  # Forecast anomalies - branch over dates
+  # Each branch gets one row from forecasts_anomalies_sources (date + forecast file)
+  tar_target(forecasts_anomalies,
+    calculate_forecast_anomalies(
+      forecasts_anomalies_sources,
       weather_historical_means,
-      forecast_anomalies_directory,
-      basename_template = "forecast_anomaly_{dates_to_process}.parquet",
-      dates_to_process,
+      forecasts_anomalies_directory,
+      basename_template = "forecast_anomaly_{date}.parquet",
       forecast_intervals,
       overwrite = parse_flag("OVERWRITE_FORECAST_ANOMALIES"),
-      ecmwf_forecasts_transformed, # Enforce dependency
-      forecast_anomalies_AWS
-    ), # Enforce dependency
-    pattern = map(dates_to_process),
+      forecasts_anomalies_AWS # Enforce dependency
+    ),
+    pattern = map(forecasts_anomalies_sources),
     error = "null",
     format = "file",
     repository = "local"
   ),
 
   # Next step put weather_historical_means files on AWS.
-  tar_target(forecast_anomalies_AWS_upload, AWS_put_files(
-      forecast_anomalies,
-      forecast_anomalies_directory,
-      overwrite = parse_flag("OVERWRITE_FORECAST_ANOMALIES")
+  tar_target(forecasts_anomalies_AWS_upload, AWS_put_files(
+    forecasts_anomalies,
+    forecasts_anomalies_directory,
+    overwrite = parse_flag("OVERWRITE_FORECAST_ANOMALIES")
     ),
-    error = "continue"
+    pattern = map(forecasts_anomalies),
+    error = "null"
   ),
 
   tar_target(
@@ -887,17 +908,22 @@ derived_data_targets <- tar_plan(
       ndvi_historical_means_AWS # Enforce dependency
     ),
     format = "file",
-    repository = "local"
+    repository = "local",
+    cue = tar_cue_age(
+      name = ndvi_historical_means,
+      age = as.difftime(180, units = "days")  # Recalculate every 6 months
+    )
   ),
 
   # Next step put ndvi_historical_means files on AWS.
   tar_target(ndvi_historical_means_AWS_upload, AWS_put_files(
-    ndvi_historical_means,
-    ndvi_historical_means_directory,
-    overwrite = parse_flag("OVERWRITE_HISTORICAL_MEANS")
+      ndvi_historical_means,
+      ndvi_historical_means_directory,
+      overwrite = parse_flag("OVERWRITE_HISTORICAL_MEANS")
+    ),
+    error = "null"
   ),
-  error = "null"
-  ),
+
   tar_target(
     ndvi_anomalies_directory,
     create_data_directory(directory_path = "data/ndvi_anomalies")
@@ -915,16 +941,18 @@ derived_data_targets <- tar_plan(
     cue = tar_cue("always")
   ),
 
+  # NDVI anomalies - branch over months (ndvi_transformed) instead of dates
+  # Each branch processes all dates within that month
   tar_target(ndvi_anomalies,
-    calculate_ndvi_anomalies(ndvi_transformed,
+    calculate_ndvi_anomalies(
+      ndvi_transformed,
       ndvi_historical_means,
       ndvi_anomalies_directory,
-      basename_template = "ndvi_anomaly_{dates_to_process}.parquet",
-      dates_to_process,
+      basename_template = "ndvi_anomaly_{date}.parquet",
       overwrite = parse_flag("OVERWRITE_NDVI_ANOMALIES"),
-      ndvi_anomalies_AWS
-    ), # Enforce dependency
-    pattern = map(dates_to_process),
+      ndvi_anomalies_AWS # Enforce dependency
+    ),
+    pattern = map(ndvi_transformed),
     error = "null",
     format = "file",
     repository = "local"
@@ -932,11 +960,12 @@ derived_data_targets <- tar_plan(
 
   # Next step put ndvi_anomalies files on AWS.
   tar_target(ndvi_anomalies_AWS_upload, AWS_put_files(
-    ndvi_anomalies,
-    ndvi_anomalies_directory,
-    overwrite = parse_flag("OVERWRITE_NDVI_ANOMALIES")
-  ),
-  error = "null"
+      ndvi_anomalies,
+      ndvi_anomalies_directory,
+      overwrite = parse_flag("OVERWRITE_NDVI_ANOMALIES")
+    ),
+    pattern = map(ndvi_anomalies),
+    error = "null"
   )
 )
 
@@ -962,49 +991,58 @@ full_data_targets <- tar_plan(
     cue = tar_cue("always")
   ),
 
-  # Combine all static and dynamic data layers.
-  # Partition into separate parquet files by month and year.
-  # Why NO WAY to deparse substitute a list of variables?
-  tar_target(africa_full_predictor_data_sources, list(
-    forecast_anomalies = forecast_anomalies,
-    weather_anomalies = weather_anomalies,
-    ndvi_anomalies = ndvi_anomalies,
-    soil_preprocessed = soil_preprocessed,
-    aspect_preprocessed = aspect_preprocessed,
-    slope_preprocessed = slope_preprocessed,
-    glw_preprocessed = glw_preprocessed,
-    elevation_preprocessed = elevation_preprocessed,
-    bioclim_preprocessed = bioclim_preprocessed,
-    landcover_preprocessed = landcover_preprocessed
-  )),
+  tar_target(africa_full_predictor_data_sources_static,
+    list(
+      soil_preprocessed = soil_preprocessed,
+      aspect_preprocessed = aspect_preprocessed,
+      slope_preprocessed = slope_preprocessed,
+      glw_preprocessed = glw_preprocessed,
+      elevation_preprocessed = elevation_preprocessed,
+      bioclim_preprocessed = bioclim_preprocessed,
+      landcover_preprocessed = landcover_preprocessed
+    )
+  ),
+
+  # Create intermediary target pairing each date with its predictor files
+  tar_target(africa_full_predictor_data_sources_temporal,
+    create_africa_full_predictor_data_sources(
+      forecasts_anomalies,
+      weather_anomalies,
+      ndvi_anomalies,
+      dates_to_process
+    ) |>
+      group_by(date) |>
+      tar_group(),
+    iteration = "group"
+  ),
 
   # Join all explanatory variable data sources using file based partitioning instead of hive
-  # error needs to be null here because some prsedictors (like wahis_outbreak_sources) aren't
+  # error needs to be null here because some predictors (like wahis_outbreak_sources) aren't
   # present in all times.
   tar_target(africa_full_predictor_data, file_partition_duckdb(
-    # sources = africa_full_predictor_data_sources,
-    sources = africa_full_predictor_data_sources,
-    dates_to_process,
+    temporal_sources = africa_full_predictor_data_sources_temporal,
+    static_sources = africa_full_predictor_data_sources_static,
     local_folder = africa_full_predictor_data_directory,
-    basename_template = "africa_full_predictor_data_{dates_to_process}.parquet",
+    basename_template = "africa_full_predictor_data_{date}.parquet",
     overwrite = parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA"),
     africa_full_predictor_data_AWS # Enforce dependency
   ),
-  pattern = map(dates_to_process),
+  pattern = map(africa_full_predictor_data_sources_temporal),
   format = "file",
-  repository = "local"
+  repository = "local",
+  error = "null"
   ),
 
   # Next step put combined_anomalies files on AWS.
   tar_target(africa_full_predictor_data_AWS_upload, AWS_put_files(
-    africa_full_predictor_data,
-    africa_full_predictor_data_directory,
-    overwrite = parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA")
-  ),
-  error = "null",
+      africa_full_predictor_data,
+      africa_full_predictor_data_directory,
+      overwrite = parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA")
+    ),
+    pattern = map(africa_full_predictor_data),
+    error = "null"
   )
 )
-
 
 # List targets -----------------------------------------------------------------
 # all_targets() doesn't work with tarchetypes like tar_change().

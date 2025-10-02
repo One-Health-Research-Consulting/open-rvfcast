@@ -50,7 +50,7 @@ transform_modis_ndvi <- function(modis_ndvi_token,
   # Check if transformed file already exists and can be loaded. If so return file name and path
   # Check if glw files exist and can be read and that we don't want to overwrite them.
   if (!is.null(error_safe_read_parquet(transformed_file)) & !overwrite) {
-    message("preprocessed modis ndvi parquet file already exists and can be loaded, skipping download and processing")
+    message(glue::glue("{basename(transformed_file)} already exists, has rows, and overwrite is not TRUE, skipping"))
     return(transformed_file)
   }
 

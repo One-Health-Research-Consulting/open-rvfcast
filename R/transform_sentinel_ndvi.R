@@ -56,7 +56,7 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_api_parameters,
   
   # Check if glw files exist and can be read and that we don't want to overwrite them.
   if(!is.null(error_safe_read_parquet(sentinel_ndvi_filename)) & !overwrite) {
-    message("transformed sentinel ndvi parquet file already exists and can be loaded, skipping download and processing")
+    message(glue::glue("{basename(sentinel_ndvi_filename)} already exists, has rows, and overwrite is not TRUE, skipping"))
     return(sentinel_ndvi_filename)
   }
   

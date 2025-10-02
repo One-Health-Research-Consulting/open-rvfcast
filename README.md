@@ -61,12 +61,14 @@ Project code is available on the
 repository which is organized with the following structure:
 
 - `data/` contains downloaded and transformed data sources. These data
-  are .gitignored and are available with access to the EHA open-rvf S3
-  bucket or the raw data can be download and processed.
+  are .gitignored and are available with access to S3-compatible cloud
+  storage or the raw data can be downloaded and processed.
 - `R/` contains functions used in this analysis.
-- `reports/` contains literate code for R Markdown reports generated in
-  the analysis.
-- `outputs/` contains compiled reports and figures.
+- `docs/` contains documentation:
+  - `dynamic_branching_guide.md` - comprehensive guide to the dynamic
+    branching implementation
+  - `manual.md` - user manual for running the pipeline
+- `outputs/` contains visualization outputs (maps, animations).
 
 ### Data Storage
 
@@ -75,13 +77,18 @@ method of storing data. Parquet files are optimized for
 high-performance, out-of-memory data processing, making it well-suited
 for efficiently handling and processing large, complex datasets.
 Additionally, `arrow::open_dataset()` supports seamless integration with
-cloud storage, enabling direct access to remote datasets, which improves
-workflow efficiency and scalability when working with large, distributed
-data sources. While the data acquisition module requires the processing
-of large datasets, the final cleaned data can be accessed directly from
-the cloud by opening the following connection:
+S3-compatible cloud storage (including Cloudflare R2), enabling direct
+access to remote datasets, which improves workflow efficiency and
+scalability when working with large, distributed data sources. While the
+data acquisition module requires the processing of large datasets, the
+final cleaned data can be accessed directly from the cloud by opening
+the following connection:
 
-    dataset <- open_dataset("s3://open-rvfcast/data/africa_full_model_data")
+    dataset <- arrow::open_dataset(arrow::s3_bucket(
+      "rvfcast/data/africa_full_data/",
+      endpoint_override = "https://85b2883dde6f6150134acd170f842c81.r2.cloudflarestorage.com",
+      anonymous = TRUE
+    ))
     dataset$schema
 
 As parquet files are a columnar format with structured metadata
@@ -92,14 +99,34 @@ collect() on the dataset will initiate the download. For example, the
 following will filter the data and then download the model data for a
 single day:
 
-    dataset <- open_dataset("s3://open-rvfcast/data/africa_full_model_data") |> 
-    filter(date == "2023-12-14") |> 
-    collect()
+    dataset <- arrow::open_dataset(arrow::s3_bucket(
+      "rvfcast/data/africa_full_data/",
+      endpoint_override = "https://85b2883dde6f6150134acd170f842c81.r2.cloudflarestorage.com",
+      anonymous = TRUE
+    )) |>
+      dplyr::filter(date == "2005-01-08") |>
+      dplyr::collect()
+
+    dataset
 
 However, due to computational demands of such large data, the model
 analysis pipeline will download the data in entirety before analysis. In
 addition, the dataset has been subsetted to two randomly chosen days per
-month between 2007 and 2024.
+month between 2007 and 2024. Future work will provide the entire dataset
+for every day between 2005 and the current year.
+
+The current full africa predictor dataset is ~56 Gb
+
+The data targets that are subsetted this way are:
+
+1.  weather_anomalies
+2.  weather_anomalies_lagged
+3.  forecasts_anomalies
+4.  forecast_anomalies_lagged
+5.  ndvi_anomalies
+6.  ndvi_anomalies_lagged
+7.  rvf_response
+8.  africa_full_model_data
 
 ## 1. Data Acquisition Module
 
@@ -107,20 +134,27 @@ month between 2007 and 2024.
 
 Many of the computational steps in the first module can be time
 consuming and either depend on or produce large files. In order to speed
-up the pipeline, intermediate files can be stored on the cloud for
-portability. We currently use an AWS [S3
-bucket](https://aws.amazon.com/s3/) for this purpose. The pipeline will
-still run without access to cloud storage, but users can add their own
-AWS access keys and bucket ID to the `.env` file to enable cloud
-storage.
+up the pipeline, intermediate files can be stored in S3-compatible cloud
+storage for portability. We currently use Cloudflare R2 (S3-compatible
+storage). The pipeline will still run without access to cloud storage,
+but users can add their own S3-compatible storage credentials to the
+`.env` file to enable cloud storage and collaboration with team members.
 
 Environment variables to add to the .env file:
 
-    AWS_DEFAULT_REGION=
-    AWS_REGION=
-    AWS_BUCKET_ID=
-    AWS_ACCESS_KEY_ID=
-    AWS_SECRET_ACCESS_KEY=
+    AWS_DEFAULT_REGION=auto
+    AWS_REGION=auto
+    AWS_BUCKET_ID=your-bucket-name
+    AWS_ACCESS_KEY_ID=your-access-key
+    AWS_SECRET_ACCESS_KEY=your-secret-key
+    AWS_S3_ENDPOINT=your-s3-endpoint
+    AWS_ENDPOINT_URL=https://${AWS_S3_ENDPOINT}
+
+The pipeline works with any S3-compatible storage including AWS S3,
+Cloudflare R2, MinIO, etc. See
+[`docs/dynamic_branching_guide.md`](docs/dynamic_branching_guide.md) for
+details on how the pipeline uses cloud storage for incremental updates
+and team collaboration.
 
 ### Data Access
 
@@ -267,15 +301,15 @@ following sources make up the dynamic layers:
     from the average value for that day-of-year (DOY).
 9.  ndvi_anomalies: NDVI data was sourced from both the NASA’s Moderate
     Resolution Imaging Spectroradiometer
-    ([MODIS](https://modis.gsfc.nasa.gov/data/dataprod/mod13.php)) and
-    the European Space Agency’s Copernicus
+    ([MODIS](https://modis.gsfc.nasa.gov/data/dataprod/mod13)) and the
+    European Space Agency’s Copernicus
     [Sentinel-3](https://user.eumetsat.int/catalogue/EO:EUM:DAT:0340)
     missions. MODIS is due to be retired in 2025 while Sentinel-3 NDVI
     data is available from September 2018. MODIS and Sentinel-3 NDVI
     values were interpolated to a daily interval from their native 16
-    day (MODIS) and \~10 day (Sentinel-3) intervals using a
-    step-function and NDVI averaged when data from both sources were
-    available. The difference, or anomaly value, was then found by
+    day (MODIS) and ~10 day (Sentinel-3) intervals using a
+    step-function. NDVI values were averaged when data from both sources
+    were available. The difference, or anomaly value, was then found by
     subtracting NDVI from the average value for that day-of-year (DOY).
 
 ##### Weather Forecasts
@@ -347,7 +381,25 @@ significant amount of time and space to run. In addition, without access
 to the remote data store, the data acquisition module must be run before
 running the modeling module.
 
-    tar_make(script = "data_acquisition_targets.R")
+The output of the data acquisition pipeline is an Africa wide dataset
+produced by joining every source above together. There are two versions.
+`africa_full_data` and `africa_full_rvf_model_data`. The first is the
+full dataset of explanatory variables and the second pairs that with RVF
+outbreak data as the response variable. The following command will start
+the data acquisition pipeline, either downloading pre-processed files
+from an AWS bucket or other cloud based resource or re-generating the
+data from the raw sources. The expected size of the full pipeline is
+\>200Gb and so will require significant storage and time to run. Each
+day in the africa_ful_rvf_model_data is saved as a separate parquet file
+of ~500Mb.
+
+    tar_make(africa_full_rvf_model_data, script = "predictor_data_processing_targets.R")
+
+For detailed documentation on the pipeline’s dynamic branching
+implementation and how incremental updates work, see
+[`docs/dynamic_branching_guide.md`](docs/dynamic_branching_guide.md).
+For operational usage instructions, see
+[`docs/manual.md`](docs/manual.md).
 
 The schematic figure below summarizes the steps of the data acquisition
 module. The figure is generated using `mermaid.js` syntax and should
@@ -355,22 +407,39 @@ display as a graph on GitHub. It can also be viewed by pasting the code
 into <https://mermaid.live>.)
 
 <!-- # ```{r, echo=FALSE, message = FALSE, results='asis'} -->
+
 <!-- # mer <- targets::tar_mermaid(targets_only = TRUE,  -->
+
 <!-- #                             outdated = FALSE,  -->
+
 <!-- #                             legend = FALSE,  -->
+
 <!-- #                             color = FALSE,  -->
+
 <!-- #                             script = "data_acquisition_targets.R", -->
+
 <!-- #                             exclude = c("readme", contains("AWS"))) -->
+
 <!-- # cat( -->
+
 <!-- #   "```mermaid", -->
+
 <!-- #   mer[1],  -->
+
 <!-- #   #'Objects([""Objects""]) --- Functions>""Functions""]', -->
+
 <!-- #   'subgraph Project Workflow', -->
+
 <!-- #   mer[3:length(mer)], -->
+
 <!-- #   'linkStyle 0 stroke-width:0px;', -->
+
 <!-- #   "```", -->
+
 <!-- #   sep = "\n" -->
+
 <!-- # ) -->
+
 <!-- # ``` -->
 
 ## 2. Rift Valley Fever (RVF) risk model pipeline
@@ -423,7 +492,7 @@ and generalizability.
 
 A visualization of the data acquisition module can be found below.
 
-    tar_make(script = "model_framework_targets.R")
+    targets::tar_make(script = "model_framework_targets.R")
 
 The schematic figure below summarizes the steps of the data acquisition
 module. The figure is generated using `mermaid.js` syntax and should
@@ -431,30 +500,46 @@ display as a graph on GitHub. It can also be viewed by pasting the code
 into <https://mermaid.live>.)
 
 <!-- # ```{r, echo=FALSE, message = FALSE, results='asis'} -->
+
 <!-- # mer <- targets::tar_mermaid(targets_only = TRUE,  -->
+
 <!-- #                             outdated = FALSE,  -->
+
 <!-- #                             legend = FALSE,  -->
+
 <!-- #                             color = FALSE,  -->
+
 <!-- #                             script = "model_framework_targets.R", -->
+
 <!-- #                             exclude = c("readme", contains("AWS"))) -->
+
 <!-- # cat( -->
+
 <!-- #   "```mermaid", -->
+
 <!-- #   mer[1],  -->
+
 <!-- #   #'Objects([""Objects""]) --- Functions>""Functions""]', -->
+
 <!-- #   'subgraph Project Workflow', -->
+
 <!-- #   mer[3:length(mer)], -->
+
 <!-- #   'linkStyle 0 stroke-width:0px;', -->
+
 <!-- #   "```", -->
+
 <!-- #   sep = "\n" -->
+
 <!-- # ) -->
+
 <!-- # ``` -->
 
-[Waywiser](https://github.com/ropensci/waywiser)
+[`Waywiser`](https://github.com/ropensci/waywiser)
 
 Follow the links for more information about:
 
 - [`targets`](https://ecohealthalliance.github.io/eha-ma-handbook/3-projects.html#targets)
 - [`renv`](https://ecohealthalliance.github.io/eha-ma-handbook/3-projects.html#package-management-with-renv)  
-- [git-crypt](https://ecohealthalliance.github.io/eha-ma-handbook/16-encryption.html)
-- [Reproducible
-  workflows](https://github.com/ecohealthalliance/building-blocks-of-reproducibility)
+- [`git-crypt`](https://ecohealthalliance.github.io/eha-ma-handbook/16-encryption.html)
+- [`Reproducible workflows`](https://github.com/ecohealthalliance/building-blocks-of-reproducibility)

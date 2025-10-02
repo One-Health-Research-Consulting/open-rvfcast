@@ -30,7 +30,7 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
   continent_raster_template,
   local_folder = "data/nasa_weather_transformed",
   basename_template = "nasa_weather_transformed_{months_to_process}.parquet",
-  endpoint = "https://power-datastore.s3.amazonaws.com/v10/daily/{year}/{month}/power_10_daily_{yyyymmdd}_merra2_lst.nc",
+  endpoint = "https://power-datastore.s3.us-west-2.amazonaws.com/v10/daily/{year}/{month}/power_10_daily_{yyyymmdd}_merra2_lst.nc",
   overwrite = FALSE,
   ...) {
 
@@ -68,7 +68,7 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
   
   # Check if transformed file already exists and can be loaded. If so return file name and path
   if(!is.null(existing_data) & overwrite == FALSE) {
-    message("File already exists and can be loaded, skipping processing")
+    message(glue::glue("{basename(transformed_file)} already exists, has rows, and overwrite is not TRUE, skipping"))
     return(transformed_file)
   }
 
@@ -76,26 +76,24 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
   failed_downloads <- c()
   
   # This errors if any of the files in the month are wrong. 
-  nasa_recorded_weather <- map_df(dates, .progress = TRUE, function(yyyymmdd) {
+  nasa_recorded_weather <- purrr::map_df(dates, .progress = TRUE, function(yyyymmdd) {
     
-    # Establish NetCDF filename
+    # Establish NetCDF filename. This uses glue to inject yyyymmdd.
     nc_file <- file.path(local_folder, glue::glue(endpoint) |> basename())
     
-    # Try to download file - returns TRUE if successful, FALSE if failed
-    download <- tryCatch({
-      curl::curl_download(glue::glue(endpoint), nc_file)
-      TRUE
-    }, error = function(e) {
-      FALSE
-    })
+    response <- httr2::request(glue::glue(endpoint)) |>
+      httr2::req_error(is_error = \(resp) FALSE) |>  # Handle errors gracefully
+      httr2::req_perform(path = nc_file)  # Automatically writes to file
 
-    if(!download) {
+    if(httr2::resp_is_error(response)) {
+      message(glue::glue("Failed to fetch {basename(nc_file)}. Response: {response$status_code}"))
+      if(response$status_code == 404) message("404 errors generally mean Nasa hasn't added the data for that date to the S3 bucket yet")
       failed_downloads <<- c(failed_downloads, yyyymmdd)
       return(NULL)
     }
 
     # Map across variable types
-    results <- imap(nasa_weather_variables, function(var, name) {
+    results <- purrr::imap(nasa_weather_variables, function(var, name) {
 
       # Read in raw raster of given var and set CRS
       raw_raster <- terra::rast(nc_file, subds = var)
@@ -110,14 +108,21 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
       terra::as.data.frame(transformed_raster, xy = TRUE)
     }) |> 
       plyr::join_all(by = c("x", "y")) |>
-      mutate(date = lubridate::ymd(yyyymmdd))
+      dplyr::mutate(date = lubridate::ymd(yyyymmdd))
 
       # Clean up file
       file.remove(nc_file)
       
       results
-  }) |>
-  mutate(year = year,
+  }) 
+  
+  if(!nrow(nasa_recorded_weather) > 0) {
+    message(glue::glue("No data found for {months_to_process}")) 
+    return(NULL)
+  } 
+  
+  nasa_recorded_weather <- nasa_recorded_weather |>
+  dplyr::mutate(year = year,
          month = month,
          day = lubridate::day(date),
          doy = lubridate::yday(date)) |>

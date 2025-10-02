@@ -30,6 +30,11 @@ AWS_get_folder <- function(local_folder,
                            skip_fetch = FALSE,
                            sync_with_remote = FALSE,
                            ...) {
+  # Return immediately if skip_fetch is TRUE
+  if (skip_fetch) {
+    return(character(0))
+  }
+
   # Check if AWS credentials and region are set in the environment
   if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
     msg <- paste(
@@ -39,6 +44,8 @@ AWS_get_folder <- function(local_folder,
     )
     stop(msg)
   }
+
+  aws_region = if (Sys.getenv("AWS_REGION") == "auto") "" else Sys.getenv("AWS_REGION")
 
   # Create a comprehensive validation function that checks both readability and row count
   error_safe_validate_file <- possibly(
@@ -52,7 +59,8 @@ AWS_get_folder <- function(local_folder,
       # Return row count if successful and has data
       if (row_count > 0) {
         return(row_count)
-      } else {
+ 
+     } else {
         return(0)  # Empty file
       }
     },
@@ -61,7 +69,10 @@ AWS_get_folder <- function(local_folder,
 
   # Get files from S3 bucket with prefix
   df_bucket_data <- aws.s3::get_bucket(bucket = Sys.getenv("AWS_BUCKET_ID"),
-                                        prefix = paste0(local_folder, "/"))
+                                       prefix = paste0(local_folder, "/"),
+                                       region = aws_region,
+                                       base_url = Sys.getenv("AWS_S3_ENDPOINT"))
+                                       
   s3_files <- map_chr(df_bucket_data, pluck, "Key")
 
   # Check if S3 has files to download
@@ -82,6 +93,7 @@ AWS_get_folder <- function(local_folder,
       aws.s3::save_object(
         object = file,
         bucket = Sys.getenv("AWS_BUCKET_ID"),
+        region = aws_region,
         file = file
       )
 
@@ -128,64 +140,75 @@ AWS_get_folder <- function(local_folder,
 #' @details The function performs several key operations:
 #' \itemize{
 #'   \item Checks for existing AWS credentials
-#'   \item Verifies file schemas before uploading
-#'   \item Supports selective file upload based on schema matching
+#'   \item Verifies file schemas and row counts before uploading
+#'   \item Supports selective file upload based on schema matching and data changes
 #'   \item Optionally overwrites existing files on AWS
-#'   \item Cleans up dangling files from the S3 bucket
+#'   \item Cleans up dangling files from the S3 bucket when requested
 #' }
 #'
 #' @author Nathan C. Layman
 #'
 #' @param transformed_file_list A character vector of filenames to be uploaded to AWS S3.
-#'   These should be base filenames (not full paths) that have been transformed and are 
-#'   ready for upload.
+#'   These should be full file paths that have been transformed and are ready for upload.
 #' @param local_folder A character string specifying the local directory containing 
 #'   the transformed files to be uploaded to AWS S3.
 #' @param overwrite Logical. If \code{TRUE}, files will be uploaded even if they 
-#'   already exist in the S3 bucket with matching schemas. Defaults to \code{FALSE}.
+#'   already exist in the S3 bucket with matching schemas and row counts. Defaults to \code{FALSE}.
+#' @param clean_remote Logical. If \code{TRUE}, files present on AWS but not in the 
+#'   \code{transformed_file_list} will be deleted from the S3 bucket. Defaults to \code{FALSE}.
+#'   Use with caution as this can delete files during testing.
 #' @param ... Additional arguments (currently unused).
 #'
 #' @return A character vector of messages describing the outcomes of file upload attempts, 
-#'   including successful uploads, skipped files, and cleanup operations.
+#'   including successful uploads, failed uploads, skipped files, and cleanup operations.
 #'
 #' @note 
 #' Required environment variables:
 #' \itemize{
 #'   \item \code{AWS_ACCESS_KEY_ID}: AWS access key
 #'   \item \code{AWS_SECRET_ACCESS_KEY}: AWS secret access key
-#'   \item \code{AWS_REGION}: AWS region
+#'   \item \code{AWS_REGION}: AWS region (can be "auto" for automatic detection)
 #'   \item \code{AWS_BUCKET_ID}: S3 bucket identifier
+#'   \item \code{AWS_S3_ENDPOINT}: S3 endpoint URL (optional, for custom S3-compatible services)
 #' }
 #' These environment variables must be set prior to calling the function, typically 
 #' in a .env file or system environment.
 #'
 #' @examples
 #' \dontrun{
-#' # Upload transformed CSV files from a local directory
+#' # Upload transformed Parquet files from a local directory
 #' AWS_put_files(
-#'   transformed_file_list = c("file1.csv", "file2.csv"),
-#'   local_folder = "./transformed_data"
+#'   transformed_file_list = c("./data/file1.parquet", "./data/file2.parquet"),
+#'   local_folder = "./data"
 #' )
 #' 
 #' # Upload with overwrite option
 #' AWS_put_files(
-#'   transformed_file_list = c("file1.csv", "file2.csv"),
-#'   local_folder = "./transformed_data",
+#'   transformed_file_list = c("./data/file1.parquet", "./data/file2.parquet"),
+#'   local_folder = "./data",
 #'   overwrite = TRUE
+#' )
+#' 
+#' # Upload and clean remote files not in the transformed list
+#' AWS_put_files(
+#'   transformed_file_list = c("./data/file1.parquet"),
+#'   local_folder = "./data",
+#'   clean_remote = TRUE
 #' )
 #' }
 #'
 #' @importFrom aws.s3 get_bucket put_object delete_object
-#' @importFrom arrow open_dataset
+#' @importFrom arrow open_dataset s3_bucket ParquetFileReader
 #' @importFrom glue glue
-#' @importFrom purrr possibly
-#' @importFrom dplyr pull
+#' @importFrom purrr possibly map_chr pluck
 #'
 #' @export
 AWS_put_files <- function(transformed_file_list,
                           local_folder,
                           overwrite = FALSE,
                           ...) {
+
+  library(arrow)
 
   # Check if AWS credentials and region are set in the environment
   if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
@@ -197,65 +220,57 @@ AWS_put_files <- function(transformed_file_list,
     stop(msg)
   }
 
-  # Create a possibly-wrapped version of the function
-  error_safe_open_dataset <- possibly(
-    function(file) {
-      arrow::open_dataset(file)$schema
-    },
-    otherwise = NULL
+  # Create a error tolerant version of the function
+  error_safe_open_dataset <- function(file, fs = NULL) {
+    tryCatch({
+      arrow::open_dataset(file, filesystem = fs)
+    }, error = function(e) {
+      cat("Error opening dataset for file:", file, "\n")
+      cat("Error message:", e$message, "\n")
+      return(NULL)
+    })
+  }
+
+  aws_region = if (Sys.getenv("AWS_REGION") == "auto") "" else Sys.getenv("AWS_REGION")
+
+  s3_fs <- arrow::S3FileSystem$create(
+    endpoint_override = Sys.getenv("AWS_S3_ENDPOINT"),
+    region = aws_region,
+    access_key = Sys.getenv("AWS_ACCESS_KEY_ID"),
+    secret_key = Sys.getenv("AWS_SECRET_ACCESS_KEY")
   )
-
-  # Get files from S3 bucket with prefix
-  df_bucket_data <- aws.s3::get_bucket(bucket = Sys.getenv("AWS_BUCKET_ID"),
-                                        prefix = paste0(local_folder, "/"))
-                                        
-  s3_files <- map_chr(df_bucket_data, pluck, "Key")
-
-  # Get files in local folder
-  local_folder_files <- list.files(path = local_folder, recursive = TRUE, full.names = TRUE)
 
   # Collect outcomes
   outcomes <- c()
 
-  # Walk through local_folder_files
-  for (file in local_folder_files) {
-    # Is the file in the transformed_file_list?
-    if (file %in% transformed_file_list) {
-      # Check that schemas match
-      remote_file <- paste0("s3://", Sys.getenv("AWS_BUCKET_ID"), "/", file)
-      remote_schema <- error_safe_open_dataset(remote_file)
-      local_schema <- error_safe_open_dataset(file)
+  # Walk through transformed_file_list (can be a single file or vector of files)
+  for (file in transformed_file_list) {
 
-      if (is.null(remote_schema) || !remote_schema$Equals(local_schema) || overwrite == TRUE) {
-        # Put the file on S3 using aws.s3
-        aws.s3::put_object(
-          file = file,
-          object = file,
-          multipart = TRUE,
-          part_size = 10485760,
-          bucket = Sys.getenv("AWS_BUCKET_ID")
-        )
+    # Get dataset object
+    remote_dataset <- error_safe_open_dataset(paste0(Sys.getenv("AWS_BUCKET_ID"), "/", file), fs = s3_fs)
+    local_dataset <- error_safe_open_dataset(file)
 
-        outcome <- glue::glue("Uploading {basename(file)} to AWS")
+    if (is.null(remote_dataset) || !remote_dataset$schema$Equals(local_dataset$schema) || remote_dataset$num_rows != local_dataset$num_rows || overwrite == TRUE) {
+
+      # Put the file on S3 using aws.s3
+      upload_result <- aws.s3::put_object(
+        file = file,
+        object = file,
+        multipart = TRUE,
+        part_size = 10485760,
+        bucket = Sys.getenv("AWS_BUCKET_ID"),
+        region = aws_region
+      )
+
+      if (upload_result) {
+        outcome <- glue::glue("Successfully uploaded {basename(file)} to AWS")
       } else {
-        outcome <- glue::glue("{basename(file)} with matching schema already present on AWS and overwrite set to FALSE")
+        outcome <- glue::glue("Failed to upload {basename(file)} to AWS")
       }
     } else {
-      # Remove the file from AWS if it's present in the folder and on AWS
-      # but not in the list of successfully transformed files. This file is
-      # not relevant to the pipeline
-      if (file %in% s3_files) {
-        outcome <- glue::glue("Cleaning up dangling file {basename(file)} from AWS")
-
-        # Remove the file from AWS using aws.s3
-        aws.s3::delete_object(
-          object = file.path(file),
-          bucket = Sys.getenv("AWS_BUCKET_ID")
-        )
-      } else {
-        next
-      }
+      outcome <- glue::glue("{basename(file)} already exists on AWS with matching rows and schema and overwrite is not TRUE, skipping upload")
     }
+
     message(outcome)
     outcomes <- c(outcomes, outcome)
   }

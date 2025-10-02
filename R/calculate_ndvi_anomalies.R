@@ -1,30 +1,28 @@
 #' Calculate NDVI Anomalies
 #'
 #' This function calculates the NDVI anomalies using the transformed NDVI data,
-#' historical NDVI means data, and dates provided for a selected model. The calculated anomalies are saved 
+#' historical NDVI means data, and dates provided for a selected model. The calculated anomalies are saved
 #' as a parquet file in a designated directory.
 #'
 #' @author Nathan Layman and Emma Mendelsohn
 #'
-#' @param ndvi_transformed Transformed NDVI data
+#' @param ndvi_transformed A single month's transformed NDVI parquet file.
 #' @param ndvi_historical_means Historical NDVI means data
 #' @param ndvi_anomalies_directory Directory where the calculated NDVI anomalies should be saved
-#' @param basename_template Template for the output filename with a placeholder for dates_to_process
-#' @param dates_to_process Dates for the selected model
+#' @param basename_template Template for the output filename with a placeholder for date
 #' @param overwrite Boolean flag indicating whether existing file of NDVI anomalies should be overwritten; Default is FALSE
 #' @param ... Additional arguments not used by this function but included for generic function compatibility
 #'
-#' @return A string containing the filepath to the calculated NDVI anomalies parquet file
+#' @return A character vector containing filepaths to all files created for dates in this month.
 #'
-#' @note If the parquet file of anomalies already exists at the target filepath and overwrite is set to FALSE,
-#' then, the existing file is returned without any calculations
+#' @note This function processes all dates within the month contained in ndvi_transformed.
+#' It creates one output file per date.
 #'
 #' @examples
 #' calculate_ndvi_anomalies(
-#'   ndvi_transformed = 'path/to/transformed/data', 
-#'   ndvi_historical_means = 'path/to/historical/means',
-#'   ndvi_anomalies_directory = '/directory_path/', 
-#'   dates_to_process = '2023-01-15', 
+#'   ndvi_transformed = "data/ndvi_transformed/ndvi_transformed_2020_01.parquet",
+#'   ndvi_historical_means = './data/historical_means',
+#'   ndvi_anomalies_directory = '/directory_path/',
 #'   overwrite = TRUE
 #' )
 #'
@@ -32,55 +30,100 @@
 calculate_ndvi_anomalies <- function(ndvi_transformed,
                                      ndvi_historical_means,
                                      ndvi_anomalies_directory,
-                                     basename_template = "ndvi_anomaly_{dates_to_process}.parquet",
-                                     dates_to_process,
+                                     basename_template = "ndvi_anomaly_{date}.parquet",
                                      overwrite = FALSE,
                                      ...) {
-  
-  # Check that we're only working on one date at a time
-  stopifnot(length(dates_to_process) == 1)
-  
-  # Set filename
-  save_filename <- file.path(ndvi_anomalies_directory, glue::glue(basename_template))
-  message(paste0("Calculating ndvi anomalies for ", dates_to_process))
-  
-  # Check if file already exists and can be read
-  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
-  
-  if(!is.null(error_safe_read_parquet(save_filename)) & !overwrite) {
-    message("file already exists and can be loaded, skipping download")
-    return(save_filename)
+
+  # Check if input file exists
+  if (length(ndvi_transformed) == 0 || is.na(ndvi_transformed)) {
+    stop("ndvi_transformed is empty or NA - no NDVI file available for this month")
   }
-  
-  # Open dataset to transformed data
-  ndvi_transformed_dataset <- arrow::open_dataset(ndvi_transformed) |> 
-    filter(date == dates_to_process)
-  
-  doy_to_process <- lubridate::yday(dates_to_process)
-  
-  # Open dataset to historical ndvi data
-  historical_means <- arrow::open_dataset(ndvi_historical_means) |> filter(doy == doy_to_process) 
-  
-  # Join the two datasets by day of year (doy)
-  ndvi_transformed_dataset <- left_join(ndvi_transformed_dataset, historical_means, by = c("x","y","doy"), suffix = c("", "_historical"))
-  
-  # Calculate ndvi anomalies
-  ndvi_transformed_dataset <- ndvi_transformed_dataset |>
-    mutate(anomaly_ndvi = ndvi - ndvi_historical,
-           anomaly_scaled_ndvi = anomaly_ndvi / ndvi_sd)
-  
-  # Remove intermediate columns
-  ndvi_transformed_dataset <- ndvi_transformed_dataset |> 
-    mutate(doy = as.integer(lubridate::yday(date)),          # Calculate day of year
-           month = as.integer(lubridate::month(date)),       # Extract month
-           year = as.integer(lubridate::year(date))) |>      # Extract year
-  select(x, y, date, doy, month, year, starts_with("anomaly")) |>
-    collect()
-  
-  # Save as parquet 
-  arrow::write_parquet(ndvi_transformed_dataset, save_filename, compression = "gzip", compression_level = 5)
-  
-  return(save_filename)
+
+  if (!file.exists(ndvi_transformed)) {
+    stop(glue::glue("NDVI file does not exist: {ndvi_transformed}"))
+  }
+
+  # Read the NDVI data for this month
+  ndvi_data <- arrow::read_parquet(ndvi_transformed)
+
+  # Get all unique dates in the parquet file
+  dates_in_month <- unique(ndvi_data$date)
+
+  if (length(dates_in_month) == 0) {
+    message("No dates found in month file")
+    return(character(0))
+  }
+
+  message(paste0("Processing ", length(dates_in_month), " dates in month"))
+
+  # Process each date and collect output filenames
+  output_files <- purrr::map_chr(dates_in_month, function(date) {
+
+    # Set filename for this date
+    save_filename <- file.path(ndvi_anomalies_directory, glue::glue(basename_template))
+
+    # Check if file already exists and can be read
+    error_safe_read_parquet <- purrr::possibly(arrow::read_parquet, NULL)
+    existing_dataset <- error_safe_read_parquet(save_filename)
+
+    if(!is.null(existing_dataset) & !overwrite) {
+      # Check if file has data - if zero rows, overwrite anyway
+      if(nrow(existing_dataset) > 0) {
+        message(glue::glue("{basename(save_filename)} already exists, has rows, and overwrite is not TRUE, skipping"))
+        return(save_filename)
+      } else {
+        message(glue::glue("{basename(save_filename)} exists but has zero rows, overwriting"))
+      }
+    } else if(!is.null(existing_dataset) & overwrite) {
+      # File exists and overwrite is TRUE
+      message(glue::glue("Overwriting existing {basename(save_filename)} for ", date))
+    } else {
+      # File doesn't exist - we're calculating
+      message(paste0("Calculating ndvi anomalies for ", date))
+    }
+
+    # Filter to this specific date
+    ndvi_transformed_dataset <- ndvi_data |>
+      dplyr::filter(date == !!date)
+
+    doy_to_process <- as.numeric(lubridate::yday(date))
+
+    # Open dataset to historical ndvi data
+    historical_means <- arrow::open_dataset(ndvi_historical_means) |>
+      dplyr::filter(doy == doy_to_process) |>
+      dplyr::collect() |>
+      tidyr::drop_na()
+
+    # Join the two datasets by day of year (doy)
+    ndvi_transformed_dataset <- dplyr::left_join(ndvi_transformed_dataset, historical_means,
+                                          by = c("x", "y", "doy"),
+                                          suffix = c("", "_historical")) |>
+      tidyr::drop_na()
+
+    # Calculate ndvi anomalies
+    ndvi_transformed_dataset <- ndvi_transformed_dataset |>
+      dplyr::mutate(
+        anomaly_ndvi = ndvi - ndvi_historical,
+        anomaly_scaled_ndvi = anomaly_ndvi / ndvi_sd
+      )
+
+    # Select and format final columns
+    ndvi_transformed_dataset <- ndvi_transformed_dataset |>
+      dplyr::mutate(
+        doy = as.integer(lubridate::yday(date)),
+        month = as.integer(lubridate::month(date)),
+        year = as.integer(lubridate::year(date))
+      ) |>
+      dplyr::select(x, y, date, doy, month, year, dplyr::starts_with("anomaly"))
+
+    # Save as parquet
+    arrow::write_parquet(ndvi_transformed_dataset, save_filename,
+                        compression = "gzip", compression_level = 5)
+
+    return(save_filename)
+  })
+
+  return(output_files)
 }
   
   
