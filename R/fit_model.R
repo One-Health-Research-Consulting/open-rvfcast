@@ -73,7 +73,7 @@ fit_model <- function(final_hyper_set, full_data, raw_data, id_cols, out_dir, ov
     bind_cols(outer_tbl_assess %>% select(outbreak)) %>%
     mutate(
       outbreak    = factor(outbreak, levels = c("1", "0"))
-    , .pred_class = factor(.pred_class, levels = c("1", "0"))
+   , .pred_class = factor(.pred_class, levels = c("1", "0"))
     )
   
   ## Evaluate metrics on assessment data
@@ -99,3 +99,18 @@ fit_model <- function(final_hyper_set, full_data, raw_data, id_cols, out_dir, ov
   
 }
   
+build_model_out_for_eval <- function(model_fits, full_data) {
+  safe_join_names <- purrr::map(seq_along(model_fits), .f = function(i) {
+   model.out <- readRDS(model_fits[i])
+   tibble(
+     path          = model_fits[i]
+   , preds         = model.out$preds
+   , metrics       = model.out$metrics
+   , outer_fold_id = strsplit(model_fits[i], "model_fit_")[[1]][2] %>% 
+       strsplit(., ".Rds") %>% unlist() %>% as.numeric()
+   )
+  }) %>% do.call("rbind", .) 
+  full_data %>% left_join(., safe_join_names)
+}
+
+

@@ -113,7 +113,7 @@ cross_validation_targets <- tar_plan(
 ## Targets for conducting model tuning -----------------------------------------
 model_tuning_targets <- tar_plan(
   
-    tar_target(tune_pars, data.frame(
+  tar_target(tune_pars, data.frame(
     tree_min       = 100
   , tree_max       = 1500
   , tree_dep_min   = 4
@@ -131,6 +131,9 @@ model_tuning_targets <- tar_plan(
   
 , tar_target(tuning_grid,
     with(tune_pars
+      ## Number of alternative grid options available, this seems fine
+       ## Possible that some of the parameter space has some combination of 
+       ## hyperparameters that don't make a lot of sense
     , grid_space_filling(
         trees(range          = c(tree_min, tree_max))
       , tree_depth(range     = c(tree_dep_min, tree_dep_max))
@@ -160,9 +163,9 @@ model_tuning_targets <- tar_plan(
 ))
 
   ## NOTE: temp check for debugging purposes
-, tar_target(folded_data_training_debug, folded_data_training[c(1, 10, 21), ])
-, tar_target(tuning_grid_debug, tuning_grid[1:3, ])
-, tar_target(folded_data_testing_debug, folded_data_testing[1:3, ])
+, tar_target(folded_data_training_debug, folded_data_training[c(1, 10, 21, 31, 41, 51), ])
+, tar_target(tuning_grid_debug, tuning_grid[1:8, ])
+, tar_target(folded_data_testing_debug, folded_data_testing[c(1, 5, 10, 15), ])
 
   ## Fit across tuning_grid across all inner folds of all outer folds
   ## NOTE: temporary minimal for working on downstream pipeline
@@ -173,9 +176,11 @@ model_tuning_targets <- tar_plan(
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
     , overwrite   = FALSE
-    , debugging   = TRUE
+    , debugging   = FALSE
     )
   , pattern = cross(folded_data_training_debug, tuning_grid_debug)
+  , error   = "null"
+  , format  = "file"
  )
 
   ## Join together all tuned inner folds and select the best per outer fold
@@ -190,9 +195,11 @@ model_tuning_targets <- tar_plan(
   , hyperparm_sets = tuned_results_joined
   , id_cols        = id_cols
   , out_dir        = outer_folds_dir2
-  , overwrite      = FALSE
+  , overwrite      = TRUE
   )
   , pattern = map(folded_data_training_debug)
+  , error   = "null"
+  , format  = "file"
  )
 
   ## Extract the best parameter set
@@ -215,18 +222,59 @@ model_fitting_targets <- tar_plan(
   , raw_data        = splitted_data
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
-  , overwrite       = FALSE
+  , overwrite       = TRUE
   )
   , pattern = map(folded_data_testing_debug)
+  , error   = "null"
+  , format  = "file"
   )
+  
+  ## Join fitted_model paths to folded_data_testing for parallel processing for model eval
+, tar_target(model_out_for_eval, build_model_out_for_eval(
+    model_fits = fitted_model
+  , full_data  = folded_data_testing_debug
+  ))
   
 )
   
 ## Asses model performance -----------------------------------------------------
-model_evaluation_targets <- tar_plan()
+model_evaluation_targets <- tar_plan(
+  
+  ## Evaluate fit in a few ways -- comparing prob to truth, confusion matrix,
+   ## map, etc.
+  tar_target(examined_fits, examine_fit(
+     model_out        = model_out_for_eval
+   , test_data        = splitted_data$test_data[[1]]
+   , train_data       = splitted_data$train_data[[1]]
+   , region_districts = region_districts
+   , africa_sf        = "data/simplified_africa_sf.Rds"
+  )
+   , pattern = map(model_out_for_eval)
+   , error   = "null"
+  )
+  
+)
 
 ## Reports ---------------------------------------------------------------------
-report_targets <- tar_plan()
+report_targets <- tar_plan(
+  
+  ## Write maps to disk  
+  tar_target(export_pdf,
+    {
+      out_file <- "output/map_predictions.pdf"
+      dir.create(dirname(out_file), showWarnings = FALSE)
+      
+      pdf(out_file, width = 7, height = 5)
+      for (p in examined_fits$map) {
+        print(p)  # each print creates a new page
+      }
+      dev.off()
+      
+      out_file
+    },
+    format = "file"  # ensures targets tracks this file as an output
+  )
+)
 
 # List targets -----------------------------------------------------------------
 list(
