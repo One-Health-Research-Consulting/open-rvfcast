@@ -141,9 +141,10 @@ norm_key           <- function(x) {
     str_squish()
 }
 prep_preds_for_map <- function(preds_all
-                               , prob_col = ".pred_1"
-                               , country_col = "Country"
-                               , region_col = "shapeName") {
+                             , prob_col = ".pred_1"
+                             , country_col = "Country"
+                             , region_col = "shapeName"
+                             ) {
   preds_all %>%
     mutate(
       country_norm = norm_key(.data[[country_col]])

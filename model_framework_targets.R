@@ -69,6 +69,22 @@ cross_validation_targets <- tar_plan(
   , end_date         = end_date
   ))
   
+  ## Number of spatial folds (parameter used in multiple functions)
+, tar_target(n_spatial_folds, 30)
+
+  ## Generate n_spatial_folds clusters of all Africa regions
+   ## Note: all funsions in spatial_helpers.R
+, tar_target(clustered_Africa_districts, make_area_clusters(
+     sf_list                   = region_districts
+   , path_to_joined_regions    = "data/joined_Africa_regions.Rds"
+   , path_to_collapsed_regions = "data/reduced_Africa_regions.Rds"
+   , path_to_clustered_regions = "data/clustered_Africa_regions.Rds"
+   , k                         = n_spatial_folds
+   , tol                       = 0.40
+   , seed                      = 10001
+   , min_area_km2              = 5
+  ))
+  
   ## Generate CV folds for training data
 , tar_target(folded_data_training_raw, fold_data(
       data              = splitted_data
@@ -76,13 +92,11 @@ cross_validation_targets <- tar_plan(
        ## train_data sets up inner folds for hyperparameter tuning 
        ## test_data just splits testing period into chunks for assessing forecasting accuracy
     , type              = "train_data"
-    , sf_districts      = region_districts
+    , sf_districts      = clustered_Africa_districts 
     , assess_time_chunk = forecast_horizon + max_lag_period
     ## Time gap between the end of the previous fold and the start of the next fold. For now setting to
      ## the 3 month lag for the variables for no overlap
     , step_size         = max_lag_period 
-    ## 10 Seems sensible to me for a start
-    , n_spatial_folds   = 20
     , district_id_col   = "shapeName"
     , seed              = 10001
     ))
@@ -97,9 +111,11 @@ cross_validation_targets <- tar_plan(
 
  ## Generate test cases for assessing model performance
 , tar_target(folded_data_testing, fold_data(
-    data              = tibble(test_data = region_data %>% dplyr::filter(forecast_interval == forecast_horizon) %>% list())
+    data              = tibble(test_data = region_data %>% 
+                                 dplyr::filter(forecast_interval == forecast_horizon) %>% 
+                                 list())
   , type              = "test_data"
-  , sf_districts      = region_districts
+  , sf_districts      = clustered_Africa_districts
   , assess_time_chunk = forecast_horizon + max_lag_period
   , step_size         = max_lag_period 
   , n_spatial_folds   = NULL
@@ -156,11 +172,11 @@ model_tuning_targets <- tar_plan(
     directory_path = paste("outputs/", region_name, "_model_tuning_inner", sep = "")
   ))
 , tar_target(outer_folds_dir2, create_data_directory(
-  directory_path = paste("outputs/", region_name, "_model_tuning_outer", sep = "")
+    directory_path = paste("outputs/", region_name, "_model_tuning_outer", sep = "")
   ))
 , tar_target(outer_folds_dir3, create_data_directory(
-  directory_path = paste("outputs/", region_name, "_final_model_fits", sep = "")
-))
+    directory_path = paste("outputs/", region_name, "_final_model_fits", sep = "")
+  ))
 
   ## NOTE: temp check for debugging purposes
 , tar_target(folded_data_training_debug, folded_data_training[c(1, 10, 21, 31, 41, 51), ])
@@ -240,8 +256,7 @@ model_fitting_targets <- tar_plan(
 ## Asses model performance -----------------------------------------------------
 model_evaluation_targets <- tar_plan(
   
-  ## Evaluate fit in a few ways -- comparing prob to truth, confusion matrix,
-   ## map, etc.
+  ## Evaluate fit in a few ways -- comparing prob to truth, confusion matrix, map, etc.
   tar_target(examined_fits, examine_fit(
      model_out        = model_out_for_eval
    , test_data        = splitted_data$test_data[[1]]

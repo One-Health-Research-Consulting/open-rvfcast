@@ -10,7 +10,6 @@
 #' @param sf_districts Shape file for the sub regions within the region of interest
 #' @param assess_time_chunk Total amount of time over which the assessment of model fit occurs
 #' @param step_size Over what period to expand the expanding window of temporal folds
-#' @param n_spatial_folds How many spatial clusters of sub-regions to generate for sptatial folds
 #' @param district_id_col What column from sf_districts to save for ID purposes of sub-regions. Must match what was used to build the data in rvf_data_processing_targets.R 
 #' @param seed A seed
 #' @return Tibble of folds
@@ -23,7 +22,6 @@ fold_data <- function(
   , sf_districts
   , assess_time_chunk = 180
   , step_size         = 90
-  , n_spatial_folds   = 15
   , district_id_col   = "shapeName"
   , seed              = 10001
   , ...
@@ -115,72 +113,11 @@ fold_data <- function(
     return(outer_folds %>% mutate(type = "test_data", .before = 1))
   }
   
-  ## Create spatial clusters via k-means on centroids. 
-   ## One simple option among many potentially better but more complicated options
-   ## for building spatial clusterings of multiple districts
+  ## Join in the pre-created clustered Africa regions from the target clustered_Africa_districts
   
-  ## Pretty rough strategy here to get clusters of approximate equal size
-  
-  ## Prepare cluster assignment tracking and such
-  coords           <- lapply(sf_districts, FUN = function(x) {
-    sf::sf_use_s2(TRUE)
-    try_coords <- try({sf::st_coordinates(sf::st_centroid(x))}, silent = T)
-    if (class(try_coords)[1] == "try-error") {
-      sf::sf_use_s2(FALSE)
-      try_coords <- try({sf::st_coordinates(sf::st_centroid(x))}, silent = T) 
-    }
-    as.data.frame(x) %>% dplyr::select(shapeGroup, shapeName) %>% 
-      cbind(., try_coords)
-  }) %>% do.call("rbind", .)
-  coords_mat       <- coords %>% dplyr::select(X, Y) %>% as.matrix()
-  kmeans_init      <- kmeans(coords_mat, centers = n_spatial_folds)
-  n_clusters       <- n_spatial_folds
-  n_districts      <- nrow(coords)
-  ## Ceiling on cluster size 
-  target_size      <- ceiling(n_districts / n_clusters) 
-  ## Floor on cluster size
-  min_size         <- floor(n_districts / n_clusters)      
-  cluster_sizes    <- rep(0, n_clusters)
-  district_cluster <- rep(NA_integer_, nrow(coords))
-  
-  ## Distance matrix: districts × centroids
-  dist_matrix <- as.matrix(dist(rbind(coords_mat, kmeans_init$centers)))[
-    1:nrow(coords_mat),
-    (nrow(coords_mat) + 1):(nrow(coords_mat) + n_clusters)
-  ]
-  
-  ## Order centroids by proximity for each district (force into matrix)
-  nearest_order <- t(apply(dist_matrix, 1, function(x) order(x)))
-  
-  ## PASS 1: Fill each cluster to min_size
-  for (cluster in seq_len(n_clusters)) {
-    ## Districts not yet assigned, sorted by proximity to this cluster
-    unassigned        <- which(is.na(district_cluster))
-    order_for_cluster <- order(dist_matrix[unassigned, cluster])
-    to_assign         <- head(unassigned[order_for_cluster], min_size)
-    
-    district_cluster[to_assign] <- cluster
-    cluster_sizes[cluster]      <- cluster_sizes[cluster] + length(to_assign)
-  }
-  
-  ## PASS 2: Assign remaining districts up to target_size
-  for (i in which(is.na(district_cluster))) {
-    for (j in nearest_order[i, ]) {
-      if (cluster_sizes[j]  < target_size) {
-        district_cluster[i] <- j
-        cluster_sizes[j]    <- cluster_sizes[j] + 1
-        break
-      }
-    }
-  }
-  
-  ## Add cluster assignments back to sf object and strip down the object.
-  ## Only need name and what CV fold they will be a part of
-  coords.sorted <- coords %>%
-    dplyr::select(-X, -Y) %>%
-    mutate(cluster = district_cluster) %>%
-    mutate(Country = plyr::mapvalues(shapeGroup, from = unique(shapeGroup), to = unique(data$Country)), .before = 1) %>%
-    dplyr::select(-shapeGroup)
+  coords.sorted <- sf_districts %>% dplyr::select(country, region, cluster) %>%
+    rename(Country = country, !!district_id_col := region) %>%
+    as.data.frame() %>% dplyr::select(-geometry)
 
   outer_folds <- outer_folds %>% mutate(inner_folds = NA)
   
@@ -288,6 +225,4 @@ build_all_inner_folds <- function(folded_data) {
  return(all_inner_folds)
 
 }
-
-
 
