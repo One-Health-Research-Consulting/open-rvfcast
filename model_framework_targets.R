@@ -38,6 +38,11 @@ model_data_targets <- tar_plan(
 , tar_target(region_data, read_parquet(region_data_path) %>% ungroup() %>%
                mutate(index = seq(n()), .before = 1)
   )
+  ## Other paths to intermediate products to save computation time
+ , tar_target(path_to_joined_regions   , paste("data/joined_", region_name, "_regions.Rds", sep = ""))
+ , tar_target(path_to_collapsed_regions, paste("data/reduced_", region_name, "_regions.Rds", sep = ""))
+ , tar_target(path_to_region_neighbors , paste("data/", region_name, "_region_neighbors.Rds", sep = ""))
+ , tar_target(path_to_clustered_regions, paste("data/clustered_", region_name, "_regions.Rds", sep = ""))
 
   ## Pulls all African countries. Alternatively can just provide a single country
    ## directly to get_region_districts below
@@ -70,20 +75,35 @@ cross_validation_targets <- tar_plan(
   ))
   
   ## Number of spatial folds (parameter used in multiple functions)
-, tar_target(n_spatial_folds, 30)
+, tar_target(n_spatial_folds, 40)
 
   ## Generate n_spatial_folds clusters of all Africa regions
    ## Note: all funsions in spatial_helpers.R
 , tar_target(clustered_Africa_districts, make_area_clusters(
      sf_list                   = region_districts
-   , path_to_joined_regions    = "data/joined_Africa_regions.Rds"
-   , path_to_collapsed_regions = "data/reduced_Africa_regions.Rds"
-   , path_to_clustered_regions = "data/clustered_Africa_regions.Rds"
+   , path_to_joined_regions    = path_to_joined_regions
+   , path_to_collapsed_regions = path_to_collapsed_regions
+   , path_to_region_neighbors  = path_to_region_neighbors
+   , path_to_clustered_regions = path_to_clustered_regions
    , k                         = n_spatial_folds
-   , tol                       = 0.40
+   , tol                       = 0.30
    , seed                      = 10001
    , min_area_km2              = 5
   ))
+
+  ## Quick aside to plot the folded map
+, tar_target(plot_spatial_folds, clustered_Africa_districts %>% 
+               group_by(cluster) %>%
+               summarise(geometry = sf::st_union(geometry), .groups = "drop") %>%
+               sf::st_make_valid() %>% {
+                   ggplot(.) +
+                   geom_sf(aes(fill = factor(cluster)), color = NA) +
+                   coord_sf(datum = NA) +
+                   scale_fill_viridis_d(name = "Cluster", option = "C") +
+                   theme_void() +
+                   theme(legend.position = "none")
+               }
+               )
   
   ## Generate CV folds for training data
 , tar_target(folded_data_training_raw, fold_data(
@@ -92,7 +112,7 @@ cross_validation_targets <- tar_plan(
        ## train_data sets up inner folds for hyperparameter tuning 
        ## test_data just splits testing period into chunks for assessing forecasting accuracy
     , type              = "train_data"
-    , sf_districts      = clustered_Africa_districts 
+    , sf_districts      = clustered_Africa_districts
     , assess_time_chunk = forecast_horizon + max_lag_period
     ## Time gap between the end of the previous fold and the start of the next fold. For now setting to
      ## the 3 month lag for the variables for no overlap
@@ -211,7 +231,7 @@ model_tuning_targets <- tar_plan(
   , hyperparm_sets = tuned_results_joined
   , id_cols        = id_cols
   , out_dir        = outer_folds_dir2
-  , overwrite      = TRUE
+  , overwrite      = FALSE
   )
   , pattern = map(folded_data_training_debug)
   , error   = "null"
@@ -238,7 +258,7 @@ model_fitting_targets <- tar_plan(
   , raw_data        = splitted_data
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
-  , overwrite       = TRUE
+  , overwrite       = FALSE
   )
   , pattern = map(folded_data_testing_debug)
   , error   = "null"
@@ -276,7 +296,7 @@ report_targets <- tar_plan(
   ## Write maps to disk  
   tar_target(export_pdf,
     {
-      out_file <- "output/map_predictions.pdf"
+      out_file <- "outputs/map_predictions.pdf"
       dir.create(dirname(out_file), showWarnings = FALSE)
       
       pdf(out_file, width = 7, height = 5)

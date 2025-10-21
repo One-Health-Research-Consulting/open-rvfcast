@@ -17,7 +17,8 @@
 tune_results_per_outer_fold <- function(folded_data, raw_data, tuning_grid, id_cols, out_dir, overwrite, debugging) {
 
   ## Extract the needed data
-  all_inner <- folded_data$inner_folds[[1]] %>% left_join(., raw_data$train_data[[1]], by = "index")
+  all_inner <- folded_data$inner_folds[[1]] %>% 
+    left_join(., raw_data$train_data[[1]], by = "index")
   
   ## Build the set of all inner train and assess datasets
   inner_tbl_set <- purrr::map(seq_along(unique(all_inner$cluster)), function(clust) {
