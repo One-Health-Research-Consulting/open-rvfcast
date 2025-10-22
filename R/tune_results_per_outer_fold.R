@@ -4,55 +4,45 @@
 #' @title tune_results_per_outer_fold
 
 #' @param folded_data one row of the folded data
+#' @param inner_ids seq of 1:n_spatial_folds
 #' @param raw_data complete set of raw data
 #' @param tuning_grid set of potential hyperparameters
 #' @param id_cols Columns that define a unique data point
 #' @param out_dir Where to save output
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
-#' @param debugging Reduce the computation for testing of downstream pipeline
 #' @return Tibble of folds
 #' @author Morgan Kain
 #' @export
 
-tune_results_per_outer_fold <- function(folded_data, raw_data, tuning_grid, id_cols, out_dir, overwrite, debugging) {
+tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data
+                                        , tuning_grid, id_cols, out_dir, overwrite) {
 
+  inner_ids <- inner_ids$inner_fold_id
+  
   ## Extract the needed data
   all_inner <- folded_data$inner_folds[[1]] %>% 
     left_join(., raw_data$train_data[[1]], by = "index")
   
-  ## Build the set of all inner train and assess datasets
-  inner_tbl_set <- purrr::map(seq_along(unique(all_inner$cluster)), function(clust) {
-    
-    ## Inner training data: exclude a cluster
-    train_inner <- all_inner %>%
-      dplyr::filter(cluster != clust) %>%
-      relocate(cluster, .after = "date") %>%
-      dplyr::select(-c(
-        cluster, forecast_interval, cases
-      )) %>%
-      mutate(outbreak = as.factor(outbreak))
-    
-    ## Inner assess data: only the left-out cluster
-    assess_inner <- all_inner %>%
-      dplyr::filter(cluster == clust) %>%
-      relocate(cluster, .after = "date") %>%
-      dplyr::select(-c(
-        cluster, forecast_interval, cases
-        )) %>%
-      mutate(outbreak = as.factor(outbreak))
-    
-    tibble(
-      inner_fold_id = clust
-      , train_inner   = list(train_inner)
-      , assess_inner  = list(assess_inner)
-    )
-    
-  }) %>% dplyr::bind_rows()
+  ## Inner training data: exclude a cluster
+  train_inner <- all_inner %>%
+    dplyr::filter(cluster != inner_ids) %>%
+    relocate(cluster, .after = "date") %>%
+    dplyr::select(-c(cluster, forecast_interval, cases)) %>%
+    mutate(outbreak = as.factor(outbreak))
   
-  if (debugging) {
-    inner_tbl_set <- inner_tbl_set[1:5, ]
-  }
+  ## Inner test data: extract one cluster
+  assess_inner <- all_inner %>%
+    dplyr::filter(cluster == inner_ids) %>%
+    relocate(cluster, .after = "date") %>%
+    dplyr::select(-c(cluster, forecast_interval, cases)) %>%
+    mutate(outbreak = as.factor(outbreak))
   
+  inner_tbl_set <- tibble(
+    inner_fold_id = inner_ids
+  , train_inner   = list(train_inner)
+  , assess_inner  = list(assess_inner)
+  )
+
   outer_tbl_train  <- raw_data$train_data[[1]] %>% 
     dplyr::filter(index %in% folded_data$train_data[[1]]) %>% 
     dplyr::select(-c(forecast_interval, cases)) %>%
@@ -65,6 +55,8 @@ tune_results_per_outer_fold <- function(folded_data, raw_data, tuning_grid, id_c
     , "inner_tuning_"
     , "outer_fold_"
     , paste(folded_data$outer_fold_id, collapse = "_")
+    , "_inner_fold_"
+    , inner_ids
     , "_tune_grid_"
     ,  tuning_grid$index
     , ".csv"
@@ -78,59 +70,53 @@ tune_results_per_outer_fold <- function(folded_data, raw_data, tuning_grid, id_c
     return(save_filename)
   }
   
-  ## For all inner folds for this outer fold do the fitting for one set of hyperparameters
-  this_param_set <- purrr::map(1:nrow(inner_tbl_set), function(fold) {
+  ## For the inner folds for this outer fold do the fitting for one set of hyperparameters
+  inner_tbl_train  <- inner_tbl_set$train_inner[[1]] 
+  inner_tbl_assess <- inner_tbl_set$assess_inner[[1]]
+  inner_fold_id    <- inner_tbl_set$inner_fold_id
     
-    inner_tbl_train  <- inner_tbl_set[fold, ]$train_inner[[1]] 
-    inner_tbl_assess <- inner_tbl_set[fold, ]$assess_inner[[1]]
-    inner_fold_id    <- inner_tbl_set[fold, ]$inner_fold_id
+  ## Get class imbalance ratio
+  neg_pos_ratio <- sum(inner_tbl_train$outbreak == 0) / sum(inner_tbl_train$outbreak == 1)
     
-    ## Get class imbalance ratio
-    neg_pos_ratio <- sum(inner_tbl_train$outbreak == 0) / sum(inner_tbl_train$outbreak == 1)
+  ## Create scaffold recipe + model
+  rec <- make_recipe(inner_tbl_train, id_cols = id_cols)
+  mod <- make_model(scale_pos_weight = neg_pos_ratio)
     
-    ## Create scaffold recipe + model
-    rec <- make_recipe(inner_tbl_train, id_cols = id_cols)
-    mod <- make_model(scale_pos_weight = neg_pos_ratio)
+  ## create rsample object from inner folds
+  inner_splits <- build_inner_rset(
+     inner_train   = inner_tbl_train
+   , inner_assess  = inner_tbl_assess
+   , outer_train   = outer_tbl_train
+   , id_cols       = id_cols
+   , inner_fold_id = inner_fold_id
+  )
     
-    ## create rsample object from inner folds
-    inner_splits <- build_inner_rset(
-      inner_train   = inner_tbl_train
-      , inner_assess  = inner_tbl_assess
-      , outer_train   = outer_tbl_train
-      , id_cols       = id_cols
-      , inner_fold_id = inner_fold_id
-    )
+  ## Initial workflow scaffold
+  wf <- workflow() %>% add_model(mod) %>% add_recipe(rec)
     
-    ## Initial workflow scaffold
-    wf <- workflow() %>% add_model(mod) %>% add_recipe(rec)
+  ## Establish metric set
+  inner_metric_set <- metric_set(mn_log_loss)
     
-    ## Establish metric set
-    inner_metric_set <- metric_set(mn_log_loss)
-    
-    ## Tune over inner folds
-    tuned <- tune_grid(
-      wf
-    , resamples = inner_splits
-    , grid      = tuning_grid %>% dplyr::select(-index)
-    , metrics   = inner_metric_set
-    , control   = control_grid(save_pred = TRUE)
-    ) %>% 
-    ## For memory purposes throw out all of the memory intensive splits and predictions and just
-    ## Retain metrics + the full parameter set + config id. Can recreate the predictions later for
-    ## just the retained
-    collect_metrics(summarize = TRUE) %>%
-    ## Finally, add the ID columns for this cross
-    mutate(
-      outer_fold_id = folded_data$outer_fold_id
-    , inner_fold_id = fold
-    , .before = 1
-    )
-    
-    tuned
-    
-  }) %>% do.call("rbind", .)
+  ## Tune over inner folds
+  tuned <- tune_grid(
+    wf
+  , resamples = inner_splits
+  , grid      = tuning_grid %>% dplyr::select(-index)
+  , metrics   = inner_metric_set
+  , control   = control_grid(save_pred = TRUE)
+  ) %>% 
+  ## For memory purposes throw out all of the memory intensive splits and predictions and just
+  ## Retain metrics + the full parameter set + config id. Can recreate the predictions later for
+  ## just the retained
+  collect_metrics(summarize = TRUE) %>%
+  ## Finally, add the ID columns for this cross
+  mutate(
+    outer_fold_id = folded_data$outer_fold_id
+  , inner_fold_id = inner_ids
+  , .before = 1
+  )
   
-  write.csv(this_param_set, save_filename)
+  write.csv(tuned, save_filename)
   
   return(save_filename)
   

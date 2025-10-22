@@ -43,6 +43,7 @@ model_data_targets <- tar_plan(
  , tar_target(path_to_collapsed_regions, paste("data/reduced_", region_name, "_regions.Rds", sep = ""))
  , tar_target(path_to_region_neighbors , paste("data/", region_name, "_region_neighbors.Rds", sep = ""))
  , tar_target(path_to_clustered_regions, paste("data/clustered_", region_name, "_regions.Rds", sep = ""))
+ , tar_target(path_to_simplifed_regions, paste("data/simplified_", region_name, "_sf.Rds", sep = ""))
 
   ## Pulls all African countries. Alternatively can just provide a single country
    ## directly to get_region_districts below
@@ -199,22 +200,25 @@ model_tuning_targets <- tar_plan(
   ))
 
   ## NOTE: temp check for debugging purposes
-, tar_target(folded_data_training_debug, folded_data_training[c(1, 10, 21, 31, 41, 51), ])
+, tar_target(folded_data_training_debug, folded_data_training[c(1, 10, 21, 31, 41), ])
 , tar_target(tuning_grid_debug, tuning_grid[1:8, ])
 , tar_target(folded_data_testing_debug, folded_data_testing[c(1, 5, 10, 15), ])
+
+  ## Final prep step for parallel processing for tuning across all inner folds
+, tar_target(inner_fold_id, data.frame(inner_fold_id = seq(n_spatial_folds)))
 
   ## Fit across tuning_grid across all inner folds of all outer folds
   ## NOTE: temporary minimal for working on downstream pipeline
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
       folded_data = folded_data_training_debug
+    , inner_ids   = inner_fold_id
     , raw_data    = splitted_data
     , tuning_grid = tuning_grid_debug
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
     , overwrite   = FALSE
-    , debugging   = FALSE
     )
-  , pattern = cross(folded_data_training_debug, tuning_grid_debug)
+  , pattern = cross(folded_data_training_debug, tuning_grid_debug, inner_fold_id)
   , error   = "null"
   , format  = "file"
  )
@@ -278,11 +282,11 @@ model_evaluation_targets <- tar_plan(
   
   ## Evaluate fit in a few ways -- comparing prob to truth, confusion matrix, map, etc.
   tar_target(examined_fits, examine_fit(
-     model_out        = model_out_for_eval
+     model_out        = model_out_for_eval[1, ]
    , test_data        = splitted_data$test_data[[1]]
    , train_data       = splitted_data$train_data[[1]]
    , region_districts = region_districts
-   , africa_sf        = "data/simplified_africa_sf.Rds"
+   , africa_sf        = path_to_simplifed_regions
   )
    , pattern = map(model_out_for_eval)
    , error   = "null"
