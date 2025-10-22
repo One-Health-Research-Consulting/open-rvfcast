@@ -14,7 +14,7 @@ make_recipe <- function(train_data, id_cols) {
     update_role(all_of(id_cols), new_role = "ID") %>%
     step_rm(all_of(id_cols)) %>%
     step_zv(all_predictors()) %>%
-    step_dummy(all_nominal_predictors())
+    step_dummy(all_nominal_predictors(), one_hot = TRUE)
 }
 
 #' Build base model scaffold
@@ -23,30 +23,69 @@ make_recipe <- function(train_data, id_cols) {
 #' @title make_model
 
 #' @return base model scaffold 
-#' @param scale_pos_weight weight for positive responses if desired, default is null
+#' @param params Set of hyperparameters for this fit
+#' @param scale_pos_weight weight for positive responses 
 #' @author Morgan Kain
 #' @export
 
-make_model <- function(scale_pos_weight = NULL) {
+make_model <- function(params, scale_pos_weight) {
  
   boost_tree(
-      trees          = tune()
-    , tree_depth     = tune()
-    , learn_rate     = tune()
-    , min_n          = tune()
-    , loss_reduction = tune()
-    , mtry           = tune()
+    trees          = params$trees
+  , tree_depth     = params$tree_depth
+  , learn_rate     = params$learn_rate
+  , min_n          = params$min_n
+  , loss_reduction = params$loss_reduction
+  , mtry           = params$mtry
   ) %>%
     set_mode("classification") %>%
     set_engine(
       "xgboost"
     , objective = "binary:logistic"
-    ## Can set later via finalize_model or pass ratio
-    , scale_pos_weight = NULL
+    , nthread   = 1
+    , scale_pos_weight = scale_pos_weight
     ) 
   
 }
 
+##### Some helpers ----------------------------------------------------------------
+
+## Memory-efficient metrics calculation
+compute_metrics_vec <- function(truth, threshold, prob1, class_hat, event_level = "first") {
+
+  if (dplyr::n_distinct(truth) < 2) {
+    return(tibble(
+      pr_auc = NA_real_, roc_auc = NA_real_,
+      recall = NA_real_, precision = NA_real_
+    ))
+  }
+  
+  tibble(
+    pr_auc    = pr_auc_vec(truth, prob1, event_level = event_level)
+  , roc_auc   = roc_auc_vec(truth, prob1, event_level = event_level)
+  , recall    = 
+      tibble(
+         threshold = threshold
+       , recall    = apply(class_hat, 2, FUN = function(x) recall_vec(truth, x %>% factor(levels = c("1", "0")), event_level = event_level))
+      ) %>% list()
+  , precision = 
+      tibble(
+        threshold = threshold
+      , precision = apply(class_hat, 2, FUN = function(x) precision_vec(truth, x %>% factor(levels = c("1", "0")), event_level = event_level))
+      ) %>% list()
+  )
+  
+}
+
+calc_spw <- function(df, outcome = "outbreak") {
+  y     <- as.character(df[[outcome]])
+  n_pos <- sum(y == "1", na.rm = TRUE)
+  n_neg <- sum(y == "0", na.rm = TRUE)
+  if (n_pos == 0) return(1)
+  n_neg / n_pos
+}
+
+##### ------------------------------------------------------------------------------------
 
 #' Port the manual splits into a tidymodels object 
 #'

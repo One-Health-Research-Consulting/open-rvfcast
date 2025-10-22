@@ -4,9 +4,9 @@
 #' @title tune_results_per_outer_fold
 
 #' @param folded_data one row of the folded data
-#' @param inner_ids seq of 1:n_spatial_folds
+#' @param inner_ids All needed fits created with prep_fold_ids
 #' @param raw_data complete set of raw data
-#' @param tuning_grid set of potential hyperparameters
+#' @param threshold For assigning a 1 | estimated prob
 #' @param id_cols Columns that define a unique data point
 #' @param out_dir Where to save output
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
@@ -14,10 +14,12 @@
 #' @author Morgan Kain
 #' @export
 
-tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data
-                                        , tuning_grid, id_cols, out_dir, overwrite) {
+tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data, threshold
+                                      , id_cols, out_dir, overwrite) {
 
-  inner_ids <- inner_ids$inner_fold_id
+  folded_data <- folded_data %>% filter(outer_fold_id == inner_ids$outer_fold_id)
+  inner_id    <- inner_ids$inner_fold_id
+  tuning_grid <- inner_ids %>% dplyr::select(-contains("fold_id"))
   
   ## Extract the needed data
   all_inner <- folded_data$inner_folds[[1]] %>% 
@@ -25,20 +27,20 @@ tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data
   
   ## Inner training data: exclude a cluster
   train_inner <- all_inner %>%
-    dplyr::filter(cluster != inner_ids) %>%
+    dplyr::filter(cluster != inner_id) %>%
     relocate(cluster, .after = "date") %>%
     dplyr::select(-c(cluster, forecast_interval, cases)) %>%
     mutate(outbreak = as.factor(outbreak))
   
   ## Inner test data: extract one cluster
   assess_inner <- all_inner %>%
-    dplyr::filter(cluster == inner_ids) %>%
+    dplyr::filter(cluster == inner_id) %>%
     relocate(cluster, .after = "date") %>%
     dplyr::select(-c(cluster, forecast_interval, cases)) %>%
     mutate(outbreak = as.factor(outbreak))
   
   inner_tbl_set <- tibble(
-    inner_fold_id = inner_ids
+    inner_fold_id = inner_id
   , train_inner   = list(train_inner)
   , assess_inner  = list(assess_inner)
   )
@@ -56,14 +58,14 @@ tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data
     , "outer_fold_"
     , paste(folded_data$outer_fold_id, collapse = "_")
     , "_inner_fold_"
-    , inner_ids
+    , inner_id
     , "_tune_grid_"
     ,  tuning_grid$index
-    , ".csv"
+    , ".Rds"
     , sep = ""
   )
   
-  error_safe_read_file <- possibly(read.csv, NULL)
+  error_safe_read_file <- possibly(readRDS, NULL)
   
   if (!is.null(error_safe_read_file(save_filename)) & !overwrite) {
     message("file already exists and can be loaded, skipping processing")
@@ -76,49 +78,95 @@ tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data
   inner_fold_id    <- inner_tbl_set$inner_fold_id
     
   ## Get class imbalance ratio
-  neg_pos_ratio <- sum(inner_tbl_train$outbreak == 0) / sum(inner_tbl_train$outbreak == 1)
+  spw <- calc_spw(inner_tbl_train, "outbreak")
     
   ## Create scaffold recipe + model
   rec <- make_recipe(inner_tbl_train, id_cols = id_cols)
-  mod <- make_model(scale_pos_weight = neg_pos_ratio)
-    
-  ## create rsample object from inner folds
-  inner_splits <- build_inner_rset(
-     inner_train   = inner_tbl_train
-   , inner_assess  = inner_tbl_assess
-   , outer_train   = outer_tbl_train
-   , id_cols       = id_cols
-   , inner_fold_id = inner_fold_id
-  )
+  mod <- make_model(params = tuning_grid, scale_pos_weight = spw)
     
   ## Initial workflow scaffold
   wf <- workflow() %>% add_model(mod) %>% add_recipe(rec)
     
-  ## Establish metric set
-  inner_metric_set <- metric_set(mn_log_loss)
-    
-  ## Tune over inner folds
-  tuned <- tune_grid(
-    wf
-  , resamples = inner_splits
-  , grid      = tuning_grid %>% dplyr::select(-index)
-  , metrics   = inner_metric_set
-  , control   = control_grid(save_pred = TRUE)
-  ) %>% 
-  ## For memory purposes throw out all of the memory intensive splits and predictions and just
-  ## Retain metrics + the full parameter set + config id. Can recreate the predictions later for
-  ## just the retained
-  collect_metrics(summarize = TRUE) %>%
-  ## Finally, add the ID columns for this cross
-  mutate(
-    outer_fold_id = folded_data$outer_fold_id
-  , inner_fold_id = inner_ids
-  , .before = 1
+  ## Fit model
+  fit <- fit(wf, data = inner_tbl_train)
+  
+  ## Predictions: prob only
+  prob1     <- predict(fit, inner_tbl_assess, type = "prob")$.pred_1
+  truth     <- factor(inner_tbl_assess[["outbreak"]], levels = c("1","0"))
+  class_hat <- apply(
+    threshold %>% matrix()
+  , 1
+  , FUN = function(x) factor(ifelse(prob1 >= x, "1", "0"), levels = c("1","0"))
   )
   
-  write.csv(tuned, save_filename)
+  ## Compute metrics 
+  metrics <- compute_metrics_vec(
+    truth
+  , threshold = threshold
+  , prob1
+  , class_hat
+  , event_level = "first"
+  ) %>% 
+    mutate(
+      outer_fold_id = folded_data$outer_fold_id
+    , inner_fold_id = inner_id
+    , .before = 1 
+    ) %>% 
+    bind_cols(
+      .
+    , tuning_grid
+    )
+
+  saveRDS(metrics, save_filename)
   
   return(save_filename)
+  
+}
+
+
+#' Finalize inner folds for all outer folds
+#'
+#'
+#' @title prep_fold_ids
+
+#' @param folded_data one row of the folded data
+#' @param raw_data complete set of raw data
+#' @return Tibble of inner folds per outer fold that have an outbreak
+#' @author Morgan Kain
+#' @export
+
+prep_fold_ids <- function(folded_data, raw_data) {
+  
+  all_inner_outer <- purrr::map(1:nrow(folded_data), function(outid) {
+    
+    ## Extract the needed data
+    all_inner <- folded_data[outid, ]$inner_folds[[1]] %>% 
+      left_join(., raw_data$train_data[[1]], by = "index")
+    
+    ## Build the set of all inner train and assess datasets
+    inner_tbl_set <- purrr::map(seq_along(unique(all_inner$cluster)), function(clust) {
+      
+      ## Inner assess data: only the left-out cluster
+      assess_inner <- all_inner %>%
+        dplyr::filter(cluster == clust) %>%
+        relocate(cluster, .after = "date") %>%
+        dplyr::select(-c(cluster, forecast_interval, cases)) %>% 
+        summarize(tot_out = sum(outbreak))
+      
+      tibble(
+        inner_fold_id = clust
+        , assess_inner  = assess_inner$tot_out
+      )
+      
+    }) %>% 
+      dplyr::bind_rows() %>% 
+      filter(assess_inner > 0)
+    
+    inner_tbl_set %>% mutate(outer_fold_id = folded_data[outid, ]$outer_fold_id, .before = 1)
+    
+  }) %>% do.call("rbind", .) %>% dplyr::select(-assess_inner)
+  
+  all_inner_outer
   
 }
 
@@ -129,22 +177,40 @@ tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data
 #' @title join_tuned_inner_folds
 
 #' @param inner_folds list of file paths for all tuned hyperparameter sets across all inner folds of all outer folds
+#' @param metric which metric is being optimized
+#' @param direction min or max
 #' @return Tibble of best parameter sets
 #' @author Morgan Kain
 #' @export
 
-join_tuned_inner_folds <- function(inner_folds) {
+join_tuned_inner_folds <- function(inner_folds, metric, direction) {
   
-  joined_files <- apply(inner_folds %>% matrix(), 1, FUN = function(x) {
-    read.csv(x)
-  }) %>% do.call("rbind", .) %>% 
-    dplyr::select(-X) %>%
-    group_by(outer_fold_id) %>% 
-    filter(mean == min(mean)) %>%
-    dplyr::slice(1) %>%
+  metric_summary <- apply(inner_folds %>% matrix(), 1, FUN = function(x) {
+    readRDS(x)
+  }) %>% do.call("rbind", .) 
+  
+  metric_summary.s <- metric_summary %>% 
+    group_by(outer_fold_id, index) %>% 
+    summarize(mean_metric = mean(get(metric))) %>% 
     ungroup()
   
-  joined_files
+  if (direction == "min") {
+    metric_summary.s %>% 
+      group_by(outer_fold_id) %>% 
+      arrange(mean_metric) %>% 
+      dplyr::slice(1) %>%
+      ungroup() %>% 
+      left_join(., metric_summary %>% dplyr::select(-contains("fold_id"), -contains("auc"), -recall, -precision) %>% distinct())
+  } else if (direction == "max") {
+    metric_summary.s %>% 
+      group_by(outer_fold_id) %>% 
+      arrange(desc(mean_metric)) %>% 
+      dplyr::slice(1) %>%
+      ungroup() %>% 
+      left_join(., metric_summary %>% dplyr::select(-contains("fold_id"), -contains("auc"), -recall, -precision) %>% distinct())
+  } else {
+    stop("choose min or max for direction")
+  }
   
 }
 
@@ -156,6 +222,7 @@ join_tuned_inner_folds <- function(inner_folds) {
 
 #' @param outer_data an outer fold
 #' @param raw_data complete set of raw data
+#' @param threshold For assigning a 1 | estimated prob
 #' @param hyperparm_sets maximized hyperparameter sets across all inner folds of all outer folds
 #' @param id_cols Columns that define a unique data point
 #' @param out_dir Where to save output
@@ -164,7 +231,7 @@ join_tuned_inner_folds <- function(inner_folds) {
 #' @author Morgan Kain
 #' @export
 
-tune_results_across_outer_folds <- function(outer_data, raw_data, hyperparm_sets, id_cols, out_dir, overwrite) {
+tune_results_across_outer_folds <- function(outer_data, raw_data, threshold, hyperparm_sets, id_cols, out_dir, overwrite) {
   
   ## The best hyperparameter set for this outer fold across all inner folds for this outer fold
   hyper_set <- hyperparm_sets %>% dplyr::filter(outer_fold_id == outer_data$outer_fold_id)
@@ -175,11 +242,11 @@ tune_results_across_outer_folds <- function(outer_data, raw_data, hyperparm_sets
     , "/"
     , "outer_tuning_"
     , outer_data$outer_fold_id
-    , ".csv"
+    , ".Rds"
     , sep = ""
   )
   
-  error_safe_read_file <- possibly(read.csv, NULL)
+  error_safe_read_file <- possibly(readRDS, NULL)
   
   if (!is.null(error_safe_read_file(save_filename)) & !overwrite) {
     message("file already exists and can be loaded, skipping processing")
@@ -196,47 +263,39 @@ tune_results_across_outer_folds <- function(outer_data, raw_data, hyperparm_sets
     dplyr::select(-c(forecast_interval, cases)) %>%
     mutate(outbreak = factor(outbreak, levels = c(1, 0)))
   
-  ## Establish metric set
-  outer_metric_set <- metric_set(mn_log_loss, pr_auc, roc_auc, recall, precision)
+  ## Get class imbalance ratio
+  spw <- calc_spw(outer_tbl_train, "outbreak")
   
-  ## Get the neg/pos ratio for this outer set
-  neg_pos_ratio    <- sum(outer_tbl_train$outbreak == 0) / sum(outer_tbl_train$outbreak == 1)
+  ## Set up and fit the final model for this outer fold
+  rec <- make_recipe(outer_tbl_train, id_cols = id_cols)
+  mod <- make_model(params = hyper_set, scale_pos_weight = spw)
+  wf  <- workflow() %>% add_model(mod) %>% add_recipe(rec) 
+  fit <- fit(wf, data = outer_tbl_train)
   
-  ## Set up the final model
-  final_spec       <- make_model(scale_pos_weight = neg_pos_ratio) %>% finalize_model(hyper_set)
-  rec              <- make_recipe(outer_tbl_train, id_cols = id_cols)
-  wf               <- workflow() %>% add_model(final_spec) %>% add_recipe(rec) 
-  
-  ## Fit
-  model_fit        <- fit(wf, data = outer_tbl_train)
-  
-  ## Predict probabilities and class labels on outer assessment
-  preds <- predict(model_fit, outer_tbl_assess, type = "prob") %>%
-    bind_cols(predict(model_fit, outer_tbl_assess, type = "class")) %>%
-    bind_cols(outer_tbl_assess %>% select(outbreak)) %>%
-    mutate(
-      outbreak   = factor(outbreak, levels = c("1", "0"))
-   , .pred_class = factor(.pred_class, levels = c("1", "0"))
-    )
-  
-  ## Evaluate metrics on assessment data
-  metric_evals <- outer_metric_set(
-    data        = preds
-  , truth       = outbreak
-  , estimate    = .pred_class
-  , .pred_1   
-  , event_level = "first" 
+  ## Predictions: prob only
+  prob1     <- predict(fit, outer_tbl_assess, type = "prob")$.pred_1
+  truth     <- factor(outer_tbl_assess[["outbreak"]], levels = c("1","0"))
+  class_hat <- apply(
+    threshold %>% matrix()
+  , 1
+  , FUN = function(x) factor(ifelse(prob1 >= x, "1", "0"), levels = c("1","0"))
   )
   
-  outer_out <- hyper_set %>% 
-    mutate(outer_fold = outer_data$outer_fold_id, .before = 1) %>%
-    cbind(
-      .
-    , metric_evals %>% 
-      pivot_wider(id_cols = .estimator, values_from = .estimate, names_from = .metric) %>% 
-      dplyr::select(-.estimator))
+  ## Compute metrics 
+  metrics <- compute_metrics_vec(
+    truth
+  , threshold = threshold
+  , prob1
+  , class_hat
+  , event_level = "first"
+  ) %>% 
+    mutate(
+      outer_fold = outer_data$outer_fold_id
+   , .before = 1 
+    ) %>% 
+    bind_cols(., hyper_set)
   
-  write.csv(outer_out, save_filename)
+  saveRDS(metrics, save_filename)
   
   return(save_filename)
   

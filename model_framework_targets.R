@@ -200,12 +200,22 @@ model_tuning_targets <- tar_plan(
   ))
 
   ## NOTE: temp check for debugging purposes
-, tar_target(folded_data_training_debug, folded_data_training[c(1, 10, 21, 31, 41), ])
-, tar_target(tuning_grid_debug, tuning_grid[1:8, ])
+#, tar_target(folded_data_training_debug, folded_data_training[c(1, 10, 21, 31, 41), ])
+, tar_target(folded_data_training_debug, folded_data_training[c(10, 21), ])
+, tar_target(tuning_grid_debug, tuning_grid[2:3, ])
 , tar_target(folded_data_testing_debug, folded_data_testing[c(1, 5, 10, 15), ])
 
-  ## Final prep step for parallel processing for tuning across all inner folds
-, tar_target(inner_fold_id, data.frame(inner_fold_id = seq(n_spatial_folds)))
+  ## Final prep step for parallel processing for tuning across all inner folds is to
+   ## evaluate which of all of the inner folds across all outer folds actually have
+   ## 1s in the assessment set
+, tar_target(inner_fold_id, prep_fold_ids(
+    folded_data = folded_data_training_debug
+  , raw_data    = splitted_data
+  ) %>% cross_join(., tuning_grid_debug) %>% 
+    group_by(outer_fold_id) %>% 
+    filter(inner_fold_id %in% unique(inner_fold_id)[1:2]) %>% 
+    ungroup()
+  )
 
   ## Fit across tuning_grid across all inner folds of all outer folds
   ## NOTE: temporary minimal for working on downstream pipeline
@@ -213,12 +223,12 @@ model_tuning_targets <- tar_plan(
       folded_data = folded_data_training_debug
     , inner_ids   = inner_fold_id
     , raw_data    = splitted_data
-    , tuning_grid = tuning_grid_debug
+    , threshold   = seq(0.05, 0.95, by = 0.05)
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
     , overwrite   = FALSE
     )
-  , pattern = cross(folded_data_training_debug, tuning_grid_debug, inner_fold_id)
+  , pattern = map(inner_fold_id)
   , error   = "null"
   , format  = "file"
  )
@@ -226,12 +236,15 @@ model_tuning_targets <- tar_plan(
   ## Join together all tuned inner folds and select the best per outer fold
 , tar_target(tuned_results_joined, join_tuned_inner_folds(
     inner_folds = tuned_results_per_outer_fold
+  , metric      = "pr_auc"
+  , direction   = "max"
   ))
 
   ## Fit each outer fold with the best inner fold hyperparameter for each of these outer folds
 , tar_target(tuned_results_across_outer_folds, tune_results_across_outer_folds(
     outer_data     = folded_data_training_debug
   , raw_data       = splitted_data
+  , threshold      = seq(0.05, 0.95, by = 0.05)
   , hyperparm_sets = tuned_results_joined
   , id_cols        = id_cols
   , out_dir        = outer_folds_dir2
