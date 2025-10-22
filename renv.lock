@@ -6614,7 +6614,7 @@
       "RemoteType": "repository",
       "RemoteUrl": "https://github.com/ropensci/rnaturalearthdata",
       "RemoteRef": "main",
-      "RemoteSha": "ff4d891f74265473ae2c936dcfeb0c9afeac6631"
+      "RemoteSha": "ff4d891f74265473ae2c936dcfeb0c9afeac6631",
       "NeedsCompilation": "no",
       "Author": "Andy South [aut] (<https://orcid.org/0000-0003-4051-6135>), Schramm Michael [aut], Philippe Massicotte [aut, cre] (<https://orcid.org/0000-0002-5919-4116>)",
       "Maintainer": "Philippe Massicotte <pmassicotte@hotmail.com>",
@@ -7559,7 +7559,7 @@
       "RemoteUrl": "https://github.com/ropensci/targets",
       "RemoteRef": "main",
       "RemoteSha": "13e6f38793ebcd570b9d30f23a35766efc35188c",
-      "Repository": "ROPENSCI"
+      "Repository": "ROPENSCI",
       "NeedsCompilation": "no",
       "Author": "William Michael Landau [aut, cre] (ORCID: <https://orcid.org/0000-0003-1878-3253>), Matthew T. Warkentin [ctb], Mark Edmondson [ctb] (ORCID: <https://orcid.org/0000-0002-8434-3881>), Samantha Oliver [rev] (ORCID: <https://orcid.org/0000-0001-5668-1165>), Tristan Mahr [rev] (ORCID: <https://orcid.org/0000-0002-8890-5116>), Eli Lilly and Company [cph, fnd]",
       "Maintainer": "William Michael Landau <will.landau.oss@gmail.com>"
