@@ -107,11 +107,24 @@ data_import_targets <- tar_plan(
   )
   
   ## Sub Region (e.g., Country) and Sub-Sub Regions (e.g., adm2 -- i.e., district or county) of interest
-  , tar_target(region_name, "RSF")
+  , tar_target(region_name, "pan")
+  
   , tar_target(region_data_directory, create_data_directory(
-    directory_path = paste("data/", region_name, "_full_response_data", sep = "")
+      directory_path = paste("data/", region_name, "_full_response_data", sep = "")
   ))
-  , tar_target(region_districts, rgeoboundaries::geoboundaries("South Africa", "adm2"))
+  
+  ## Pulls all African countries. Alternatively can just provide a single country
+   ## directly to get_region_districts below
+  , tar_target(all_african_countries, {
+    ne_countries(continent = "Africa", returnclass = "sf") |>
+      st_drop_geometry() |>
+      pull(admin) |>
+      sort()
+  })
+
+  ## Sub-regions of region of interest
+   ## Takes a character vector of any length
+  , tar_target(region_districts, get_region_districts(all_african_countries))
   
 )
 
@@ -122,12 +135,22 @@ data_import_targets <- tar_plan(
 ## D) Summarizing covariates and cases to the Sub-Sub-Region of interest
 rvf_processing_targets <- tar_plan(
   
-  ## Build smaller more manageable .parquet files composed of the same dates but
-  ## with data masked to the Sub-Region and with Sub-Sub Regions identified
-  tar_target(region_data, mask_and_cluster(
-    cov_files       = base_predictors
-    , districts_sf    = region_districts
-    , district_id_col = "shapeName"
+## Determine the Country and ADM2 (or 1) region for all of the x, y coordinates
+ tar_target(region_data_template, mask_and_cluster_build_template(
+    cov_files       = base_predictors[1]
+  , districts_sf    = region_districts
+  , district_id_col = "shapeName"
+  , out_dir         = region_data_directory
+  , overwrite       = FALSE
+))
+
+## Use the template to categorize all x, y, coordinates for all of the data (by date)
+ ## Mask to the Sub-Region of interest (drop nothing if pan-African is desired) and
+ ## with Sub-Sub Regions identified
+ ## Build smaller more manageable .parquet files composed of the same dates but
+, tar_target(region_data, mask_and_cluster_from_template(
+      template        = region_data_template
+    , cov_files       = base_predictors[1]
     , out_dir         = region_data_directory
     , overwrite       = FALSE
   )
@@ -136,18 +159,48 @@ rvf_processing_targets <- tar_plan(
   , format  = "file"
   )
   
-  ## Set up folder for the cleaned data
+  ## Set up folders for the cleaned data
   , tar_target(region_cleaned_data_directory, create_data_directory(
     directory_path = paste("data/", region_name, "_cleaned_response_data", sep = "")
   ))
+
+  , tar_target(region_joined_data_directory, create_data_directory(
+    directory_path = paste("data/", region_name, "_joined_response_data", sep = "")
+  ))
+
+  ## First step in building the lagged variables of figuring out what files are needed for each
+   ## of the lags. Save these details for each individual date in a list of tibbles
+  , tar_target(prepped_dates, prep_dates(
+    cov_files    = region_data[-length(region_data)]
+  , rvf_response = rvf_response
+  ))
+
+  ## some finicky bs to get arrow to work. For whatever reason will not work unless I pull these out
+   ## of the prepped_dates object
+  , tar_target(file_path_per_date
+             , lapply(prepped_dates, FUN = function(x) x$filename[1]) %>% unlist()
+  )
   
-  ## Calculate lags, join cases, summarize and build master dataset
-  , tar_target(cleaned_region_data, lag_join_aggregate(
-    cov_files       = region_data[-length(region_data)]
-    , rvf_response    = rvf_response
-    , district_id_col = "shapeName"
-    , out_dir         = region_cleaned_data_directory
-    , overwrite       = FALSE
+  ## Calculate lags, join cases, summarize and build master dataset. Save the output in individual
+   ## parquet files by date
+, tar_target(cleaned_region_data, lag_join_aggregate(
+    file_list       = file_path_per_date
+  , processed_dates = prepped_dates
+  , cov_files       = region_data[-length(region_data)]
+  , rvf_response    = rvf_response
+  , out_dir         = region_cleaned_data_directory
+  , overwrite       = FALSE
+)
+  , pattern = map(file_path_per_date)
+  , error   = "null"
+  , format  = "file"
+)
+
+  ## Build a single master file 
+, tar_target(joined_region_data, combine_lja(
+    in_dir    = cleaned_region_data
+  , out_dir   = region_joined_data_directory
+  , overwrite = TRUE
   ))
   
 )

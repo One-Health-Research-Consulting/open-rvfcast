@@ -1,4 +1,5 @@
 source("renv/activate.R")
+library(lubridate)
 # Load env vars from any file starting with `.env`. This allows user-specific
 # options to be set in `.env_user` (which is .gitignored), and to have both
 # encrypted and non-encrypted .env files
