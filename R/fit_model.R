@@ -6,6 +6,7 @@
 #' @param final_hyper_set The choice of hyperparameters for final model fitting
 #' @param full_data Full training set and test data
 #' @param raw_data complete set of raw data
+#' @param threshold For assigning a 1 | estimated prob
 #' @param id_cols Columns that define a unique data point
 #' @param out_dir Where to save output
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
@@ -13,7 +14,7 @@
 #' @author Morgan Kain
 #' @export
 
-fit_model <- function(final_hyper_set, full_data, raw_data, id_cols, out_dir, overwrite) {
+fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, out_dir, overwrite) {
   
   ## Set filename
   save_filename <- paste(
@@ -53,19 +54,14 @@ fit_model <- function(final_hyper_set, full_data, raw_data, id_cols, out_dir, ov
     dplyr::select(-c(forecast_interval, cases)) %>%
     mutate(outbreak = factor(outbreak, levels = c(1, 0)))
   
-  ## Establish metric set
-  outer_metric_set <- metric_set(mn_log_loss, pr_auc, roc_auc, recall, precision)
+  ## Get class imbalance ratio
+  spw <- calc_spw(outer_tbl_train, "outbreak")
   
-  ## Get the neg/pos ratio for this outer set
-  neg_pos_ratio    <- sum(outer_tbl_train$outbreak == 0) / sum(outer_tbl_train$outbreak == 1)
-  
-  ## Set up the final model
-  final_spec       <- make_model(scale_pos_weight = neg_pos_ratio) %>% finalize_model(final_hyper_set)
-  rec              <- make_recipe(outer_tbl_train, id_cols = id_cols)
-  wf               <- workflow() %>% add_model(final_spec) %>% add_recipe(rec) 
-  
-  ## Fit
-  model_fit        <- fit(wf, data = outer_tbl_train)
+  ## Set up and fit the final model for this outer fold
+  rec <- make_recipe(outer_tbl_train, id_cols = id_cols)
+  mod <- make_model(params = final_hyper_set, scale_pos_weight = spw)
+  wf  <- workflow() %>% add_model(mod) %>% add_recipe(rec) 
+  model_fit <- fit(wf, data = outer_tbl_train)
   
   ## Predict probabilities and class labels on outer assessment
   preds <- predict(model_fit, outer_tbl_assess, type = "prob") %>%
@@ -73,27 +69,41 @@ fit_model <- function(final_hyper_set, full_data, raw_data, id_cols, out_dir, ov
     bind_cols(outer_tbl_assess %>% select(outbreak)) %>%
     mutate(
       outbreak    = factor(outbreak, levels = c("1", "0"))
-   , .pred_class = factor(.pred_class, levels = c("1", "0"))
+    , .pred_class = factor(.pred_class, levels = c("1", "0"))
     )
   
-  ## Evaluate metrics on assessment data
-  metric_evals <- outer_metric_set(
-    data        = preds
-  , truth       = outbreak
-  , estimate    = .pred_class
-  , .pred_1   
-  , event_level = "first" 
+  ## Predictions: prob only
+  prob1     <- predict(model_fit, outer_tbl_assess, type = "prob")$.pred_1
+  truth     <- factor(outer_tbl_assess[["outbreak"]], levels = c("1","0"))
+  class_hat <- apply(
+    threshold %>% matrix()
+    , 1
+    , FUN = function(x) factor(ifelse(prob1 >= x, "1", "0"), levels = c("1","0"))
   )
   
-  ## Return
-  model_fit <- tibble(
-    fit         = model_fit %>% list()
-  , preds       = preds %>% list()
-  , hyperparams = final_hyper_set %>% list()
-  , metrics     = metric_evals %>% list()
-  )
+## Compute metrics 
+metrics <- compute_metrics_vec(
+  truth
+  , threshold = threshold
+  , prob1
+  , class_hat
+  , event_level = "first"
+) %>% 
+  mutate(
+    outer_fold = full_data$outer_fold_id
+    , .before = 1 
+  ) %>% 
+  bind_cols(., final_hyper_set %>% dplyr::select(-contains("fold"), -contains("auc"), -recall, -precision))
+
+## Return
+model_out <- tibble(
+  fit         = model_fit %>% list()
+, preds       = preds %>% list()
+, hyperparams = final_hyper_set %>% list()
+, metrics     = metrics %>% list()
+)
   
-  saveRDS(model_fit, save_filename)
+  saveRDS(model_out, save_filename)
   
   return(save_filename)
   

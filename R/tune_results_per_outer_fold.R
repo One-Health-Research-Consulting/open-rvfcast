@@ -170,6 +170,26 @@ prep_fold_ids <- function(folded_data, raw_data) {
   
 }
 
+prep_outer_ids <- function(folded_data, raw_data, inner_ids) {
+  
+  all_outer <- purrr::map(1:nrow(folded_data), function(outid) {
+    
+    ## Extract the needed data and check for 1s in outbreak
+    all_asses <- raw_data$train_data[[1]] %>% 
+      filter(index %in% folded_data[outid, ]$assess_data[[1]]) %>%
+      summarize(n_out = n_distinct(outbreak)) %>%
+      mutate(outer_fold_id = folded_data[outid, ]$outer_fold_id, .before = 1) %>%
+      mutate(has_outbreak = ifelse(n_out > 1, 1, 0)) %>% 
+      dplyr::select(-n_out)
+      
+    all_asses
+
+  }) %>% do.call("rbind", .)
+  
+  inner_ids %>% left_join(., all_outer) %>% filter(has_outbreak == 1) %>% dplyr::select(-has_outbreak)
+  
+}
+
 
 #' Load in and combine saved output from all inner folds
 #'
@@ -290,10 +310,10 @@ tune_results_across_outer_folds <- function(outer_data, raw_data, threshold, hyp
   , event_level = "first"
   ) %>% 
     mutate(
-      outer_fold = outer_data$outer_fold_id
+      outer_fold_id = outer_data$outer_fold_id
    , .before = 1 
     ) %>% 
-    bind_cols(., hyper_set)
+    left_join(., hyper_set)
   
   saveRDS(metrics, save_filename)
   
@@ -308,23 +328,22 @@ tune_results_across_outer_folds <- function(outer_data, raw_data, threshold, hyp
 #' @title finalize_hyperparameters
 
 #' @param outer_folds Tibble of output across all outer folds 
-#' @param chosen_metric Metric used for selection
-#' @param direction maximize or minimize corresponding to chosen_metric
+#' @param metric Metric used for selection
+#' @param direction min or max
 #' @return Set of best hyperparameters
 #' @author Morgan Kain
 #' @export
 
-finalize_hyperparameters <- function(outer_folds, chosen_metric, direction) { 
+finalize_hyperparameters <- function(outer_folds, metric, direction) { 
   
   joined_files <- apply(outer_folds %>% matrix(), 1, FUN = function(x) {
-    read.csv(x)
-  }) %>% do.call("rbind", .) %>% 
-    dplyr::select(-X)
+    readRDS(x)
+  }) %>% do.call("rbind", .) 
   
-  if (direction == "maximize") {
-    joined_files %>% arrange(desc(get(chosen_metric))) %>% dplyr::slice(1)
-  } else if (direction == "minimize") {
-    joined_files %>% arrange(get(chosen_metric)) %>% dplyr::slice(1)
+  if (direction == "max") {
+    joined_files %>% arrange(desc(get(metric))) %>% dplyr::slice(1)
+  } else if (direction == "min") {
+    joined_files %>% arrange(get(metric)) %>% dplyr::slice(1)
   } else {
     stop("choose minimize or maximize for direction")
   }

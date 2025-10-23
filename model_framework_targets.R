@@ -181,12 +181,15 @@ model_tuning_targets <- tar_plan(
       , finalize(mtry()      , folded_data_training$inner_folds[[20]] %>% 
                    left_join(., splitted_data$train_data[[1]], by = "index") %>% filter(cluster != 1))
       ## Total number of combinations of hyperparameters
-      , size = 40 
+      , size = 30 
       )
     ) %>% mutate(index = seq(n()), .before = 1)
   )
 
 , tar_target(id_cols, c("shapeName", "Country", "date", "index"))
+
+  ## probability value over which a one is assigned
+, tar_target(positive_threshold, seq(0.05, 0.95, by = 0.05))
 
   ## Set up location for saving intermediate output
 , tar_target(outer_folds_dir, create_data_directory(
@@ -199,36 +202,51 @@ model_tuning_targets <- tar_plan(
     directory_path = paste("outputs/", region_name, "_final_model_fits", sep = "")
   ))
 
-  ## NOTE: temp check for debugging purposes
-#, tar_target(folded_data_training_debug, folded_data_training[c(1, 10, 21, 31, 41), ])
-, tar_target(folded_data_training_debug, folded_data_training[c(10, 21), ])
-, tar_target(tuning_grid_debug, tuning_grid[2:3, ])
-, tar_target(folded_data_testing_debug, folded_data_testing[c(1, 5, 10, 15), ])
-
-  ## Final prep step for parallel processing for tuning across all inner folds is to
-   ## evaluate which of all of the inner folds across all outer folds actually have
-   ## 1s in the assessment set
+## Final prep step for parallel processing for tuning across all inner folds is to
+ ## evaluate which of all of the inner folds across all outer folds actually have
+ ## 1s in the assessment set
 , tar_target(inner_fold_id, prep_fold_ids(
-    folded_data = folded_data_training_debug
+    folded_data = folded_data_training
   , raw_data    = splitted_data
-  ) %>% cross_join(., tuning_grid_debug) %>% 
-    group_by(outer_fold_id) %>% 
-    filter(inner_fold_id %in% unique(inner_fold_id)[1:2]) %>% 
-    ungroup()
-  )
+) %>% cross_join(., tuning_grid) %>% 
+  group_by(outer_fold_id) %>% 
+  filter(inner_fold_id %in% unique(inner_fold_id)) %>% 
+  ungroup()
+)
+
+## AND which of the outer_fold_ids for ALL of the train_data have at least a single
+## 1 in the assess_data. There is no point in wasting computation on inner folds if
+## the best inner fold hyperparameter set cant be evaluated on the whole training_set
+## for this outer_fold because there is no outbreak in the assess_data
+, tar_target(inner_fold_id_finalized, prep_outer_ids(
+    folded_data = folded_data_training
+  , raw_data    = splitted_data
+  , inner_ids   = inner_fold_id
+))
+
+  ## NOTE: temp check for debugging purposes
+, tar_target(inner_fold_id_finalized_DEBUG, {
+    inner_fold_id_finalized %>% filter(
+      outer_fold_id %in% c(15, 30, 45)
+    , inner_fold_id %in% c(8, 18, 35)
+    , index %in% c(3, 15, 25)
+    )})
+, tar_target(folded_data_training_DEBUG, folded_data_training %>% filter(outer_fold_id %in% inner_fold_id_finalized_DEBUG$outer_fold_id))
+, tar_target(tuning_grid_DEBUG, tuning_grid %>% filter(index %in% inner_fold_id_finalized_DEBUG$index))
+, tar_target(folded_data_testing_DEBUG, folded_data_testing %>% filter(outer_fold_id %in% c(5, 10)))
 
   ## Fit across tuning_grid across all inner folds of all outer folds
   ## NOTE: temporary minimal for working on downstream pipeline
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
-      folded_data = folded_data_training_debug
-    , inner_ids   = inner_fold_id
+      folded_data = folded_data_training_DEBUG
+    , inner_ids   = inner_fold_id_finalized
     , raw_data    = splitted_data
-    , threshold   = seq(0.05, 0.95, by = 0.05)
+    , threshold   = positive_threshold
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
     , overwrite   = FALSE
     )
-  , pattern = map(inner_fold_id)
+  , pattern = map(inner_fold_id_finalized_DEBUG)
   , error   = "null"
   , format  = "file"
  )
@@ -242,24 +260,24 @@ model_tuning_targets <- tar_plan(
 
   ## Fit each outer fold with the best inner fold hyperparameter for each of these outer folds
 , tar_target(tuned_results_across_outer_folds, tune_results_across_outer_folds(
-    outer_data     = folded_data_training_debug
+    outer_data     = folded_data_training_DEBUG
   , raw_data       = splitted_data
-  , threshold      = seq(0.05, 0.95, by = 0.05)
+  , threshold      = positive_threshold
   , hyperparm_sets = tuned_results_joined
   , id_cols        = id_cols
   , out_dir        = outer_folds_dir2
   , overwrite      = FALSE
   )
-  , pattern = map(folded_data_training_debug)
+  , pattern = map(folded_data_training_DEBUG)
   , error   = "null"
   , format  = "file"
  )
 
   ## Extract the best parameter set
 , tar_target(finalized_hyperparameters, finalize_hyperparameters(
-    outer_folds   = tuned_results_across_outer_folds
-  , chosen_metric = "mn_log_loss"
-  , direction     = "minimize"
+    outer_folds = tuned_results_across_outer_folds
+  , metric      = "pr_auc"
+  , direction   = "max"
   ))
 
 )
@@ -271,13 +289,14 @@ model_fitting_targets <- tar_plan(
    ## make up the testing phase
   tar_target(fitted_model, fit_model(
     final_hyper_set = finalized_hyperparameters
-  , full_data       = folded_data_testing_debug
+  , full_data       = folded_data_testing_DEBUG
   , raw_data        = splitted_data
+  , threshold       = positive_threshold
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
   , overwrite       = FALSE
   )
-  , pattern = map(folded_data_testing_debug)
+  , pattern = map(folded_data_testing_DEBUG)
   , error   = "null"
   , format  = "file"
   )
@@ -285,7 +304,7 @@ model_fitting_targets <- tar_plan(
   ## Join fitted_model paths to folded_data_testing for parallel processing for model eval
 , tar_target(model_out_for_eval, build_model_out_for_eval(
     model_fits = fitted_model
-  , full_data  = folded_data_testing_debug
+  , full_data  = folded_data_testing_DEBUG
   ))
   
 )
@@ -295,7 +314,7 @@ model_evaluation_targets <- tar_plan(
   
   ## Evaluate fit in a few ways -- comparing prob to truth, confusion matrix, map, etc.
   tar_target(examined_fits, examine_fit(
-     model_out        = model_out_for_eval[1, ]
+     model_out        = model_out_for_eval
    , test_data        = splitted_data$test_data[[1]]
    , train_data       = splitted_data$train_data[[1]]
    , region_districts = region_districts
