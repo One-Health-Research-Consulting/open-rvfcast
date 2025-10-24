@@ -53,6 +53,8 @@ fold_data <- function(
     , by   = paste(step_size, "days")
   )
   
+  fold_starts <- fold_starts[(fold_starts + step_size) < end_date]
+  
   outer_folds <- map_df(seq_along(fold_starts), function(i) {
     
     train_end    <- fold_starts[i]
@@ -159,26 +161,26 @@ clean_folded_data <- function (raw_data, folded_data, epidemic_threshold_total, 
     x$inner_folds[[1]] %>% 
       mutate(
         type            = x$type
-        , outer_fold_id   = x$outer_fold_id
-        , train_range     = x$train_range
-        , assess_range    = x$assess_range
-        , .before         = 1
+      , outer_fold_id   = x$outer_fold_id
+      , train_range     = x$train_range
+      , assess_range    = x$assess_range
+      , .before         = 1
       ) %>% left_join(., raw_data[[1]], by = "index") %>%
       group_by(cluster, outer_fold_id) %>%
       summarize(
         has_outbreak = ifelse(any(outbreak == 1), 1, 0)
-        , tot_outbreak = sum(outbreak)
+      , tot_outbreak = sum(outbreak)
       )
   }) %>% do.call("rbind", .)
   
   folded_sub <- clean_folded %>% group_by(outer_fold_id) %>% 
     summarize(
       reg_with_out = sum(has_outbreak)
-      , tot_out      = sum(tot_outbreak)
+    , tot_out      = sum(tot_outbreak)
     ) %>%
     filter(
       reg_with_out > epidemic_threshold_space
-      , tot_out > epidemic_threshold_total
+    , tot_out > epidemic_threshold_total
     )
   
   folded_data %>% filter(outer_fold_id %in% folded_sub$outer_fold_id)

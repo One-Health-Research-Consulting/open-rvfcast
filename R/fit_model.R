@@ -35,32 +35,40 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, 
   
   ## Extract the needed data
   ## 1) full amount of training data (all the stuff from the hyperparameter tuning step)
-  outer_tbl_train_train   <- raw_data$train_data[[1]] %>% 
-    dplyr::filter(index %in% full_data$train_data[[1]]) %>% 
-    dplyr::select(-c(forecast_interval, cases)) %>%
-    mutate(outbreak = factor(outbreak, levels = c(1, 0)))
-  
-  ## 2) some portion of the data from the left-out period depending on what forecast window
-   ## is being predicted
-  outer_tbl_train_assess  <- raw_data$test_data[[1]] %>% 
-    dplyr::filter(index %in% full_data$train_data[[1]]) %>% 
-    dplyr::select(-c(forecast_interval, cases)) %>%
-    mutate(outbreak = factor(outbreak, levels = c(1, 0)))
-  
-  outer_tbl_train <- rbind(outer_tbl_train_train, outer_tbl_train_assess)
+  ## 2) some portion of the data from the left-out period depending on what forecast window is being predicted
+  outer_tbl_train <- rbind(
+    raw_data$train_data[[1]] %>% 
+      dplyr::filter(index %in% full_data$train_data[[1]]) %>% 
+      dplyr::select(-c(cases)) %>%
+      mutate(outbreak = factor(outbreak, levels = c(1, 0)))
+  , raw_data$test_data[[1]] %>% 
+      dplyr::filter(index %in% full_data$train_data[[1]]) %>% 
+      dplyr::select(-c(cases)) %>%
+      mutate(outbreak = factor(outbreak, levels = c(1, 0)))
+  ) %>% 
+    mutate(forecast_interval = as.factor(forecast_interval)) %>%
+    ## Get class imbalance ratio per forecast horizon
+    group_by(forecast_interval) %>% 
+    mutate(
+      weights = length(which(outbreak == "0")) / length(which(outbreak == "1"))
+    , weights = ifelse(outbreak == "0", 1, weights)
+    , weights = hardhat::importance_weights(weights)
+    , .after = "index"
+    )
   
   outer_tbl_assess  <- raw_data$test_data[[1]] %>% 
     dplyr::filter(index %in% full_data$assess_data[[1]]) %>% 
-    dplyr::select(-c(forecast_interval, cases)) %>%
-    mutate(outbreak = factor(outbreak, levels = c(1, 0)))
+    dplyr::select(-c(cases)) %>%
+    mutate(outbreak = factor(outbreak, levels = c(1, 0))) %>% 
+    mutate(forecast_interval = as.factor(forecast_interval))
   
-  ## Get class imbalance ratio
-  spw <- calc_spw(outer_tbl_train, "outbreak")
+  ## Attempt to clear up some ram
+  rm(raw_data); gc()
   
   ## Set up and fit the final model for this outer fold
-  rec <- make_recipe(outer_tbl_train, id_cols = id_cols)
-  mod <- make_model(params = final_hyper_set, scale_pos_weight = spw)
-  wf  <- workflow() %>% add_model(mod) %>% add_recipe(rec) 
+  rec       <- make_recipe(outer_tbl_train, id_cols = id_cols)
+  mod       <- make_model(params = final_hyper_set)
+  wf        <- workflow() %>% add_model(mod) %>% add_recipe(rec) %>% add_case_weights(weights)
   model_fit <- fit(wf, data = outer_tbl_train)
   
   ## Predict probabilities and class labels on outer assessment
@@ -73,35 +81,37 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, 
     )
   
   ## Predictions: prob only
-  prob1     <- predict(model_fit, outer_tbl_assess, type = "prob")$.pred_1
+  prob1     <- predict(fit, outer_tbl_assess, type = "prob")$.pred_1
   truth     <- factor(outer_tbl_assess[["outbreak"]], levels = c("1","0"))
   class_hat <- apply(
     threshold %>% matrix()
     , 1
     , FUN = function(x) factor(ifelse(prob1 >= x, "1", "0"), levels = c("1","0"))
   )
+  all_intervals     <- outer_tbl_assess$forecast_interval
+  forecast_interval <- all_intervals %>% unique()
   
-## Compute metrics 
-metrics <- compute_metrics_vec(
-  truth
+  ## Compute metrics 
+  metrics <- compute_metrics_vec(
+    truth
   , threshold = threshold
   , prob1
   , class_hat
   , event_level = "first"
-) %>% 
+  ) %>% 
   mutate(
     outer_fold = full_data$outer_fold_id
-    , .before = 1 
+  , .before = 1 
   ) %>% 
   bind_cols(., final_hyper_set %>% dplyr::select(-contains("fold"), -contains("auc"), -recall, -precision))
 
-## Return
-model_out <- tibble(
-  fit         = model_fit %>% list()
-, preds       = preds %>% list()
-, hyperparams = final_hyper_set %>% list()
-, metrics     = metrics %>% list()
-)
+  ## Return
+  model_out <- tibble(
+    fit         = model_fit %>% list()
+  , preds       = preds %>% list()
+  , hyperparams = final_hyper_set %>% list()
+  , metrics     = metrics %>% list()
+  )
   
   saveRDS(model_out, save_filename)
   

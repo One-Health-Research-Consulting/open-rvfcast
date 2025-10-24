@@ -35,7 +35,16 @@ model_data_targets <- tar_plan(
                , region_name, "_joined_response_data_final.parquet"
                , sep = "")
   )
-, tar_target(region_data, read_parquet(region_data_path) %>% ungroup() %>%
+
+  ## Load and mask forecast data so that forecasts further out than the summarized
+   ## outbreak data are NA
+, tar_target(region_data, read_parquet(region_data_path) %>% 
+               ungroup() %>%
+               mutate(
+                 across(ends_with("_30"), ~ if_else(forecast_interval < 30, NA, .x))
+               , across(ends_with("_60"), ~ if_else(forecast_interval < 60, NA, .x))
+               , across(ends_with("_90"), ~ if_else(forecast_interval < 90, NA, .x))
+               ) %>%
                mutate(index = seq(n()), .before = 1)
   )
   ## Other paths to intermediate products to save computation time
@@ -57,7 +66,7 @@ model_data_targets <- tar_plan(
 
   ## As in the comment in the preamble, testing my mental map of the problem and working on code dev for
    ## one forecast horizon for now
-, tar_target(forecast_horizon, 90)
+, tar_target(forecast_horizon, c(30, 60, 90, 120, 150))
 , tar_target(max_lag_period, 90)
 
 )
@@ -69,7 +78,7 @@ cross_validation_targets <- tar_plan(
    ## Going for name of target as a noun (even if it is a funny nonsense word like it is here)
    ## and the function as the related verb
   tar_target(splitted_data, split_data(
-    dat              = region_data %>% filter(forecast_interval == forecast_horizon)
+    dat              = region_data
     ## Prevent overlap in training and test, so start test after the end of the forecast horizon 
      ## from the last training date
   , end_date         = end_date
@@ -114,10 +123,11 @@ cross_validation_targets <- tar_plan(
        ## test_data just splits testing period into chunks for assessing forecasting accuracy
     , type              = "train_data"
     , sf_districts      = clustered_Africa_districts
-    , assess_time_chunk = forecast_horizon + max_lag_period
+      ## Skip through time by the max forecast horizon + max time variables are lagged
+    , assess_time_chunk = max(forecast_horizon) + max_lag_period
     ## Time gap between the end of the previous fold and the start of the next fold. For now setting to
-     ## the 3 month lag for the variables for no overlap
-    , step_size         = max_lag_period 
+     ## the max forecast time so that there isn't overlap
+    , step_size         = max(forecast_horizon) 
     , district_id_col   = "shapeName"
     , seed              = 10001
     ))
@@ -132,13 +142,11 @@ cross_validation_targets <- tar_plan(
 
  ## Generate test cases for assessing model performance
 , tar_target(folded_data_testing, fold_data(
-    data              = tibble(test_data = region_data %>% 
-                                 dplyr::filter(forecast_interval == forecast_horizon) %>% 
-                                 list())
+    data              = tibble(test_data = region_data %>% list())
   , type              = "test_data"
   , sf_districts      = clustered_Africa_districts
-  , assess_time_chunk = forecast_horizon + max_lag_period
-  , step_size         = max_lag_period 
+  , assess_time_chunk = max(forecast_horizon) + max_lag_period
+  , step_size         = max(forecast_horizon)
   , n_spatial_folds   = NULL
   , district_id_col   = "shapeName"
   , seed              = 10001
@@ -227,19 +235,25 @@ model_tuning_targets <- tar_plan(
   ## NOTE: temp check for debugging purposes
 , tar_target(inner_fold_id_finalized_DEBUG, {
     inner_fold_id_finalized %>% filter(
-      outer_fold_id %in% c(15, 30, 45)
-    , inner_fold_id %in% c(8, 18, 35)
-    , index %in% c(3, 15, 25)
+      outer_fold_id %in% c(15, 30
+                           #, 45
+                           )
+    , inner_fold_id %in% c(8, 18
+                           #, 35
+                           )
+    , index %in% c(3, 15
+                   #, 25
+                   )
     )})
 , tar_target(folded_data_training_DEBUG, folded_data_training %>% filter(outer_fold_id %in% inner_fold_id_finalized_DEBUG$outer_fold_id))
-, tar_target(tuning_grid_DEBUG, tuning_grid %>% filter(index %in% inner_fold_id_finalized_DEBUG$index))
-, tar_target(folded_data_testing_DEBUG, folded_data_testing %>% filter(outer_fold_id %in% c(5, 10)))
+, tar_target(tuning_grid_DEBUG         , tuning_grid %>% filter(index %in% inner_fold_id_finalized_DEBUG$index))
+, tar_target(folded_data_testing_DEBUG , folded_data_testing %>% filter(outer_fold_id %in% c(5, 10)))
 
   ## Fit across tuning_grid across all inner folds of all outer folds
   ## NOTE: temporary minimal for working on downstream pipeline
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
       folded_data = folded_data_training_DEBUG
-    , inner_ids   = inner_fold_id_finalized
+    , inner_ids   = inner_fold_id_finalized_DEBUG
     , raw_data    = splitted_data
     , threshold   = positive_threshold
     , id_cols     = id_cols
@@ -253,9 +267,10 @@ model_tuning_targets <- tar_plan(
 
   ## Join together all tuned inner folds and select the best per outer fold
 , tar_target(tuned_results_joined, join_tuned_inner_folds(
-    inner_folds = tuned_results_per_outer_fold
-  , metric      = "pr_auc"
-  , direction   = "max"
+    inner_folds  = tuned_results_per_outer_fold
+  , training_dat = splitted_data$train_data[[1]]
+  , metric       = "pr_auc"
+  , direction    = "max"
   ))
 
   ## Fit each outer fold with the best inner fold hyperparameter for each of these outer folds
@@ -275,9 +290,10 @@ model_tuning_targets <- tar_plan(
 
   ## Extract the best parameter set
 , tar_target(finalized_hyperparameters, finalize_hyperparameters(
-    outer_folds = tuned_results_across_outer_folds
-  , metric      = "pr_auc"
-  , direction   = "max"
+    outer_folds  = tuned_results_across_outer_folds
+  , training_dat = splitted_data$train_data[[1]]
+  , metric       = "pr_auc"
+  , direction    = "max"
   ))
 
 )
