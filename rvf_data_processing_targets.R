@@ -62,7 +62,7 @@ data_import_targets <- tar_plan(
   , tar_target(rvf_outbreaks, get_wahis_rvf_outbreaks() |>
                  mutate(
                    start_date = coalesce(outbreak_start_date, outbreak_end_date)
-                   , end_date   = coalesce(outbreak_end_date, outbreak_start_date)
+                 , end_date   = coalesce(outbreak_end_date, outbreak_start_date)
                  ) |>
                  select(cases, start_date, end_date, latitude, longitude) |>
                  distinct() |>
@@ -96,7 +96,7 @@ data_import_targets <- tar_plan(
   ## and forecast interval, the outbreaks in the forecast interval duration
   ## after the given dates_to_process
   tar_target(rvf_response, get_rvf_response(
-    rvf_outbreaks
+      rvf_outbreaks
     , wahis_raster_template
     , forecast_intervals = c(1, 30, 60, 90, 120, 150)
     , dates_to_process = dates_in_predictors
@@ -150,7 +150,7 @@ rvf_processing_targets <- tar_plan(
  ## Build smaller more manageable .parquet files composed of the same dates but
 , tar_target(region_data, mask_and_cluster_from_template(
       template        = region_data_template
-    , cov_files       = base_predictors[1]
+    , cov_files       = base_predictors
     , out_dir         = region_data_directory
     , overwrite       = FALSE
   )
@@ -184,12 +184,12 @@ rvf_processing_targets <- tar_plan(
   ## Calculate lags, join cases, summarize and build master dataset. Save the output in individual
    ## parquet files by date
 , tar_target(cleaned_region_data, lag_join_aggregate(
-    file_list       = file_path_per_date
+    file_list       = file_path_per_date[1]
   , processed_dates = prepped_dates
   , cov_files       = region_data[-length(region_data)]
   , rvf_response    = rvf_response
   , out_dir         = region_cleaned_data_directory
-  , overwrite       = FALSE
+  , overwrite       = TRUE
 )
   , pattern = map(file_path_per_date)
   , error   = "null"

@@ -12,10 +12,6 @@
 make_recipe <- function(train_data, id_cols) {
   recipe(outbreak ~ ., data = train_data) %>%
     update_role(all_of(id_cols), new_role = "ID") %>%
-    ## add *_na flags for forecast columns
-    step_indicate_na(matches("_(30|60|90)$")) %>%
-    ## impute the original forecast columns
-    step_impute_mean(matches("_(30|60|90)$")) %>%
     step_rm(all_of(id_cols)) %>%
     step_zv(all_predictors()) %>%
     step_dummy(all_nominal_predictors(), one_hot = TRUE)

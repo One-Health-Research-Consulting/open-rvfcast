@@ -38,15 +38,14 @@ model_data_targets <- tar_plan(
 
   ## Load and mask forecast data so that forecasts further out than the summarized
    ## outbreak data are NA
-, tar_target(region_data, read_parquet(region_data_path) %>% 
-               ungroup() %>%
-               mutate(
-                 across(ends_with("_30"), ~ if_else(forecast_interval < 30, NA, .x))
-               , across(ends_with("_60"), ~ if_else(forecast_interval < 60, NA, .x))
-               , across(ends_with("_90"), ~ if_else(forecast_interval < 90, NA, .x))
-               ) %>%
-               mutate(index = seq(n()), .before = 1)
+, tar_target(region_data_raw, read_parquet(region_data_path) %>% 
+               ungroup() %>% mutate(index = seq(n()), .before = 1)
   )
+
+  ## Reduce down to already scaled covariates and scale the other unbounded covariates so that
+   ## covariates are roughly on the same scale
+, tar_target(region_data, clean_region_data(dat = region_data_raw))
+
   ## Other paths to intermediate products to save computation time
  , tar_target(path_to_joined_regions   , paste("data/joined_", region_name, "_regions.Rds", sep = ""))
  , tar_target(path_to_collapsed_regions, paste("data/reduced_", region_name, "_regions.Rds", sep = ""))
@@ -253,7 +252,7 @@ model_tuning_targets <- tar_plan(
   ## NOTE: temporary minimal for working on downstream pipeline
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
       folded_data = folded_data_training_DEBUG
-    , inner_ids   = inner_fold_id_finalized_DEBUG
+    , inner_ids   = inner_fold_id_finalized_DEBUG[1, ]
     , raw_data    = splitted_data
     , threshold   = positive_threshold
     , id_cols     = id_cols
