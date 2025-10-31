@@ -5,14 +5,14 @@
 
 #' @param model_out target model_out_for_eval
 #' @param test_data splitted_data$test_data
-#' @param train_data splitted_data$train_data
 #' @param region_districts region_districts
 #' @param africa_sf path to saved previously cleaned combined sf of all sub-regions (created with combine_africa_sf)
+#' @param p_thresh probability over which to assign a one
 #' @return Tibble of summary metrics of model fit
 #' @author Morgan Kain
 #' @export
 
-examine_fit <- function(model_out, test_data, train_data, region_districts, africa_sf) {
+examine_fits_within <- function(model_out, test_data, region_districts, africa_sf, p_thresh) {
 
   ## Load the previously created / saved Africa map of sub-regions per Country
   afmap <- readRDS(africa_sf)
@@ -32,25 +32,49 @@ examine_fit <- function(model_out, test_data, train_data, region_districts, afri
     )
   
   ## Confusion matrix -- just doing it by hand to avoid issues
-    conf_mat.t <- matrix(
-      data = rep(0, 4)
-    , ncol = 2, nrow = 2
-    , dimnames = list(Prediction = c("0", "1"), Truth = c("0", "1"))
-    )
+  conf_mat <- purrr::map(seq_along(p_thresh), .f = function(i) {
+     
+     conf_mat.d <- dat_with_pred %>% 
+       mutate(outbreak_assigned = ifelse(.pred_1 > p_thresh[i], 1, 0), .after = outbreak_pred) %>%
+       group_by(forecast_interval) %>%
+       group_by(forecast_interval, outbreak, outbreak_assigned) %>%
+       summarize(nout = n()) %>% 
+       mutate(positive_threshold = p_thresh[i], .before = 1)
+     
+   }) %>% do.call("rbind", .)
+  
+conf_mat_plot <- conf_mat %>% 
+    filter(positive_threshold %in% c(0.1, 0.2, 0.3, 0.4, 0.5)) %>% 
+    group_by(forecast_interval, positive_threshold) %>%
+    mutate(prop_t = log(nout / sum(nout))) %>% {
+    ggplot(., aes(outbreak, outbreak_assigned)) + 
+      geom_tile(aes(fill = prop_t)) +
+      scale_fill_continuous() +
+      facet_grid(positive_threshold ~ forecast_interval) +
+      geom_text(aes(label = nout), color = "white", size = 3) +
+      theme(
+        axis.text.x = element_text(size = 10)
+      , axis.text.y = element_text(size = 10)
+      ) +
+        scale_x_continuous(breaks = c(0, 1)) +
+        scale_y_continuous(breaks = c(0, 1)) +
+        xlab("True Outbreaks") + ylab("Predicted Outbreaks")
+  }
     
-    conf_mat.d <- dat_with_pred %>% 
-      group_by(outbreak, outbreak_pred) %>%
-      summarize(nout = n()) 
-    
-    for (q in 1:nrow(conf_mat.d)) {
-      conf_mat.t[
-        as.character(conf_mat.d$outbreak_pred[q])
-      , as.character(conf_mat.d$outbreak[q])
-      ] <- conf_mat.d$nout[q]
+  ## Distribution of probabilities for true 1s and true 0s
+prob_dens_plot <- dat_with_pred %>% 
+    mutate(
+      outbreak = as.factor(outbreak)
+    , .pred_1  = qlogis(.pred_1)
+    ) %>% {
+      ggplot(., aes(x = .pred_1)) + 
+      geom_density(aes(fill = outbreak), alpha = 0.5, colour = NA) +
+      facet_wrap(~forecast_interval) +
+      scale_fill_brewer(palette = "Dark2") +
+      xlab("Predicted Probability of Outbreak (logit scale)") +
+      ylab("Density")
     }
-    
-    conf_mat <- conf_mat.t
-    
+  
   ## Estimating spatial variability of divergence between truth and predictions
   africa_sf <- afmap %>%
     mutate(country_norm = norm_key(country),
@@ -74,7 +98,7 @@ examine_fit <- function(model_out, test_data, train_data, region_districts, afri
             mutate(true_out = as.factor(true_out)) %>% 
             filter(!is.na(prob_pred)) %>%
             filter(true_out == 1)
-          , aes(fill = prob_pred), colour = "white", linewidth = 0.01
+          , aes(fill = prob_pred), colour = "black", linewidth = 0.4
           , alpha = 1
         ) +
         scale_fill_viridis_c(name = "Pr(outbreak)", limits = c(0, 1), oob = scales::squish) +
@@ -85,16 +109,24 @@ examine_fit <- function(model_out, test_data, train_data, region_districts, afri
   
   return(
     tibble(
-        outer_fold_id = model_out$outer_fold_id
-      , index         = model_out$assess_data
-      , metrics       = model_out$metrics
-      , conf_mat      = conf_mat %>% list()
-      , predictions   = preds_summarized %>% list()
-      , map           = pred_map %>% list()
+        outer_fold_id  = model_out$outer_fold_id
+      , index          = model_out$assess_data
+      , metrics        = model_out$metrics
+      , conf_mat       = conf_mat %>% list()
+      , conf_mat_plot  = conf_mat_plot %>% list()
+      , prob_dens_plot = prob_dens_plot %>% list()
+      , predictions    = preds_summarized %>% list()
+      , map            = pred_map %>% list()
     )
   )
     
 }
+
+
+examine_fits_across <- function(ex_within, test_data) {
+  
+}
+
 
 ## Series of helper functions for debugging
 combine_africa_sf  <- function(sf_list) {

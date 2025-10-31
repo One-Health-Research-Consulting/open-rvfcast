@@ -25,10 +25,9 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, 
     , ".Rds"
     , sep = ""
   )
-  
-  error_safe_read_file <- possibly(readRDS, NULL)
-  
-  if (!is.null(error_safe_read_file(save_filename)) & !overwrite) {
+
+  ## Loading these Rds are very slow, so just checking that they exist
+  if (file.exists(save_filename) & !overwrite) {
     message("file already exists and can be loaded, skipping processing")
     return(save_filename)
   }
@@ -81,7 +80,7 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, 
     )
   
   ## Predictions: prob only
-  prob1     <- predict(fit, outer_tbl_assess, type = "prob")$.pred_1
+  prob1     <- predict(model_fit, outer_tbl_assess, type = "prob")$.pred_1
   truth     <- factor(outer_tbl_assess[["outbreak"]], levels = c("1","0"))
   class_hat <- apply(
     threshold %>% matrix()
@@ -103,7 +102,7 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, 
     outer_fold = full_data$outer_fold_id
   , .before = 1 
   ) %>% 
-  bind_cols(., final_hyper_set %>% dplyr::select(-contains("fold"), -contains("auc"), -recall, -precision))
+  bind_cols(., final_hyper_set)
 
   ## Return
   model_out <- tibble(

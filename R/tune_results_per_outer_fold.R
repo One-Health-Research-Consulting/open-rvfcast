@@ -364,7 +364,13 @@ finalize_hyperparameters <- function(outer_folds, training_dat, metric, directio
   
   joined_files <- apply(outer_folds %>% matrix(), 1, FUN = function(x) {
     readRDS(x)
-  }) %>% do.call("rbind", .) 
+  }) 
+  
+  if (length(joined_files) > 1) {
+    joined_files <- joined_files %>% do.call("rbind")
+  } else {
+    joined_files <- joined_files[[1]][[1]]
+  }
   
   ## Get waited metric
   metric_summary.s <- joined_files %>% 

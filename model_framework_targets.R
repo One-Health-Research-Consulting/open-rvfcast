@@ -2,6 +2,12 @@
 # To switch to the modeling pipeline run:
 # Sys.setenv(TAR_PROJECT = "model")
 
+## NOTES / ToDo ---------------------------------------------
+
+## 1) Update the calibration curves plotting function to allow for different summaries/comparisons 
+## 2) Need to check on how .pred becomes .pred_class internally. Where is the threshold assigned.
+ ## Maybe doesn't matter all that much because the raw probabilities are available though
+
 # Re-record current dependencies for CAPSULE users
 if (Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true"))
   capsule::capshot(c("packages.R",
@@ -87,7 +93,7 @@ cross_validation_targets <- tar_plan(
 , tar_target(n_spatial_folds, 40)
 
   ## Generate n_spatial_folds clusters of all Africa regions
-   ## Note: all funsions in spatial_helpers.R
+   ## Note: all functions in spatial_helpers.R
 , tar_target(clustered_Africa_districts, make_area_clusters(
      sf_list                   = region_districts
    , path_to_joined_regions    = path_to_joined_regions
@@ -123,10 +129,10 @@ cross_validation_targets <- tar_plan(
     , type              = "train_data"
     , sf_districts      = clustered_Africa_districts
       ## Skip through time by the max forecast horizon + max time variables are lagged
-    , assess_time_chunk = max(forecast_horizon) + max_lag_period
+    , assess_time_chunk = max(forecast_horizon)
     ## Time gap between the end of the previous fold and the start of the next fold. For now setting to
      ## the max forecast time so that there isn't overlap
-    , step_size         = max(forecast_horizon) 
+    , step_size         = max(forecast_horizon) + max_lag_period
     , district_id_col   = "shapeName"
     , seed              = 10001
     ))
@@ -144,8 +150,8 @@ cross_validation_targets <- tar_plan(
     data              = tibble(test_data = region_data %>% list())
   , type              = "test_data"
   , sf_districts      = clustered_Africa_districts
-  , assess_time_chunk = max(forecast_horizon) + max_lag_period
-  , step_size         = max(forecast_horizon)
+  , assess_time_chunk = max(forecast_horizon)
+  , step_size         = max(forecast_horizon) + max_lag_period
   , n_spatial_folds   = NULL
   , district_id_col   = "shapeName"
   , seed              = 10001
@@ -185,7 +191,7 @@ model_tuning_targets <- tar_plan(
       , min_n(range          = c(minn_min, minn_max))
       , loss_reduction(range = c(loss_red_min, loss_red_max))
       ## Arbitrary choice here in which train_inner, shouldn't really matter
-      , finalize(mtry()      , folded_data_training$inner_folds[[20]] %>% 
+      , finalize(mtry()      , folded_data_training$inner_folds[[10]] %>% 
                    left_join(., splitted_data$train_data[[1]], by = "index") %>% filter(cluster != 1))
       ## Total number of combinations of hyperparameters
       , size = 30 
@@ -234,25 +240,19 @@ model_tuning_targets <- tar_plan(
   ## NOTE: temp check for debugging purposes
 , tar_target(inner_fold_id_finalized_DEBUG, {
     inner_fold_id_finalized %>% filter(
-      outer_fold_id %in% c(15, 30
-                           #, 45
-                           )
-    , inner_fold_id %in% c(8, 18
-                           #, 35
-                           )
-    , index %in% c(3, 15
-                   #, 25
-                   )
+      outer_fold_id %in% c(20) #c(15, 30)
+    , inner_fold_id %in% c(18)  #c(8, 18)
+    , index         %in% c(15) #c(3, 15)
     )})
 , tar_target(folded_data_training_DEBUG, folded_data_training %>% filter(outer_fold_id %in% inner_fold_id_finalized_DEBUG$outer_fold_id))
 , tar_target(tuning_grid_DEBUG         , tuning_grid %>% filter(index %in% inner_fold_id_finalized_DEBUG$index))
-, tar_target(folded_data_testing_DEBUG , folded_data_testing %>% filter(outer_fold_id %in% c(5, 10)))
+, tar_target(folded_data_testing_DEBUG , folded_data_testing %>% filter(outer_fold_id %in% c(1, 2)))
 
   ## Fit across tuning_grid across all inner folds of all outer folds
   ## NOTE: temporary minimal for working on downstream pipeline
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
       folded_data = folded_data_training_DEBUG
-    , inner_ids   = inner_fold_id_finalized_DEBUG[1, ]
+    , inner_ids   = inner_fold_id_finalized_DEBUG
     , raw_data    = splitted_data
     , threshold   = positive_threshold
     , id_cols     = id_cols
@@ -327,17 +327,45 @@ model_fitting_targets <- tar_plan(
 ## Asses model performance -----------------------------------------------------
 model_evaluation_targets <- tar_plan(
   
-  ## Evaluate fit in a few ways -- comparing prob to truth, confusion matrix, map, etc.
-  tar_target(examined_fits, examine_fit(
-     model_out        = model_out_for_eval
-   , test_data        = splitted_data$test_data[[1]]
-   , train_data       = splitted_data$train_data[[1]]
-   , region_districts = region_districts
-   , africa_sf        = path_to_simplifed_regions
+  ## Build the calibration curves
+  tar_target(calibration_curves, generate_calibration_curve(
+    preds      = model_out_for_eval
+  , test_data  = splitted_data$test_data[[1]]
+  , predname   = ".pred_1"
+  , truename   = "outbreak"
+  , splitgrp   = c("forecast_interval")
+  ))
+  
+  ## Depending on what grouping variables are chosen, calibration curves may be made
+   ## ACROSS all outer_fold_ids -- which would summarize prediction ability *generally*
+  ## However, with a different 
+, tar_target(plotted_calibration, plot_calibration(
+    caltib = calibration_curves
+  , xg     = "assess_range"
+  , yg     = "forecast_interval"
+  , forcastvals = c(30, 90, 150)
+  ))
+  
+  ## Evaluate fit in a few other ways appart from calibration curves:
+   ## comparing prob to truth across space and time, distributions of probabilities for true ones, confusion matrix 
+   ## as a function of different probability cutoffs, etc.
+, tar_target(examined_fits_within, examine_fits_within(
+    model_out        = model_out_for_eval
+  , test_data        = splitted_data$test_data[[1]]
+  , region_districts = region_districts
+  , africa_sf        = path_to_simplifed_regions
+  , p_thresh         = positive_threshold
   )
-   , pattern = map(model_out_for_eval)
-   , error   = "null"
+  , pattern = map(model_out_for_eval)
+  , error   = "null"
   )
+
+  ## Then take all of the within-test period summaries and compare model performance broadly
+   ## across all of these fitting periods (e.g., specific periods of time, specific countries etc.)
+, tar_target(examined_fits_across, examine_fits_across(
+    ex_within = examined_fits_within
+  , test_data = splitted_data$test_data[[1]]
+  ))
   
 )
 
