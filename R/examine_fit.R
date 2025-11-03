@@ -122,9 +122,114 @@ prob_dens_plot <- dat_with_pred %>%
     
 }
 
-
-examine_fits_across <- function(ex_within, test_data) {
+examine_fits_across <- function(ex_within, model_out, test_data, africa_sf) {
   
+  ## Looking at correct and incorrect assignments across time
+  conf_mats.s <- ex_within %>% 
+    left_join(., model_out %>% dplyr::select(outer_fold_id, assess_range)) %>%
+    dplyr::select(outer_fold_id, assess_range, conf_mat) %>% unnest(cols = c(conf_mat)) %>%
+    rowwise() %>%
+    mutate(assess_range = strsplit(assess_range, " ")[[1]][2] %>% as.Date(.)) %>% 
+    group_by(assess_range, positive_threshold, outbreak, outbreak_assigned) %>%
+    summarize(nout = sum(nout)) %>%
+    group_by(assess_range, positive_threshold) %>%
+    mutate(noutp = nout / sum(nout)) %>%
+    ungroup() %>%
+    filter(positive_threshold %in% c(0.1, 0.2, 0.3, 0.4, 0.5)) %>% 
+    mutate(positive_threshold = as.factor(positive_threshold)) %>%
+    mutate(correct = ifelse(outbreak == outbreak_assigned, 1, 0))
+  
+  gg_mat1 <- conf_mats.s %>% filter(correct == 1) %>% {
+      ggplot(., aes(assess_range, nout)) + 
+        geom_line(aes(colour = positive_threshold)) +
+        scale_colour_brewer(palette = "Dark2", name = "Positive
+Threshold") +
+        xlab("Assessment Period (last day of three month period)") +
+        ylab("Number Correct") +
+        facet_wrap(~outbreak, scales = "free") 
+  }
+  
+  gg_mat2 <- conf_mats.s %>% filter(correct == 0) %>% {
+    ggplot(., aes(assess_range, nout)) + 
+      geom_line(aes(colour = positive_threshold)) +
+      scale_colour_brewer(palette = "Dark2", name = "Positive
+Threshold") +
+      xlab("Assessment Period (last day of three month period)") +
+      ylab("Number Incorrect") +
+      facet_wrap(~outbreak, scales = "free") 
+  }
+  
+  gg.matf <- gridExtra::arrangeGrob(gg_mat1, gg_mat2, nrow = 2)
+  
+  ## Looking at predictions across regions
+  region.s <- ex_within %>% 
+    pull(predictions) %>% do.call("rbind", .) %>%
+    group_by(country_norm, region_norm, true_out) %>%
+    summarize(
+      lwr   = quantile(prob_pred, 0.025) 
+    , lwr_n = quantile(prob_pred, 0.200) 
+    , mid   = quantile(prob_pred, 0.500) 
+    , upr_n = quantile(prob_pred, 0.800) 
+    , upr   = quantile(prob_pred, 0.975) 
+    )
+  
+  ## And a plot-specific map
+  region.s.t   <- region.s %>% dplyr::select(-contains("lwr"), -contains("upr"))
+  region.s.t.m <- rbind(
+    region.s.t %>% dplyr::select(country_norm, region_norm) %>% distinct() %>%
+      mutate(true_out = 0)
+  , region.s.t %>% dplyr::select(country_norm, region_norm) %>% distinct() %>%
+      mutate(true_out = 1)
+  ) %>% left_join(.,  region.s.t )
+  
+  country.s <- ex_within %>% 
+    pull(predictions) %>% 
+    do.call("rbind", .) %>%
+    group_by(country_norm, true_out) %>%
+    summarize(
+      lwr   = quantile(prob_pred, 0.025) 
+      , lwr_n = quantile(prob_pred, 0.200) 
+      , mid   = quantile(prob_pred, 0.500) 
+      , upr_n = quantile(prob_pred, 0.800) 
+      , upr   = quantile(prob_pred, 0.975) 
+    )
+  
+  ## Make plots with these summaries
+  
+  ## Load the previously created / saved Africa map of sub-regions per Country
+  afmap <- readRDS(africa_sf)
+  
+  ## Estimating spatial variability of divergence between truth and predictions
+  africa_sf <- afmap %>%
+    mutate(country_norm = norm_key(country),
+           region_norm  = norm_key(region))
+
+  map_sf <- africa_sf %>% 
+    left_join(., region.s.t.m, by = c("country_norm", "region_norm")) 
+  
+  pred_map <- map_sf %>% 
+    filter(!is.na(true_out)) %>%
+    mutate(true_out = as.factor(true_out)) %>% 
+    mutate(alpha_down = ifelse(is.na(mid), 1, 0)) %>% {
+      ggplot(.) +
+        geom_sf(aes(fill = mid, alpha = alpha_down)
+                , colour = "black", linewidth = 0.01) +
+        scale_fill_viridis_c(name = "Pr(outbreak)", limits = c(0, 1)
+                             , oob = scales::squish) +
+        scale_alpha_binned(range = c(1, 0.3)) +
+        guides(alpha = "none") +
+        coord_sf() +
+        theme_void() +
+        facet_wrap(~true_out)
+    }
+  
+  return(
+    tibble(
+      conf_mat_time = gg.matf %>% list()
+    , map_pred_time = pred_map %>% list()
+    )
+  )
+
 }
 
 

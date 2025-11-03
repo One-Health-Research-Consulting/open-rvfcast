@@ -4,8 +4,7 @@
 
 ## NOTES / ToDo ---------------------------------------------
 
-## 1) Update the calibration curves plotting function to allow for different summaries/comparisons 
-## 2) Need to check on how .pred becomes .pred_class internally. Where is the threshold assigned.
+## 1) Need to check on how .pred becomes .pred_class internally. Where is the threshold assigned.
  ## Maybe doesn't matter all that much because the raw probabilities are available though
 
 # Re-record current dependencies for CAPSULE users
@@ -246,7 +245,7 @@ model_tuning_targets <- tar_plan(
     )})
 , tar_target(folded_data_training_DEBUG, folded_data_training %>% filter(outer_fold_id %in% inner_fold_id_finalized_DEBUG$outer_fold_id))
 , tar_target(tuning_grid_DEBUG         , tuning_grid %>% filter(index %in% inner_fold_id_finalized_DEBUG$index))
-, tar_target(folded_data_testing_DEBUG , folded_data_testing %>% filter(outer_fold_id %in% c(1, 2)))
+, tar_target(folded_data_testing_DEBUG , folded_data_testing %>% filter(outer_fold_id %in% c(1, 2, 3)))
 
   ## Fit across tuning_grid across all inner folds of all outer folds
   ## NOTE: temporary minimal for working on downstream pipeline
@@ -327,21 +326,24 @@ model_fitting_targets <- tar_plan(
 ## Asses model performance -----------------------------------------------------
 model_evaluation_targets <- tar_plan(
   
+  ## calibration curve groupings
+  tar_target(cal_curve_splitgrp, c("forecast_interval"))
+  
   ## Build the calibration curves
-  tar_target(calibration_curves, generate_calibration_curve(
+   ## Depending on what grouping variables are chosen, calibration curves may be made
+   ## ACROSS all outer_fold_ids -- which would summarize prediction ability *generally*
+   ## However, with a different grouping, plotting can be made *within* fit
+, tar_target(calibration_curves, generate_calibration_curve(
     preds      = model_out_for_eval
   , test_data  = splitted_data$test_data[[1]]
   , predname   = ".pred_1"
   , truename   = "outbreak"
-  , splitgrp   = c("forecast_interval")
+  , splitgrp   = cal_curve_splitgrp
   ))
   
-  ## Depending on what grouping variables are chosen, calibration curves may be made
-   ## ACROSS all outer_fold_ids -- which would summarize prediction ability *generally*
-  ## However, with a different 
 , tar_target(plotted_calibration, plot_calibration(
     caltib = calibration_curves
-  , xg     = "assess_range"
+  , xg     = NULL # "assess_range"
   , yg     = "forecast_interval"
   , forcastvals = c(30, 90, 150)
   ))
@@ -364,7 +366,9 @@ model_evaluation_targets <- tar_plan(
    ## across all of these fitting periods (e.g., specific periods of time, specific countries etc.)
 , tar_target(examined_fits_across, examine_fits_across(
     ex_within = examined_fits_within
+  , model_out = model_out_for_eval
   , test_data = splitted_data$test_data[[1]]
+  , africa_sf = path_to_simplifed_regions
   ))
   
 )
