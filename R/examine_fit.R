@@ -53,12 +53,18 @@ conf_mat_plot <- conf_mat %>%
       facet_grid(positive_threshold ~ forecast_interval) +
       geom_text(aes(label = nout), color = "white", size = 3) +
       theme(
-        axis.text.x = element_text(size = 10)
-      , axis.text.y = element_text(size = 10)
-      ) +
+        axis.text.x  = element_text(size = 10)
+      , axis.text.y  = element_text(size = 10)
+      , axis.title.x = element_text(size = 12)
+      , axis.title.y = element_text(size = 12)
+        ) +
         scale_x_continuous(breaks = c(0, 1)) +
         scale_y_continuous(breaks = c(0, 1)) +
-        xlab("True Outbreaks") + ylab("Predicted Outbreaks")
+        xlab("True Outbreaks") + ylab("Predicted Outbreaks") +
+        ggtitle(paste(
+          "Prediction Period = "
+        , strsplit(model_out$assess_range, " ")[[1]] %>% paste(., collapse = " - ")
+        ))
   }
     
   ## Distribution of probabilities for true 1s and true 0s
@@ -69,10 +75,20 @@ prob_dens_plot <- dat_with_pred %>%
     ) %>% {
       ggplot(., aes(x = .pred_1)) + 
       geom_density(aes(fill = outbreak), alpha = 0.5, colour = NA) +
-      facet_wrap(~forecast_interval) +
+      facet_wrap(~forecast_interval, scales = "free") +
       scale_fill_brewer(palette = "Dark2") +
+      theme(
+        axis.text.x  = element_text(size = 10)
+      , axis.text.y  = element_text(size = 10)
+      , axis.title.x = element_text(size = 12)
+      , axis.title.y = element_text(size = 12)
+      ) +
       xlab("Predicted Probability of Outbreak (logit scale)") +
-      ylab("Density")
+      ylab("Density") +
+        ggtitle(paste(
+          "Prediction Period = "
+        , strsplit(model_out$assess_range, " ")[[1]] %>% paste(., collapse = " - ")
+        ))
     }
   
   ## Estimating spatial variability of divergence between truth and predictions
@@ -104,7 +120,11 @@ prob_dens_plot <- dat_with_pred %>%
         scale_fill_viridis_c(name = "Pr(outbreak)", limits = c(0, 1), oob = scales::squish) +
         coord_sf() +
         theme_void() +
-        labs(title = "Predicted Outbreak Probability by Region")
+        labs(title = "Predicted Outbreak Probability by Region") +
+        ggtitle(paste(
+          "Prediction Period = "
+        , strsplit(model_out$assess_range, " ")[[1]] %>% paste(., collapse = " - ")
+        ))
     }
   
   return(
@@ -139,24 +159,38 @@ examine_fits_across <- function(ex_within, model_out, test_data, africa_sf) {
     mutate(positive_threshold = as.factor(positive_threshold)) %>%
     mutate(correct = ifelse(outbreak == outbreak_assigned, 1, 0))
   
-  gg_mat1 <- conf_mats.s %>% filter(correct == 1) %>% {
+  gg_mat1 <- conf_mats.s %>% filter(correct == 1) %>% 
+    mutate(outbreak = plyr::mapvalues(outbreak, from = c(0, 1), to = c("No Outbreak", "Yes Outbreak"))) %>% {
       ggplot(., aes(assess_range, nout)) + 
         geom_line(aes(colour = positive_threshold)) +
         scale_colour_brewer(palette = "Dark2", name = "Positive
 Threshold") +
         xlab("Assessment Period (last day of three month period)") +
         ylab("Number Correct") +
-        facet_wrap(~outbreak, scales = "free") 
+        facet_wrap(~outbreak, scales = "free") +
+        theme(
+          axis.text.x  = element_text(size = 10)
+        , axis.text.y  = element_text(size = 10)
+        , axis.title.x = element_text(size = 12)
+        , axis.title.y = element_text(size = 12)
+          )
   }
   
-  gg_mat2 <- conf_mats.s %>% filter(correct == 0) %>% {
+  gg_mat2 <- conf_mats.s %>% filter(correct == 0) %>%
+    mutate(outbreak = plyr::mapvalues(outbreak, from = c(0, 1), to = c("No Outbreak", "Yes Outbreak"))) %>% {
     ggplot(., aes(assess_range, nout)) + 
       geom_line(aes(colour = positive_threshold)) +
       scale_colour_brewer(palette = "Dark2", name = "Positive
 Threshold") +
       xlab("Assessment Period (last day of three month period)") +
       ylab("Number Incorrect") +
-      facet_wrap(~outbreak, scales = "free") 
+      facet_wrap(~outbreak, scales = "free") +
+        theme(
+          axis.text.x  = element_text(size = 10)
+        , axis.text.y  = element_text(size = 10)
+        , axis.title.x = element_text(size = 12)
+        , axis.title.y = element_text(size = 12)
+          )
   }
   
   gg.matf <- gridExtra::arrangeGrob(gg_mat1, gg_mat2, nrow = 2)
@@ -210,7 +244,8 @@ Threshold") +
   pred_map <- map_sf %>% 
     filter(!is.na(true_out)) %>%
     mutate(true_out = as.factor(true_out)) %>% 
-    mutate(alpha_down = ifelse(is.na(mid), 1, 0)) %>% {
+    mutate(alpha_down = ifelse(is.na(mid), 1, 0)) %>% 
+    mutate(true_out = plyr::mapvalues(true_out, from = c(0, 1), to = c("No Outbreak", "Yes Outbreak"))) %>% {
       ggplot(.) +
         geom_sf(aes(fill = mid, alpha = alpha_down)
                 , colour = "black", linewidth = 0.01) +

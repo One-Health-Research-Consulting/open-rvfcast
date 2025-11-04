@@ -342,13 +342,13 @@ model_evaluation_targets <- tar_plan(
   ))
   
 , tar_target(plotted_calibration, plot_calibration(
-    caltib = calibration_curves
-  , xg     = NULL # "assess_range"
-  , yg     = "forecast_interval"
+    caltib      = calibration_curves
+  , xg          = NULL # "assess_range"
+  , yg          = "forecast_interval"
   , forcastvals = c(30, 90, 150)
   ))
   
-  ## Evaluate fit in a few other ways appart from calibration curves:
+  ## Evaluate fit in a few other ways apart from calibration curves:
    ## comparing prob to truth across space and time, distributions of probabilities for true ones, confusion matrix 
    ## as a function of different probability cutoffs, etc.
 , tar_target(examined_fits_within, examine_fits_within(
@@ -376,22 +376,17 @@ model_evaluation_targets <- tar_plan(
 ## Reports ---------------------------------------------------------------------
 report_targets <- tar_plan(
   
-  ## Write maps to disk  
-  tar_target(export_pdf,
-    {
-      out_file <- "outputs/map_predictions.pdf"
-      dir.create(dirname(out_file), showWarnings = FALSE)
-      
-      pdf(out_file, width = 7, height = 5)
-      for (p in examined_fits$map) {
-        print(p)  # each print creates a new page
-      }
-      dev.off()
-      
-      out_file
-    },
-    format = "file"  # ensures targets tracks this file as an output
+  ## Put together a report composed of all of the model evaluation figures 
+  tar_target(report, build_report(
+    calcurves  = plotted_calibration
+  , fitswithin = examined_fits_within
+  , fitsacross = examined_fits_across
+  , outpath    = "outputs/report.pdf"
+  , overwrite  = TRUE
   )
+  , format  = "file"
+  )
+  
 )
 
 # List targets -----------------------------------------------------------------

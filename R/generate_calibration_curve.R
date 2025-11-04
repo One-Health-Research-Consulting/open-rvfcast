@@ -139,13 +139,19 @@ plot_calibration <- function(caltib, xg, yg, forcastvals) {
   }
   
   if (!is.null(yg) & !is.null(xg)) {
-    return(gg1 + facet_grid(get(yg) ~ get(xg)))
+    gg1 <- gg1 + facet_grid(get(yg) ~ get(xg))
   } else if (!is.null(yg) & is.null(xg)) {
-    gg1 + facet_wrap(~get(yg), ncol = 1)
+    gg1 <- gg1 + facet_wrap(~get(yg), ncol = 1)
   } else if (is.null(yg) & !is.null(xg)) {
-    gg1 + facet_wrap(~get(xg), ncol = 1)
+    gg1 <- gg1 + facet_wrap(~get(xg), ncol = 1)
   } else {
-    gg1
+    gg1 <- gg1
   }
+  
+  return(
+    tibble(
+      calplot = gg1 %>% list()
+    )
+  )
 
 }
