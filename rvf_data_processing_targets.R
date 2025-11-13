@@ -124,7 +124,9 @@ data_import_targets <- tar_plan(
 
   ## Sub-regions of region of interest
    ## Takes a character vector of any length
-  , tar_target(region_districts, get_region_districts(all_african_countries))
+  , tar_target(region_districts, get_region_districts(
+      c(all_african_countries, "MYT", "COM")
+    ))
   
 )
 
@@ -141,8 +143,7 @@ rvf_processing_targets <- tar_plan(
   , districts_sf    = region_districts
   , district_id_col = "shapeName"
   , out_dir         = region_data_directory
-  , overwrite       = FALSE
-))
+  ))
 
 ## Use the template to categorize all x, y, coordinates for all of the data (by date)
  ## Mask to the Sub-Region of interest (drop nothing if pan-African is desired) and
@@ -184,17 +185,17 @@ rvf_processing_targets <- tar_plan(
   ## Calculate lags, join cases, summarize and build master dataset. Save the output in individual
    ## parquet files by date
 , tar_target(cleaned_region_data, lag_join_aggregate(
-    file_list       = file_path_per_date[1]
+    file_list       = file_path_per_date
   , processed_dates = prepped_dates
   , cov_files       = region_data[-length(region_data)]
   , rvf_response    = rvf_response
   , out_dir         = region_cleaned_data_directory
-  , overwrite       = TRUE
-)
+  , overwrite       = FALSE
+  )
   , pattern = map(file_path_per_date)
   , error   = "null"
   , format  = "file"
-)
+  )
 
   ## Build a single master file 
 , tar_target(joined_region_data, combine_lja(

@@ -4,8 +4,11 @@
 
 ## NOTES / ToDo ---------------------------------------------
 
-## 1) Need to check on how .pred becomes .pred_class internally. Where is the threshold assigned.
- ## Maybe doesn't matter all that much because the raw probabilities are available though
+## 1) Figure out why without any location-specific covariates (e.g., country), the whole
+ ## of RSA but not the surrounding area has high predictions
+## 2) Adjust model if needed, set up to run on server
+## 3) Add different metric for all 0s
+## 4) Add alternative hexagon based spatial clustering
 
 # Re-record current dependencies for CAPSULE users
 if (Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true"))
@@ -37,7 +40,7 @@ model_data_targets <- tar_plan(
   tar_target(region_name, "pan")
 , tar_target(region_data_path
              , paste("data/", region_name, "_joined_response_data/"
-               , region_name, "_joined_response_data_final.parquet"
+               , region_name, "_joined_response_data_final2.parquet"
                , sep = "")
   )
 
@@ -89,7 +92,7 @@ cross_validation_targets <- tar_plan(
   ))
   
   ## Number of spatial folds (parameter used in multiple functions)
-, tar_target(n_spatial_folds, 40)
+, tar_target(n_spatial_folds, 30)
 
   ## Generate n_spatial_folds clusters of all Africa regions
    ## Note: all functions in spatial_helpers.R
@@ -100,9 +103,10 @@ cross_validation_targets <- tar_plan(
    , path_to_region_neighbors  = path_to_region_neighbors
    , path_to_clustered_regions = path_to_clustered_regions
    , k                         = n_spatial_folds
-   , tol                       = 0.30
+   , tol                       = 0.20
    , seed                      = 10001
-   , min_area_km2              = 5
+  #, min_area_km2              = 5
+   , overwrite                 = FALSE
   ))
 
   ## Quick aside to plot the folded map
@@ -240,7 +244,7 @@ model_tuning_targets <- tar_plan(
 , tar_target(inner_fold_id_finalized_DEBUG, {
     inner_fold_id_finalized %>% filter(
       outer_fold_id %in% c(20) #c(15, 30)
-    , inner_fold_id %in% c(18)  #c(8, 18)
+    , inner_fold_id %in% c(18) #c(8, 18)
     , index         %in% c(15) #c(3, 15)
     )})
 , tar_target(folded_data_training_DEBUG, folded_data_training %>% filter(outer_fold_id %in% inner_fold_id_finalized_DEBUG$outer_fold_id))
@@ -347,6 +351,31 @@ model_evaluation_targets <- tar_plan(
   , yg          = "forecast_interval"
   , forcastvals = c(30, 90, 150)
   ))
+
+## Struggling with RAM useage because targets is deciding to load a huge amount
+ ## of stuff it doesn't actually need to run my previous larger function, so
+  ## splitting this up
+, tar_target(variable_importance_prep_a, prep_for_variable_importance_a(
+    model_dat     = model_out_for_eval
+  , splitted_data = splitted_data
+ ) 
+ , pattern = map(model_out_for_eval)
+ )
+
+## Actually do the variable importance calculation, now loading far fewer targets
+, tar_target(variable_importance, calculate_variable_importance(
+    model_dat     = variable_importance_prep_a
+  , fitdir        = outer_folds_dir3
+  , recdir        = outer_folds_dir3
+  , num_vars      = 10
+  ) 
+  , pattern = map(variable_importance_prep_a)
+  )
+
+## And a quick comparison of the shapes of the partial dependence plots among fits
+, tar_target(variable_importance_among, compare_vi(
+    variable_importance = variable_importance
+  ))
   
   ## Evaluate fit in a few other ways apart from calibration curves:
    ## comparing prob to truth across space and time, distributions of probabilities for true ones, confusion matrix 
@@ -381,6 +410,7 @@ report_targets <- tar_plan(
     calcurves  = plotted_calibration
   , fitswithin = examined_fits_within
   , fitsacross = examined_fits_across
+  , viacross   = variable_importance_among
   , outpath    = "outputs/report.pdf"
   , overwrite  = TRUE
   )

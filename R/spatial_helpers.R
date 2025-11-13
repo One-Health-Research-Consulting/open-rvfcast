@@ -15,38 +15,42 @@ make_area_clusters        <- function(
   , k
   , tol                       = 0.30
   , seed                      = 10001
-  , min_area_km2              = 5
+#  , min_area_km2              = 5
+  , overwrite                 = FALSE
     ) {
   
   ## Build or load single joined feature of all regions in the broadest target area
-  if (!file.exists(path_to_joined_regions)) {
+  if (file.exists(path_to_joined_regions) & !overwrite) {
+    ## Load if previously saved
+    regions_eq <- readRDS(path_to_joined_regions)
+  } else {
     ## Combine list of country regions
     regions      <- build_regions_sf(sf_list)
     ## Tidy up regions
-    regions_eq   <- prep_equal_area(regions, min_area_km2 = min_area_km2)
+    regions_eq   <- prep_equal_area(regions)
     ## Save for future use
     saveRDS(regions_eq, path_to_joined_regions)
-  } else {
-    ## Load if previously saved
-    regions_eq <- readRDS(path_to_joined_regions)
   }
   
   ## Build or load simplified feature set (collapsing/joining small nearby regions)
-  if (!file.exists(path_to_joined_regions)) {
+  if (file.exists(path_to_collapsed_regions) & !overwrite) {
+    ## Load or previously saved
+    regions_eq.r <- readRDS(path_to_collapsed_regions)
+  } else {
     ## Collapse within-country regions so that within-country regions are *vaguely* comparable
     regions_eq.r <- reduce_regions_by_country(regions_eq)
     ## Save for future use
     saveRDS(regions_eq.r, path_to_collapsed_regions)
-  } else {
-    ## Load or previously saved
-    regions_eq.r <- readRDS(path_to_collapsed_regions)
   }
   
   ## Add row for tidying up the region names that make up the broader region
   regions_eq.r <- regions_eq.r %>% mutate(regions = list(rep(character(1), nrow(.))))
   
   ## Build or load how these regions have been clustered for inner folds
-  if (!file.exists(path_to_clustered_regions)) {
+  if (file.exists(path_to_clustered_regions) & !overwrite) {
+    ## Load if already run and saved
+    clusts.t <- readRDS(path_to_clustered_regions)
+  } else {
     
     ## Do the clustering
     clusts.t <- make_k_contiguous_area_clusters(regions_eq.r, K = k, alpha = tol, seed = seed)
@@ -59,9 +63,7 @@ make_area_clusters        <- function(
     
     ## Save for future use
     saveRDS(clusts.t, path_to_clustered_regions)
-  } else {
-    ## Load if already run and saved
-    clusts.t <- readRDS(path_to_clustered_regions)
+    
   }
     
   ## Figure out the cluster of the ungrouped regions
@@ -136,8 +138,8 @@ build_regions_sf     <- function(sf_list) {
   
 }
 
-## Project to equal-area, compute areas (km^2), drop tiny slivers
-prep_equal_area      <- function(regions, min_area_km2 = 5) {
+## Project to equal-area, compute areas (km^2)
+prep_equal_area      <- function(regions) {
   
   ## Equal-area CRS (Cylindrical Equal Area)
   cea        <- "+proj=cea +lon_0=0 +lat_ts=0 +datum=WGS84 +units=m +no_defs"
@@ -148,8 +150,8 @@ prep_equal_area      <- function(regions, min_area_km2 = 5) {
   parts$area_km2 <- as.numeric(sf::st_area(parts)) / 1e6
   
   regions_filtered <- parts %>%
-    dplyr::filter(.data$area_km2 >= min_area_km2) %>%
-    dplyr::group_by(.data$country, .data$region) %>%
+   # dplyr::filter(area_km2 >= min_area_km2) %>%
+    dplyr::group_by(country, region) %>%
     dplyr::summarise(geometry = sf::st_union(.data$geometry), .groups = "drop") %>%
     vfix()
   
@@ -161,7 +163,7 @@ prep_equal_area      <- function(regions, min_area_km2 = 5) {
 
 ## Collapse within-country regions so that within-country regions are *vaguely* comparable
 ## in size across countries to speed up the spatial folding across all of Africa
-reduce_country_units <- function(sf_cty, target_unit_area_km2 = 15000, min_unit_area_km2 = 8000) {
+reduce_country_units <- function(sf_cty, target_unit_area_km2, min_unit_area_km2) {
   
   ## Nothing to do for small countries
   if (nrow(sf_cty) <= 1) return(sf_cty)
@@ -205,20 +207,24 @@ reduce_country_units <- function(sf_cty, target_unit_area_km2 = 15000, min_unit_
     
     ## Drop i
     sf_cty <- sf_cty[-i, ]
-    sf_cty <- vfix(sf_cty) # keep valid
+    sf_cty <- vfix(sf_cty)
     
   }
   
   ## Dissolve duplicates if any residual overlaps
-  sf_cty %>%
+  sf_cty.f <- sf_cty %>%
     group_by(country, region) %>%
     summarise(geometry = sf::st_union(geometry), .groups = "drop") %>%
     vfix()
   
+  print(sf_cty.f[1, ]$region)
+  
+  return(sf_cty.f)
+  
 }
 
 ## Apply the reduction per country
-reduce_regions_by_country <- function(regions_eq, target_unit_area_km2 = 15000, min_unit_area_km2 = 8000) {
+reduce_regions_by_country <- function(regions_eq, target_unit_area_km2, min_unit_area_km2) {
   regions_eq %>%
     group_split(country, .keep = TRUE) %>%
     map_dfr(~reduce_country_units(.x,
@@ -259,12 +265,12 @@ area_clusters_rgeoda      <- function(regions_eq, k, tol = 0.3, seed = 10001) {
 make_k_contiguous_area_clusters <- function(sf_in, K, alpha, seed, path_to_region_neighbors) {
   
   ## Some cleanup of shapes
-  eq         <- prep_equal_area(sf_in)
+  eq         <- prep_shapes(sf_in)
   
   ## See note above wrapper function and for this function
   eq$cluster <- partition_by_area(
-    eq =, K = K, alpha = alpha, seed = seed
-    , path_to_region_neighbors = "data/Africa_region_neighbors.Rds"
+    sf_eq = eq, K = K, alpha = alpha, seed = seed
+  , path_to_region_neighbors = "data/Africa_region_neighbors.Rds"
   )
   
   # return with original attributes + cluster_id in WGS84 for joins/plots
@@ -275,7 +281,7 @@ make_k_contiguous_area_clusters <- function(sf_in, K, alpha, seed, path_to_regio
 }
 
 ## Clean & prep grouped / collapsed region map
-prep_equal_area <- function(sf_regions, cea = "+proj=cea +lon_0=0 +lat_ts=0 +datum=WGS84 +units=m +no_defs") {
+prep_shapes <- function(sf_regions, cea = "+proj=cea +lon_0=0 +lat_ts=0 +datum=WGS84 +units=m +no_defs") {
   
   ## Turn of s2 to better deal with some overlapping edges and such, make this slightly less precise but fine
   sf_use_s2(FALSE)

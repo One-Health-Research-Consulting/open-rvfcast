@@ -16,11 +16,30 @@
 
 fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, out_dir, overwrite) {
   
-  ## Set filename
+  ## Set filenames
   save_filename <- paste(
     out_dir
     , "/"
     , "model_fit_"
+    , full_data$outer_fold_id
+    , ".Rds"
+    , sep = ""
+  )
+  
+  ## partial filenames as well for partial dependence plots so the entire workflow doesn't need to be loaded
+  save_filename2 <- paste(
+      out_dir
+    , "/"
+    , "parsnip_fit_"
+    , full_data$outer_fold_id
+    , ".Rds"
+    , sep = ""
+  )
+  
+  save_filename3 <- paste(
+    out_dir
+    , "/"
+    , "recipe_"
     , full_data$outer_fold_id
     , ".Rds"
     , sep = ""
@@ -113,6 +132,8 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, 
   )
   
   saveRDS(model_out, save_filename)
+  saveRDS(model_fit %>% extract_fit_parsnip(), save_filename2)
+  saveRDS(model_fit %>% extract_recipe(estimated = TRUE), save_filename3)
   
   return(save_filename)
   

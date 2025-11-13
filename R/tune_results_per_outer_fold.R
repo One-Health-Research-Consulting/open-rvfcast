@@ -332,11 +332,10 @@ tune_results_across_outer_folds <- function(outer_data, raw_data, threshold, hyp
       , event_level = "first"
     ) %>% mutate(
       outer_fold_id = outer_data$outer_fold_id
-      , inner_fold_id = inner_id
-      , interval      = forecast_interval[this_int]
-      , .before = 1 
+    , interval      = forecast_interval[this_int]
+    , .before = 1 
     ) %>% 
-      bind_cols(., tuning_grid)
+      left_join(., hyper_set)
     
   }) %>% do.call("rbind", .)
   
@@ -369,7 +368,7 @@ finalize_hyperparameters <- function(outer_folds, training_dat, metric, directio
   if (length(joined_files) > 1) {
     joined_files <- joined_files %>% do.call("rbind")
   } else {
-    joined_files <- joined_files[[1]][[1]]
+    joined_files <- joined_files[[1]]
   }
   
   ## Get waited metric

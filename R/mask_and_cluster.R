@@ -9,7 +9,6 @@
 #' @param districts_sf sf / dataframe object of sub-sub regions
 #' @param district_id_col name of the identifier column for the sub-sub region
 #' @param out_dir directory to save output
-#' @param overwrite boolean to recalculate and save over a previously saved file or not
 #' @return Single tibble of the ADM identifiers for all x, y coordinates
 #' @author Morgan Kain
 #' @export
@@ -19,7 +18,6 @@ mask_and_cluster_build_template <- function(
   , districts_sf
   , district_id_col = "shapeName"
   , out_dir
-  , overwrite = FALSE
 ) {
   
   ## Check that we're only working on one date at a time
