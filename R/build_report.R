@@ -22,7 +22,8 @@ build_report <- function(calcurves, fitswithin, fitsacross, viacross, outpath, o
 
   set_of_figs <- c(
     list(
-    calcurves$calplot[[1]]
+    calcurves$calplot.opt[[1]]
+  , calcurves$calplot.even[[1]]
   , fitsacross$conf_mat_time[[1]]
   , fitsacross$map_pred_time[[1]]
     )
