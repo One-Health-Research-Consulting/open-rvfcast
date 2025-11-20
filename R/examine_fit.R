@@ -12,10 +12,17 @@
 #' @author Morgan Kain
 #' @export
 
-examine_fits_within <- function(model_out, test_data, region_districts, africa_sf, p_thresh) {
+examine_fits_within <- function(model_out, test_data, region_districts, africa_sf, p_thresh, using_hexes) {
 
   ## Load the previously created / saved Africa map of sub-regions per Country
-  afmap <- readRDS(africa_sf)
+  if (!using_hexes) {
+    africa_sf <- readRDS(africa_sf) %>%
+      mutate(country_norm = norm_key(country),
+             region_norm  = norm_key(region))
+  } else {
+    africa_sf <- region_districts[[1]] %>% 
+      rename(region_norm = shapeName) %>% mutate(country_norm = "null")
+  }
   
   ## Combine predictions with the data
   dat_with_pred <- model_out$preds[[1]] %>% 
@@ -92,10 +99,6 @@ prob_dens_plot <- dat_with_pred %>%
     }
   
   ## Estimating spatial variability of divergence between truth and predictions
-  africa_sf <- afmap %>%
-    mutate(country_norm = norm_key(country),
-           region_norm  = norm_key(region))
-  
   preds_summarized <- prep_preds_for_map(dat_with_pred)
   
   map_sf <- africa_sf %>% 
@@ -231,12 +234,14 @@ Threshold") +
   ## Make plots with these summaries
   
   ## Load the previously created / saved Africa map of sub-regions per Country
-  afmap <- readRDS(africa_sf)
-  
-  ## Estimating spatial variability of divergence between truth and predictions
-  africa_sf <- afmap %>%
-    mutate(country_norm = norm_key(country),
-           region_norm  = norm_key(region))
+  if (!using_hexes) {
+    africa_sf <- readRDS(africa_sf) %>%
+      mutate(country_norm = norm_key(country),
+             region_norm  = norm_key(region))
+  } else {
+    africa_sf <- region_districts[[1]] %>% 
+      rename(region_norm = shapeName) %>% mutate(country_norm = "null")
+  }
 
   map_sf <- africa_sf %>% 
     left_join(., region.s.t.m, by = c("country_norm", "region_norm")) 

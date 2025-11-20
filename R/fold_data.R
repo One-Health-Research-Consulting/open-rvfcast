@@ -132,7 +132,8 @@ fold_data <- function(
   for (i in 1:nrow(outer_folds)) {
     
     tdat <- data %>% filter(index %in% (outer_folds[i, ] %>% pull(train_data) %>% unlist())) %>% 
-      left_join(., coords.sorted, by = c("shapeName", "Country")) %>% 
+      left_join(., coords.sorted %>% mutate(Country = "NULL")
+                , by = c("shapeName", "Country")) %>% 
       relocate(cluster, .after = index)
     
     outer_folds[i, ]$inner_folds <- tdat %>% dplyr::select(index, cluster) %>% list()

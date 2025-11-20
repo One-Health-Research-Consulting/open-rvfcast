@@ -2,59 +2,78 @@
 # To switch to the modeling pipeline run:
 # Sys.setenv(TAR_PROJECT = "model")
 
-## NOTES / ToDo ---------------------------------------------
+## NOTES / ToDo ----------------------------------------------------------------
 
-## 1) Figure out why without any location-specific covariates (e.g., country), the whole
- ## of RSA but not the surrounding area has high predictions
-## 2) Adjust model if needed, set up to run on server
-## 3) Add different metric for all 0s
-## 4) Add alternative hexagon based spatial clustering
+## 1) Adjust to not allow area interaction with ADM or not use area at all for hex
+## 2) Add different metric for all 0s
+## 3) Make code more dynamic for spatial clustering and district_id_col choice  
+## 4) Get going on the server
 
-# Re-record current dependencies for CAPSULE users
+## Setup / Preamble ------------------------------------------------------------
+
+## Re-record current dependencies for CAPSULE users
 if (Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true"))
   capsule::capshot(c("packages.R",
                      list.files(pattern = "_targets.*\\.(r|R)$", full.names = TRUE),
                      list.files("R", pattern = "\\.(R|r)$", full.names = TRUE)))
 
-# Load packages (in packages.R) and load project-specific functions in R folder
+## Load packages (in packages.R) and load project-specific functions in R folder
 suppressPackageStartupMessages(source("packages.R"))
 for (f in list.files(here::here("R"), full.names = TRUE)) source (f)
 
 aws_bucket <- Sys.getenv("AWS_BUCKET_ID")
 
-# Targets options
+## Targets options
 source("_targets_settings.R")
 
-# Convenience function to format .env flags properly for overwrite parameter and target cues
+## Convenience function to format .env flags properly for overwrite parameter and target cues
 parse_flag <- function(flags, cue = F) {
   flags <- any(as.logical(Sys.getenv(flags, unset = "FALSE")))
   if (cue) flags <- targets::tar_cue(ifelse(flags, "always", "thorough"))
   flags
 }
 
+## Some settings that change much about the pipeline ---------------------------
+
+## Whether to use H3 hex-based spatial aggregation (TRUE) or ADM2 regions (FALSE)
+ ## NOTE: Has to match what was used in the previous phase of the pipeline
+ ## (rvf_data_processing_targets.R) because the data output from that phase will have
+ ## region names that must be matched here. For example, if TRUE in the previous pipeline
+ ## which_countries -> region_districts will be an empty list (as there are no country
+ ## names in the hex ids)
+using_hexes     <- TRUE
+
+## Column name that refers to the subregions. Default if not manually adjusted in 
+ ## the previous pipeline (rvf_data_processing_targets.R) is "shapeName"
+ ## NOTE: code was originally built for using_hexes == FALSE (hex option added later)
+ ## so some code was added here and there to add using_hexes == FALSE language to the
+ ## object created with using_hexes == TRUE. So currently, not fully dynamic. The
+ ## short of it is shapeName is fine for now regardless of the above choice
+district_id_col <- "shapeName"
+
 ## Targets for loading needed data ---------------------------------------------
 model_data_targets <- tar_plan(
 
   ## Eventually will want to download the data from the S3 bucket, but for now load from local
    ## Sub Region (e.g., Country) and Sub-Sub Regions (e.g., adm2 -- i.e., district or county) of interest
-  tar_target(region_name, "pan")
+  tar_target(region_name, if(using_hexes){"pan_hex"}else{"pan"})
 , tar_target(region_data_path
              , paste("data/", region_name, "_joined_response_data/"
-               , region_name, "_joined_response_data_final2.parquet"
-               , sep = "")
+             , region_name, "_joined_response_data_final.parquet"
+             , sep = "")
   )
 
   ## Load and mask forecast data so that forecasts further out than the summarized
    ## outbreak data are NA
 , tar_target(region_data_raw, read_parquet(region_data_path) %>% 
-               ungroup() %>% mutate(index = seq(n()), .before = 1)
-  )
+               ungroup() %>% mutate(index = seq(n()), .before = 1))
 
   ## Reduce down to already scaled covariates and scale the other unbounded covariates so that
    ## covariates are roughly on the same scale
 , tar_target(region_data, clean_region_data(dat = region_data_raw))
 
-  ## Other paths to intermediate products to save computation time
+  ## Other paths to intermediate products to save computation time. 
+   ## Most used only for using_hexes == FALSE
  , tar_target(path_to_joined_regions   , paste("data/joined_", region_name, "_regions.Rds", sep = ""))
  , tar_target(path_to_collapsed_regions, paste("data/reduced_", region_name, "_regions.Rds", sep = ""))
  , tar_target(path_to_region_neighbors , paste("data/", region_name, "_region_neighbors.Rds", sep = ""))
@@ -68,6 +87,13 @@ model_data_targets <- tar_plan(
   ## Sub-regions of region[s] of interest
 , tar_target(region_districts, get_region_districts(which_countries))
 
+  ## Load the previously saved spatial hexes. 
+   ## Saved as part of the rvf_data_processing_targets.R pipeline phase
+, tar_target(region_hexes, readRDS("data/region_hexes.Rds"))
+
+  ## set up which map object to use given choice for using_hexes
+, tar_target(region_map, if(using_hexes){region_hexes}else{region_districts})
+
   ## Last date of the training data set (all data beyond this date will be set aside for final model evaluation)
 , tar_target(end_date, as.Date("2020-12-19"))
 
@@ -75,7 +101,7 @@ model_data_targets <- tar_plan(
    ## one forecast horizon for now
 , tar_target(forecast_horizon, c(30, 60, 90, 120, 150))
 , tar_target(max_lag_period, 90)
-
+  
 )
 
 ## Targets for preparing for model tuning --------------------------------------
@@ -96,17 +122,20 @@ cross_validation_targets <- tar_plan(
 
   ## Generate n_spatial_folds clusters of all Africa regions
    ## Note: all functions in spatial_helpers.R
+  ## Slightly unwieldy because most ignored if using_hexes, but functioning fine,
+   ## so leaving for now
 , tar_target(clustered_Africa_districts, make_area_clusters(
-     sf_list                   = region_districts
+     sf_list                   = region_map
+   , using_hexes               = using_hexes
    , path_to_joined_regions    = path_to_joined_regions
    , path_to_collapsed_regions = path_to_collapsed_regions
    , path_to_region_neighbors  = path_to_region_neighbors
    , path_to_clustered_regions = path_to_clustered_regions
    , k                         = n_spatial_folds
-   , tol                       = 0.20
-   , seed                      = 10001
-  #, min_area_km2              = 5
-   , overwrite                 = FALSE
+   , tol                       = 1E-9
+   , growth_option             = "balanced"
+   , seed                      = 10010
+   , overwrite                 = TRUE
   ))
 
   ## Quick aside to plot the folded map
@@ -136,7 +165,7 @@ cross_validation_targets <- tar_plan(
     ## Time gap between the end of the previous fold and the start of the next fold. For now setting to
      ## the max forecast time so that there isn't overlap
     , step_size         = max(forecast_horizon) + max_lag_period
-    , district_id_col   = "shapeName"
+    , district_id_col   = district_id_col
     , seed              = 10001
     ))
     
@@ -156,7 +185,7 @@ cross_validation_targets <- tar_plan(
   , assess_time_chunk = max(forecast_horizon)
   , step_size         = max(forecast_horizon) + max_lag_period
   , n_spatial_folds   = NULL
-  , district_id_col   = "shapeName"
+  , district_id_col   = district_id_col
   , seed              = 10001
   , holdout_start     = end_date
   ))
@@ -243,9 +272,9 @@ model_tuning_targets <- tar_plan(
   ## NOTE: temp check for debugging purposes
 , tar_target(inner_fold_id_finalized_DEBUG, {
     inner_fold_id_finalized %>% filter(
-      outer_fold_id %in% c(20) #c(15, 30)
-    , inner_fold_id %in% c(18) #c(8, 18)
-    , index         %in% c(15) #c(3, 15)
+      outer_fold_id %in% c(20)                   # c(15, 30)
+    , inner_fold_id %in% c(7, 10, 20)            # c(8, 18)
+    , index         %in% c(3, 8, 13, 18, 23, 28) # c(3, 15)
     )})
 , tar_target(folded_data_training_DEBUG, folded_data_training %>% filter(outer_fold_id %in% inner_fold_id_finalized_DEBUG$outer_fold_id))
 , tar_target(tuning_grid_DEBUG         , tuning_grid %>% filter(index %in% inner_fold_id_finalized_DEBUG$index))
@@ -260,7 +289,7 @@ model_tuning_targets <- tar_plan(
     , threshold   = positive_threshold
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
-    , overwrite   = FALSE
+    , overwrite   = TRUE
     )
   , pattern = map(inner_fold_id_finalized_DEBUG)
   , error   = "null"
@@ -283,7 +312,7 @@ model_tuning_targets <- tar_plan(
   , hyperparm_sets = tuned_results_joined
   , id_cols        = id_cols
   , out_dir        = outer_folds_dir2
-  , overwrite      = FALSE
+  , overwrite      = TRUE
   )
   , pattern = map(folded_data_training_DEBUG)
   , error   = "null"
@@ -312,7 +341,7 @@ model_fitting_targets <- tar_plan(
   , threshold       = positive_threshold
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
-  , overwrite       = FALSE
+  , overwrite       = TRUE
   )
   , pattern = map(folded_data_testing_DEBUG)
   , error   = "null"
@@ -383,9 +412,10 @@ model_evaluation_targets <- tar_plan(
 , tar_target(examined_fits_within, examine_fits_within(
     model_out        = model_out_for_eval
   , test_data        = splitted_data$test_data[[1]]
-  , region_districts = region_districts
+  , region_districts = region_map
   , africa_sf        = path_to_simplifed_regions
   , p_thresh         = positive_threshold
+  , using_hexes      = using_hexes
   )
   , pattern = map(model_out_for_eval)
   , error   = "null"
@@ -394,10 +424,11 @@ model_evaluation_targets <- tar_plan(
   ## Then take all of the within-test period summaries and compare model performance broadly
    ## across all of these fitting periods (e.g., specific periods of time, specific countries etc.)
 , tar_target(examined_fits_across, examine_fits_across(
-    ex_within = examined_fits_within
-  , model_out = model_out_for_eval
-  , test_data = splitted_data$test_data[[1]]
-  , africa_sf = path_to_simplifed_regions
+    ex_within   = examined_fits_within
+  , model_out   = model_out_for_eval
+  , test_data   = splitted_data$test_data[[1]]
+  , africa_sf   = path_to_simplifed_regions
+  , using_hexes = using_hexes
   ))
   
 )

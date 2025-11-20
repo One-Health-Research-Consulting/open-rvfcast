@@ -8,17 +8,28 @@
 ## Build contiguous clusters by total area
 make_area_clusters        <- function(
     sf_list
+  , using_hexes               = FALSE
   , path_to_joined_regions    = "data/joined_Africa_regions.Rds"
   , path_to_collapsed_regions = "data/reduced_Africa_regions.Rds"
   , path_to_region_neighbors  = "data/Africa_region_neighbors.Rds"
   , path_to_clustered_regions = "data/clustered_Africa_regions.Rds"
   , k
+  ## Weight placed on distance relative to area. Very finnicy. Need a *tiny* value to
+   ## put more weight on area added then distance. The more weight on area the more meandering
+   ## the regions. The more weight on distance the more blocky the regions
   , tol                       = 0.30
+  ## three options for choosing the next region to add
+  ## "balanced" (using both area of the new region -- focus on adding small regions over larger first 
+  ## and distance from the entire grown region to that point and the next region)
+  ## "distance" (using only distance)
+  ## "random" (add a random region next)
+  , growth_option             = "distance"
   , seed                      = 10001
-#  , min_area_km2              = 5
   , overwrite                 = FALSE
     ) {
   
+  if (!using_hexes) {
+    
   ## Build or load single joined feature of all regions in the broadest target area
   if (file.exists(path_to_joined_regions) & !overwrite) {
     ## Load if previously saved
@@ -46,6 +57,12 @@ make_area_clusters        <- function(
   ## Add row for tidying up the region names that make up the broader region
   regions_eq.r <- regions_eq.r %>% mutate(regions = list(rep(character(1), nrow(.))))
   
+  } else {
+    
+  regions_eq.r <- sf_list[[1]]
+    
+  }
+  
   ## Build or load how these regions have been clustered for inner folds
   if (file.exists(path_to_clustered_regions) & !overwrite) {
     ## Load if already run and saved
@@ -53,12 +70,20 @@ make_area_clusters        <- function(
   } else {
     
     ## Do the clustering
-    clusts.t <- make_k_contiguous_area_clusters(regions_eq.r, K = k, alpha = tol, seed = seed)
+    clusts.t <- make_k_contiguous_area_clusters(
+      regions_eq.r, K = k, alpha = tol, seed = seed
+    , path_to_region_neighbors = path_to_region_neighbors
+    , growth_option = growth_option
+    )
+    
+    if (!using_hexes) {
     
     ## Tidy region names
     for (z in 1:nrow(clusts.t)) {
       region_chunk           <- strsplit(clusts.t[z, ]$region, " [+] ") %>% unlist()
       clusts.t[z, ]$regions  <- region_chunk %>% list()
+    }
+      
     }
     
     ## Save for future use
@@ -67,6 +92,8 @@ make_area_clusters        <- function(
   }
     
   ## Figure out the cluster of the ungrouped regions
+  if (!using_hexes) {
+  
   regions_eq <- regions_eq %>% mutate(cluster = 0)
   
   for (i in 1:nrow(clusts.t)) {
@@ -76,6 +103,22 @@ make_area_clusters        <- function(
   }
   
   return(regions_eq)
+  
+  } else {
+    
+  return(
+    clusts.t %>% 
+      mutate(
+        regions = NA, country = NA
+        ## not actually area in km2, but not using this anyway for hexes
+         ## so just putting this in here so the rest of the downstream code
+         ## works the same as for ADM2
+      , area_km2 = log(area)
+      , .after = "shapeName"
+      ) %>% rename(region = shapeName)
+  )
+    
+  }
   
 }
 
@@ -262,15 +305,17 @@ area_clusters_rgeoda      <- function(regions_eq, k, tol = 0.3, seed = 10001) {
 
 ## Wrapper for custom function to build regions by selecting seeds across Africa and then growing the regions
  ## by accumulating nearby regions
-make_k_contiguous_area_clusters <- function(sf_in, K, alpha, seed, path_to_region_neighbors) {
+make_k_contiguous_area_clusters <- function(sf_in, K, alpha, seed, path_to_region_neighbors, growth_option) {
   
   ## Some cleanup of shapes
   eq         <- prep_shapes(sf_in)
   
   ## See note above wrapper function and for this function
   eq$cluster <- partition_by_area(
-    sf_eq = eq, K = K, alpha = alpha, seed = seed
-  , path_to_region_neighbors = "data/Africa_region_neighbors.Rds"
+    sf_eq = eq, K = K
+  , alpha = alpha, seed = seed
+  , growth_option = growth_option
+  , path_to_region_neighbors = path_to_region_neighbors
   )
   
   # return with original attributes + cluster_id in WGS84 for joins/plots
@@ -301,8 +346,8 @@ prep_shapes <- function(sf_regions, cea = "+proj=cea +lon_0=0 +lat_ts=0 +datum=W
   
 }
 
-## Grow areas adhering to contiguity + area balance + compactness
-partition_by_area <- function(sf_eq, K, alpha, seed, path_to_region_neighbors) {
+## Grow areas adhering to contiguity + area balance + compactness (but see growth_options)
+partition_by_area <- function(sf_eq, K, alpha, seed, growth_option, path_to_region_neighbors) {
   
   set.seed(seed)
   
@@ -313,6 +358,7 @@ partition_by_area <- function(sf_eq, K, alpha, seed, path_to_region_neighbors) {
   
   if(!file.exists(path_to_region_neighbors)) {
     nb_info <- build_neighbors_with_tolerance(sf_eq, tol_m = 500)
+    saveRDS(nb_info, path_to_region_neighbors)
   } else {
     nb_info <- readRDS(path_to_region_neighbors)
   }
@@ -373,8 +419,17 @@ partition_by_area <- function(sf_eq, K, alpha, seed, path_to_region_neighbors) {
       ## Balance term: |(Acl + a) - target|
       ## Compactness term: alpha * distance to cluster centroid
       dc    <- sqrt((Cx[cand] - Ccl_x[k])^2 + (Cy[cand] - Ccl_y[k])^2)
-      score <- abs((Acl[k] + A[cand]) - target) + alpha * dc
-      j     <- cand[which.min(score)]
+      score <- log(abs((Acl[k] + A[cand]) - target)) + alpha * dc
+      if (growth_option == "balanced") {
+        j     <- cand[which.min(score)]
+      } else if (growth_option == "distance") {
+        j     <- cand[which.min(dc)]
+      } else if (growth_option == "random") {
+        j     <- cand[sample(seq(length(score)), 1)]
+      } else {
+        stop("choose balanced, distance, or random")
+      }
+      
       
       ## assign j to cluster k
       cl[j]  <- k

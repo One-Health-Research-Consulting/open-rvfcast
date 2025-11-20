@@ -32,4 +32,5 @@ library(yardstick)
 library(tune)
 library(vip)
 library(pdp)
+library(h3jsr)
 

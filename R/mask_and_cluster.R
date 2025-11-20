@@ -30,7 +30,7 @@ mask_and_cluster_build_template <- function(
   
   ## Ensure districts are in projected CRS (ensure valid polygons)
   districts_sf <- lapply(districts_sf, FUN = function(x) {
-    sf::st_make_valid(x) |> st_collection_extract("POLYGON")
+    sf::st_make_valid(x) %>% st_collection_extract("POLYGON")
   }) 
   
   crs_target   <- lapply(districts_sf, FUN = function(x) sf::st_crs(x))
