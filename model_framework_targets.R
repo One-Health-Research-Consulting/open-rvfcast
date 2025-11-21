@@ -4,10 +4,11 @@
 
 ## NOTES / ToDo ----------------------------------------------------------------
 
-## 1) Adjust to not allow area interaction with ADM or not use area at all for hex
-## 2) Add different metric for all 0s
-## 3) Make code more dynamic for spatial clustering and district_id_col choice  
-## 4) Get going on the server
+## 0) Fix crew / mirai dispatcher issues with targets that require the data
+## 1) Add different metric for all 0s
+## 2) Confirm all code functioning. Check fits across a smallish range of folds
+ ## and tuning params
+## 3) Get going on the server
 
 ## Setup / Preamble ------------------------------------------------------------
 
@@ -272,9 +273,9 @@ model_tuning_targets <- tar_plan(
   ## NOTE: temp check for debugging purposes
 , tar_target(inner_fold_id_finalized_DEBUG, {
     inner_fold_id_finalized %>% filter(
-      outer_fold_id %in% c(20)                   # c(15, 30)
-    , inner_fold_id %in% c(7, 10, 20)            # c(8, 18)
-    , index         %in% c(3, 8, 13, 18, 23, 28) # c(3, 15)
+      outer_fold_id %in% c(20)        # c(15, 30)
+    , inner_fold_id %in% c(10)        # c(8, 18)
+    , index         %in% c(8, 18, 28) # c(3, 15)
     )})
 , tar_target(folded_data_training_DEBUG, folded_data_training %>% filter(outer_fold_id %in% inner_fold_id_finalized_DEBUG$outer_fold_id))
 , tar_target(tuning_grid_DEBUG         , tuning_grid %>% filter(index %in% inner_fold_id_finalized_DEBUG$index))
@@ -283,9 +284,9 @@ model_tuning_targets <- tar_plan(
   ## Fit across tuning_grid across all inner folds of all outer folds
   ## NOTE: temporary minimal for working on downstream pipeline
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
-      folded_data = folded_data_training_DEBUG
+      folded_data = folded_data_training_DEBUG %>% dplyr::select(outer_fold_id, inner_folds)
     , inner_ids   = inner_fold_id_finalized_DEBUG
-    , raw_data    = splitted_data
+    , raw_data    = splitted_data$train_data[[1]]
     , threshold   = positive_threshold
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
@@ -336,14 +337,14 @@ model_fitting_targets <- tar_plan(
    ## make up the testing phase
   tar_target(fitted_model, fit_model(
     final_hyper_set = finalized_hyperparameters
-  , full_data       = folded_data_testing_DEBUG
+  , full_data       = folded_data_testing
   , raw_data        = splitted_data
   , threshold       = positive_threshold
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
   , overwrite       = TRUE
   )
-  , pattern = map(folded_data_testing_DEBUG)
+  , pattern = map(folded_data_testing)
   , error   = "null"
   , format  = "file"
   )
@@ -351,7 +352,7 @@ model_fitting_targets <- tar_plan(
   ## Join fitted_model paths to folded_data_testing for parallel processing for model eval
 , tar_target(model_out_for_eval, build_model_out_for_eval(
     model_fits = fitted_model
-  , full_data  = folded_data_testing_DEBUG
+  , full_data  = folded_data_testing
   ))
   
 )

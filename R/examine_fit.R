@@ -99,21 +99,55 @@ prob_dens_plot <- dat_with_pred %>%
     }
   
   ## Estimating spatial variability of divergence between truth and predictions
-  preds_summarized <- prep_preds_for_map(dat_with_pred)
+
+  ## Split up by forecast interval
+  preds_summarized1 <- prep_preds_for_map(
+    preds_all     = dat_with_pred
+  , grouping_vals = "forecast_interval"
+  )
   
-  map_sf <- africa_sf %>% 
-    left_join(
-      .
-    , preds_summarized, by = c("country_norm", "region_norm")
-    )
+  map_sf1 <- africa_sf %>% left_join(., preds_summarized1, by = c("country_norm", "region_norm"))
   
-  pred_map <- map_sf %>% 
+  ## 'Summed' over the full forecast interval
+  preds_summarized2 <- prep_preds_for_map(
+    preds_all = dat_with_pred
+  , grouping_vals = NULL
+  )
+  
+  map_sf2 <- africa_sf %>% left_join(., preds_summarized2, by = c("country_norm", "region_norm"))
+  
+  pred_map1 <- map_sf1 %>% 
     mutate(true_out = as.factor(true_out)) %>% 
     filter(!is.na(prob_pred)) %>% {
       ggplot(.) +
         geom_sf(aes(fill = prob_pred), colour = "black", linewidth = 0.01, alpha = 0.2) +
         geom_sf(
-          data = map_sf %>% 
+          data = map_sf1 %>% 
+            mutate(true_out = as.factor(true_out)) %>% 
+            filter(!is.na(prob_pred)) %>%
+            filter(true_out == 1)
+          , aes(fill = prob_pred), colour = "black", linewidth = 0.4
+          , alpha = 1
+        ) +
+        scale_fill_viridis_c(name = "Pr(outbreak)", limits = c(0, 1), oob = scales::squish) +
+        coord_sf() +
+        theme_void() +
+        labs(title = "Predicted Outbreak Probability by Region") +
+        facet_wrap(~forecast_interval) +
+        ggtitle(paste(
+          "Prediction Period = "
+          , strsplit(model_out$assess_range, " ")[[1]] %>% paste(., collapse = " - ")
+        ))
+    }
+    
+    
+  pred_map2 <- map_sf2 %>% 
+    mutate(true_out = as.factor(true_out)) %>% 
+    filter(!is.na(prob_pred)) %>% {
+      ggplot(.) +
+        geom_sf(aes(fill = prob_pred), colour = "black", linewidth = 0.01, alpha = 0.2) +
+        geom_sf(
+          data = map_sf2 %>% 
             mutate(true_out = as.factor(true_out)) %>% 
             filter(!is.na(prob_pred)) %>%
             filter(true_out == 1)
@@ -138,8 +172,10 @@ prob_dens_plot <- dat_with_pred %>%
       , conf_mat       = conf_mat %>% list()
       , conf_mat_plot  = conf_mat_plot %>% list()
       , prob_dens_plot = prob_dens_plot %>% list()
-      , predictions    = preds_summarized %>% list()
-      , map            = pred_map %>% list()
+      , predictions_split     = preds_summarized1 %>% list()
+      , predictions_collpased = preds_summarized2 %>% list()
+      , map_split      = pred_map1 %>% list()
+      , map_collapsed  = pred_map2 %>% list()
     )
   )
     
@@ -321,13 +357,14 @@ prep_preds_for_map <- function(preds_all
                              , prob_col = ".pred_1"
                              , country_col = "Country"
                              , region_col = "shapeName"
+                             , grouping_vals
                              ) {
   preds_all %>%
     mutate(
       country_norm = norm_key(.data[[country_col]])
-      , region_norm  = norm_key(.data[[region_col]])
+    , region_norm  = norm_key(.data[[region_col]])
     ) %>%
-    group_by(country_norm, region_norm) %>%
+    group_by_at(all_of(c("country_norm", "region_norm", grouping_vals))) %>%
     summarize(
       prob_pred = 1 - prod(1 - get(prob_col))
     , true_out  = max(outbreak)

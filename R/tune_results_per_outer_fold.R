@@ -23,7 +23,7 @@ tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data, thresh
   
   ## Inner training data: exclude a cluster
   inner_tbl_train <- folded_data$inner_folds[[1]] %>% 
-    left_join(., raw_data$train_data[[1]], by = "index") %>%
+    left_join(., raw_data, by = "index") %>%
     dplyr::filter(cluster != inner_id) %>%
     relocate(cluster, .after = "date") %>%
     dplyr::select(-c(cluster, cases)) %>%
@@ -40,7 +40,7 @@ tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data, thresh
   
   ## Inner test data: extract one cluster
   inner_tbl_assess <- folded_data$inner_folds[[1]] %>% 
-    left_join(., raw_data$train_data[[1]], by = "index") %>%
+    left_join(., raw_data, by = "index") %>%
     dplyr::filter(cluster == inner_id) %>%
     relocate(cluster, .after = "date") %>%
     dplyr::select(-c(cluster, cases)) %>%
@@ -76,7 +76,10 @@ tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data, thresh
   rec <- make_recipe(inner_tbl_train, id_cols = id_cols)
   mod <- make_model(params = tuning_grid)
   wf  <- workflow() %>% add_model(mod) %>% add_recipe(rec) %>% add_case_weights(weights)
+  
+  print("At model fitting")
   fit <- fit(wf, data = inner_tbl_train)
+  print("Finished with model fitting")
   
   ## Predictions: prob only
   prob1     <- predict(fit, inner_tbl_assess, type = "prob")$.pred_1
@@ -115,6 +118,16 @@ tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data, thresh
   saveRDS(metrics, save_filename)
   
   return(save_filename)
+  
+}
+
+test_func <- function(folded_data, inner_ids, raw_data, threshold
+                      , id_cols, out_dir, overwrite) {
+  if (overwrite) {
+    return(inner_ids)
+  } else {
+    stop("already done")
+  }
   
 }
 
