@@ -61,8 +61,7 @@ model_data_targets <- tar_plan(
 , tar_target(region_data_path
              , paste("data/", region_name, "_joined_response_data/"
              , region_name, "_joined_response_data_final.parquet"
-             , sep = "")
-  )
+             , sep = ""))
 
   ## Load and mask forecast data so that forecasts further out than the summarized
    ## outbreak data are NA
@@ -75,11 +74,11 @@ model_data_targets <- tar_plan(
 
   ## Other paths to intermediate products to save computation time. 
    ## Most used only for using_hexes == FALSE
- , tar_target(path_to_joined_regions   , paste("data/joined_", region_name, "_regions.Rds", sep = ""))
- , tar_target(path_to_collapsed_regions, paste("data/reduced_", region_name, "_regions.Rds", sep = ""))
- , tar_target(path_to_region_neighbors , paste("data/", region_name, "_region_neighbors.Rds", sep = ""))
- , tar_target(path_to_clustered_regions, paste("data/clustered_", region_name, "_regions.Rds", sep = ""))
- , tar_target(path_to_simplifed_regions, paste("data/simplified_", region_name, "_sf.Rds", sep = ""))
+, tar_target(path_to_joined_regions   , paste("data/joined_"    , region_name, "_regions.Rds", sep = ""))
+, tar_target(path_to_collapsed_regions, paste("data/reduced_"   , region_name, "_regions.Rds", sep = ""))
+, tar_target(path_to_region_neighbors , paste("data/"           , region_name, "_region_neighbors.Rds", sep = ""))
+, tar_target(path_to_clustered_regions, paste("data/clustered_" , region_name, "_regions.Rds", sep = ""))
+, tar_target(path_to_simplifed_regions, paste("data/simplified_", region_name, "_sf.Rds", sep = ""))
 
   ## Pulls all African countries. Alternatively can just provide a single country
    ## directly to get_region_districts below
@@ -112,19 +111,18 @@ cross_validation_targets <- tar_plan(
    ## Going for name of target as a noun (even if it is a funny nonsense word like it is here)
    ## and the function as the related verb
   tar_target(splitted_data, split_data(
-    dat              = region_data
+     dat              = region_data
     ## Prevent overlap in training and test, so start test after the end of the forecast horizon 
      ## from the last training date
-  , end_date         = end_date
-  ))
+   , end_date         = end_date))
   
   ## Number of spatial folds (parameter used in multiple functions)
 , tar_target(n_spatial_folds, 30)
 
   ## Generate n_spatial_folds clusters of all Africa regions
    ## Note: all functions in spatial_helpers.R
-  ## Slightly unwieldy because most ignored if using_hexes, but functioning fine,
-   ## so leaving for now
+  ## Slightly unwieldy because many of these steps are not needed if using_hexes
+  ## but functioning fine, so leaving for now
 , tar_target(clustered_Africa_districts, make_area_clusters(
      sf_list                   = region_map
    , using_hexes               = using_hexes
@@ -136,8 +134,7 @@ cross_validation_targets <- tar_plan(
    , tol                       = 1E-9
    , growth_option             = "balanced"
    , seed                      = 10010
-   , overwrite                 = TRUE
-  ))
+   , overwrite                 = FALSE))
 
   ## Quick aside to plot the folded map
 , tar_target(plot_spatial_folds, clustered_Africa_districts %>% 
@@ -149,34 +146,30 @@ cross_validation_targets <- tar_plan(
                    coord_sf(datum = NA) +
                    scale_fill_viridis_d(name = "Cluster", option = "C") +
                    theme_void() +
-                   theme(legend.position = "none")
-               }
-               )
+                   theme(legend.position = "none")})
   
   ## Generate CV folds for training data
 , tar_target(folded_data_training_raw, fold_data(
-      data              = splitted_data
-      ## Two options, train_data or test_data. 
-       ## train_data sets up inner folds for hyperparameter tuning 
-       ## test_data just splits testing period into chunks for assessing forecasting accuracy
-    , type              = "train_data"
-    , sf_districts      = clustered_Africa_districts
-      ## Skip through time by the max forecast horizon + max time variables are lagged
-    , assess_time_chunk = max(forecast_horizon)
-    ## Time gap between the end of the previous fold and the start of the next fold. For now setting to
-     ## the max forecast time so that there isn't overlap
-    , step_size         = max(forecast_horizon) + max_lag_period
-    , district_id_col   = district_id_col
-    , seed              = 10001
-    ))
+     data              = splitted_data
+     ## Two options, train_data or test_data. 
+      ## train_data sets up inner folds for hyperparameter tuning 
+      ## test_data just splits testing period into chunks for assessing forecasting accuracy
+   , type              = "train_data"
+   , sf_districts      = clustered_Africa_districts
+     ## Skip through time by the max forecast horizon + max time variables are lagged
+   , assess_time_chunk = max(forecast_horizon)
+     ## Time gap between the end of the previous fold and the start of the next fold. For now setting to
+      ## the max forecast time so that there isn't overlap
+   , step_size         = max(forecast_horizon) + max_lag_period
+   , district_id_col   = district_id_col
+   , seed              = 10001))
     
   ## Collapse these based on some criteria of "information content" 
 , tar_target(folded_data_training, clean_folded_data(
      raw_data                 = splitted_data$train_data
    , folded_data              = folded_data_training_raw
    , epidemic_threshold_total = 10
-   , epidemic_threshold_space = 3
-  ))
+   , epidemic_threshold_space = 3))
 
  ## Generate test cases for assessing model performance
 , tar_target(folded_data_testing, fold_data(
@@ -188,8 +181,7 @@ cross_validation_targets <- tar_plan(
   , n_spatial_folds   = NULL
   , district_id_col   = district_id_col
   , seed              = 10001
-  , holdout_start     = end_date
-  ))
+  , holdout_start     = end_date))
 
 )
 
@@ -209,8 +201,7 @@ model_tuning_targets <- tar_plan(
   , loss_red_max   = 0.5
   , mtry_min       = 1
   , mtry_max       = 3
-  , size           = 20)
-  )
+  , size           = 20))
   
 , tar_target(tuning_grid,
     with(tune_pars
@@ -227,26 +218,22 @@ model_tuning_targets <- tar_plan(
       , finalize(mtry()      , folded_data_training$inner_folds[[10]] %>% 
                    left_join(., splitted_data$train_data[[1]], by = "index") %>% filter(cluster != 1))
       ## Total number of combinations of hyperparameters
-      , size = 30 
-      )
-    ) %>% mutate(index = seq(n()), .before = 1)
-  )
+      , size = 30 )) %>% mutate(index = seq(n()), .before = 1))
 
 , tar_target(id_cols, c("shapeName", "Country", "date", "index"))
 
   ## probability value over which a one is assigned
 , tar_target(positive_threshold, seq(0.05, 0.95, by = 0.05))
+  ## How much to weight 1s relative to 0s in predictions
+, tar_target(weightings_on_ones, c(1, 10, 100, 1000))
 
   ## Set up location for saving intermediate output
 , tar_target(outer_folds_dir, create_data_directory(
-    directory_path = paste("outputs/", region_name, "_model_tuning_inner", sep = "")
-  ))
+    directory_path = paste("outputs/", region_name, "_model_tuning_inner", sep = "")))
 , tar_target(outer_folds_dir2, create_data_directory(
-    directory_path = paste("outputs/", region_name, "_model_tuning_outer", sep = "")
-  ))
+    directory_path = paste("outputs/", region_name, "_model_tuning_outer", sep = "")))
 , tar_target(outer_folds_dir3, create_data_directory(
-    directory_path = paste("outputs/", region_name, "_final_model_fits", sep = "")
-  ))
+    directory_path = paste("outputs/", region_name, "_final_model_fits", sep = "")))
 
 ## Final prep step for parallel processing for tuning across all inner folds is to
  ## evaluate which of all of the inner folds across all outer folds actually have
@@ -257,7 +244,7 @@ model_tuning_targets <- tar_plan(
 ) %>% cross_join(., tuning_grid) %>% 
   group_by(outer_fold_id) %>% 
   filter(inner_fold_id %in% unique(inner_fold_id)) %>% 
-  ungroup()
+  ungroup() 
 )
 
 ## AND which of the outer_fold_ids for ALL of the train_data have at least a single
@@ -267,15 +254,14 @@ model_tuning_targets <- tar_plan(
 , tar_target(inner_fold_id_finalized, prep_outer_ids(
     folded_data = folded_data_training
   , raw_data    = splitted_data
-  , inner_ids   = inner_fold_id
-))
+  , inner_ids   = inner_fold_id))
 
   ## NOTE: temp check for debugging purposes
 , tar_target(inner_fold_id_finalized_DEBUG, {
     inner_fold_id_finalized %>% filter(
-      outer_fold_id %in% c(20)        # c(15, 30)
-    , inner_fold_id %in% c(10)        # c(8, 18)
-    , index         %in% c(8, 18, 28) # c(3, 15)
+      outer_fold_id %in% c(7, 14, 21)         # c(15, 30)
+    , inner_fold_id %in% c(5, 14, 21)         # c(8, 18)
+    , index         %in% c(5, 10, 15, 20, 25) # c(3, 15)
     )})
 , tar_target(folded_data_training_DEBUG, folded_data_training %>% filter(outer_fold_id %in% inner_fold_id_finalized_DEBUG$outer_fold_id))
 , tar_target(tuning_grid_DEBUG         , tuning_grid %>% filter(index %in% inner_fold_id_finalized_DEBUG$index))
@@ -288,10 +274,11 @@ model_tuning_targets <- tar_plan(
     , inner_ids   = inner_fold_id_finalized_DEBUG
     , raw_data    = splitted_data$train_data[[1]]
     , threshold   = positive_threshold
+    , weightings  = weightings_on_ones
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
-    , overwrite   = TRUE
-    )
+    , overwrite   = FALSE
+    , DEBUG       = TRUE)
   , pattern = map(inner_fold_id_finalized_DEBUG)
   , error   = "null"
   , format  = "file"
@@ -301,7 +288,19 @@ model_tuning_targets <- tar_plan(
 , tar_target(tuned_results_joined, join_tuned_inner_folds(
     inner_folds  = tuned_results_per_outer_fold
   , training_dat = splitted_data$train_data[[1]]
-  , metric       = "pr_auc"
+    ## Choices of how to pick the optimal parameter set include 
+     ## 'mix' for a balance of pr_auc and logloss or 'binomial' 
+  , metric       = "mix" 
+    ## Choices of weighting for 1s vs 0s for either 'mix' or 'binomial'
+     ## If for 'mix' can provide anything, if for 'binomial' must be a value
+     ## given in the 'weightings' vector given in tune_results_per_outer_fold
+    ## In the case of 'mix' the smaller the number (e.g., < 1) causes the hyperparameters
+     ## to be more tuned to pr_auc and thus folds with true 1s. The larger the number
+     ## the more weight given to logloss (and thus penalizing high probabilities
+     ## when there are true 0s). In the case of 'binomial' the larger the number the
+     ## more weight given to predicting true 1s with high probability
+  , weightval    = 0.1
+    ## Currently both options are to maximize
   , direction    = "max"
   ))
 
@@ -311,10 +310,11 @@ model_tuning_targets <- tar_plan(
   , raw_data       = splitted_data
   , threshold      = positive_threshold
   , hyperparm_sets = tuned_results_joined
+  , weightings     = weightings_on_ones
   , id_cols        = id_cols
   , out_dir        = outer_folds_dir2
   , overwrite      = TRUE
-  )
+  , DEBUG          = TRUE)
   , pattern = map(folded_data_training_DEBUG)
   , error   = "null"
   , format  = "file"
@@ -324,9 +324,10 @@ model_tuning_targets <- tar_plan(
 , tar_target(finalized_hyperparameters, finalize_hyperparameters(
     outer_folds  = tuned_results_across_outer_folds
   , training_dat = splitted_data$train_data[[1]]
-  , metric       = "pr_auc"
-  , direction    = "max"
-  ))
+    ## See notes in tuned_results_joined
+  , metric       = "mix"
+  , weightval    = 1
+  , direction    = "max"))
 
 )
 
@@ -337,13 +338,14 @@ model_fitting_targets <- tar_plan(
    ## make up the testing phase
   tar_target(fitted_model, fit_model(
     final_hyper_set = finalized_hyperparameters
-  , full_data       = folded_data_testing
+  , full_data       = folded_data_testing[1, ]
   , raw_data        = splitted_data
   , threshold       = positive_threshold
+  , weightings      = weightings_on_ones
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
   , overwrite       = TRUE
-  )
+  , DEBUG           = TRUE)
   , pattern = map(folded_data_testing)
   , error   = "null"
   , format  = "file"

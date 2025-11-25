@@ -7,15 +7,17 @@
 #' @param inner_ids All needed fits created with prep_fold_ids
 #' @param raw_data complete set of raw data
 #' @param threshold For assigning a 1 | estimated prob
+#' @param weightings weight assigned to 1s in binomial loss metric 
 #' @param id_cols Columns that define a unique data point
 #' @param out_dir Where to save output
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
+#' @param DEBUG If TRUE reduce to a small dataset for code testing
 #' @return Tibble of folds
 #' @author Morgan Kain
 #' @export
 
 tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data, threshold
-                                      , id_cols, out_dir, overwrite) {
+                                      , weightings, id_cols, out_dir, overwrite, DEBUG) {
 
   folded_data <- folded_data %>% filter(outer_fold_id == inner_ids$outer_fold_id)
   inner_id    <- inner_ids$inner_fold_id
@@ -45,7 +47,16 @@ tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data, thresh
     relocate(cluster, .after = "date") %>%
     dplyr::select(-c(cluster, cases)) %>%
     mutate(outbreak = as.factor(outbreak)) %>% 
-    mutate(forecast_interval = as.factor(forecast_interval))
+    mutate(forecast_interval = as.factor(forecast_interval)) %>% 
+    ## Get class imbalance ratio per forecast horizon
+    mutate(
+      weights = length(which(outbreak == "0")) / length(which(outbreak == "1"))
+    , weights = ifelse(outbreak == "0", 1, weights)
+    , weights = hardhat::importance_weights(weights)
+    , .after = "index"
+    )
+  
+  if (DEBUG) { inner_tbl_train  <- inner_tbl_train[1:10000, ] }
   
   ## Attempt to clear some ram
   rm(raw_data); gc()
@@ -100,16 +111,20 @@ tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data, thresh
     class_hat.t <- class_hat[which(all_intervals == forecast_interval[this_int]), ]
     
     metrics.t <- compute_metrics_vec(
-      truth.t
-      , threshold = threshold
-      , prob1.t
-      , class_hat.t
-      , event_level = "first"
-    ) %>% mutate(
+      truth     = truth.t
+    , threshold = threshold
+    , weightings = weightings
+    , caseweights = inner_tbl_assess %>% 
+      filter(forecast_interval == forecast_interval[this_int]) %>% 
+       pull(weights)
+    , prob1 = prob1.t
+    , class_hat = class_hat.t
+    , event_level = "first"
+  ) %>% mutate(
       outer_fold_id = folded_data$outer_fold_id
-      , inner_fold_id = inner_id
-      , interval      = forecast_interval[this_int]
-      , .before = 1 
+    , inner_fold_id = inner_id
+    , interval      = forecast_interval[this_int]
+    , .before = 1 
     ) %>% 
       bind_cols(., tuning_grid)
     
@@ -120,17 +135,6 @@ tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data, thresh
   return(save_filename)
   
 }
-
-test_func <- function(folded_data, inner_ids, raw_data, threshold
-                      , id_cols, out_dir, overwrite) {
-  if (overwrite) {
-    return(inner_ids)
-  } else {
-    stop("already done")
-  }
-  
-}
-
 
 #' Finalize inner folds for all outer folds
 #'
@@ -158,20 +162,22 @@ prep_fold_ids  <- function(folded_data, raw_data) {
         dplyr::filter(cluster == clust) %>%
         relocate(cluster, .after = "date") %>%
         dplyr::select(-c(cluster, forecast_interval, cases)) %>% 
-        summarize(tot_out = sum(outbreak))
+        summarize(
+          nrow = n()
+        , tot_out = sum(outbreak))
       
       tibble(
         inner_fold_id = clust
-        , assess_inner  = assess_inner$tot_out
+      , nrow          = assess_inner$nrow
+      , assess_inner  = assess_inner$tot_out
       )
       
     }) %>% 
-      dplyr::bind_rows() %>% 
-      filter(assess_inner > 0)
+      dplyr::bind_rows() %>% filter(nrow > 0)
     
     inner_tbl_set %>% mutate(outer_fold_id = folded_data[outid, ]$outer_fold_id, .before = 1)
     
-  }) %>% do.call("rbind", .) %>% dplyr::select(-assess_inner)
+  }) %>% do.call("rbind", .) 
   
   all_inner_outer
   
@@ -192,8 +198,8 @@ prep_outer_ids <- function(folded_data, raw_data, inner_ids) {
 
   }) %>% do.call("rbind", .)
   
-  inner_ids %>% left_join(., all_outer) %>% filter(has_outbreak == 1) %>% dplyr::select(-has_outbreak)
-  
+ # inner_ids %>% left_join(., all_outer) %>% filter(has_outbreak == 1) %>% dplyr::select(-has_outbreak)
+  inner_ids %>% left_join(., all_outer)
 }
 
 
@@ -205,48 +211,74 @@ prep_outer_ids <- function(folded_data, raw_data, inner_ids) {
 #' @param inner_folds list of file paths for all tuned hyperparameter sets across all inner folds of all outer folds
 #' @param training_dat The training data
 #' @param metric which metric is being optimized
+#' @param weightval how to scale the weighting on the metric on 1s
 #' @param direction min or max
 #' @return Tibble of best parameter sets
 #' @author Morgan Kain
 #' @export
 
-join_tuned_inner_folds <- function(inner_folds, training_dat, metric, direction) {
+join_tuned_inner_folds <- function(inner_folds, training_dat, metric, weightval, direction) {
   
   metric_summary <- apply(inner_folds %>% matrix(), 1, FUN = function(x) {
     readRDS(x)
   }) %>% do.call("rbind", .) 
   
-  ## Get waited metric
-  metric_summary.s <- metric_summary %>% 
-  left_join(
-    .
-  , training_dat %>% 
-    group_by(forecast_interval) %>% 
-    summarize(n_out = sum(outbreak)) %>%
-    rename(interval = forecast_interval) %>%
-    mutate(interval = as.factor(interval))
-  ) %>% 
-  group_by(outer_fold_id, index) %>% 
-  summarize(mean_metric = sum(get(metric) * n_out, na.rm = TRUE) / sum(n_out, na.rm = TRUE)) %>% 
-  ungroup()
+  if (metric == "mix") {
+    metric_summary.s <- metric_summary %>%
+      mutate(
+        weight = if_else(n_pos > 0, n_pos, n_all)
+      , contrib = case_when(
+          n_pos > 0 ~ pr_auc * n_pos
+        , n_pos == 0 ~ -weightval * exlogloss * n_all
+        )) %>%
+      group_by(outer_fold_id, index) %>%
+      summarise(
+        final_score = sum(contrib, na.rm = TRUE) / sum(weight, na.rm = TRUE)
+      , .groups     = "drop"
+      )
+  } else if (metric == "logloss") {
+    metric_summary.s <- metric_summary %>% 
+      dplyr::select(outer_fold_id, logloss_weighted, index) %>% 
+      unnest(cols = c(logloss_weighted)) %>%
+      filter(weighting == weightval) %>%
+      group_by(outer_fold_id, index) %>%
+      summarise(
+        final_score = max(precision)
+      , .groups     = "drop"
+      )
+  } else {
+    stop("Choose mix or logloss for metric")
+  }
   
   if (direction == "min") {
-    metric_summary.s %>% 
+    if (metric %in% c("mix", "logloss")) {
+      stop("Using either of these metrics and min does not make sense, use max")
+    }
+    metric_summary.s2 <- metric_summary.s %>% 
       group_by(outer_fold_id) %>% 
-      arrange(mean_metric) %>% 
+      arrange(final_score) %>% 
       dplyr::slice(1) %>%
-      ungroup() %>% 
-      left_join(., metric_summary %>% dplyr::select(-interval, -contains("fold_id"), -contains("auc"), -recall, -precision) %>% distinct())
+      ungroup()
   } else if (direction == "max") {
-    metric_summary.s %>% 
+    metric_summary.s2 <- metric_summary.s %>% 
       group_by(outer_fold_id) %>% 
-      arrange(desc(mean_metric)) %>% 
+      arrange(desc(final_score)) %>% 
       dplyr::slice(1) %>%
-      ungroup() %>% 
-      left_join(., metric_summary %>% dplyr::select(-interval, -contains("fold_id"), -contains("auc"), -recall, -precision) %>% distinct())
+      ungroup() 
   } else {
     stop("choose min or max for direction")
   }
+  
+  metric_summary.s2 %>% 
+    left_join(
+      .
+    , metric_summary %>% dplyr::select(
+       -interval, -contains("fold_id"), -contains("auc")
+     , -recall, -precision, -contains("log"), -n_pos, -n_all
+     ) %>% distinct()
+    ) %>% mutate(
+      metric = metric, weightval = weightval, .before = "index"
+    )
   
 }
 
@@ -259,15 +291,18 @@ join_tuned_inner_folds <- function(inner_folds, training_dat, metric, direction)
 #' @param outer_data an outer fold
 #' @param raw_data complete set of raw data
 #' @param threshold For assigning a 1 | estimated prob
+#' @param weightings weight assigned to 1s in binomial loss metric 
 #' @param hyperparm_sets maximized hyperparameter sets across all inner folds of all outer folds
 #' @param id_cols Columns that define a unique data point
 #' @param out_dir Where to save output
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
+#' @param DEBUG If TRUE reduce to a small dataset for code testing
 #' @return Tibble of folds
 #' @author Morgan Kain
 #' @export
 
-tune_results_across_outer_folds <- function(outer_data, raw_data, threshold, hyperparm_sets, id_cols, out_dir, overwrite) {
+tune_results_across_outer_folds <- function(outer_data, raw_data, threshold, weightings
+                                          , hyperparm_sets, id_cols, out_dir, overwrite, DEBUG) {
   
   ## The best hyperparameter set for this outer fold across all inner folds for this outer fold
   hyper_set <- hyperparm_sets %>% dplyr::filter(outer_fold_id == outer_data$outer_fold_id)
@@ -308,7 +343,15 @@ tune_results_across_outer_folds <- function(outer_data, raw_data, threshold, hyp
     dplyr::filter(index %in% outer_data$assess_data[[1]]) %>% 
     dplyr::select(-c(cases)) %>%
     mutate(outbreak = factor(outbreak, levels = c(1, 0))) %>% 
-    mutate(forecast_interval = as.factor(forecast_interval))
+    mutate(forecast_interval = as.factor(forecast_interval)) %>% 
+    mutate(
+      weights = length(which(outbreak == "0")) / length(which(outbreak == "1"))
+    , weights = ifelse(outbreak == "0", 1, weights)
+    , weights = hardhat::importance_weights(weights)
+    , .after = "index"
+    )
+  
+  if (DEBUG) { outer_tbl_train  <- outer_tbl_train[1:10000, ] }
   
   ## Clear up some ram
   rm(raw_data); gc()
@@ -338,10 +381,14 @@ tune_results_across_outer_folds <- function(outer_data, raw_data, threshold, hyp
     class_hat.t <- class_hat[which(all_intervals == forecast_interval[this_int]), ]
     
     metrics.t <- compute_metrics_vec(
-      truth.t
+        truth     = truth.t
       , threshold = threshold
-      , prob1.t
-      , class_hat.t
+      , weightings = weightings
+      , caseweights = outer_tbl_assess %>% 
+          filter(forecast_interval == forecast_interval[this_int]) %>% 
+          pull(weights)
+      , prob1 = prob1.t
+      , class_hat = class_hat.t
       , event_level = "first"
     ) %>% mutate(
       outer_fold_id = outer_data$outer_fold_id
@@ -367,56 +414,79 @@ tune_results_across_outer_folds <- function(outer_data, raw_data, threshold, hyp
 #' @param outer_folds Tibble of output across all outer folds 
 #' @param training_dat The training data
 #' @param metric Metric used for selection
+#' @param weightval how to scale the weighting on the metric on 1s
 #' @param direction min or max
 #' @return Set of best hyperparameters
 #' @author Morgan Kain
 #' @export
 
-finalize_hyperparameters <- function(outer_folds, training_dat, metric, direction) { 
+finalize_hyperparameters <- function(outer_folds, training_dat, metric, weightval, direction) { 
   
-  joined_files <- apply(outer_folds %>% matrix(), 1, FUN = function(x) {
-    readRDS(x)
-  }) 
+  joined_files <- apply(outer_folds %>% matrix(), 1, FUN = function(x) { readRDS(x) }) 
   
   if (length(joined_files) > 1) {
-    joined_files <- joined_files %>% do.call("rbind")
+    joined_files <- joined_files %>% do.call("rbind", .)
   } else {
     joined_files <- joined_files[[1]]
   }
   
-  ## Get waited metric
-  metric_summary.s <- joined_files %>% 
-    left_join(
-      .
-      , training_dat %>% 
-        group_by(forecast_interval) %>% 
-        summarize(n_out = sum(outbreak)) %>%
-        rename(interval = forecast_interval) %>%
-        mutate(interval = as.factor(interval))
-    ) %>% 
-    group_by(index) %>% 
-    summarize(metric_final = sum(get(metric) * n_out) / sum(n_out)) %>% 
-    ungroup()
+    ## Removing the score that was used to choose the hyperparameter set from the inner folding step
+    joined_files <- joined_files %>% dplyr::select(-final_score)
   
-  if (direction == "max") {
-    metric_summary.s %>% arrange(desc(metric_final)) %>% dplyr::slice(1) %>%
-      left_join(
-        .
-      , joined_files %>% dplyr::select(
-          -mean_metric, -interval, -contains("fold_id"), -contains("auc"), -recall, -precision
-        ) %>% distinct()
+  ## Get waited metric
+  if (metric == "mix") {
+    metric_summary.s <- joined_files %>%
+      mutate(
+        weight = ifelse(n_pos > 0, n_pos, n_all)
+      , contrib = case_when(
+        n_pos > 0 ~ pr_auc * n_pos
+      , n_pos == 0 ~ -weightval * exlogloss * n_all
+        )) %>%
+      group_by(index) %>%
+      summarise(
+        final_score = sum(contrib, na.rm = TRUE) / sum(weight, na.rm = TRUE)
+      , .groups     = "drop"
       )
-  } else if (direction == "min") {
-    metric_summary.s %>% arrange(metric_final) %>% dplyr::slice(1) %>%
-      left_join(
-        .
-        , joined_files %>% dplyr::select(
-           -mean_metric, -interval, -contains("fold_id"), -contains("auc"), -recall, -precision
-          ) %>% distinct()
+  } else if (metric == "logloss") {
+    metric_summary.s <- joined_files %>% 
+      dplyr::select(outer_fold_id, logloss_weighted, index) %>% 
+      unnest(cols = c(logloss_weighted)) %>%
+      filter(weighting == weightval) %>%
+      group_by(index) %>%
+      summarise(
+        final_score = max(precision)
+      , .groups     = "drop"
       )
   } else {
-    stop("choose minimize or maximize for direction")
+    stop("Choose mix or logloss for metric")
   }
+  
+  if (direction == "min") {
+    if (metric %in% c("mix", "logloss")) {
+      stop("Using either of these metrics and min does not make sense, use max")
+    }
+    metric_summary.s2 <- metric_summary.s %>% 
+      arrange(final_score) %>% 
+      dplyr::slice(1) %>%
+      ungroup()
+  } else if (direction == "max") {
+    metric_summary.s2 <- metric_summary.s %>% 
+      arrange(desc(final_score)) %>% 
+      dplyr::slice(1)
+  } else {
+    stop("choose min or max for direction")
+  }
+  
+  metric_summary.s2 %>% 
+    left_join(
+      .
+      , joined_files %>% dplyr::select(
+        -interval, -contains("fold_id"), -contains("auc")
+        , -recall, -precision, -contains("log"), -n_pos, -n_all
+      ) %>% distinct()
+    ) %>% mutate(
+      metric = metric, weightval = weightval, .before = "index"
+    )
 
 }
 

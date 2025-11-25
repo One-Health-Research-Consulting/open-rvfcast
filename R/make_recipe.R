@@ -50,29 +50,40 @@ make_model <- function(params) {
 ##### Some helpers ----------------------------------------------------------------
 
 ## Memory-efficient metrics calculation
-compute_metrics_vec <- function(truth, threshold, prob1, class_hat, event_level = "first") {
+compute_metrics_vec <- function(truth, threshold, weightings, caseweights, prob1, class_hat, event_level = "first") {
 
-  if (dplyr::n_distinct(truth) < 2) {
-    return(tibble(
-      pr_auc = NA_real_, roc_auc = NA_real_,
-      recall = NA_real_, precision = NA_real_
-    ))
-  }
+  n_pos <- length(which(truth == "1"))
+  n_all <- length(truth)
+  p     <- n_pos / n_all
+  q     <- 1 - p
+  logloss_baseline <- if(p == 0){0}else{-(p*log(p) + q*log(q))}
   
-  tibble(
-    pr_auc    = pr_auc_vec(truth, prob1, event_level = event_level)
-  , roc_auc   = roc_auc_vec(truth, prob1, event_level = event_level)
-  , recall    = 
-      tibble(
-         threshold = threshold
-       , recall    = apply(class_hat, 2, FUN = function(x) recall_vec(truth, x %>% factor(levels = c("1", "0")), event_level = event_level))
-      ) %>% list()
-  , precision = 
-      tibble(
+  ttib <- tibble(
+      n_pos     = n_pos
+    , n_all     = n_all
+    , pr_auc    = pr_auc_vec(truth, prob1, event_level = event_level)
+    , roc_auc   = roc_auc_vec(truth, prob1, event_level = event_level)
+    , recall    = tibble(
+        threshold = threshold
+      , recall    = apply(class_hat, 2, FUN = function(x) recall_vec(truth, x %>% factor(levels = c("1", "0")), event_level = event_level))
+    ) %>% list()
+    , precision = tibble(
         threshold = threshold
       , precision = apply(class_hat, 2, FUN = function(x) precision_vec(truth, x %>% factor(levels = c("1", "0")), event_level = event_level))
+    ) %>% list()
+    , logloss          = yardstick::mn_log_loss_vec(truth, prob1)
+    , logloss_weighted = tibble(
+        weighting = weightings
+      , precision = apply(weightings %>% matrix(), 1, FUN = function(x) {
+        tweights <- as.numeric(caseweights)
+        tweights <- ifelse(tweights > 1, x, 1)
+        yardstick::mn_log_loss_vec(truth, prob1, case_weights = tweights)})
       ) %>% list()
+  ) %>% mutate(
+    exlogloss   = max(0, logloss - logloss_baseline)
   )
+ 
+  ttib
   
 }
 

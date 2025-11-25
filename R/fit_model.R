@@ -7,14 +7,16 @@
 #' @param full_data Full training set and test data
 #' @param raw_data complete set of raw data
 #' @param threshold For assigning a 1 | estimated prob
+#' @param weightings weight assigned to 1s in binomial loss metric 
 #' @param id_cols Columns that define a unique data point
 #' @param out_dir Where to save output
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
+#' @param DEBUG If TRUE reduce to a small dataset for code testing
 #' @return Tibble of model fit output
 #' @author Morgan Kain
 #' @export
 
-fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, out_dir, overwrite) {
+fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weightings, id_cols, out_dir, overwrite, DEBUG) {
   
   ## Set filenames
   save_filename <- paste(
@@ -23,8 +25,7 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, 
     , "model_fit_"
     , full_data$outer_fold_id
     , ".Rds"
-    , sep = ""
-  )
+    , sep = "")
   
   ## partial filenames as well for partial dependence plots so the entire workflow doesn't need to be loaded
   save_filename2 <- paste(
@@ -33,8 +34,7 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, 
     , "parsnip_fit_"
     , full_data$outer_fold_id
     , ".Rds"
-    , sep = ""
-  )
+    , sep = "")
   
   save_filename3 <- paste(
     out_dir
@@ -42,8 +42,7 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, 
     , "recipe_"
     , full_data$outer_fold_id
     , ".Rds"
-    , sep = ""
-  )
+    , sep = "")
 
   ## Loading these Rds are very slow, so just checking that they exist
   if (file.exists(save_filename) & !overwrite) {
@@ -78,7 +77,15 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, 
     dplyr::filter(index %in% full_data$assess_data[[1]]) %>% 
     dplyr::select(-c(cases)) %>%
     mutate(outbreak = factor(outbreak, levels = c(1, 0))) %>% 
-    mutate(forecast_interval = as.factor(forecast_interval))
+    mutate(forecast_interval = as.factor(forecast_interval)) %>% 
+    mutate(
+      weights = length(which(outbreak == "0")) / length(which(outbreak == "1"))
+      , weights = ifelse(outbreak == "0", 1, weights)
+      , weights = hardhat::importance_weights(weights)
+      , .after = "index"
+    )
+  
+  if (DEBUG) { outer_tbl_train  <- outer_tbl_train[1:10000, ] }
   
   ## Attempt to clear up some ram
   rm(raw_data); gc()
@@ -102,7 +109,7 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, 
   prob1     <- predict(model_fit, outer_tbl_assess, type = "prob")$.pred_1
   truth     <- factor(outer_tbl_assess[["outbreak"]], levels = c("1","0"))
   class_hat <- apply(
-    threshold %>% matrix()
+      threshold %>% matrix()
     , 1
     , FUN = function(x) factor(ifelse(prob1 >= x, "1", "0"), levels = c("1","0"))
   )
@@ -111,15 +118,17 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, id_cols, 
   
   ## Compute metrics 
   metrics <- compute_metrics_vec(
-    truth
-  , threshold = threshold
-  , prob1
-  , class_hat
-  , event_level = "first"
+      truth       = truth
+    , threshold   = threshold
+    , weightings  = weightings
+    , caseweights = outer_tbl_assess %>% pull(weights)
+    , prob1       = prob1
+    , class_hat   = class_hat
+    , event_level = "first"
   ) %>% 
   mutate(
     outer_fold = full_data$outer_fold_id
-  , .before = 1 
+  , .before    = 1 
   ) %>% 
   bind_cols(., final_hyper_set)
 
