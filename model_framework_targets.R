@@ -259,12 +259,18 @@ model_tuning_targets <- tar_plan(
   ## NOTE: temp check for debugging purposes
 , tar_target(inner_fold_id_finalized_DEBUG, {
     inner_fold_id_finalized %>% filter(
-      outer_fold_id %in% c(7, 14, 21)         # c(15, 30)
-    , inner_fold_id %in% c(5, 14, 21)         # c(8, 18)
-    , index         %in% c(5, 10, 15, 20, 25) # c(3, 15)
-    )})
+  outer_fold_id == 16 & inner_fold_id == 24 |
+  outer_fold_id == 16 & inner_fold_id == 10 |   
+  outer_fold_id == 16 & inner_fold_id == 1  |
+  outer_fold_id == 18 & inner_fold_id == 7  |
+  outer_fold_id == 18 & inner_fold_id == 22 |
+  outer_fold_id == 18 & inner_fold_id == 5  |
+  outer_fold_id == 17 & inner_fold_id == 26 |
+  outer_fold_id == 17 & inner_fold_id == 21 |
+  outer_fold_id == 17 & inner_fold_id == 20 
+    ) %>% filter(index %in% c(5, 10, 15, 20, 25)) %>% 
+    dplyr::select(-assess_inner, -has_outbreak, -nrow)})
 , tar_target(folded_data_training_DEBUG, folded_data_training %>% filter(outer_fold_id %in% inner_fold_id_finalized_DEBUG$outer_fold_id))
-, tar_target(tuning_grid_DEBUG         , tuning_grid %>% filter(index %in% inner_fold_id_finalized_DEBUG$index))
 , tar_target(folded_data_testing_DEBUG , folded_data_testing %>% filter(outer_fold_id %in% c(1, 2, 3)))
 
   ## Fit across tuning_grid across all inner folds of all outer folds
@@ -277,7 +283,7 @@ model_tuning_targets <- tar_plan(
     , weightings  = weightings_on_ones
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
-    , overwrite   = FALSE
+    , overwrite   = TRUE
     , DEBUG       = TRUE)
   , pattern = map(inner_fold_id_finalized_DEBUG)
   , error   = "null"
@@ -299,7 +305,7 @@ model_tuning_targets <- tar_plan(
      ## the more weight given to logloss (and thus penalizing high probabilities
      ## when there are true 0s). In the case of 'binomial' the larger the number the
      ## more weight given to predicting true 1s with high probability
-  , weightval    = 0.1
+  , weightval    = 0.25
     ## Currently both options are to maximize
   , direction    = "max"
   ))
@@ -326,7 +332,7 @@ model_tuning_targets <- tar_plan(
   , training_dat = splitted_data$train_data[[1]]
     ## See notes in tuned_results_joined
   , metric       = "mix"
-  , weightval    = 1
+  , weightval    = 0.25
   , direction    = "max"))
 
 )
@@ -338,7 +344,7 @@ model_fitting_targets <- tar_plan(
    ## make up the testing phase
   tar_target(fitted_model, fit_model(
     final_hyper_set = finalized_hyperparameters
-  , full_data       = folded_data_testing[1, ]
+  , full_data       = folded_data_testing
   , raw_data        = splitted_data
   , threshold       = positive_threshold
   , weightings      = weightings_on_ones
