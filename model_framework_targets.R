@@ -218,7 +218,7 @@ model_tuning_targets <- tar_plan(
       , finalize(mtry()      , folded_data_training$inner_folds[[10]] %>% 
                    left_join(., splitted_data$train_data[[1]], by = "index") %>% filter(cluster != 1))
       ## Total number of combinations of hyperparameters
-      , size = 30 )) %>% mutate(index = seq(n()), .before = 1))
+      , size = 30)) %>% mutate(index = seq(n()), .before = 1))
 
 , tar_target(id_cols, c("shapeName", "Country", "date", "index"))
 
@@ -244,8 +244,7 @@ model_tuning_targets <- tar_plan(
 ) %>% cross_join(., tuning_grid) %>% 
   group_by(outer_fold_id) %>% 
   filter(inner_fold_id %in% unique(inner_fold_id)) %>% 
-  ungroup() 
-)
+  ungroup())
 
 ## AND which of the outer_fold_ids for ALL of the train_data have at least a single
 ## 1 in the assess_data. There is no point in wasting computation on inner folds if
@@ -283,12 +282,11 @@ model_tuning_targets <- tar_plan(
     , weightings  = weightings_on_ones
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
-    , overwrite   = TRUE
-    , DEBUG       = TRUE)
+    , overwrite   = FALSE
+    , DEBUG       = FALSE)
   , pattern = map(inner_fold_id_finalized_DEBUG)
   , error   = "null"
-  , format  = "file"
- )
+  , format  = "file")
 
   ## Join together all tuned inner folds and select the best per outer fold
 , tar_target(tuned_results_joined, join_tuned_inner_folds(
@@ -307,8 +305,7 @@ model_tuning_targets <- tar_plan(
      ## more weight given to predicting true 1s with high probability
   , weightval    = 0.25
     ## Currently both options are to maximize
-  , direction    = "max"
-  ))
+  , direction    = "max"))
 
   ## Fit each outer fold with the best inner fold hyperparameter for each of these outer folds
 , tar_target(tuned_results_across_outer_folds, tune_results_across_outer_folds(
@@ -319,12 +316,11 @@ model_tuning_targets <- tar_plan(
   , weightings     = weightings_on_ones
   , id_cols        = id_cols
   , out_dir        = outer_folds_dir2
-  , overwrite      = TRUE
-  , DEBUG          = TRUE)
+  , overwrite      = FALSE
+  , DEBUG          = FALSE)
   , pattern = map(folded_data_training_DEBUG)
   , error   = "null"
-  , format  = "file"
- )
+  , format  = "file")
 
   ## Extract the best parameter set
 , tar_target(finalized_hyperparameters, finalize_hyperparameters(
@@ -350,18 +346,16 @@ model_fitting_targets <- tar_plan(
   , weightings      = weightings_on_ones
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
-  , overwrite       = TRUE
-  , DEBUG           = TRUE)
+  , overwrite       = FALSE
+  , DEBUG           = FALSE)
   , pattern = map(folded_data_testing)
   , error   = "null"
-  , format  = "file"
-  )
+  , format  = "file")
   
   ## Join fitted_model paths to folded_data_testing for parallel processing for model eval
 , tar_target(model_out_for_eval, build_model_out_for_eval(
     model_fits = fitted_model
-  , full_data  = folded_data_testing
-  ))
+  , full_data  = folded_data_testing))
   
 )
   
@@ -380,40 +374,33 @@ model_evaluation_targets <- tar_plan(
   , test_data  = splitted_data$test_data[[1]]
   , predname   = ".pred_1"
   , truename   = "outbreak"
-  , splitgrp   = cal_curve_splitgrp
-  ))
+  , splitgrp   = cal_curve_splitgrp))
   
 , tar_target(plotted_calibration, plot_calibration(
     caltib      = calibration_curves
   , xg          = NULL # "assess_range"
   , yg          = "forecast_interval"
-  , forcastvals = c(30, 90, 150)
-  ))
+  , forcastvals = c(30, 90, 150)))
 
 ## Struggling with RAM useage because targets is deciding to load a huge amount
  ## of stuff it doesn't actually need to run my previous larger function, so
   ## splitting this up
 , tar_target(variable_importance_prep_a, prep_for_variable_importance_a(
     model_dat     = model_out_for_eval
-  , splitted_data = splitted_data
- ) 
- , pattern = map(model_out_for_eval)
- )
+  , splitted_data = splitted_data) 
+  , pattern = map(model_out_for_eval))
 
 ## Actually do the variable importance calculation, now loading far fewer targets
 , tar_target(variable_importance, calculate_variable_importance(
-    model_dat     = variable_importance_prep_a
-  , fitdir        = outer_folds_dir3
-  , recdir        = outer_folds_dir3
-  , num_vars      = 10
-  ) 
-  , pattern = map(variable_importance_prep_a)
-  )
+    model_dat       = variable_importance_prep_a
+  , final_hyper_set = finalized_hyperparameters
+  , fitdir          = outer_folds_dir3
+  , recdir          = outer_folds_dir3
+  , num_vars        = 10)
+  , pattern = map(variable_importance_prep_a))
 
 ## And a quick comparison of the shapes of the partial dependence plots among fits
-, tar_target(variable_importance_among, compare_vi(
-    variable_importance = variable_importance
-  ))
+, tar_target(variable_importance_among, compare_vi(variable_importance = variable_importance))
   
   ## Evaluate fit in a few other ways apart from calibration curves:
    ## comparing prob to truth across space and time, distributions of probabilities for true ones, confusion matrix 
@@ -424,21 +411,19 @@ model_evaluation_targets <- tar_plan(
   , region_districts = region_map
   , africa_sf        = path_to_simplifed_regions
   , p_thresh         = positive_threshold
-  , using_hexes      = using_hexes
-  )
+  , using_hexes      = using_hexes)
   , pattern = map(model_out_for_eval)
-  , error   = "null"
-  )
+  , error   = "null")
 
   ## Then take all of the within-test period summaries and compare model performance broadly
    ## across all of these fitting periods (e.g., specific periods of time, specific countries etc.)
 , tar_target(examined_fits_across, examine_fits_across(
-    ex_within   = examined_fits_within
-  , model_out   = model_out_for_eval
-  , test_data   = splitted_data$test_data[[1]]
-  , africa_sf   = path_to_simplifed_regions
-  , using_hexes = using_hexes
-  ))
+    ex_within        = examined_fits_within
+  , model_out        = model_out_for_eval
+  , test_data        = splitted_data$test_data[[1]]
+  , region_districts = region_map
+  , africa_sf        = path_to_simplifed_regions
+  , using_hexes      = using_hexes))
   
 )
 
@@ -452,10 +437,8 @@ report_targets <- tar_plan(
   , fitsacross = examined_fits_across
   , viacross   = variable_importance_among
   , outpath    = "outputs/report.pdf"
-  , overwrite  = TRUE
-  )
-  , format  = "file"
-  )
+  , overwrite  = TRUE)
+  , format  = "file")
   
 )
 

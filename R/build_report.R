@@ -31,15 +31,15 @@ build_report <- function(calcurves, fitswithin, fitsacross, viacross, outpath, o
   , viacross$pdp_gg
   , fitswithin$prob_dens_plot
   , fitswithin$conf_mat_plot
-  , fitswithin$map
+  , fitswithin$map_split
+  , fitswithin$map_collapsed
   )
   
   print(length(set_of_figs))
   
   out_file <- outpath
   dir.create(dirname(out_file), showWarnings = FALSE)
-  
-  pdf(out_file, width = 7, height = 5)
+  cairo_pdf(out_file, width = 7, height = 5)
   for (p in seq_along(set_of_figs)) {
     if (length(class(set_of_figs[[p]])) > 2) {
       grid::grid.newpage()

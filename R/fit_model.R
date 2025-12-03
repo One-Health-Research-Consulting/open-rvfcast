@@ -24,6 +24,8 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weighting
     , "/"
     , "model_fit_"
     , full_data$outer_fold_id
+    , "_"
+    , final_hyper_set$index
     , ".Rds"
     , sep = "")
   
@@ -33,6 +35,8 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weighting
     , "/"
     , "parsnip_fit_"
     , full_data$outer_fold_id
+    , "_"
+    , final_hyper_set$index
     , ".Rds"
     , sep = "")
   
@@ -41,6 +45,8 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weighting
     , "/"
     , "recipe_"
     , full_data$outer_fold_id
+    , "_"
+    , final_hyper_set$index
     , ".Rds"
     , sep = "")
 

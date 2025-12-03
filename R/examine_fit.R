@@ -120,7 +120,7 @@ prob_dens_plot <- dat_with_pred %>%
     mutate(true_out = as.factor(true_out)) %>% 
     filter(!is.na(prob_pred)) %>% {
       ggplot(.) +
-        geom_sf(aes(fill = prob_pred), colour = "black", linewidth = 0.01, alpha = 0.2) +
+        geom_sf(aes(fill = prob_pred), colour = NA, linewidth = 0, alpha = 0.2) +
         geom_sf(
           data = map_sf1 %>% 
             mutate(true_out = as.factor(true_out)) %>% 
@@ -145,7 +145,7 @@ prob_dens_plot <- dat_with_pred %>%
     mutate(true_out = as.factor(true_out)) %>% 
     filter(!is.na(prob_pred)) %>% {
       ggplot(.) +
-        geom_sf(aes(fill = prob_pred), colour = "black", linewidth = 0.01, alpha = 0.2) +
+        geom_sf(aes(fill = prob_pred), colour = NA, linewidth = 0, alpha = 0.2) +
         geom_sf(
           data = map_sf2 %>% 
             mutate(true_out = as.factor(true_out)) %>% 
@@ -180,8 +180,18 @@ prob_dens_plot <- dat_with_pred %>%
   )
     
 }
-
-examine_fits_across <- function(ex_within, model_out, test_data, africa_sf) {
+examine_fits_across <- function(ex_within, model_out, test_data, region_districts, africa_sf, using_hexes) {
+  
+  ## Load the previously created / saved Africa map of sub-regions per Country
+   ## for use later
+  if (!using_hexes) {
+    africa_sf <- readRDS(africa_sf) %>%
+      mutate(country_norm = norm_key(country),
+             region_norm  = norm_key(region))
+  } else {
+    africa_sf <- region_districts[[1]] %>% 
+      rename(region_norm = shapeName) %>% mutate(country_norm = "null")
+  }
   
   ## Looking at correct and incorrect assignments across time
   conf_mats.s <- ex_within %>% 
@@ -236,7 +246,8 @@ Threshold") +
   
   ## Looking at predictions across regions
   region.s <- ex_within %>% 
-    pull(predictions) %>% do.call("rbind", .) %>%
+    pull(predictions_split) %>% 
+    do.call("rbind", .) %>%
     group_by(country_norm, region_norm, true_out) %>%
     summarize(
       lwr   = quantile(prob_pred, 0.025) 
@@ -256,31 +267,20 @@ Threshold") +
   ) %>% left_join(.,  region.s.t )
   
   country.s <- ex_within %>% 
-    pull(predictions) %>% 
+    pull(predictions_split) %>% 
     do.call("rbind", .) %>%
     group_by(country_norm, true_out) %>%
     summarize(
       lwr   = quantile(prob_pred, 0.025) 
-      , lwr_n = quantile(prob_pred, 0.200) 
-      , mid   = quantile(prob_pred, 0.500) 
-      , upr_n = quantile(prob_pred, 0.800) 
-      , upr   = quantile(prob_pred, 0.975) 
+    , lwr_n = quantile(prob_pred, 0.200) 
+    , mid   = quantile(prob_pred, 0.500) 
+    , upr_n = quantile(prob_pred, 0.800) 
+    , upr   = quantile(prob_pred, 0.975) 
     )
   
   ## Make plots with these summaries
   
-  ## Load the previously created / saved Africa map of sub-regions per Country
-  if (!using_hexes) {
-    africa_sf <- readRDS(africa_sf) %>%
-      mutate(country_norm = norm_key(country),
-             region_norm  = norm_key(region))
-  } else {
-    africa_sf <- region_districts[[1]] %>% 
-      rename(region_norm = shapeName) %>% mutate(country_norm = "null")
-  }
-
-  map_sf <- africa_sf %>% 
-    left_join(., region.s.t.m, by = c("country_norm", "region_norm")) 
+  map_sf <- africa_sf %>% left_join(., region.s.t.m, by = c("country_norm", "region_norm")) 
   
   pred_map <- map_sf %>% 
     filter(!is.na(true_out)) %>%

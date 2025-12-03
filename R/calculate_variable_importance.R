@@ -4,6 +4,7 @@
 #' @title calculate_variable_importance
 
 #' @param model_dat path to saved model fit
+#' @param final_hyper_set The choice of hyperparameters for final model fitting
 #' @param fitdir path to saved extracted parsnip fit
 #' @param recdir path to saved recipe
 #' @param num_vars number of variables for partial dependence plots
@@ -13,11 +14,15 @@
 #' @author Morgan Kain
 #' @export
 
-calculate_variable_importance   <- function(model_dat, fitdir, recdir, num_vars) {
+calculate_variable_importance   <- function(model_dat, final_hyper_set, fitdir, recdir, num_vars) {
   
   ## generate path to the fit for this model
-  fit_path    <- paste(fitdir, "/parsnip_fit_", model_dat$outer_fold_id, ".Rds", sep = "")
-  rec_path    <- paste(fitdir, "/recipe_", model_dat$outer_fold_id, ".Rds", sep = "")
+  fit_path    <- paste(fitdir, "/parsnip_fit_", model_dat$outer_fold_id
+                       , "_", final_hyper_set$index
+                       , ".Rds", sep = "")
+  rec_path    <- paste(fitdir, "/recipe_", model_dat$outer_fold_id
+                       , "_", final_hyper_set$index
+                       , ".Rds", sep = "")
   
   ## Load fit from RDS
   parsnip_fit  <- readRDS(fit_path)
