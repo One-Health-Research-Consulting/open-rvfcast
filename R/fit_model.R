@@ -119,8 +119,6 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weighting
     , 1
     , FUN = function(x) factor(ifelse(prob1 >= x, "1", "0"), levels = c("1","0"))
   )
-  all_intervals     <- outer_tbl_assess$forecast_interval
-  forecast_interval <- all_intervals %>% unique()
   
   ## Compute metrics 
   metrics <- compute_metrics_vec(
@@ -146,7 +144,9 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weighting
   , metrics     = metrics %>% list()
   )
   
-  saveRDS(model_out, save_filename)
+  ## Too large of a file and dont ever actually use the full fitted model, so skip this 
+  #saveRDS(model_out, save_filename)
+  
   saveRDS(model_fit %>% extract_fit_parsnip(), save_filename2)
   saveRDS(model_fit %>% extract_recipe(estimated = TRUE), save_filename3)
   

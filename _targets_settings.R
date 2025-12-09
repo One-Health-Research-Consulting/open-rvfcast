@@ -9,6 +9,8 @@ tar_option_set(
   # See https://books.ropensci.org/targets/performance.html#memory
   memory = "transient",  # Discard targets after loading to clear memory
   garbage_collection = TRUE # Clean up memory before building next target
+, storage = "worker"
+, retrieval = "worker"
 )
 
 # Set up a process controller if multiple cores are requested

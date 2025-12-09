@@ -101,32 +101,29 @@ tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data, thresh
   , FUN = function(x) factor(ifelse(prob1 >= x, "1", "0"), levels = c("1","0"))
   )
   all_intervals     <- inner_tbl_assess$forecast_interval
-  forecast_interval <- all_intervals %>% unique()
+  forecast_interval <- all_intervals %>% unique() %>% as.character() %>% as.numeric() %>% sort()
   
   ## Compute metrics 
-  metrics <- purrr:::map(seq_along(forecast_interval), .f = function(this_int) {
+  metrics <- purrr:::map(forecast_interval, .f = function(this_int) {
     
-    truth.t     <- truth[which(all_intervals == forecast_interval[this_int])]
-    prob1.t     <- prob1[which(all_intervals == forecast_interval[this_int])]
-    class_hat.t <- class_hat[which(all_intervals == forecast_interval[this_int]), ]
+    truth.t     <- truth[which(all_intervals == this_int)]
+    prob1.t     <- prob1[which(all_intervals == this_int)]
+    class_hat.t <- class_hat[which(all_intervals == this_int), ]
     
     metrics.t <- compute_metrics_vec(
-      truth     = truth.t
-    , threshold = threshold
-    , weightings = weightings
-    , caseweights = inner_tbl_assess %>% 
-      filter(forecast_interval == forecast_interval[this_int]) %>% 
-       pull(weights)
-    , prob1 = prob1.t
-    , class_hat = class_hat.t
+      truth       = truth.t
+    , threshold   = threshold
+    , weightings  = weightings
+    , caseweights = inner_tbl_assess %>% filter(forecast_interval == this_int) %>% pull(weights)
+    , prob1       = prob1.t
+    , class_hat   = class_hat.t
     , event_level = "first"
   ) %>% mutate(
       outer_fold_id = folded_data$outer_fold_id
     , inner_fold_id = inner_id
-    , interval      = forecast_interval[this_int]
-    , .before = 1 
-    ) %>% 
-      bind_cols(., tuning_grid)
+    , interval      = this_int
+    , .before       = 1 
+    ) %>% bind_cols(., tuning_grid)
     
   }) %>% do.call("rbind", .)
 
@@ -371,29 +368,27 @@ tune_results_across_outer_folds <- function(outer_data, raw_data, threshold, wei
   , FUN = function(x) factor(ifelse(prob1 >= x, "1", "0"), levels = c("1","0"))
   )
   all_intervals     <- outer_tbl_assess$forecast_interval
-  forecast_interval <- all_intervals %>% unique()
+  forecast_interval <- all_intervals %>% unique() %>% as.character() %>% as.numeric() %>% sort()
   
   ## Compute metrics 
-  metrics <- purrr:::map(seq_along(forecast_interval), .f = function(this_int) {
+  metrics <- purrr:::map(forecast_interval, .f = function(this_int) {
     
-    truth.t     <- truth[which(all_intervals == forecast_interval[this_int])]
-    prob1.t     <- prob1[which(all_intervals == forecast_interval[this_int])]
-    class_hat.t <- class_hat[which(all_intervals == forecast_interval[this_int]), ]
+    truth.t     <- truth[which(all_intervals     == this_int)]
+    prob1.t     <- prob1[which(all_intervals     == this_int)]
+    class_hat.t <- class_hat[which(all_intervals == this_int), ]
     
     metrics.t <- compute_metrics_vec(
-        truth     = truth.t
-      , threshold = threshold
-      , weightings = weightings
-      , caseweights = outer_tbl_assess %>% 
-          filter(forecast_interval == forecast_interval[this_int]) %>% 
-          pull(weights)
-      , prob1 = prob1.t
-      , class_hat = class_hat.t
+        truth       = truth.t
+      , threshold   = threshold
+      , weightings  = weightings
+      , caseweights = outer_tbl_assess %>% filter(forecast_interval == this_int) %>% pull(weights)
+      , prob1       = prob1.t
+      , class_hat   = class_hat.t
       , event_level = "first"
     ) %>% mutate(
       outer_fold_id = outer_data$outer_fold_id
-    , interval      = forecast_interval[this_int]
-    , .before = 1 
+    , interval      = this_int
+    , .before       = 1 
     ) %>% 
       left_join(., hyper_set)
     

@@ -4,11 +4,9 @@
 
 ## NOTES / ToDo ----------------------------------------------------------------
 
-## 0) Fix crew / mirai dispatcher issues with targets that require the data
-## 1) Add different metric for all 0s
-## 2) Confirm all code functioning. Check fits across a smallish range of folds
- ## and tuning params
-## 3) Get going on the server
+## 1) Implement some computation speedup choices
+## 2) Finalize covariate selection and model definition
+## 3) Get up and running on the server
 
 ## Setup / Preamble ------------------------------------------------------------
 
@@ -111,13 +109,24 @@ cross_validation_targets <- tar_plan(
    ## Going for name of target as a noun (even if it is a funny nonsense word like it is here)
    ## and the function as the related verb
   tar_target(splitted_data, split_data(
-     dat              = region_data
+     dat      = region_data
     ## Prevent overlap in training and test, so start test after the end of the forecast horizon 
      ## from the last training date
-   , end_date         = end_date))
+   , end_date = end_date
+     ## If we want to reduce the dataset for model fitting speed. Uncertain about this
+      ## Details in function (could potentially be pulled out for greater transparency)
+   , reduce   = TRUE
+   ))
+  
+  ## And split data for fitting (no reduction)
+, tar_target(splitted_data_fitting, split_data(
+    dat      = region_data
+  , end_date = end_date
+  , reduce   = FALSE
+  ))
   
   ## Number of spatial folds (parameter used in multiple functions)
-, tar_target(n_spatial_folds, 30)
+, tar_target(n_spatial_folds, 20)
 
   ## Generate n_spatial_folds clusters of all Africa regions
    ## Note: all functions in spatial_helpers.R
@@ -134,7 +143,7 @@ cross_validation_targets <- tar_plan(
    , tol                       = 1E-9
    , growth_option             = "balanced"
    , seed                      = 10010
-   , overwrite                 = FALSE))
+   , overwrite                 = TRUE))
 
   ## Quick aside to plot the folded map
 , tar_target(plot_spatial_folds, clustered_Africa_districts %>% 
@@ -201,7 +210,7 @@ model_tuning_targets <- tar_plan(
   , loss_red_max   = 0.5
   , mtry_min       = 1
   , mtry_max       = 3
-  , size           = 20))
+  , size           = 30))
   
 , tar_target(tuning_grid,
     with(tune_pars
@@ -282,7 +291,7 @@ model_tuning_targets <- tar_plan(
     , weightings  = weightings_on_ones
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
-    , overwrite   = FALSE
+    , overwrite   = TRUE
     , DEBUG       = FALSE)
   , pattern = map(inner_fold_id_finalized_DEBUG)
   , error   = "null"
@@ -316,7 +325,7 @@ model_tuning_targets <- tar_plan(
   , weightings     = weightings_on_ones
   , id_cols        = id_cols
   , out_dir        = outer_folds_dir2
-  , overwrite      = FALSE
+  , overwrite      = TRUE
   , DEBUG          = FALSE)
   , pattern = map(folded_data_training_DEBUG)
   , error   = "null"
@@ -341,12 +350,12 @@ model_fitting_targets <- tar_plan(
   tar_target(fitted_model, fit_model(
     final_hyper_set = finalized_hyperparameters
   , full_data       = folded_data_testing
-  , raw_data        = splitted_data
+  , raw_data        = splitted_data_fitting
   , threshold       = positive_threshold
   , weightings      = weightings_on_ones
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
-  , overwrite       = FALSE
+  , overwrite       = TRUE
   , DEBUG           = FALSE)
   , pattern = map(folded_data_testing)
   , error   = "null"
@@ -406,7 +415,7 @@ model_evaluation_targets <- tar_plan(
    ## comparing prob to truth across space and time, distributions of probabilities for true ones, confusion matrix 
    ## as a function of different probability cutoffs, etc.
 , tar_target(examined_fits_within, examine_fits_within(
-    model_out        = model_out_for_eval
+    model_out        = model_out_for_eval[1, ]
   , test_data        = splitted_data$test_data[[1]]
   , region_districts = region_map
   , africa_sf        = path_to_simplifed_regions
