@@ -17,7 +17,7 @@
 #' @export
 
 fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weightings, id_cols, out_dir, overwrite, DEBUG) {
-  
+
   ## Set filenames
   save_filename <- paste(
     out_dir
@@ -51,9 +51,9 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weighting
     , sep = "")
 
   ## Loading these Rds are very slow, so just checking that they exist
-  if (file.exists(save_filename) & !overwrite) {
+  if (file.exists(save_filename2) & !overwrite) {
     message("file already exists and can be loaded, skipping processing")
-    return(save_filename)
+    return(save_filename2)
   }
   
   ## Extract the needed data
@@ -138,15 +138,14 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weighting
 
   ## Return
   model_out <- tibble(
-    fit         = model_fit %>% list()
-  , preds       = preds %>% list()
-  , hyperparams = final_hyper_set %>% list()
-  , metrics     = metrics %>% list()
+    outer_fold_id = full_data$outer_fold_id
+  , path          = save_filename
+  , preds         = preds %>% list()
+  , hyperparams   = final_hyper_set %>% list()
+  , metrics       = metrics %>% list()
   )
   
-  ## Too large of a file and dont ever actually use the full fitted model, so skip this 
-  #saveRDS(model_out, save_filename)
-  
+  saveRDS(model_out, save_filename)
   saveRDS(model_fit %>% extract_fit_parsnip(), save_filename2)
   saveRDS(model_fit %>% extract_recipe(estimated = TRUE), save_filename3)
   
@@ -156,16 +155,7 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weighting
   
 build_model_out_for_eval <- function(model_fits, full_data) {
   safe_join_names <- purrr::map(seq_along(model_fits), .f = function(i) {
-   model.out <- readRDS(model_fits[i])
-   tibble(
-     path          = model_fits[i]
-   , preds         = model.out$preds
-   , metrics       = model.out$metrics
-   , outer_fold_id = strsplit(model_fits[i], "model_fit_")[[1]][2] %>% 
-       strsplit(., ".Rds") %>% unlist() %>% as.numeric()
-   )
+    readRDS(model_fits[i])
   }) %>% do.call("rbind", .) 
   full_data %>% left_join(., safe_join_names)
 }
-
-

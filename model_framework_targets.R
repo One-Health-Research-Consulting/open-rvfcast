@@ -210,7 +210,7 @@ model_tuning_targets <- tar_plan(
   , loss_red_max   = 0.5
   , mtry_min       = 1
   , mtry_max       = 3
-  , size           = 30))
+  , size           = 50))
   
 , tar_target(tuning_grid,
     with(tune_pars
@@ -227,7 +227,7 @@ model_tuning_targets <- tar_plan(
       , finalize(mtry()      , folded_data_training$inner_folds[[10]] %>% 
                    left_join(., splitted_data$train_data[[1]], by = "index") %>% filter(cluster != 1))
       ## Total number of combinations of hyperparameters
-      , size = 30)) %>% mutate(index = seq(n()), .before = 1))
+      , size = size)) %>% mutate(index = seq(n()), .before = 1))
 
 , tar_target(id_cols, c("shapeName", "Country", "date", "index"))
 
@@ -267,16 +267,11 @@ model_tuning_targets <- tar_plan(
   ## NOTE: temp check for debugging purposes
 , tar_target(inner_fold_id_finalized_DEBUG, {
     inner_fold_id_finalized %>% filter(
-  outer_fold_id == 16 & inner_fold_id == 24 |
+  outer_fold_id == 16 & inner_fold_id == 1 |
   outer_fold_id == 16 & inner_fold_id == 10 |   
-  outer_fold_id == 16 & inner_fold_id == 1  |
-  outer_fold_id == 18 & inner_fold_id == 7  |
-  outer_fold_id == 18 & inner_fold_id == 22 |
   outer_fold_id == 18 & inner_fold_id == 5  |
-  outer_fold_id == 17 & inner_fold_id == 26 |
-  outer_fold_id == 17 & inner_fold_id == 21 |
-  outer_fold_id == 17 & inner_fold_id == 20 
-    ) %>% filter(index %in% c(5, 10, 15, 20, 25)) %>% 
+  outer_fold_id == 18 & inner_fold_id == 7 
+    ) %>% filter(index %in% c(15)) %>% 
     dplyr::select(-assess_inner, -has_outbreak, -nrow)})
 , tar_target(folded_data_training_DEBUG, folded_data_training %>% filter(outer_fold_id %in% inner_fold_id_finalized_DEBUG$outer_fold_id))
 , tar_target(folded_data_testing_DEBUG , folded_data_testing %>% filter(outer_fold_id %in% c(1, 2, 3)))
@@ -291,7 +286,7 @@ model_tuning_targets <- tar_plan(
     , weightings  = weightings_on_ones
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
-    , overwrite   = TRUE
+    , overwrite   = FALSE
     , DEBUG       = FALSE)
   , pattern = map(inner_fold_id_finalized_DEBUG)
   , error   = "null"
@@ -325,7 +320,7 @@ model_tuning_targets <- tar_plan(
   , weightings     = weightings_on_ones
   , id_cols        = id_cols
   , out_dir        = outer_folds_dir2
-  , overwrite      = TRUE
+  , overwrite      = FALSE
   , DEBUG          = FALSE)
   , pattern = map(folded_data_training_DEBUG)
   , error   = "null"
@@ -355,7 +350,7 @@ model_fitting_targets <- tar_plan(
   , weightings      = weightings_on_ones
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
-  , overwrite       = TRUE
+  , overwrite       = FALSE
   , DEBUG           = FALSE)
   , pattern = map(folded_data_testing)
   , error   = "null"
@@ -415,7 +410,7 @@ model_evaluation_targets <- tar_plan(
    ## comparing prob to truth across space and time, distributions of probabilities for true ones, confusion matrix 
    ## as a function of different probability cutoffs, etc.
 , tar_target(examined_fits_within, examine_fits_within(
-    model_out        = model_out_for_eval[1, ]
+    model_out        = model_out_for_eval
   , test_data        = splitted_data$test_data[[1]]
   , region_districts = region_map
   , africa_sf        = path_to_simplifed_regions

@@ -310,6 +310,8 @@ tune_results_across_outer_folds <- function(outer_data, raw_data, threshold, wei
     , "/"
     , "outer_tuning_"
     , outer_data$outer_fold_id
+    , "_tune_grid_"
+    ,  hyper_set$index
     , ".Rds"
     , sep = ""
   )
