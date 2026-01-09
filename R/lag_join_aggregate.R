@@ -271,3 +271,31 @@ combine_lja <- function(
   return(save_filename)
   
 }
+
+
+join_in_sero_layer <- function(region_dat, sero_layer) {
+  
+  ## 0) Logistics stuff
+  
+  ## Set filename
+  save_filename <- gsub("final.parquet", "final_with_sero.parquet", region_dat)
+  
+  ## Check if file already exists and can be read
+  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
+  
+  if (!is.null(error_safe_read_parquet(save_filename)) & !overwrite) {
+    message("file already exists and can be loaded, skipping processing")
+    return(save_filename)
+  }
+  
+  tdat <- read_parquet(region_dat)
+  slay <- read_parquet(sero_layer) %>% rename(shapeName = h3_id)
+  fdat <- left_join(tdat, slay)
+  
+  arrow::write_parquet(fdat, save_filename, compression = "gzip", compression_level = 5)
+  
+  return(save_filename)
+
+}
+
+

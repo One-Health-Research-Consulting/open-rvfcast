@@ -26,6 +26,7 @@ clean_region_data <- function(dat) {
   , "Precipitation_of_Wettest_Month", "Precipitation_of_Driest_Month"
   , "Precipitation_Seasonality", "Precipitation_of_Wettest_Quarter"
   , "Precipitation_of_Driest_Quarter", "Precipitation_of_Warmest_Quarter", "Precipitation_of_Coldest_Quarter"
+  , "pred_sero"
   )
   
   dat <- dat %>% mutate(across(all_of(vars_to_scale), ~ as.numeric(scale(.x)[, 1])))

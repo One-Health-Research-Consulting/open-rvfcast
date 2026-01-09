@@ -58,7 +58,7 @@ model_data_targets <- tar_plan(
   tar_target(region_name, if(using_hexes){"pan_hex"}else{"pan"})
 , tar_target(region_data_path
              , paste("data/", region_name, "_joined_response_data/"
-             , region_name, "_joined_response_data_final.parquet"
+             , region_name, "_joined_response_data_final_with_sero.parquet"
              , sep = ""))
 
   ## Load and mask forecast data so that forecasts further out than the summarized

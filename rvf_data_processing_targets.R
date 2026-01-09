@@ -78,9 +78,11 @@ data_import_targets <- tar_plan(
                  arrange(end_date) %>%
                  mutate(outbreak_id = seq_len(n())))
   
+  ## Import RVF seroprevalence data
+  , tar_target(rvf_seroprevalence, readRDS("data/cases_sero.Rds")$sero_data %>% mutate(index = seq(n())))
+  
   ## Set up directory for cleaned case data
-  , tar_target(
-      rvf_response_directory
+  , tar_target(rvf_response_directory
     , create_data_directory(directory_path = "data/rvf_response")
   )
   
@@ -144,6 +146,44 @@ data_import_targets <- tar_plan(
   
   , tar_target(region_map, if(using_hexes){region_hexes}else{region_districts})
   
+  ## Prep the seroprevalence-cases dataset
+  , tar_target(cases_sero, prep_cases_sero_dataset(
+      sero_dat  = rvf_seroprevalence
+    , cases_dat = rvf_outbreaks
+    , map_dat   = region_map
+    ))
+  
+)
+
+## Targets to build and process the sero layer ---------------------------------
+modeling_targets <- tar_plan(
+  
+  tar_target(sero_stan_model, 
+    fit_sero_cases_stan(
+      stan_dat  = cases_sero$stan_data
+    , outpath   = "data/sero_kernel_icar_base_model_fit.Rds"
+    , overwrite = FALSE)
+    , error   = "null"
+    , format  = "file"
+  )
+  
+  ## Make predictions 
+, tar_target(built_sero_layer, 
+    build_sero_layer(
+      fitted_stan_model = sero_stan_model
+    , sero_cases_dat    = cases_sero
+    ## NOTE: This is a little funny, and some code reorg is probably sensible to save
+     ## a step here and not have to load a close to final data set and then create and 
+     ## finally add this one covariate to create a final final data set
+    ## Finalized dataset apart from this layer; what is needed here is the complete
+     ## set of cells -by- dates over which all other covariate data exists
+    , cov_dat           = joined_region_data
+    , map_dat           = region_map[[1]]
+    , outpath           = "data/sero_layer.parquet"
+    , overwrite         = FALSE)
+    , error   = "null"
+    , format  = "file")
+      
 )
 
 ## Build final master dataset for model fitting --------------------------------
@@ -171,7 +211,7 @@ rvf_processing_targets <- tar_plan(
       template        = region_data_template
     , cov_files       = base_predictors
     , out_dir         = region_data_directory
-    , overwrite       = TRUE
+    , overwrite       = FALSE
   )
   , pattern = map(base_predictors)
   , error   = "null"
@@ -199,7 +239,7 @@ rvf_processing_targets <- tar_plan(
   , tar_target(file_path_per_date
              , lapply(prepped_dates, FUN = function(x) x$filename[1]) %>% unlist()
   )
-  
+
   ## Calculate lags, join cases, summarize and build master dataset. Save the output in individual
    ## parquet files by date
 , tar_target(cleaned_region_data, lag_join_aggregate(
@@ -208,7 +248,7 @@ rvf_processing_targets <- tar_plan(
   , cov_files       = region_data[-length(region_data)]
   , rvf_response    = rvf_response
   , out_dir         = region_cleaned_data_directory
-  , overwrite       = TRUE
+  , overwrite       = FALSE
   )
   , pattern = map(file_path_per_date)
   , error   = "null"
@@ -219,12 +259,19 @@ rvf_processing_targets <- tar_plan(
 , tar_target(joined_region_data, combine_lja(
     in_dir    = cleaned_region_data
   , out_dir   = region_joined_data_directory
-  , overwrite = TRUE
+  , overwrite = FALSE
+  ))
+
+  ## And finally add the sero layer
+, tar_target(final_region_data, join_in_sero_layer(
+    region_dat = joined_region_data
+  , sero_layer = built_sero_layer
   ))
   
 )
 
 list(
   data_import_targets
+, modeling_targets
 , rvf_processing_targets
 )
