@@ -89,6 +89,8 @@ model_data_targets <- tar_plan(
    ## Saved as part of the rvf_data_processing_targets.R pipeline phase
 , tar_target(region_hexes, readRDS("data/region_hexes.Rds"))
 
+, tar_target(performance_hexes, readRDS("data/region_hexes_for_evaluation.Rds"))
+
   ## set up which map object to use given choice for using_hexes
 , tar_target(region_map, if(using_hexes){region_hexes}else{region_districts})
 
@@ -413,6 +415,7 @@ model_evaluation_targets <- tar_plan(
     model_out        = model_out_for_eval
   , test_data        = splitted_data$test_data[[1]]
   , region_districts = region_map
+  , larger_districts = performance_hexes
   , africa_sf        = path_to_simplifed_regions
   , p_thresh         = positive_threshold
   , using_hexes      = using_hexes)

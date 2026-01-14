@@ -6,13 +6,14 @@
 #' @param model_out target model_out_for_eval
 #' @param test_data splitted_data$test_data
 #' @param region_districts region_districts
+#' @param larger_districts performance_hexes or just set to NULL if not using hexes or if you dont want to evaluate at a larger scale
 #' @param africa_sf path to saved previously cleaned combined sf of all sub-regions (created with combine_africa_sf)
 #' @param p_thresh probability over which to assign a one
 #' @return Tibble of summary metrics of model fit
 #' @author Morgan Kain
 #' @export
 
-examine_fits_within <- function(model_out, test_data, region_districts, africa_sf, p_thresh, using_hexes) {
+examine_fits_within <- function(model_out, test_data, region_districts, larger_districts, africa_sf, p_thresh, using_hexes) {
 
   ## Load the previously created / saved Africa map of sub-regions per Country
   if (!using_hexes) {
@@ -22,6 +23,10 @@ examine_fits_within <- function(model_out, test_data, region_districts, africa_s
   } else {
     africa_sf <- region_districts[[1]] %>% 
       rename(region_norm = shapeName) %>% mutate(country_norm = "null")
+    if (!is.null(larger_districts)) {
+      eval_regions <- larger_districts[[1]] 
+      africa_sf <- africa_sf %>% mutate(shapeName = h3jsr::get_parent(region_norm, 2)) 
+     }
   }
   
   ## Combine predictions with the data
@@ -164,6 +169,79 @@ prob_dens_plot <- dat_with_pred %>%
         ))
     }
   
+  ## And summarized into the larger H3 hexes
+  dat_with_pred_coarse <- dat_with_pred %>%
+    rename(region_norm = shapeName) %>% 
+    left_join(africa_sf %>% as.data.frame() %>% dplyr::select(region_norm, shapeName)) %>%
+    group_by(shapeName, Country, forecast_interval, date) %>%
+    summarize(.pred_1 = mean(.pred_1), outbreak = max(outbreak))
+  
+  ## Split up by forecast interval
+  preds_summarized1.r <- prep_preds_for_map(
+    preds_all     = dat_with_pred_coarse
+  , grouping_vals = "forecast_interval"
+  )
+  
+  map_sf1.r <- eval_regions %>%
+    left_join(., preds_summarized1.r %>% rename(shapeName = region_norm), by = c("shapeName"))
+  
+  ## 'Summed' over the full forecast interval
+  preds_summarized2.r <- prep_preds_for_map(
+    preds_all = dat_with_pred_coarse
+    , grouping_vals = NULL
+  )
+  
+  map_sf2.r <- eval_regions %>%
+    left_join(., preds_summarized2.r %>% rename(shapeName = region_norm), by = c("shapeName"))
+  
+  pred_map1.r <- map_sf1.r %>% 
+    mutate(true_out = as.factor(true_out)) %>% 
+    filter(!is.na(prob_pred)) %>% {
+      ggplot(.) +
+        geom_sf(aes(fill = prob_pred), colour = NA, linewidth = 0, alpha = 0.2) +
+        geom_sf(
+          data = map_sf1.r %>% 
+            mutate(true_out = as.factor(true_out)) %>% 
+            filter(!is.na(prob_pred)) %>%
+            filter(true_out == 1)
+          , aes(fill = prob_pred), colour = "black", linewidth = 0.4
+          , alpha = 0.2
+        ) +
+        scale_fill_viridis_c(name = "Pr(outbreak)", limits = c(0, 1), oob = scales::squish) +
+        coord_sf() +
+        theme_void() +
+        labs(title = "Predicted Outbreak Probability by Region") +
+        facet_wrap(~forecast_interval) +
+        ggtitle(paste(
+          "Prediction Period = "
+          , strsplit(model_out$assess_range, " ")[[1]] %>% paste(., collapse = " - ")
+        ))
+    }
+  
+  
+  pred_map2.r <- map_sf2.r %>% 
+    mutate(true_out = as.factor(true_out)) %>% 
+    filter(!is.na(prob_pred)) %>% {
+      ggplot(.) +
+        geom_sf(aes(fill = prob_pred), colour = NA, linewidth = 0, alpha = 0.2) +
+        geom_sf(
+          data = map_sf2.r %>% 
+            mutate(true_out = as.factor(true_out)) %>% 
+            filter(!is.na(prob_pred)) %>%
+            filter(true_out == 1)
+          , aes(fill = prob_pred), colour = "black", linewidth = 0.4
+          , alpha = 0.2
+        ) +
+        scale_fill_viridis_c(name = "Pr(outbreak)", limits = c(0, 1), oob = scales::squish) +
+        coord_sf() +
+        theme_void() +
+        labs(title = "Predicted Outbreak Probability by Region") +
+        ggtitle(paste(
+          "Prediction Period = "
+          , strsplit(model_out$assess_range, " ")[[1]] %>% paste(., collapse = " - ")
+        ))
+    }
+  
   return(
     tibble(
         outer_fold_id  = model_out$outer_fold_id
@@ -176,6 +254,8 @@ prob_dens_plot <- dat_with_pred %>%
       , predictions_collpased = preds_summarized2 %>% list()
       , map_split      = pred_map1 %>% list()
       , map_collapsed  = pred_map2 %>% list()
+      , map_split_coarse    = pred_map1.r %>% list()
+      , map_collapsed_coars = pred_map2.r %>% list()
     )
   )
     

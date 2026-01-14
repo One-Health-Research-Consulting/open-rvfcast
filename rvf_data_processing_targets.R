@@ -73,6 +73,7 @@ data_import_targets <- tar_plan(
                    start_date = coalesce(outbreak_start_date, outbreak_end_date)
                  , end_date   = coalesce(outbreak_end_date, outbreak_start_date)
                  ) %>%
+                 filter(grepl("sheep|cattle|camelidae|goat", species)) %>%
                  select(cases, start_date, end_date, latitude, longitude) %>%
                  distinct() %>%
                  arrange(end_date) %>%
