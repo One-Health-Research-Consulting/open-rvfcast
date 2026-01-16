@@ -89,6 +89,7 @@ model_data_targets <- tar_plan(
    ## Saved as part of the rvf_data_processing_targets.R pipeline phase
 , tar_target(region_hexes, readRDS("data/region_hexes.Rds"))
 
+  ## Load previous saved larger spatial hexes for summarizing output 
 , tar_target(performance_hexes, readRDS("data/region_hexes_for_evaluation.Rds"))
 
   ## set up which map object to use given choice for using_hexes
@@ -368,30 +369,10 @@ model_fitting_targets <- tar_plan(
 ## Asses model performance -----------------------------------------------------
 model_evaluation_targets <- tar_plan(
   
-  ## calibration curve groupings
-  tar_target(cal_curve_splitgrp, c("forecast_interval"))
-  
-  ## Build the calibration curves
-   ## Depending on what grouping variables are chosen, calibration curves may be made
-   ## ACROSS all outer_fold_ids -- which would summarize prediction ability *generally*
-   ## However, with a different grouping, plotting can be made *within* fit
-, tar_target(calibration_curves, generate_calibration_curve(
-    preds      = model_out_for_eval
-  , test_data  = splitted_data$test_data[[1]]
-  , predname   = ".pred_1"
-  , truename   = "outbreak"
-  , splitgrp   = cal_curve_splitgrp))
-  
-, tar_target(plotted_calibration, plot_calibration(
-    caltib      = calibration_curves
-  , xg          = NULL # "assess_range"
-  , yg          = "forecast_interval"
-  , forcastvals = c(30, 90, 150)))
-
 ## Struggling with RAM useage because targets is deciding to load a huge amount
  ## of stuff it doesn't actually need to run my previous larger function, so
   ## splitting this up
-, tar_target(variable_importance_prep_a, prep_for_variable_importance_a(
+  tar_target(variable_importance_prep_a, prep_for_variable_importance_a(
     model_dat     = model_out_for_eval
   , splitted_data = splitted_data) 
   , pattern = map(model_out_for_eval))

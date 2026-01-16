@@ -14,30 +14,10 @@
 
 generate_calibration_curve <- function(preds, test_data, predname, truename, splitgrp) {
   
-  all_dat_preds <- preds %>% group_by(outer_fold_id) %>% group_split() %>% purrr::map_dfr(function(preddat) {
-    
-    preddat$preds[[1]] %>% 
-      mutate(
-        index    = preddat$assess_data[[1]]
-      , outbreak = as.numeric(as.character(.pred_class))
-      , .before  = 1
-      ) %>% 
-      dplyr::select(-.pred_class) %>%
-      rename(outbreak_pred = outbreak) %>%
-      left_join(
-        .
-        , test_data %>% filter(index %in% preddat$assess_data[[1]]) 
-      ) %>%
-      dplyr::select(!!predname, !!truename, any_of(splitgrp)) %>%
-      mutate(outer_fold_id = preddat$outer_fold_id)
-    
-  }) 
+  if (is.na(splitgrp)) {splitgrp <- NULL}
   
-  binoms.all <- all_dat_preds %>% dplyr::group_by_at(splitgrp) %>% 
+  binoms.all <- preds %>% dplyr::group_by_at(splitgrp) %>% 
     dplyr::group_split() %>% purrr::map_dfr(function(dat) {
-      
-      grp_vals <- dat %>% dplyr::select(all_of(splitgrp)) 
-      grp_vals <- apply(grp_vals %>% as.matrix(), 2, unique) 
       
       ## Optimized breaks using reliabilitydiag
       opt_breaks <- optimise_bins(dat, predname, truename) %>%
@@ -56,10 +36,10 @@ generate_calibration_curve <- function(preds, test_data, predname, truename, spl
         group_by(predicted_grp) %>% 
         mutate(
           predicted_grp_med    = quantile(get(predname), 0.500, na.rm = TRUE)
-        , predicted_grp_upr    = quantile(get(predname), 0.975, na.rm = TRUE)
-        , predicted_grp_uprn   = quantile(get(predname), 0.800, na.rm = TRUE)
-        , predicted_grp_lwr    = quantile(get(predname), 0.025, na.rm = TRUE)
-        , predicted_grp_lwrn   = quantile(get(predname), 0.200, na.rm = TRUE)
+          , predicted_grp_upr    = quantile(get(predname), 0.975, na.rm = TRUE)
+          , predicted_grp_uprn   = quantile(get(predname), 0.800, na.rm = TRUE)
+          , predicted_grp_lwr    = quantile(get(predname), 0.025, na.rm = TRUE)
+          , predicted_grp_lwrn   = quantile(get(predname), 0.200, na.rm = TRUE)
         ) %>% ungroup()
       
       grps.even <- dat %>%
@@ -68,10 +48,10 @@ generate_calibration_curve <- function(preds, test_data, predname, truename, spl
         group_by(predicted_grp) %>% 
         mutate(
           predicted_grp_med    = quantile(get(predname), 0.500, na.rm = TRUE)
-        , predicted_grp_upr    = quantile(get(predname), 0.975, na.rm = TRUE)
-        , predicted_grp_uprn   = quantile(get(predname), 0.800, na.rm = TRUE)
-        , predicted_grp_lwr    = quantile(get(predname), 0.025, na.rm = TRUE)
-        , predicted_grp_lwrn   = quantile(get(predname), 0.200, na.rm = TRUE)
+          , predicted_grp_upr    = quantile(get(predname), 0.975, na.rm = TRUE)
+          , predicted_grp_uprn   = quantile(get(predname), 0.800, na.rm = TRUE)
+          , predicted_grp_lwr    = quantile(get(predname), 0.025, na.rm = TRUE)
+          , predicted_grp_lwrn   = quantile(get(predname), 0.200, na.rm = TRUE)
         ) %>% ungroup()
       
       grp_sizes.opt <- grps.opt %>%
@@ -94,7 +74,7 @@ generate_calibration_curve <- function(preds, test_data, predname, truename, spl
           tw.t <- tw %>%
             dplyr::distinct(
               predicted_grp, predicted_grp_med, predicted_grp_lwr, predicted_grp_lwrn
-            , predicted_grp_upr, predicted_grp_uprn
+              , predicted_grp_upr, predicted_grp_uprn
             ) %>%
             dplyr::mutate(grp_mean = binom$mean, grp_lwr = binom$lower, grp_upr = binom$upper)
           tw.t 
@@ -108,26 +88,25 @@ generate_calibration_curve <- function(preds, test_data, predname, truename, spl
           tw.t <- tw %>%
             dplyr::distinct(
               predicted_grp, predicted_grp_med, predicted_grp_lwr, predicted_grp_lwrn
-            , predicted_grp_upr, predicted_grp_uprn
+              , predicted_grp_upr, predicted_grp_uprn
             ) %>%
             dplyr::mutate(grp_mean = binom$mean, grp_lwr = binom$lower, grp_upr = binom$upper)
           tw.t 
         })
       
-      for (i in seq_along(grp_vals)) {
-        binoms.opt  <- binoms.opt %>% 
-          mutate(!!names(grp_vals)[i] := grp_vals[i], .before = 1) %>%
-          left_join(., grp_sizes.opt)
-        binoms.even <- binoms.even %>% 
-          mutate(!!names(grp_vals)[i] := grp_vals[i], .before = 1) %>%
-          left_join(., grp_sizes.even)
+      binoms.opt  <- binoms.opt %>% left_join(., grp_sizes.opt)
+      binoms.even <- binoms.even %>% left_join(., grp_sizes.even)
+      
+      if (!is.null(splitgrp)) {
+        binoms.opt  <- binoms.opt  %>% mutate(forecast_interval = dat$forecast_interval[1])
+        binoms.even <- binoms.even %>% mutate(forecast_interval = dat$forecast_interval[1])
       }
       
       binoms.opt %>% 
         dplyr::select(all_of(splitgrp)) %>% distinct() %>% 
         mutate(
           calibration_curves.opt  = list(binoms.opt)
-        , calibration_curves.even = list(binoms.even)
+          , calibration_curves.even = list(binoms.even)
         )
       
     })
@@ -164,73 +143,81 @@ plot_calibration <- function(caltib, xg, yg, forcastvals) {
   caltib.opt  <- do.call("rbind", caltib$calibration_curves.opt)
   caltib.even <- do.call("rbind", caltib$calibration_curves.even)
   
-  gg1.opt <- caltib.opt %>% 
-    filter(forecast_interval %in% forcastvals) %>%
-    filter(truth > 0) %>% {
-      ggplot(., aes(grp_mean, predicted_grp_med)) +
-        geom_abline(color = "gray50") +
-        geom_errorbarh(aes(xmin = grp_lwr, xmax = grp_upr), linewidth = 0.5, width = 0) +
-        geom_errorbar(aes(ymin = predicted_grp_lwr, ymax = predicted_grp_upr), linewidth = 0.5, width = 0) +
-        geom_errorbar(aes(ymin = predicted_grp_lwrn, ymax = predicted_grp_uprn), linewidth = 1, width = 0) +
-        geom_point(aes(size = log(n)), pch = 21, fill = "white") +
-        scale_size_continuous(name = "Number
-Predicted
-(log)") +
-        scale_x_log10() +
-        scale_y_log10() +
-        labs(y = "Forecasted outbreak probability", x = "Observed outbreak rate", color = "") +
-        theme_minimal() +
-        theme(
-          axis.text = element_text(size = 14)
-          , axis.title = element_text(size = 16)
-          , plot.title.position = "plot"
-          , plot.caption = element_text(hjust = 0)
-        ) 
-    }
-  
-  gg1.even <- caltib.even %>% 
-    filter(forecast_interval %in% forcastvals) %>%
-    filter(truth > 0) %>% {
-      ggplot(., aes(grp_mean, predicted_grp_med)) +
-        geom_abline(color = "gray50") +
-        geom_errorbarh(aes(xmin = grp_lwr, xmax = grp_upr), linewidth = 0.5, width = 0) +
-        geom_errorbar(aes(ymin = predicted_grp_lwr, ymax = predicted_grp_upr), linewidth = 0.5, width = 0) +
-        geom_errorbar(aes(ymin = predicted_grp_lwrn, ymax = predicted_grp_uprn), linewidth = 1, width = 0) +
-        geom_point(aes(size = log(n)), pch = 21, fill = "white") +
-        scale_size_continuous(name = "Number
-Predicted
-(log)") +
-        scale_x_sqrt() +
-        scale_y_sqrt() +
-        labs(y = "Forecasted outbreak probability", x = "Observed outbreak rate", color = "") +
-        theme_minimal() +
-        theme(
-          axis.text = element_text(size = 14)
-          , axis.title = element_text(size = 16)
-          , plot.title.position = "plot"
-          , plot.caption = element_text(hjust = 0)
-        ) 
-    }
-  
-  if (!is.null(yg) & !is.null(xg)) {
-    gg1.opt  <- gg1.opt + facet_grid(get(yg) ~ get(xg))
-    gg1.even <- gg1.even + facet_grid(get(yg) ~ get(xg))
-  } else if (!is.null(yg) & is.null(xg)) {
-    gg1.opt  <- gg1.opt + facet_wrap(~get(yg), ncol = 1)
-    gg1.even <- gg1.even + facet_wrap(~get(yg), ncol = 1)
-  } else if (is.null(yg) & !is.null(xg)) {
-    gg1.opt  <- gg1.opt + facet_wrap(~get(xg), ncol = 1)
-    gg1.even <- gg1.even + facet_wrap(~get(xg), ncol = 1)
+  ## NOTE: Really hacky rough approach to get this working, needs cleanup for sure
+  if (!is.na(yg)) {
+    caltib.opt  <- caltib.opt %>% filter(forecast_interval %in% forcastvals) %>% filter(truth > 0)
+    caltib.even <- caltib.even %>% filter(forecast_interval %in% forcastvals) %>% filter(truth > 0)
   } else {
-    gg1.opt  <- gg1.opt
-    gg1.even <- gg1.even
+    caltib.opt  <- caltib.opt %>% filter(truth > 0)
+    caltib.even <- caltib.even %>% filter(truth > 0)
+  }
+  
+  gg1.opt <- caltib.opt %>% {
+    ggplot(., aes(grp_mean, predicted_grp_med)) +
+      geom_abline(color = "gray50") +
+      geom_errorbarh(aes(xmin = grp_lwr, xmax = grp_upr), linewidth = 0.5, width = 0) +
+      geom_errorbar(aes(ymin = predicted_grp_lwr, ymax = predicted_grp_upr), linewidth = 0.5, width = 0) +
+      geom_errorbar(aes(ymin = predicted_grp_lwrn, ymax = predicted_grp_uprn), linewidth = 1, width = 0) +
+      geom_point(aes(size = log(n)), pch = 21, fill = "white") +
+      scale_size_continuous(name = "Number
+Predicted
+(log)") +
+      scale_x_log10() +
+      scale_y_log10() +
+      labs(y = "Forecasted outbreak probability", x = "Observed outbreak rate", color = "") +
+      theme_minimal() +
+      theme(
+        axis.text = element_text(size = 14)
+        , axis.title = element_text(size = 16)
+        , plot.title.position = "plot"
+        , plot.caption = element_text(hjust = 0)
+      ) 
+  }
+  
+  gg1.even <- caltib.even %>% {
+    ggplot(., aes(grp_mean, predicted_grp_med)) +
+      geom_abline(color = "gray50") +
+      geom_errorbarh(aes(xmin = grp_lwr, xmax = grp_upr), linewidth = 0.5, width = 0) +
+      geom_errorbar(aes(ymin = predicted_grp_lwr, ymax = predicted_grp_upr), linewidth = 0.5, width = 0) +
+      geom_errorbar(aes(ymin = predicted_grp_lwrn, ymax = predicted_grp_uprn), linewidth = 1, width = 0) +
+      geom_point(aes(size = log(n)), pch = 21, fill = "white") +
+      scale_size_continuous(name = "Number
+Predicted
+(log)") +
+      scale_x_sqrt() +
+      scale_y_sqrt() +
+      labs(y = "Forecasted outbreak probability", x = "Observed outbreak rate", color = "") +
+      theme_minimal() +
+      theme(
+        axis.text = element_text(size = 14)
+        , axis.title = element_text(size = 16)
+        , plot.title.position = "plot"
+        , plot.caption = element_text(hjust = 0)
+      ) 
+  }
+  
+  ## NOTE: Really hacky rough approach to get this working, needs cleanup for sure
+  if (!is.na(yg)) {
+    if (!is.null(yg) & !is.null(xg)) {
+      gg1.opt  <- gg1.opt + facet_grid(get(yg) ~ get(xg))
+      gg1.even <- gg1.even + facet_grid(get(yg) ~ get(xg))
+    } else if (!is.null(yg) & is.null(xg)) {
+      gg1.opt  <- gg1.opt + facet_wrap(~get(yg), ncol = 1)
+      gg1.even <- gg1.even + facet_wrap(~get(yg), ncol = 1)
+    } else if (is.null(yg) & !is.null(xg)) {
+      gg1.opt  <- gg1.opt + facet_wrap(~get(xg), ncol = 1)
+      gg1.even <- gg1.even + facet_wrap(~get(xg), ncol = 1)
+    } else {
+      gg1.opt  <- gg1.opt
+      gg1.even <- gg1.even
+    }
   }
   
   return(
     tibble(
       calplot.opt  = gg1.opt %>% list()
-    , calplot.even = gg1.even %>% list()
+      , calplot.even = gg1.even %>% list()
     )
   )
-
+  
 }

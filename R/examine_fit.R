@@ -43,222 +43,192 @@ examine_fits_within <- function(model_out, test_data, region_districts, larger_d
     , test_data %>% filter(index %in% model_out$assess_data[[1]]) 
     )
   
-  ## Confusion matrix -- just doing it by hand to avoid issues
-  conf_mat <- purrr::map(seq_along(p_thresh), .f = function(i) {
-     
-     conf_mat.d <- dat_with_pred %>% 
-       mutate(outbreak_assigned = ifelse(.pred_1 > p_thresh[i], 1, 0), .after = outbreak_pred) %>%
-       group_by(forecast_interval) %>%
-       group_by(forecast_interval, outbreak, outbreak_assigned) %>%
-       summarize(nout = n()) %>% 
-       mutate(positive_threshold = p_thresh[i], .before = 1)
-     
-   }) %>% do.call("rbind", .)
-  
-conf_mat_plot <- conf_mat %>% 
-    filter(positive_threshold %in% c(0.1, 0.2, 0.3, 0.4, 0.5)) %>% 
-    group_by(forecast_interval, positive_threshold) %>%
-    mutate(prop_t = log(nout / sum(nout))) %>% {
-    ggplot(., aes(outbreak, outbreak_assigned)) + 
-      geom_tile(aes(fill = prop_t)) +
-      scale_fill_continuous() +
-      facet_grid(positive_threshold ~ forecast_interval) +
-      geom_text(aes(label = nout), color = "white", size = 3) +
-      theme(
-        axis.text.x  = element_text(size = 10)
-      , axis.text.y  = element_text(size = 10)
-      , axis.title.x = element_text(size = 12)
-      , axis.title.y = element_text(size = 12)
-        ) +
-        scale_x_continuous(breaks = c(0, 1)) +
-        scale_y_continuous(breaks = c(0, 1)) +
-        xlab("True Outbreaks") + ylab("Predicted Outbreaks") +
-        ggtitle(paste(
-          "Prediction Period = "
-        , strsplit(model_out$assess_range, " ")[[1]] %>% paste(., collapse = " - ")
-        ))
-  }
-    
-  ## Distribution of probabilities for true 1s and true 0s
-prob_dens_plot <- dat_with_pred %>% 
-    mutate(
-      outbreak = as.factor(outbreak)
-    , .pred_1  = qlogis(.pred_1)
-    ) %>% {
-      ggplot(., aes(x = .pred_1)) + 
-      geom_density(aes(fill = outbreak), alpha = 0.5, colour = NA) +
-      facet_wrap(~forecast_interval, scales = "free") +
-      scale_fill_brewer(palette = "Dark2") +
-      theme(
-        axis.text.x  = element_text(size = 10)
-      , axis.text.y  = element_text(size = 10)
-      , axis.title.x = element_text(size = 12)
-      , axis.title.y = element_text(size = 12)
-      ) +
-      xlab("Predicted Probability of Outbreak (logit scale)") +
-      ylab("Density") +
-        ggtitle(paste(
-          "Prediction Period = "
-        , strsplit(model_out$assess_range, " ")[[1]] %>% paste(., collapse = " - ")
-        ))
-    }
-  
-  ## Estimating spatial variability of divergence between truth and predictions
-
-  ## Split up by forecast interval
-  preds_summarized1 <- prep_preds_for_map(
-    preds_all     = dat_with_pred
-  , grouping_vals = "forecast_interval"
-  )
-  
-  map_sf1 <- africa_sf %>% left_join(., preds_summarized1, by = c("country_norm", "region_norm"))
-  
-  ## 'Summed' over the full forecast interval
-  preds_summarized2 <- prep_preds_for_map(
-    preds_all = dat_with_pred
-  , grouping_vals = NULL
-  )
-  
-  map_sf2 <- africa_sf %>% left_join(., preds_summarized2, by = c("country_norm", "region_norm"))
-  
-  pred_map1 <- map_sf1 %>% 
-    mutate(true_out = as.factor(true_out)) %>% 
-    filter(!is.na(prob_pred)) %>% {
-      ggplot(.) +
-        geom_sf(aes(fill = prob_pred), colour = NA, linewidth = 0, alpha = 0.2) +
-        geom_sf(
-          data = map_sf1 %>% 
-            mutate(true_out = as.factor(true_out)) %>% 
-            filter(!is.na(prob_pred)) %>%
-            filter(true_out == 1)
-          , aes(fill = prob_pred), colour = "black", linewidth = 0.4
-          , alpha = 1
-        ) +
-        scale_fill_viridis_c(name = "Pr(outbreak)", limits = c(0, 1), oob = scales::squish) +
-        coord_sf() +
-        theme_void() +
-        labs(title = "Predicted Outbreak Probability by Region") +
-        facet_wrap(~forecast_interval) +
-        ggtitle(paste(
-          "Prediction Period = "
-          , strsplit(model_out$assess_range, " ")[[1]] %>% paste(., collapse = " - ")
-        ))
-    }
-    
-    
-  pred_map2 <- map_sf2 %>% 
-    mutate(true_out = as.factor(true_out)) %>% 
-    filter(!is.na(prob_pred)) %>% {
-      ggplot(.) +
-        geom_sf(aes(fill = prob_pred), colour = NA, linewidth = 0, alpha = 0.2) +
-        geom_sf(
-          data = map_sf2 %>% 
-            mutate(true_out = as.factor(true_out)) %>% 
-            filter(!is.na(prob_pred)) %>%
-            filter(true_out == 1)
-          , aes(fill = prob_pred), colour = "black", linewidth = 0.4
-          , alpha = 1
-        ) +
-        scale_fill_viridis_c(name = "Pr(outbreak)", limits = c(0, 1), oob = scales::squish) +
-        coord_sf() +
-        theme_void() +
-        labs(title = "Predicted Outbreak Probability by Region") +
-        ggtitle(paste(
-          "Prediction Period = "
-        , strsplit(model_out$assess_range, " ")[[1]] %>% paste(., collapse = " - ")
-        ))
-    }
-  
-  ## And summarized into the larger H3 hexes
-  dat_with_pred_coarse <- dat_with_pred %>%
+  ## Add in the larger H3 hexes
+  dat_with_pred <- dat_with_pred %>%
     rename(region_norm = shapeName) %>% 
     left_join(africa_sf %>% as.data.frame() %>% dplyr::select(region_norm, shapeName)) %>%
-    group_by(shapeName, Country, forecast_interval, date) %>%
-    summarize(.pred_1 = mean(.pred_1), outbreak = max(outbreak))
+    relocate(shapeName, .after = "region_norm")
   
-  ## Split up by forecast interval
-  preds_summarized1.r <- prep_preds_for_map(
-    preds_all     = dat_with_pred_coarse
-  , grouping_vals = "forecast_interval"
+  ## Do all of the performance summaries for each date, for:
+   ## A) No aggregation: each small hex for each forecast window
+   ## B) Spatial aggregation: larger hex for each forecast window
+   ## C) Temporal aggregation: small hexes across forecast windows
+   ## D) Double aggregation: larger hexes across forecast windows
+  
+  aggregation_list <- list(
+    "No aggregation"       = c("date", "region_norm", "forecast_interval")
+  , "Spatial aggregation"  = c("date", "shapeName", "forecast_interval")
+  , "Temporal aggregation" = c("date", "region_norm")
+  , "Double aggregation"   = c("date", "shapeName")
   )
   
-  map_sf1.r <- eval_regions %>%
-    left_join(., preds_summarized1.r %>% rename(shapeName = region_norm), by = c("shapeName"))
-  
-  ## 'Summed' over the full forecast interval
-  preds_summarized2.r <- prep_preds_for_map(
-    preds_all = dat_with_pred_coarse
-    , grouping_vals = NULL
-  )
-  
-  map_sf2.r <- eval_regions %>%
-    left_join(., preds_summarized2.r %>% rename(shapeName = region_norm), by = c("shapeName"))
-  
-  pred_map1.r <- map_sf1.r %>% 
-    mutate(true_out = as.factor(true_out)) %>% 
-    filter(!is.na(prob_pred)) %>% {
-      ggplot(.) +
-        geom_sf(aes(fill = prob_pred), colour = NA, linewidth = 0, alpha = 0.2) +
-        geom_sf(
-          data = map_sf1.r %>% 
-            mutate(true_out = as.factor(true_out)) %>% 
-            filter(!is.na(prob_pred)) %>%
-            filter(true_out == 1)
-          , aes(fill = prob_pred), colour = "black", linewidth = 0.4
-          , alpha = 0.2
-        ) +
-        scale_fill_viridis_c(name = "Pr(outbreak)", limits = c(0, 1), oob = scales::squish) +
-        coord_sf() +
-        theme_void() +
-        labs(title = "Predicted Outbreak Probability by Region") +
-        facet_wrap(~forecast_interval) +
-        ggtitle(paste(
-          "Prediction Period = "
+ out_list <- purrr::pmap(list(aggregation_list, names(aggregation_list)), .f = function(x, z) {
+    
+    ## Do the appropriate level of summarization
+    dat.s <- dat_with_pred %>% 
+      dplyr::group_by(across(all_of(x))) %>%
+      summarize(
+        prob_pred = 1 - prod(1 - .pred_1)
+      , true_out  = max(outbreak)
+      ) %>% ungroup()
+    
+    ## Build calibration curves
+    calcurves <- generate_calibration_curve(
+      preds      = dat.s
+    , test_data  = splitted_data$test_data[[1]]
+    , predname   = "prob_pred"
+    , truename   = "true_out"
+    , splitgrp   = ifelse("forecast_interval" %in% x, "forecast_interval", NA)
+    )
+    
+    plotted_calibration <- plot_calibration(
+      caltib      = calcurves
+    , xg          = NULL 
+    , yg          = ifelse("forecast_interval" %in% x, "forecast_interval", NA)
+    , forcastvals = ifelse("forecast_interval" %in% x, c(30, 90, 150), NA)
+    )
+    
+    ## Confusion matrix -- just doing it by hand to avoid issues
+    conf_mat <- purrr::map(seq_along(p_thresh), .f = function(i) {
+      
+      if ("forecast_interval" %in% x) {
+        conf_mat.d <- dat.s %>% 
+          mutate(outbreak_assigned = ifelse(prob_pred > p_thresh[i], 1, 0)) %>%
+          group_by(forecast_interval, true_out, outbreak_assigned) %>%
+          summarize(nout = n()) %>% 
+          mutate(positive_threshold = p_thresh[i], .before = 1)
+      } else {
+        conf_mat.d <- dat.s %>% 
+          mutate(outbreak_assigned = ifelse(prob_pred > p_thresh[i], 1, 0)) %>%
+          group_by(true_out, outbreak_assigned) %>%
+          summarize(nout = n()) %>% 
+          mutate(positive_threshold = p_thresh[i], .before = 1)
+      }
+      
+    }) %>% do.call("rbind", .)
+    
+    if ("forecast_interval" %in% x) {
+    conf_mat.t <- conf_mat %>% 
+      filter(positive_threshold %in% c(0.1, 0.2, 0.3, 0.4, 0.5)) %>% 
+      group_by(forecast_interval, positive_threshold) %>%
+      mutate(prop_t = log(nout / sum(nout)))
+    } else {
+      conf_mat.t <- conf_mat %>% 
+        filter(positive_threshold %in% c(0.1, 0.2, 0.3, 0.4, 0.5)) %>% 
+        group_by(positive_threshold) %>%
+        mutate(prop_t = log(nout / sum(nout)))
+    } 
+    
+    conf_mat_plot <- conf_mat.t %>% {
+        ggplot(., aes(true_out, outbreak_assigned)) + 
+          geom_tile(aes(fill = prop_t)) +
+          scale_fill_continuous() +
+          facet_grid(positive_threshold ~ forecast_interval) +
+          geom_text(aes(label = nout), color = "white", size = 3) +
+          theme(
+            axis.text.x  = element_text(size = 10)
+            , axis.text.y  = element_text(size = 10)
+            , axis.title.x = element_text(size = 12)
+            , axis.title.y = element_text(size = 12)
+          ) +
+          scale_x_continuous(breaks = c(0, 1)) +
+          scale_y_continuous(breaks = c(0, 1)) +
+          xlab("True Outbreaks") + ylab("Predicted Outbreaks") +
+          ggtitle(paste(
+            "Prediction Period = "
+            , strsplit(model_out$assess_range, " ")[[1]] %>% paste(., collapse = " - ")
+          ))
+      }
+    
+    ## Distribution of probabilities for true 1s and true 0s
+    prob_dens_plot <- dat.s %>% 
+      mutate(
+        true_out  = as.factor(true_out)
+      , prob_pred = qlogis(prob_pred)
+      ) %>% {
+        ggplot(., aes(x = prob_pred)) + 
+          geom_density(aes(fill = true_out), alpha = 0.5, colour = NA) +
+          {
+            if("forecast_interval" %in% x) {
+              facet_wrap(~forecast_interval, scales = "free")
+            }
+          } +
+          scale_fill_brewer(palette = "Dark2") +
+          theme(
+            axis.text.x  = element_text(size = 10)
+            , axis.text.y  = element_text(size = 10)
+            , axis.title.x = element_text(size = 12)
+            , axis.title.y = element_text(size = 12)
+          ) +
+          xlab("Predicted Probability of Outbreak (logit scale)") +
+          ylab("Density") +
+          ggtitle(paste(
+            "Prediction Period = "
           , strsplit(model_out$assess_range, " ")[[1]] %>% paste(., collapse = " - ")
-        ))
-    }
-  
-  
-  pred_map2.r <- map_sf2.r %>% 
-    mutate(true_out = as.factor(true_out)) %>% 
-    filter(!is.na(prob_pred)) %>% {
-      ggplot(.) +
-        geom_sf(aes(fill = prob_pred), colour = NA, linewidth = 0, alpha = 0.2) +
-        geom_sf(
-          data = map_sf2.r %>% 
-            mutate(true_out = as.factor(true_out)) %>% 
-            filter(!is.na(prob_pred)) %>%
-            filter(true_out == 1)
-          , aes(fill = prob_pred), colour = "black", linewidth = 0.4
-          , alpha = 0.2
-        ) +
-        scale_fill_viridis_c(name = "Pr(outbreak)", limits = c(0, 1), oob = scales::squish) +
-        coord_sf() +
-        theme_void() +
-        labs(title = "Predicted Outbreak Probability by Region") +
-        ggtitle(paste(
-          "Prediction Period = "
-          , strsplit(model_out$assess_range, " ")[[1]] %>% paste(., collapse = " - ")
-        ))
-    }
-  
-  return(
-    tibble(
-        outer_fold_id  = model_out$outer_fold_id
-      , index          = model_out$assess_data
-      , metrics        = model_out$metrics
+          ))
+      }
+    
+    map_list <- lapply(unique(dat.s$date) %>% as.list(), FUN = function(d) {
+      
+      if ("shapeName" %in% x) {
+        map.dat.s <- eval_regions %>% left_join(., dat.s)
+      } else {
+        map.dat.s <- africa_sf %>% left_join(., dat.s)
+      }
+      
+      map.dat.s %>% 
+        mutate(true_out = as.factor(true_out)) %>% 
+        filter(!is.na(prob_pred)) %>%
+        filter(date == d) %>% {
+          ggplot(.) +
+            geom_sf(aes(fill = prob_pred), colour = NA, linewidth = 0, alpha = 0.2) +
+            geom_sf(
+              data = map.dat.s %>% 
+                mutate(true_out = as.factor(true_out)) %>% 
+                filter(!is.na(prob_pred)) %>%
+                filter(date == d) %>%
+                filter(true_out == 1)
+              , aes(fill = prob_pred), colour = "black", linewidth = 0.4
+              , alpha = 1
+            ) +
+            scale_fill_viridis_c(name = "Pr(outbreak)", limits = c(0, 1), oob = scales::squish) +
+            coord_sf() +
+            theme_void() +
+            labs(title = "Predicted Outbreak Probability by Region") +
+            {
+              if("forecast_interval" %in% x) {
+                facet_wrap(~forecast_interval)
+              }
+            } +
+            ggtitle(paste("Prediction Date = ", d))
+        }
+      
+    })
+    
+    return(
+      tibble(
+        aggregation    = z
       , conf_mat       = conf_mat %>% list()
       , conf_mat_plot  = conf_mat_plot %>% list()
+      , calcurves      = calcurves %>% list()
+      , plotted_calibration = plotted_calibration %>% list()
       , prob_dens_plot = prob_dens_plot %>% list()
-      , predictions_split     = preds_summarized1 %>% list()
-      , predictions_collpased = preds_summarized2 %>% list()
-      , map_split      = pred_map1 %>% list()
-      , map_collapsed  = pred_map2 %>% list()
-      , map_split_coarse    = pred_map1.r %>% list()
-      , map_collapsed_coars = pred_map2.r %>% list()
-    )
-  )
+      , map_split      = map_list %>% list()
+      )
+    ) 
     
+  })
+ 
+ out_list <- out_list %>% 
+   bind_rows() %>% 
+   mutate(
+      outer_fold_id  = model_out$outer_fold_id
+    , index          = model_out$assess_data
+    , metrics        = model_out$metrics
+   )
+ 
+ return(out_list)
+  
 }
 examine_fits_across <- function(ex_within, model_out, test_data, region_districts, africa_sf, using_hexes) {
   
