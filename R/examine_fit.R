@@ -5,15 +5,18 @@
 
 #' @param model_out target model_out_for_eval
 #' @param test_data splitted_data$test_data
-#' @param region_districts region_districts
+#' @param regions broken up area map
 #' @param larger_districts performance_hexes or just set to NULL if not using hexes or if you dont want to evaluate at a larger scale
 #' @param africa_sf path to saved previously cleaned combined sf of all sub-regions (created with combine_africa_sf)
+#' @param region_to_sum country or other region type into which to summarize predictions
 #' @param p_thresh probability over which to assign a one
 #' @return Tibble of summary metrics of model fit
 #' @author Morgan Kain
 #' @export
 
-examine_fits_within <- function(model_out, test_data, region_districts, larger_districts, africa_sf, p_thresh, using_hexes) {
+examine_fits_within <- function(model_out, test_data, regions, larger_districts
+                                , africa_sf, region_to_sum, p_thresh, using_hexes
+                                ) {
 
   ## Load the previously created / saved Africa map of sub-regions per Country
   if (!using_hexes) {
@@ -21,12 +24,12 @@ examine_fits_within <- function(model_out, test_data, region_districts, larger_d
       mutate(country_norm = norm_key(country),
              region_norm  = norm_key(region))
   } else {
-    africa_sf <- region_districts[[1]] %>% 
+    africa_sf <- regions[[1]] %>% 
       rename(region_norm = shapeName) %>% mutate(country_norm = "null")
     if (!is.null(larger_districts)) {
       eval_regions <- larger_districts[[1]] 
-      africa_sf <- africa_sf %>% mutate(shapeName = h3jsr::get_parent(region_norm, 2)) 
-     }
+      africa_sf    <- africa_sf %>% mutate(shapeName = h3jsr::get_parent(region_norm, 2)) 
+    }
   }
   
   ## Combine predictions with the data
@@ -44,10 +47,32 @@ examine_fits_within <- function(model_out, test_data, region_districts, larger_d
     )
   
   ## Add in the larger H3 hexes
+  if (!is.null(larger_districts)) {
   dat_with_pred <- dat_with_pred %>%
     rename(region_norm = shapeName) %>% 
     left_join(africa_sf %>% as.data.frame() %>% dplyr::select(region_norm, shapeName)) %>%
     relocate(shapeName, .after = "region_norm")
+  }
+  
+  ## And finally other country-level or regions if desired
+  if (!is.null(region_to_sum)) {
+    
+    intersecting_hexes <- st_intersects(region_to_sum[[1]], africa_sf) %>% as.data.frame() %>%
+      rename(area_index = row.id, index = col.id)
+    
+    dat_with_pred <- dat_with_pred %>% 
+      rename(region_norm = shapeName) %>% 
+      left_join(
+        .
+      , africa_sf %>% as.data.frame() %>% dplyr::select(region_norm) %>%
+         mutate(index = seq(n())) %>% left_join(intersecting_hexes) %>% 
+         filter(!is.na(area_index)) %>% dplyr::select(-index)
+      ) %>% filter(!is.na(area_index)) %>%
+      left_join(
+        .
+      , region_to_sum[[1]] %>% as.data.frame() %>% dplyr::select(shapeName) %>% mutate(area_index = seq(n()))
+      ) 
+  }
   
   ## Do all of the performance summaries for each date, for:
    ## A) No aggregation: each small hex for each forecast window
@@ -55,12 +80,21 @@ examine_fits_within <- function(model_out, test_data, region_districts, larger_d
    ## C) Temporal aggregation: small hexes across forecast windows
    ## D) Double aggregation: larger hexes across forecast windows
   
-  aggregation_list <- list(
-    "No aggregation"       = c("date", "region_norm", "forecast_interval")
-  , "Spatial aggregation"  = c("date", "shapeName", "forecast_interval")
-  , "Temporal aggregation" = c("date", "region_norm")
-  , "Double aggregation"   = c("date", "shapeName")
-  )
+  if (!is.null(larger_districts) & !is.null(region_to_sum)) {
+    stop("Exactly one of larger_districts or region_to_sum should be NULL")
+  } else if (!is.null(larger_districts)) {
+    aggregation_list <- list(
+      "No aggregation"       = c("date", "region_norm", "forecast_interval")
+    , "Spatial aggregation"  = c("date", "shapeName", "forecast_interval")
+    , "Temporal aggregation" = c("date", "region_norm")
+    , "Double aggregation"   = c("date", "shapeName")
+    )
+  } else {
+    aggregation_list <- list(
+      "Spatial aggregation"  = c("date", "shapeName", "forecast_interval")
+    , "Double aggregation"   = c("date", "shapeName")
+    )
+  }
   
  out_list <- purrr::pmap(list(aggregation_list, names(aggregation_list)), .f = function(x, z) {
     
@@ -85,8 +119,20 @@ examine_fits_within <- function(model_out, test_data, region_districts, larger_d
       caltib      = calcurves
     , xg          = NULL 
     , yg          = ifelse("forecast_interval" %in% x, "forecast_interval", NA)
-    , forcastvals = ifelse("forecast_interval" %in% x, c(30, 90, 150), NA)
+    , forcastvals = if("forecast_interval" %in% x){c(30, 90, 150)}else{NA}
     )
+    
+    ## Summary table
+    summary_probs <- dat.s %>% dplyr::group_by(across(all_of(
+      c(x, "true_out")[c(x, "true_out") %notin% c("region_norm", "shapeName")]
+    ))) %>%
+      summarize(
+        lwr   = quantile(prob_pred, 0.025)
+      , lwr_n = quantile(prob_pred, 0.200)
+      , mid   = quantile(prob_pred, 0.500)
+      , ur_n  = quantile(prob_pred, 0.800)
+      , upr   = quantile(prob_pred, 0.975)
+        )
     
     ## Confusion matrix -- just doing it by hand to avoid issues
     conf_mat <- purrr::map(seq_along(p_thresh), .f = function(i) {
@@ -171,7 +217,13 @@ examine_fits_within <- function(model_out, test_data, region_districts, larger_d
     map_list <- lapply(unique(dat.s$date) %>% as.list(), FUN = function(d) {
       
       if ("shapeName" %in% x) {
-        map.dat.s <- eval_regions %>% left_join(., dat.s)
+        if (!is.null(larger_districts) & !is.null(region_to_sum)) {
+          stop("Exactly one of larger_districts or region_to_sum should be NULL")
+        } else if (!is.null(larger_districts)) {
+          map.dat.s <- eval_regions %>% left_join(., dat.s)
+        } else {
+          map.dat.s <- region_to_sum[[1]] %>% left_join(., dat.s)
+        }
       } else {
         map.dat.s <- africa_sf %>% left_join(., dat.s)
       }
@@ -208,6 +260,8 @@ examine_fits_within <- function(model_out, test_data, region_districts, larger_d
     return(
       tibble(
         aggregation    = z
+      , date_range     = unique(dat.s$date) %>% list()
+      , summary_probs  = summary_probs %>% list()
       , conf_mat       = conf_mat %>% list()
       , conf_mat_plot  = conf_mat_plot %>% list()
       , calcurves      = calcurves %>% list()
@@ -230,134 +284,6 @@ examine_fits_within <- function(model_out, test_data, region_districts, larger_d
  return(out_list)
   
 }
-examine_fits_across <- function(ex_within, model_out, test_data, region_districts, africa_sf, using_hexes) {
-  
-  ## Load the previously created / saved Africa map of sub-regions per Country
-   ## for use later
-  if (!using_hexes) {
-    africa_sf <- readRDS(africa_sf) %>%
-      mutate(country_norm = norm_key(country),
-             region_norm  = norm_key(region))
-  } else {
-    africa_sf <- region_districts[[1]] %>% 
-      rename(region_norm = shapeName) %>% mutate(country_norm = "null")
-  }
-  
-  ## Looking at correct and incorrect assignments across time
-  conf_mats.s <- ex_within %>% 
-    left_join(., model_out %>% dplyr::select(outer_fold_id, assess_range)) %>%
-    dplyr::select(outer_fold_id, assess_range, conf_mat) %>% unnest(cols = c(conf_mat)) %>%
-    rowwise() %>%
-    mutate(assess_range = strsplit(assess_range, " ")[[1]][2] %>% as.Date(.)) %>% 
-    group_by(assess_range, positive_threshold, outbreak, outbreak_assigned) %>%
-    summarize(nout = sum(nout)) %>%
-    group_by(assess_range, positive_threshold) %>%
-    mutate(noutp = nout / sum(nout)) %>%
-    ungroup() %>%
-    filter(positive_threshold %in% c(0.1, 0.2, 0.3, 0.4, 0.5)) %>% 
-    mutate(positive_threshold = as.factor(positive_threshold)) %>%
-    mutate(correct = ifelse(outbreak == outbreak_assigned, 1, 0))
-  
-  gg_mat1 <- conf_mats.s %>% filter(correct == 1) %>% 
-    mutate(outbreak = plyr::mapvalues(outbreak, from = c(0, 1), to = c("No Outbreak", "Yes Outbreak"))) %>% {
-      ggplot(., aes(assess_range, nout)) + 
-        geom_line(aes(colour = positive_threshold)) +
-        scale_colour_brewer(palette = "Dark2", name = "Positive
-Threshold") +
-        xlab("Assessment Period (last day of three month period)") +
-        ylab("Number Correct") +
-        facet_wrap(~outbreak, scales = "free") +
-        theme(
-          axis.text.x  = element_text(size = 10)
-        , axis.text.y  = element_text(size = 10)
-        , axis.title.x = element_text(size = 12)
-        , axis.title.y = element_text(size = 12)
-          )
-  }
-  
-  gg_mat2 <- conf_mats.s %>% filter(correct == 0) %>%
-    mutate(outbreak = plyr::mapvalues(outbreak, from = c(0, 1), to = c("No Outbreak", "Yes Outbreak"))) %>% {
-    ggplot(., aes(assess_range, nout)) + 
-      geom_line(aes(colour = positive_threshold)) +
-      scale_colour_brewer(palette = "Dark2", name = "Positive
-Threshold") +
-      xlab("Assessment Period (last day of three month period)") +
-      ylab("Number Incorrect") +
-      facet_wrap(~outbreak, scales = "free") +
-        theme(
-          axis.text.x  = element_text(size = 10)
-        , axis.text.y  = element_text(size = 10)
-        , axis.title.x = element_text(size = 12)
-        , axis.title.y = element_text(size = 12)
-          )
-  }
-  
-  gg.matf <- gridExtra::arrangeGrob(gg_mat1, gg_mat2, nrow = 2)
-  
-  ## Looking at predictions across regions
-  region.s <- ex_within %>% 
-    pull(predictions_split) %>% 
-    do.call("rbind", .) %>%
-    group_by(country_norm, region_norm, true_out) %>%
-    summarize(
-      lwr   = quantile(prob_pred, 0.025) 
-    , lwr_n = quantile(prob_pred, 0.200) 
-    , mid   = quantile(prob_pred, 0.500) 
-    , upr_n = quantile(prob_pred, 0.800) 
-    , upr   = quantile(prob_pred, 0.975) 
-    )
-  
-  ## And a plot-specific map
-  region.s.t   <- region.s %>% dplyr::select(-contains("lwr"), -contains("upr"))
-  region.s.t.m <- rbind(
-    region.s.t %>% dplyr::select(country_norm, region_norm) %>% distinct() %>%
-      mutate(true_out = 0)
-  , region.s.t %>% dplyr::select(country_norm, region_norm) %>% distinct() %>%
-      mutate(true_out = 1)
-  ) %>% left_join(.,  region.s.t )
-  
-  country.s <- ex_within %>% 
-    pull(predictions_split) %>% 
-    do.call("rbind", .) %>%
-    group_by(country_norm, true_out) %>%
-    summarize(
-      lwr   = quantile(prob_pred, 0.025) 
-    , lwr_n = quantile(prob_pred, 0.200) 
-    , mid   = quantile(prob_pred, 0.500) 
-    , upr_n = quantile(prob_pred, 0.800) 
-    , upr   = quantile(prob_pred, 0.975) 
-    )
-  
-  ## Make plots with these summaries
-  
-  map_sf <- africa_sf %>% left_join(., region.s.t.m, by = c("country_norm", "region_norm")) 
-  
-  pred_map <- map_sf %>% 
-    filter(!is.na(true_out)) %>%
-    mutate(true_out = as.factor(true_out)) %>% 
-    mutate(alpha_down = ifelse(is.na(mid), 1, 0)) %>% 
-    mutate(true_out = plyr::mapvalues(true_out, from = c(0, 1), to = c("No Outbreak", "Yes Outbreak"))) %>% {
-      ggplot(.) +
-        geom_sf(aes(fill = mid, alpha = alpha_down)
-                , colour = "black", linewidth = 0.01) +
-        scale_fill_viridis_c(name = "Pr(outbreak)", limits = c(0, 1)
-                             , oob = scales::squish) +
-        scale_alpha_binned(range = c(1, 0.3)) +
-        guides(alpha = "none") +
-        coord_sf() +
-        theme_void() +
-        facet_wrap(~true_out)
-    }
-  
-  return(
-    tibble(
-      conf_mat_time = gg.matf %>% list()
-    , map_pred_time = pred_map %>% list()
-    )
-  )
-
-}
-
 
 ## Series of helper functions for debugging
 combine_africa_sf  <- function(sf_list) {

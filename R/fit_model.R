@@ -51,9 +51,9 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weighting
     , sep = "")
 
   ## Loading these Rds are very slow, so just checking that they exist
-  if (file.exists(save_filename2) & !overwrite) {
+  if (file.exists(save_filename) & !overwrite) {
     message("file already exists and can be loaded, skipping processing")
-    return(save_filename2)
+    return(save_filename)
   }
   
   ## Extract the needed data

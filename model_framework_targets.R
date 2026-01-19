@@ -80,7 +80,7 @@ model_data_targets <- tar_plan(
 
   ## Pulls all African countries. Alternatively can just provide a single country
    ## directly to get_region_districts below
-, tar_target(which_countries, unique(region_data$Country))
+, tar_target(which_countries, "South Africa")
 
   ## Sub-regions of region[s] of interest
 , tar_target(region_districts, get_region_districts(which_countries))
@@ -146,7 +146,7 @@ cross_validation_targets <- tar_plan(
    , tol                       = 1E-9
    , growth_option             = "balanced"
    , seed                      = 10010
-   , overwrite                 = TRUE))
+   , overwrite                 = FALSE))
 
   ## Quick aside to plot the folded map
 , tar_target(plot_spatial_folds, clustered_Africa_districts %>% 
@@ -392,27 +392,52 @@ model_evaluation_targets <- tar_plan(
   ## Evaluate fit in a few other ways apart from calibration curves:
    ## comparing prob to truth across space and time, distributions of probabilities for true ones, confusion matrix 
    ## as a function of different probability cutoffs, etc.
-, tar_target(examined_fits_within, examine_fits_within(
+, tar_target(examined_fits_within_pan, examine_fits_within(
     model_out        = model_out_for_eval
   , test_data        = splitted_data$test_data[[1]]
-  , region_districts = region_map
+  , regions          = region_map
   , larger_districts = performance_hexes
   , africa_sf        = path_to_simplifed_regions
+  , region_to_sum    = NULL
   , p_thresh         = positive_threshold
   , using_hexes      = using_hexes)
   , pattern = map(model_out_for_eval)
   , error   = "null")
 
-  ## Then take all of the within-test period summaries and compare model performance broadly
-   ## across all of these fitting periods (e.g., specific periods of time, specific countries etc.)
-, tar_target(examined_fits_across, examine_fits_across(
-    ex_within        = examined_fits_within
-  , model_out        = model_out_for_eval
+, tar_target(examined_fits_within_country, examine_fits_within(
+    model_out        = model_out_for_eval
   , test_data        = splitted_data$test_data[[1]]
-  , region_districts = region_map
+  , regions          = region_map
+  , larger_districts = NULL
   , africa_sf        = path_to_simplifed_regions
-  , using_hexes      = using_hexes))
-  
+  , region_to_sum    = region_districts
+  , p_thresh         = positive_threshold
+  , using_hexes      = using_hexes)
+  , pattern = map(model_out_for_eval)
+  , error   = "null")
+
+## For speed and RAM considerations, extract out pieces for individual exploration as
+ ## targets, and can the more easily plot / explore from these extracted pieces
+, tar_target(ex_fits.summary_probs, {
+    examined_fits_within_pan %>% 
+    dplyr::select(outer_fold_id, aggregation, summary_probs) %>% 
+    unnest(summary_probs)
+  })
+, tar_target(ex_fits.plotted_calibration, {
+    examined_fits_within_pan %>% 
+    dplyr::select(outer_fold_id, aggregation, plotted_calibration) %>% 
+    unnest(plotted_calibration)
+  })
+, tar_target(ex_fits.prob_dens_plot, {
+    examined_fits_within_pan %>% 
+    dplyr::select(outer_fold_id, aggregation, prob_dens_plot) 
+  })
+, tar_target(ex_fits.map_split, {
+    examined_fits_within_pan %>% 
+    dplyr::select(outer_fold_id, aggregation, date_range, map_split) %>% 
+    unnest(c(date_range, map_split))
+  })
+
 )
 
 ## Reports ---------------------------------------------------------------------
