@@ -92,13 +92,14 @@ lag_join_aggregate <- function (
         soil_drainage
         , from = soil_drainage_key$old
         , to   = soil_drainage_key$new
-      ) %>% as.numeric()
-      , soil_texture = as.numeric(soil_texture)
+      ) 
+    ) %>% mutate(
+      soil_texture  = as.factor(soil_texture)
+    , soil_drainage = as.factor(soil_drainage)
     )
   })
   
-  ## First, find the variables that are static and forecasted -- these do not
-  ## need to be lagged
+  ## First, find the variables that are static and forecasted -- these do not need to be lagged
   
   ## Covariates for lagging
   lagging_names <- fdat %>% dplyr::select(
@@ -150,14 +151,45 @@ lag_join_aggregate <- function (
   ## and then reduce
   fdat.final <- fdat.fcc %>% 
     dplyr::select(-c(x, y, doy, month, year)) %>%
-    group_by(shapeName, Country, date, forecast_interval) %>% 
-    summarize(across(where(is.numeric), ~ mean(.x, na.rm = TRUE)), .groups = "keep") %>%
+    group_by(shapeName, date, forecast_interval) %>% 
+    summarize(
+      across(where(is.numeric), ~ mean(.x, na.rm = TRUE))
+    , across(where(is.factor), ~ stat_mode(.x, na.rm = TRUE))  
+    , .groups = "keep") %>%
     mutate(outbreak = ifelse(cases > 0, 1, 0), .after = cases) %>%
     ## Finally, second step in dealing with NAN or infinite: 2) convert (rare) NAN, NA, and inf to 0
     mutate(across(starts_with("anomaly"), ~ replace(., is.nan(.), 0))) %>%
     mutate(across(starts_with("anomaly"), ~ replace(., is.na(.), 0))) %>%
     mutate(across(starts_with("anomaly"), ~ replace(., is.infinite(.), 0))) %>%
     ungroup()
+  
+  ## and get country and ADM2 region for each hex and the proportion of that hex in that country and ADM2 region
+  dominant_country <- fdat.fcc %>% 
+    dplyr::select(Country, shapeName) %>% 
+    group_by(shapeName, Country) %>%
+    summarize(n = n()) %>%
+    ungroup(Country) %>%
+    mutate(Proportion_Country = n / sum(n)) %>%
+    arrange(desc(Proportion_Country)) %>%
+    slice(1) %>% 
+    ungroup() %>%
+    dplyr::select(-n)
+  dominant_ADM2 <- fdat.fcc %>% 
+    dplyr::select(ADM2, shapeName) %>% 
+    group_by(shapeName, ADM2) %>%
+    summarize(n = n()) %>%
+    ungroup(ADM2) %>%
+    mutate(Proportion_ADM2 = n / sum(n)) %>%
+    arrange(desc(Proportion_ADM2)) %>%
+    slice(1) %>% 
+    ungroup() %>%
+    dplyr::select(-n)
+  
+  ## Finally, now have the country and ADM2 that has the largest share of the H3 hex
+  fdat.final <- fdat.final %>%
+    left_join(., dominant_country) %>% 
+    left_join(., dominant_ADM2) %>% 
+    relocate(c(Country, Proportion_Country, ADM2, Proportion_ADM2), .after = shapeName)
   
   arrow::write_parquet(fdat.final, save_filename, compression = "gzip", compression_level = 5)
   
@@ -273,7 +305,7 @@ combine_lja <- function(
 }
 
 
-join_in_sero_layer <- function(region_dat, sero_layer) {
+join_in_sero_layer <- function(region_dat, sero_layer, overwrite) {
   
   ## 0) Logistics stuff
   

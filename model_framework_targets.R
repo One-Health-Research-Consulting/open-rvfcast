@@ -4,9 +4,8 @@
 
 ## NOTES / ToDo ----------------------------------------------------------------
 
-## 1) Implement some computation speedup choices
-## 2) Finalize covariate selection and model definition
-## 3) Get up and running on the server
+## 1) Revisit model definition
+## 2) Summarize output / create report
 
 ## Setup / Preamble ------------------------------------------------------------
 
@@ -59,12 +58,16 @@ model_data_targets <- tar_plan(
 , tar_target(region_data_path
              , paste("data/", region_name, "_joined_response_data/"
              , region_name, "_joined_response_data_final_with_sero.parquet"
-             , sep = ""))
+             , sep = ""), format  = "file")
 
   ## Load and mask forecast data so that forecasts further out than the summarized
    ## outbreak data are NA
 , tar_target(region_data_raw, read_parquet(region_data_path) %>% 
-               ungroup() %>% mutate(index = seq(n()), .before = 1))
+               ungroup() %>% 
+               mutate(index = seq(n()), .before = 1) %>%
+               mutate(
+                 soil_texture = as.numeric(as.factor(soil_texture))
+               , soil_drainage = as.numeric(as.factor(soil_drainage))))
 
   ## Reduce down to already scaled covariates and scale the other unbounded covariates so that
    ## covariates are roughly on the same scale
@@ -189,7 +192,7 @@ cross_validation_targets <- tar_plan(
   , type              = "test_data"
   , sf_districts      = clustered_Africa_districts
   , assess_time_chunk = max(forecast_horizon)
-  , step_size         = max(forecast_horizon) + max_lag_period
+  , step_size         = max(forecast_horizon) 
   , n_spatial_folds   = NULL
   , district_id_col   = district_id_col
   , seed              = 10001
@@ -232,7 +235,7 @@ model_tuning_targets <- tar_plan(
       ## Total number of combinations of hyperparameters
       , size = size)) %>% mutate(index = seq(n()), .before = 1))
 
-, tar_target(id_cols, c("shapeName", "Country", "date", "index"))
+, tar_target(id_cols, c("shapeName", "Proportion_Country", "ADM2", "Proportion_ADM2", "date", "index"))
 
   ## probability value over which a one is assigned
 , tar_target(positive_threshold, seq(0.05, 0.95, by = 0.05))
@@ -283,14 +286,14 @@ model_tuning_targets <- tar_plan(
   ## NOTE: temporary minimal for working on downstream pipeline
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
       folded_data = folded_data_training_DEBUG %>% dplyr::select(outer_fold_id, inner_folds)
-    , inner_ids   = inner_fold_id_finalized_DEBUG
+    , inner_ids   = inner_fold_id_finalized_DEBUG[1, ]
     , raw_data    = splitted_data$train_data[[1]]
     , threshold   = positive_threshold
     , weightings  = weightings_on_ones
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
-    , overwrite   = FALSE
-    , DEBUG       = FALSE)
+    , overwrite   = TRUE
+    , DEBUG       = TRUE)
   , pattern = map(inner_fold_id_finalized_DEBUG)
   , error   = "null"
   , format  = "file")
@@ -310,7 +313,7 @@ model_tuning_targets <- tar_plan(
      ## the more weight given to logloss (and thus penalizing high probabilities
      ## when there are true 0s). In the case of 'binomial' the larger the number the
      ## more weight given to predicting true 1s with high probability
-  , weightval    = 0.25
+  , weightval    = 1E-5
     ## Currently both options are to maximize
   , direction    = "max"))
 
@@ -323,8 +326,8 @@ model_tuning_targets <- tar_plan(
   , weightings     = weightings_on_ones
   , id_cols        = id_cols
   , out_dir        = outer_folds_dir2
-  , overwrite      = FALSE
-  , DEBUG          = FALSE)
+  , overwrite      = TRUE
+  , DEBUG          = TRUE)
   , pattern = map(folded_data_training_DEBUG)
   , error   = "null"
   , format  = "file")
@@ -335,7 +338,7 @@ model_tuning_targets <- tar_plan(
   , training_dat = splitted_data$train_data[[1]]
     ## See notes in tuned_results_joined
   , metric       = "mix"
-  , weightval    = 0.25
+  , weightval    = 1E-5
   , direction    = "max"))
 
 )
@@ -419,24 +422,42 @@ model_evaluation_targets <- tar_plan(
 ## For speed and RAM considerations, extract out pieces for individual exploration as
  ## targets, and can the more easily plot / explore from these extracted pieces
 , tar_target(ex_fits.summary_probs, {
-    examined_fits_within_pan %>% 
+    tf <- examined_fits_within_pan %>% 
     dplyr::select(outer_fold_id, aggregation, summary_probs) %>% 
     unnest(summary_probs)
-  })
+    saveRDS(tf, "outputs/ex_fits.summary_probs.Rds")
+    "outputs/ex_fits.summary_probs.Rds"
+  }, error   = "null"
+   , format  = "file")
 , tar_target(ex_fits.plotted_calibration, {
-    examined_fits_within_pan %>% 
+    tf <- examined_fits_within_pan %>% 
     dplyr::select(outer_fold_id, aggregation, plotted_calibration) %>% 
     unnest(plotted_calibration)
-  })
+    saveRDS(tf, "outputs/ex_fits.plotted_calibration.Rds")
+    "outputs/ex_fits.plotted_calibration.Rds"
+  }, error   = "null"
+   , format  = "file")
 , tar_target(ex_fits.prob_dens_plot, {
-    examined_fits_within_pan %>% 
+    tf <- examined_fits_within_pan %>% 
     dplyr::select(outer_fold_id, aggregation, prob_dens_plot) 
-  })
+    saveRDS(tf, "outputs/ex_fits.prob_dens_plot.Rds")
+    "outputs/ex_fits.prob_dens_plot.Rds"
+  }, error   = "null"
+   , format  = "file")
 , tar_target(ex_fits.map_split, {
-    examined_fits_within_pan %>% 
+    tf <- examined_fits_within_pan %>% 
     dplyr::select(outer_fold_id, aggregation, date_range, map_split) %>% 
     unnest(c(date_range, map_split))
-  })
+    saveRDS(tf, "outputs/ex_fits.map_split.Rds")
+    "outputs/ex_fits.map_split.Rds"
+  }, error   = "null"
+   , format  = "file")
+
+## Figures with the above saved exploration
+, tar_target(summary_probs.plots, plot.summary_probs(ex_fits.summary_probs))
+, tar_target(plotted_calibration.plots, plot.plotted_calibration(ex_fits.plotted_calibration))
+, tar_target(prob_dens_plot.plots, plot.prob_dens_plot(ex_fits.prob_dens_plot))
+, tar_target(map_split.plots, plot.map_split(ex_fits.map_split))
 
 )
 

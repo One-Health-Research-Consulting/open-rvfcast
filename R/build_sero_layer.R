@@ -1,28 +1,23 @@
 #' Make the predictions for sero ~ cases across all of space and time to match the 
 #' other prepared covariates
 
-#' @title build_sero_layer
+#' @title sero layer functions
 
 #' @param fitted_stan_model path to fitted stan model
 #' @param sero_cases_dat prepped data
 #' @param cov_dat path to otherwise completed dataset
 #' @param map_dat spatial groupings
+#' @param time_adjustment boolean to overwrite fitted temporal decay curve with a more defined curve (from a priori knowledge)
+#' @param the_pairs links from all hex-date combos to all relevant outbreaks
+#' @param with_outbreaks seroprevalence estimates for all of the the_pairs
+#' @param the_samps cleaned up samples
 #' @param outpath path to the saved
 #' @param overwrite 
 #' @return tibble of data
 #' @author Morgan Kain
 #' @export
 
-build_sero_layer <- function(fitted_stan_model, sero_cases_dat, cov_dat, map_dat, outpath, overwrite) {
-  
-  if (file.exists(outpath) & !overwrite) {
-    print("Layer already generated from fitted stan model, returning previously saved covariate layer")
-    return(outpath)
-  }
-  
-  ## First do a bit of work to extract the stan model coefficients
-  stan_fit  <- readRDS(fitted_stan_model)
-  samps     <- as.array(stan_fit) 
+prep_all_pairs           <- function(sero_cases_dat, cov_dat, map_dat) {
   
   ## grab the stan data to get the correct indices for the H3 hex names
   stan_data <- sero_cases_dat$stan_data[[1]]
@@ -40,7 +35,7 @@ build_sero_layer <- function(fitted_stan_model, sero_cases_dat, cov_dat, map_dat
   cases_sf <- sero_cases_dat$cases_sf[[1]]
   
   ## For each unique H3 hex, find all of the possible oubtreaks that could contribute to that
-   ## hex, regardless of date (figure out date in the next step below)
+  ## hex, regardless of date (figure out date in the next step below)
   possible_idx.f <-  purrr::map(1:nrow(all_dates_sf), .f = function(i) {
     
     ## this row
@@ -53,7 +48,7 @@ build_sero_layer <- function(fitted_stan_model, sero_cases_dat, cov_dat, map_dat
       mutate(
         ## Figure out the window in time from this outbreak over which it can contribute serology
         date_max  = date + 8*365
-      , distances = dists[which(dists <= 1000)]
+        , distances = dists[which(dists <= 1000)]
       ) %>% rename(h3_case = h3_id) %>%
       mutate(h3_id = all_dates_sf[i, ]$shapeName, .before = 1) %>%
       as.data.frame() %>%
@@ -100,16 +95,47 @@ build_sero_layer <- function(fitted_stan_model, sero_cases_dat, cov_dat, map_dat
     filter(time_diff <= 8, time_diff > 0) %>%
     split_tibble(., c("h3_id", "date"))
   
-  all_dates_with_outbreaks <- lapply(all_dates.prepped, FUN = function(x) {
+  return(split(all_dates.prepped, ceiling(seq_along(all_dates.prepped) / 2000)))
+  
+}
+prep_samps               <- function(fitted_stan_model, time_adjustment) {
+  
+  ## First do a bit of work to extract the stan model coefficients
+  param_samps  <- readRDS(fitted_stan_model)
+  
+  ## Don't need them all so drop some
+  param_samps  <- param_samps[sample.int(dim(param_samps)[1], 2000),,]
+  ## Exponentiate the needed params
+  param_samps[,,3] <- param_samps[,,3] %>% exp()
+  param_samps[,,4] <- param_samps[,,4] %>% exp()
+  
+  ## Pull down the temporal decay rate if desired
+  if (time_adjustment) {
+    param_samps[,,4] <- param_samps[,,4] / 10
+  }
+  
+  return(param_samps)
+  
+}
+prep_all_dates           <- function(cov_dat) {
+  ## Load the covariate stack and strip out the unique combination of H3 and dates
+  all_dates <- read_parquet(cov_dat) %>% dplyr::select(shapeName, date) %>% distinct()
+  return(all_dates)
+}
+build_sero_for_outbreaks <- function(the_pairs, the_samps) {
+  
+  the_pairs <- the_pairs[[1]]
+  
+  all_dates_with_outbreaks <- lapply(the_pairs, FUN = function(x) {
     
     predval <- get_pred(
-        b0    = samps[,, 1] %>% c()
-      , b     = the_bs[,,x$idx[1]] %>% c()
-      , alpha = samps[,, 2] %>% c()
-      , rho_d = samps[,, 3] %>% c() %>% exp() 
-      , rho_t = samps[,, 4] %>% c() %>% exp()
-      , dists = x$distances
-      , times = x$time_diff
+      b0    = the_samps[,, 1] %>% c()
+    , b     = the_samps[,,5:dim(the_samps)[3]] %>% c()
+    , alpha = the_samps[,, 2] %>% c()
+    , rho_d = the_samps[,, 3] %>% c() %>% exp() 
+    , rho_t = the_samps[,, 4] %>% c() %>% exp()
+    , dists = x$distances
+    , times = x$time_diff
     )
     
     tibble(
@@ -120,18 +146,35 @@ build_sero_layer <- function(fitted_stan_model, sero_cases_dat, cov_dat, map_dat
     
   }) %>% do.call("rbind", .)
   
+  return(all_dates_with_outbreaks)
+  
+}
+finish_sero_layer        <- function(sero_cases_dat, samps, with_outbreaks, all_dates, outpath, overwrite) {
+  
+  if (file.exists(outpath) & !overwrite) {
+    print("Layer already generated from fitted stan model, returning previously saved covariate layer")
+    return(outpath)
+  }
+  
+  map_data  <- sero_cases_dat$map_data[[1]]
+  
   all_dates_without_outbreaks <- all_dates %>% 
     rename(h3_id = shapeName) %>% 
-    left_join(., cells_with_outbreaks) %>%
+    left_join(., with_outbreaks) %>%
     left_join(., map_data %>% dplyr::select(-hexgroup)) %>%
     filter(is.na(pred_sero))
   
   all_dates_without_outbreaks <- all_dates_without_outbreaks %>% 
     rowwise() %>%
-    mutate(pred_sero = mean(samps[,, 1] %>% c() + the_bs[,,idx] %>% c()))
+    mutate(pred_sero = mean(
+      samps[,, 1] %>% c() + 
+      ## grab the appropriate conditional mode of the GRM
+      samps[,, 4 + idx] %>% c()
+      )
+    ) %>% dplyr::select(-idx)
   
   all_dates.f <- rbind(
-    all_dates_with_outbreaks
+    with_outbreaks
   , all_dates_without_outbreaks
   ) %>% 
     distinct() %>% 
@@ -139,14 +182,15 @@ build_sero_layer <- function(fitted_stan_model, sero_cases_dat, cov_dat, map_dat
     mutate(pred_sero = ifelse(is.na(pred_sero), mean(samps[,, 1] %>% c()), pred_sero))
   
   arrow::write_parquet(
-      all_dates.f
-    , outpath
-    , compression = "gzip", compression_level = 5
-    )
+    all_dates.f
+  , outpath
+  , compression = "gzip", compression_level = 5
+  )
   
   return(outpath)
   
 }
+
 
 #' Some helper functions
 

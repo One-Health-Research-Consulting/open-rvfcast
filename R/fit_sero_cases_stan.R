@@ -18,7 +18,7 @@ fit_sero_cases_stan <- function(stan_dat, outpath, overwrite) {
     
     stan_fit <- stan(
       file    = "models/sero_kernel_icar_base.stan"
-    , data    = stan_data
+    , data    = stan_dat
     , chains  = 4
     , iter    = 20000
     , warmup  = 5000
@@ -26,8 +26,11 @@ fit_sero_cases_stan <- function(stan_dat, outpath, overwrite) {
     , control = list(adapt_delta = 0.95, max_treedepth = 13)
     )
     
-    saveRDS(stan_fit, outpath)
-    
+    samps <- as.array(stan_fit)
+    the_bs      <- samps[,,which(grepl("b\\[", sampnames))]
+    param_samps <- samps[,,c(1:4, which(grepl("b\\[", sampnames)))]
+    saveRDS(param_samps, outpath)
+
     return(outpath)
     
 }

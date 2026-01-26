@@ -65,12 +65,43 @@ prep_cases_sero_dataset <- function(sero_dat, cases_dat, map_dat) {
     sero_df        = sero_df
   , outbreak_df    = cases_dat.c
   , support_hex_df = map_dat.reduced
+  , stripping_down = TRUE
   , use_magnitude  = FALSE
-  , R_km           = 500
-  , L_years        = 8
+  , R_km           = 1000
+  , L_years        = 5
+  )
+  
+  ## Drop all seroprevalence values with no linked epidemics, with these very loose criteria
+  sero_df.r <- sero_df %>% 
+    mutate(i = seq(n())) %>%
+    left_join(
+      .
+      , res %>% group_by(i) %>% summarize(n_linked = n())
+    ) %>% filter(!is.na(n_linked))
+  
+  res <- make_stan_data_from_real_h3_support(
+      sero_df = sero_df.r
+    , outbreak_df = cases_dat.c
+    , support_hex_df = map_dat.reduced
+    , use_magnitude  = FALSE
+    , R_km = 1000
+    , L_years = 5
   )
   
   stan_data <- c(res, C = C %>% list(), comp_id = comp_id %>% list())
+  
+  check_list <- c(
+    length(stan_data$comp_id) == stan_data$G
+  , max(stan_data$edge_u) <= stan_data$G
+  , max(stan_data$edge_v) <= stan_data$G
+  , max(stan_data$cell)   <= stan_data$G
+  , min(stan_data$cell)   >= 1
+  , min(stan_data$comp_id) >= 1
+  , max(stan_data$comp_id) == stan_data$C
+  , all(stan_data$comp_id[stan_data$edge_u] == stan_data$comp_id[stan_data$edge_v])
+  )
+  
+  if (any(!check_list)) {stop("Some indices are not aligning, debug in and check")}
   
   return(
     tibble(
@@ -152,6 +183,7 @@ make_stan_data_from_real_h3_support <- function(
     sero_df
   , outbreak_df
   , support_hex_df
+  , stripping_down = FALSE
   , h3_col_sero    = "h3_id"
   , h3_col_support = "h3_id"
   , sero_lat       = "lat"
@@ -268,6 +300,7 @@ make_stan_data_from_real_h3_support <- function(
   } else {
     pairs <- pairs %>% arrange(i)
   }
+  if (stripping_down) {return(pairs)}
   K <- nrow(pairs)
   
   ## Build the indexing ragged array vector for speedy computation

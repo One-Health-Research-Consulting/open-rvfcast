@@ -79,22 +79,12 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
    ## B) Spatial aggregation: larger hex for each forecast window
    ## C) Temporal aggregation: small hexes across forecast windows
    ## D) Double aggregation: larger hexes across forecast windows
-  
-  if (!is.null(larger_districts) & !is.null(region_to_sum)) {
-    stop("Exactly one of larger_districts or region_to_sum should be NULL")
-  } else if (!is.null(larger_districts)) {
-    aggregation_list <- list(
+  aggregation_list <- list(
       "No aggregation"       = c("date", "region_norm", "forecast_interval")
     , "Spatial aggregation"  = c("date", "shapeName", "forecast_interval")
     , "Temporal aggregation" = c("date", "region_norm")
     , "Double aggregation"   = c("date", "shapeName")
-    )
-  } else {
-    aggregation_list <- list(
-      "Spatial aggregation"  = c("date", "shapeName", "forecast_interval")
-    , "Double aggregation"   = c("date", "shapeName")
-    )
-  }
+  )
   
  out_list <- purrr::pmap(list(aggregation_list, names(aggregation_list)), .f = function(x, z) {
     

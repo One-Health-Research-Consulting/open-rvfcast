@@ -118,9 +118,9 @@ fold_data <- function(
   ## Join in the pre-created clustered Africa regions from the target clustered_Africa_districts
   
   coords.sorted <- sf_districts %>% 
-    dplyr::select(country, region, cluster, area_km2) %>%
+    dplyr::select(region, cluster, area_km2) %>%
     mutate(area_km2 = log(area_km2)) %>%
-    rename(Country = country, !!district_id_col := region) %>%
+    rename(!!district_id_col := region) %>%
     as.data.frame() %>% 
     dplyr::select(-geometry)
 
@@ -132,8 +132,7 @@ fold_data <- function(
   for (i in 1:nrow(outer_folds)) {
     
     tdat <- data %>% filter(index %in% (outer_folds[i, ] %>% pull(train_data) %>% unlist())) %>% 
-      left_join(., coords.sorted %>% mutate(Country = "NULL")
-                , by = c("shapeName", "Country")) %>% 
+      left_join(., coords.sorted, by = c("shapeName")) %>% 
       relocate(cluster, .after = index)
     
     outer_folds[i, ]$inner_folds <- tdat %>% dplyr::select(index, cluster) %>% list()

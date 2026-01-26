@@ -2,6 +2,13 @@
 
 `%notin%`    <- Negate(`%in%`)
 
+## get most common factor
+stat_mode <- function(x, na.rm = TRUE) {
+  if (na.rm) x <- x[!is.na(x)]
+  if (length(x) == 0) return(NA)
+  names(which.max(table(x)))
+}
+
 ## Split up data frame into list with entries defined by 'col'
 split_tibble <- function(tibble, col = 'col') {
   temp_list <- tibble %>% split(., .[, col])
