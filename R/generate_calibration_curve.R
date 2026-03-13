@@ -19,10 +19,10 @@ generate_calibration_curve <- function(preds, test_data, predname, truename, spl
   binoms.all <- preds %>% dplyr::group_by_at(splitgrp) %>% 
     dplyr::group_split() %>% purrr::map_dfr(function(dat) {
       
-      ## Optimized breaks using reliabilitydiag
+      ## Optimized breaks using reliability diag
       opt_breaks <- optimise_bins(dat, predname, truename) %>%
         get_optimised_bin_values() %>%
-        (\(x) x$breaks)()
+        (\(x) x$breaks)() %>% unique()
       
       ## And even breaks to get the full range
       even_breaks <- seq(0.00, 1, by = 0.025)

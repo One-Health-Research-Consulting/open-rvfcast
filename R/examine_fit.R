@@ -16,7 +16,20 @@
 
 examine_fits_within <- function(model_out, test_data, regions, larger_districts
                                 , africa_sf, region_to_sum, p_thresh, using_hexes
+                                , outpath, overwrite
                                 ) {
+  
+  print(model_out$outer_fold_id)
+  
+  if (is.null(region_to_sum)) {
+    outname <- paste(paste(outpath, "/", sep = ""), "predictions_raw_", model_out$outer_fold_id, ".Rds", sep = "")
+  } else {
+    outname <- paste(paste(outpath, "/", sep = ""), "predictions_collapsed_", model_out$outer_fold_id, ".Rds", sep = "")
+  }
+  
+  if (file.exists(outname) & !overwrite) {
+    return(outname)
+  }
 
   ## Load the previously created / saved Africa map of sub-regions per Country
   if (!using_hexes) {
@@ -271,7 +284,9 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
     , metrics        = model_out$metrics
    )
  
- return(out_list)
+ saveRDS(out_list, outname)
+ 
+ return(outname)
   
 }
 

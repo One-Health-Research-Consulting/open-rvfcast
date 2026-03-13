@@ -286,7 +286,7 @@ model_tuning_targets <- tar_plan(
   ## NOTE: temporary minimal for working on downstream pipeline
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
       folded_data = folded_data_training_DEBUG %>% dplyr::select(outer_fold_id, inner_folds)
-    , inner_ids   = inner_fold_id_finalized_DEBUG[1, ]
+    , inner_ids   = inner_fold_id_finalized_DEBUG
     , raw_data    = splitted_data$train_data[[1]]
     , threshold   = positive_threshold
     , weightings  = weightings_on_ones
@@ -356,7 +356,7 @@ model_fitting_targets <- tar_plan(
   , weightings      = weightings_on_ones
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
-  , overwrite       = FALSE
+  , overwrite       = TRUE
   , DEBUG           = FALSE)
   , pattern = map(folded_data_testing)
   , error   = "null"
@@ -403,9 +403,12 @@ model_evaluation_targets <- tar_plan(
   , africa_sf        = path_to_simplifed_regions
   , region_to_sum    = NULL
   , p_thresh         = positive_threshold
-  , using_hexes      = using_hexes)
-  , pattern = map(model_out_for_eval)
-  , error   = "null")
+  , using_hexes      = using_hexes
+  , outpath          = "outputs/examined_fits"
+  , overwrite        = FALSE)
+  , pattern          = map(model_out_for_eval)
+  , error            = "null"
+  , format           = "file")
 
 , tar_target(examined_fits_within_country, examine_fits_within(
     model_out        = model_out_for_eval
@@ -416,48 +419,76 @@ model_evaluation_targets <- tar_plan(
   , region_to_sum    = region_districts
   , p_thresh         = positive_threshold
   , using_hexes      = using_hexes)
-  , pattern = map(model_out_for_eval)
-  , error   = "null")
+  , pattern          = map(model_out_for_eval)
+  , error            = "null")
 
 ## For speed and RAM considerations, extract out pieces for individual exploration as
  ## targets, and can the more easily plot / explore from these extracted pieces
-, tar_target(ex_fits.summary_probs, {
-    tf <- examined_fits_within_pan %>% 
-    dplyr::select(outer_fold_id, aggregation, summary_probs) %>% 
-    unnest(summary_probs)
-    saveRDS(tf, "outputs/ex_fits.summary_probs.Rds")
-    "outputs/ex_fits.summary_probs.Rds"
-  }, error   = "null"
-   , format  = "file")
-, tar_target(ex_fits.plotted_calibration, {
-    tf <- examined_fits_within_pan %>% 
-    dplyr::select(outer_fold_id, aggregation, plotted_calibration) %>% 
-    unnest(plotted_calibration)
-    saveRDS(tf, "outputs/ex_fits.plotted_calibration.Rds")
-    "outputs/ex_fits.plotted_calibration.Rds"
-  }, error   = "null"
-   , format  = "file")
-, tar_target(ex_fits.prob_dens_plot, {
-    tf <- examined_fits_within_pan %>% 
-    dplyr::select(outer_fold_id, aggregation, prob_dens_plot) 
-    saveRDS(tf, "outputs/ex_fits.prob_dens_plot.Rds")
-    "outputs/ex_fits.prob_dens_plot.Rds"
-  }, error   = "null"
-   , format  = "file")
-, tar_target(ex_fits.map_split, {
-    tf <- examined_fits_within_pan %>% 
-    dplyr::select(outer_fold_id, aggregation, date_range, map_split) %>% 
-    unnest(c(date_range, map_split))
-    saveRDS(tf, "outputs/ex_fits.map_split.Rds")
-    "outputs/ex_fits.map_split.Rds"
-  }, error   = "null"
-   , format  = "file")
+, tar_target(ex_fits.summary_probs_raw, {
+  
+  filepath <- "outputs/summarized_fits/ex_fits.summary_probs_raw.Rds"
+  if (file.exists(filepath)) {return(filepath)}
+  
+    tf <- purrr::map(examined_fits_within_pan, .f = function(x) {
+        readRDS(x) %>% dplyr::select(outer_fold_id, aggregation, summary_probs) %>% unnest(summary_probs)
+      }) %>% bind_rows()
+    
+    saveRDS(tf, filepath)
+    return(filepath)
+  }, error   = "null", format  = "file")
 
-## Figures with the above saved exploration
-, tar_target(summary_probs.plots, plot.summary_probs(ex_fits.summary_probs))
-, tar_target(plotted_calibration.plots, plot.plotted_calibration(ex_fits.plotted_calibration))
-, tar_target(prob_dens_plot.plots, plot.prob_dens_plot(ex_fits.prob_dens_plot))
-, tar_target(map_split.plots, plot.map_split(ex_fits.map_split))
+, tar_target(ex_fits.summary_probs, {
+  
+  filepath <- "outputs/summarized_fits/ex_fits.summary_probs.qs"
+  if (file.exists(filepath)) {return(filepath)}
+  
+    tt <- readRDS(ex_fits.summary_probs_raw)
+    tf <- plot.summary_probs(tt)
+    qsave(tf, filepath)
+    return(filepath)
+  }, error   = "null", format  = "file")
+
+, tar_target(ex_fits.plotted_calibration, {
+  
+  filepath <- "outputs/summarized_fits/ex_fits.plotted_calibration.qs"
+  
+  if (file.exists(filepath)) {return(filepath)}
+  
+    tf <- purrr::map(examined_fits_within_pan, .f = function(x) {
+      readRDS(x) %>% dplyr::select(outer_fold_id, aggregation, plotted_calibration) %>% unnest(plotted_calibration)
+    }) %>% bind_rows()
+  
+    qsave(tf, filepath)
+    return(filepath)
+  }, error   = "null", format  = "file")
+
+, tar_target(ex_fits.prob_dens_plot, {
+  
+  filepath <- "outputs/summarized_fits/ex_fits.prob_dens_plot.qs"
+  
+  if (file.exists(filepath)) {return(filepath)}
+  
+  tf <- purrr::map(examined_fits_within_pan, .f = function(x) {
+    readRDS(x) %>% dplyr::select(outer_fold_id, aggregation, prob_dens_plot)
+  }) %>% bind_rows()
+  
+    qsave(tf, filepath)
+    return(filepath)
+  }, error   = "null", format  = "file")
+
+, tar_target(ex_fits.map_split, {
+  
+  filepath <- "outputs/summarized_fits/ex_fits.map_split.qs"
+  
+  if (file.exists(filepath)) {return(filepath)}
+  
+  tf <- purrr::map(examined_fits_within_pan, .f = function(x) {
+    readRDS(x) %>% dplyr::select(outer_fold_id, aggregation, date_range, map_split) %>% unnest(c(date_range, map_split))
+  }) %>% bind_rows()
+  
+    qsave(tf, filepath)
+    return(filepath)
+  }, error   = "null", format  = "file")
 
 )
 
