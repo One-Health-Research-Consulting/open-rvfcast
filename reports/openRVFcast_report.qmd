@@ -1,0 +1,106 @@
+---
+title: "openRVFcast Report"
+author: "Morgan Kain"
+format:
+  html:
+    toc: true
+execute: 
+  echo: false
+---
+
+```{r}
+#| label: load
+#| message: false
+
+library(targets)
+library(tidyverse)
+library(qs)
+
+store <- "../model_framework_targets"
+
+targets::tar_load(c(plot_spatial_folds, ex_fits.summary_probs), store = store)
+prob_sum_plot <- qread(paste("../", ex_fits.summary_probs, sep = ""))
+```
+
+#### Note
+
+For a description of the modeling strategy, including visuals of the cross validation approach see docs/openRVFcast_Walkthrough.docx
+
+#### Methods / Prep
+
+First, a view of the spatial folds used in cross validation
+
+```{r}
+#| label: methods_fig1
+#| message: false
+#| fig-cap: "Methods / Prep Figure 1: Spatial folds for cross validation"
+
+plot_spatial_folds
+```
+
+No other visuals for now (see docs/openRVFcast_Walkthrough.docx for methods)
+
+
+#### Diagnostics
+
+Given the overarching modeling/evaluation strategy of comparing predictions to reality in small temporal chunks, there are too many evaluation figures produced to show them all here. What is presented here is a few examples; all figures are housed in reports/figure_pieces as .svg files (calibration curves and density plots) or reports/ (maps).
+
+First, calibration curves. Aiming for points along the 1:1 line here. Values beneath the line show underprediction of true 1s (and above the opposite). Two examples dates shown, one each for "optimum" breaks generated with reliabilitydiag::reliabilitydiag, the other with even breaks in probability space (which may be sparse given few estimates above the lowest probabilities). 
+
+Each calibration curve plot is broken into 4 panels, which each show a different level of "aggregation" of predicted probabilities. These levels of aggregation are used throughout the diagnostic plots. Top left: No aggregation: predicted probabilities are "raw" in the sense that they represent the lowest level for both space (H3 hex size) and time as used in model fitting. Top right: Spatial aggregation -- `sums` probabilities (i.e., 1 - prod(1-x)) in H3 hexes one level up (resulting in 1/6 of the hexes overall; i.e., probability of an outbreak over a larger spatial area). Bottom left: Temporal aggregation -- `sums` probabilities across the forecast windows (i.e., probability of an outbreak over the 150 day period). Bottom right: Double aggregation -- sum up in scale and across time. Naturally, each form of aggregation increases the predicted probability of an outbreak. 
+
+In an attempt to reduce clutter, panels with non-temporally aggregated probabilities (top 2) show 3 of the 5 prediction windows. The dates at the top of the plots show the period of time over which the forecasts were made.
+
+<!-- Rather poor way to do this -->
+
+Example "optimum" breaks date 1
+![Calibration Curve Optimum Breaks Example Date 1](figure_pieces/calibration/gg_calplot_opt_1.svg)
+
+Example evenly spaced breaks date 1
+![Calibration Curve Even Breaks Example Date 1](figure_pieces/calibration/gg_calplot_even_1.svg)
+
+Example "optimum" breaks date 2
+![Calibration Curve Optimum Breaks Example Date 2](figure_pieces/calibration/gg_calplot_opt_7.svg)
+
+Example evenly spaced breaks date 2
+![Calibration Curve Even Breaks Example Date 2](figure_pieces/calibration/gg_calplot_even_7.svg)
+
+
+#### Predictions
+
+First, summarized outbreak probabilities across Africa. Overall, this figure shows the median, 80% and 95% central density of the estimated probabilities across all H3 hexes without outbreaks (0; left column) and with outbreaks (1; right column). X-axis and forecast interval (color) show the 30 day period over which the probabilities are summarized. Rows show the 4 different levels of aggregation of probabilities described previously. 
+
+```{r}
+#| label: predictions_fig1
+#| message: false
+#| fig-cap: "Predictions Figure 1: Summarized outbreak probabilities."
+
+prob_sum_plot
+```
+
+Second, a slightly different view of the same predictions as above -- comparing the overall probabilities of an outbreak across H3 hexes for cells that did and did not have an outbreak. Two examples here, rest in reports/figure_pieces/calibration. The same four panels showing the four levels of aggregation are arranged as before. 
+
+<!-- Rather poor way to do this -->
+Example date 1
+![Example Density Plot 1](figure_pieces/dens/gg_prob_dens_plot_1.svg)
+
+Example date 2
+![Example Density Plot 2](figure_pieces/dens/gg_prob_dens_plot_2.svg)
+
+
+Finally, maps of the predictions for the 4 forms of aggregation as described previously. Only one example shown here as one map of each aggregation level is made for each start date (forward from which predictions are made), for which there are over 90. Four pdfs (one for each level of aggregation), with one map (i.e., one starting date) per page are stored in /reports.
+
+<!-- Rather poor way to do this -->
+
+Example map 1, No aggregation. 
+![Example map 1, No aggregation](figure_pieces/maps_wide/gg_map_split_No_aggregation_1.svg)
+
+Example map 2, Spatial aggregation. 
+![Example map 2, Spatial aggregation](figure_pieces/maps_wide/gg_map_split_Spatial_aggregation_1.svg)
+
+Example map 3, Temporal aggregation. 
+![Example map 3, Temporal aggregation](figure_pieces/maps_wide/gg_map_split_Temporal_aggregation_1.svg)
+
+Example map 4, Double aggregation. 
+![Example map 4, Double aggregation](figure_pieces/maps_wide/gg_map_split_Double_aggregation_1.svg)
+

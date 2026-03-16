@@ -50,14 +50,3 @@ Interval"
   }
   
 }
-## Incomplete functions that probably are not needed since the previous function exports a list of plots alread
-plot.plotted_calibration <- function(dat) {
-  td <- readRDS(dat)
-}
-plot.prob_dens_plot <- function(dat) {
-  td <- readRDS(dat)
-}
-plot.map_split <- function(dat) {
-  td <- readRDS(dat)
-}
-

@@ -4,8 +4,8 @@
 
 ## NOTES / ToDo ----------------------------------------------------------------
 
-## 1) Revisit model definition
-## 2) Summarize output / create report
+## 1) Somewhat of a bare-bones non-dynamic report made
+ ## A) Non-dynamic, need to change path to each and every figure if code changes which is bad practice
 
 ## Setup / Preamble ------------------------------------------------------------
 
@@ -424,7 +424,7 @@ model_evaluation_targets <- tar_plan(
 
 ## For speed and RAM considerations, extract out pieces for individual exploration as
  ## targets, and can the more easily plot / explore from these extracted pieces
-, tar_target(ex_fits.summary_probs_raw, {
+, tar_target(ex_fits.summary_probs_raw  , {
   
   filepath <- "outputs/summarized_fits/ex_fits.summary_probs_raw.Rds"
   if (file.exists(filepath)) {return(filepath)}
@@ -436,18 +436,15 @@ model_evaluation_targets <- tar_plan(
     saveRDS(tf, filepath)
     return(filepath)
   }, error   = "null", format  = "file")
-
-, tar_target(ex_fits.summary_probs, {
+, tar_target(ex_fits.summary_probs      , {
   
   filepath <- "outputs/summarized_fits/ex_fits.summary_probs.qs"
   if (file.exists(filepath)) {return(filepath)}
   
-    tt <- readRDS(ex_fits.summary_probs_raw)
-    tf <- plot.summary_probs(tt)
+    tf <- plot.summary_probs(ex_fits.summary_probs_raw)
     qsave(tf, filepath)
     return(filepath)
   }, error   = "null", format  = "file")
-
 , tar_target(ex_fits.plotted_calibration, {
   
   filepath <- "outputs/summarized_fits/ex_fits.plotted_calibration.qs"
@@ -461,8 +458,7 @@ model_evaluation_targets <- tar_plan(
     qsave(tf, filepath)
     return(filepath)
   }, error   = "null", format  = "file")
-
-, tar_target(ex_fits.prob_dens_plot, {
+, tar_target(ex_fits.prob_dens_plot     , {
   
   filepath <- "outputs/summarized_fits/ex_fits.prob_dens_plot.qs"
   
@@ -475,8 +471,7 @@ model_evaluation_targets <- tar_plan(
     qsave(tf, filepath)
     return(filepath)
   }, error   = "null", format  = "file")
-
-, tar_target(ex_fits.map_split, {
+, tar_target(ex_fits.map_split          , {
   
   filepath <- "outputs/summarized_fits/ex_fits.map_split.qs"
   
@@ -490,20 +485,41 @@ model_evaluation_targets <- tar_plan(
     return(filepath)
   }, error   = "null", format  = "file")
 
+, tar_target(plotted_calibration.plot_export, save_fig_pieces(
+    input     = ex_fits.plotted_calibration
+  , outpath   = "reports/figure_pieces/calibration/"
+  , idinfo    = model_out_for_eval
+  , plotname  = "calplot.opt"
+  , overwrite = FALSE))
+, tar_target(plotted_calibration.plot_export, save_fig_pieces(
+    input     = ex_fits.plotted_calibration
+  , outpath   = "reports/figure_pieces/calibration/"
+  , idinfo    = model_out_for_eval
+  , plotname  = "calplot.even"
+  , overwrite = FALSE))
+, tar_target(prob_dens.plot_export, save_fig_pieces(
+    input     = ex_fits.prob_dens_plot
+  , outpath   = "reports/figure_pieces/dens/"
+  , idinfo    = model_out_for_eval
+  , plotname  = "prob_dens_plot"
+  , overwrite = FALSE))
+, tar_target(map_split.plot_export, save_fig_pieces(
+    input     = ex_fits.map_split
+  , outpath   = "reports/figure_pieces/map_split/"
+  , idinfo    = model_out_for_eval
+  , plotname  = "map_split"
+  , overwrite = FALSE))
+
 )
 
 ## Reports ---------------------------------------------------------------------
 report_targets <- tar_plan(
   
-  ## Put together a report composed of all of the model evaluation figures 
-  tar_target(report, build_report(
-    calcurves  = plotted_calibration
-  , fitswithin = examined_fits_within
-  , fitsacross = examined_fits_across
-  , viacross   = variable_importance_among
-  , outpath    = "outputs/report.pdf"
-  , overwrite  = TRUE)
-  , format  = "file")
+  ## Somewhat of a poor, non-dynamic report. See figures in report
+  tar_quarto(
+    remit_report
+  , path  = "reports/openRVFcast_report.qmd"
+  , quiet = FALSE)
   
 )
 
