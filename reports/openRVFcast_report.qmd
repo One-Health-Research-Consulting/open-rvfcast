@@ -18,7 +18,7 @@ library(qs)
 
 store <- "../model_framework_targets"
 
-targets::tar_load(c(plot_spatial_folds, ex_fits.summary_probs), store = store)
+targets::tar_load(c(plot_spatial_folds, ex_fits.summary_probs, variable_importance_among), store = store)
 prob_sum_plot <- qread(paste("../", ex_fits.summary_probs, sep = ""))
 ```
 
@@ -33,7 +33,7 @@ First, a view of the spatial folds used in cross validation
 ```{r}
 #| label: methods_fig1
 #| message: false
-#| fig-cap: "Methods / Prep Figure 1: Spatial folds for cross validation"
+#| fig-cap: "Spatial folds for cross validation."
 
 plot_spatial_folds
 ```
@@ -66,6 +66,25 @@ Example evenly spaced breaks date 2
 ![Calibration Curve Even Breaks Example Date 2](figure_pieces/calibration/gg_calplot_even_7.svg)
 
 
+Second, variable importance and partial dependence plots. 
+
+```{r}
+#| label: VI_fig1
+#| message: false
+#| fig-cap: "Variable Importance. In short, `gain` gives the total reduction in loss attributable to splits on the corresponding feature; i.e., larger number = greater importance. A point is given for each re-fit and 5 month forecast window (11 points total) -- see see docs/openRVFcast_Walkthrough.docx for methods."
+
+variable_importance_among$vi_gg[[1]]
+```
+
+```{r}
+#| label: PD_fig1
+#| message: false
+#| fig-cap: "Dependence. How model predictions chance as a funtion of each covariate."
+
+variable_importance_among$pdp_gg[[1]]
+```
+
+
 #### Predictions
 
 First, summarized outbreak probabilities across Africa. Overall, this figure shows the median, 80% and 95% central density of the estimated probabilities across all H3 hexes without outbreaks (0; left column) and with outbreaks (1; right column). X-axis and forecast interval (color) show the 30 day period over which the probabilities are summarized. Rows show the 4 different levels of aggregation of probabilities described previously. 
@@ -73,7 +92,7 @@ First, summarized outbreak probabilities across Africa. Overall, this figure sho
 ```{r}
 #| label: predictions_fig1
 #| message: false
-#| fig-cap: "Predictions Figure 1: Summarized outbreak probabilities."
+#| fig-cap: "Summarized outbreak probabilities."
 
 prob_sum_plot
 ```
