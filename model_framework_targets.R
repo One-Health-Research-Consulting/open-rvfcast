@@ -216,7 +216,7 @@ model_tuning_targets <- tar_plan(
   , loss_red_max   = 0.5
   , mtry_min       = 1
   , mtry_max       = 3
-  , size           = 50))
+  , size           = 150))
   
 , tar_target(tuning_grid,
     with(tune_pars
@@ -244,11 +244,11 @@ model_tuning_targets <- tar_plan(
 
   ## Set up location for saving intermediate output
 , tar_target(outer_folds_dir, create_data_directory(
-    directory_path = paste("outputs/", region_name, "_model_tuning_inner", sep = "")))
+    directory_path = paste("outputs/", region_name, "_model_tuning_inner_ws", sep = "")))
 , tar_target(outer_folds_dir2, create_data_directory(
-    directory_path = paste("outputs/", region_name, "_model_tuning_outer", sep = "")))
+    directory_path = paste("outputs/", region_name, "_model_tuning_outer_ws", sep = "")))
 , tar_target(outer_folds_dir3, create_data_directory(
-    directory_path = paste("outputs/", region_name, "_final_model_fits", sep = "")))
+    directory_path = paste("outputs/", region_name, "_final_model_fits_ws", sep = "")))
 
 ## Final prep step for parallel processing for tuning across all inner folds is to
  ## evaluate which of all of the inner folds across all outer folds actually have
@@ -265,10 +265,12 @@ model_tuning_targets <- tar_plan(
 ## 1 in the assess_data. There is no point in wasting computation on inner folds if
 ## the best inner fold hyperparameter set cant be evaluated on the whole training_set
 ## for this outer_fold because there is no outbreak in the assess_data
-, tar_target(inner_fold_id_finalized, prep_outer_ids(
+, tar_target(inner_fold_id_finalized, {
+  tfolds <- prep_outer_ids(
     folded_data = folded_data_training
-  , raw_data    = splitted_data
-  , inner_ids   = inner_fold_id))
+    , raw_data    = splitted_data
+    , inner_ids   = inner_fold_id)
+  tfolds[sample(nrow(tfolds)), ]})
 
   ## NOTE: temp check for debugging purposes
 , tar_target(inner_fold_id_finalized_DEBUG, {
@@ -285,16 +287,17 @@ model_tuning_targets <- tar_plan(
   ## Fit across tuning_grid across all inner folds of all outer folds
   ## NOTE: temporary minimal for working on downstream pipeline
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
-      folded_data = folded_data_training_DEBUG %>% dplyr::select(outer_fold_id, inner_folds)
-    , inner_ids   = inner_fold_id_finalized_DEBUG
+      folded_data = folded_data_training %>% dplyr::select(outer_fold_id, inner_folds)
+    , inner_ids   = inner_fold_id_finalized
     , raw_data    = splitted_data$train_data[[1]]
     , threshold   = positive_threshold
     , weightings  = weightings_on_ones
+    , start_p     = 0.005
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
-    , overwrite   = TRUE
-    , DEBUG       = TRUE)
-  , pattern = map(inner_fold_id_finalized_DEBUG)
+    , overwrite   = FALSE
+    , DEBUG       = FALSE)
+  , pattern = map(inner_fold_id_finalized)
   , error   = "null"
   , format  = "file")
 
@@ -357,7 +360,7 @@ model_fitting_targets <- tar_plan(
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
   , overwrite       = TRUE
-  , DEBUG           = FALSE)
+  , DEBUG           = TRUE)
   , pattern = map(folded_data_testing)
   , error   = "null"
   , format  = "file")
@@ -485,13 +488,13 @@ model_evaluation_targets <- tar_plan(
     return(filepath)
   }, error   = "null", format  = "file")
 
-, tar_target(plotted_calibration.plot_export, save_fig_pieces(
+, tar_target(plotted_calibration.plot_export_opt, save_fig_pieces(
     input     = ex_fits.plotted_calibration
   , outpath   = "reports/figure_pieces/calibration/"
   , idinfo    = model_out_for_eval
   , plotname  = "calplot.opt"
   , overwrite = FALSE))
-, tar_target(plotted_calibration.plot_export, save_fig_pieces(
+, tar_target(plotted_calibration.plot_export_even, save_fig_pieces(
     input     = ex_fits.plotted_calibration
   , outpath   = "reports/figure_pieces/calibration/"
   , idinfo    = model_out_for_eval

@@ -8,6 +8,7 @@
 #' @param raw_data complete set of raw data
 #' @param threshold For assigning a 1 | estimated prob
 #' @param weightings weight assigned to 1s in binomial loss metric 
+#' @param start_p initilization point for base intercept 
 #' @param id_cols Columns that define a unique data point
 #' @param out_dir Where to save output
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
@@ -17,7 +18,7 @@
 #' @export
 
 tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data, threshold
-                                      , weightings, id_cols, out_dir, overwrite, DEBUG) {
+                                      , weightings, start_p, id_cols, out_dir, overwrite, DEBUG) {
 
   folded_data <- folded_data %>% filter(outer_fold_id == inner_ids$outer_fold_id)
   inner_id    <- inner_ids$inner_fold_id
@@ -85,7 +86,7 @@ tune_results_per_outer_fold <- function(folded_data, inner_ids, raw_data, thresh
 
   ## Create scaffold recipe + model + workflow and fit model
   rec <- make_recipe(inner_tbl_train, id_cols = id_cols)
-  mod <- make_model(params = tuning_grid)
+  mod <- make_model(params = tuning_grid, start_p = start_p)
   wf  <- workflow() %>% add_model(mod) %>% add_recipe(rec) %>% add_case_weights(weights)
   
   print("At model fitting")

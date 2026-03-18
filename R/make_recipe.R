@@ -28,7 +28,7 @@ make_recipe <- function(train_data, id_cols) {
 #' @author Morgan Kain
 #' @export
 
-make_model <- function(params) {
+make_model <- function(params, start_p = start_p) {
  
   boost_tree(
     trees          = params$trees
@@ -42,7 +42,9 @@ make_model <- function(params) {
     set_engine(
       "xgboost"
     , objective = "binary:logistic"
+    , base_score = start_p
     , nthread   = 1
+    , verbosity = 0
     ) 
   
 }
