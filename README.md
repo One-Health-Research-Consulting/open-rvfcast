@@ -3,6 +3,10 @@
 
 # An open-source framework for Rift Valley Fever forecasting
 
+NOTE: Much of this info is still good, but some is out of date – readme
+needs a bit of updating. See docs/openRVFcast_Walkthrough.docx for the
+most up-to-date details on the modeling pipeline.
+
 <!-- badges: start -->
 
 [![Project Status: WIP – Initial development is in progress, but there
@@ -458,93 +462,105 @@ module. The figure is generated using `mermaid.js` syntax and should
 display as a graph on GitHub. It can also be viewed by pasting the code
 into <https://mermaid.live>.)
 
+- One or more packages recorded in the lockfile are not installed.
+- Use `]8;;x-r-run:renv::status()renv::status()]8;;` for more details.
+
+Attaching package: ‘lubridate’
+
+The following objects are masked from ‘package:base’:
+
+    date, intersect, setdiff, union
+
+retry_tasks was deprecated on 2025-01-24 (version 0.10.2.9005).
+Alternative: none.
+
 ``` mermaid
 graph LR
   style Graph fill:#FFFFFF00,stroke:#000000;
   subgraph Graph
     direction LR
-    x308dbc26c1784375(["africa_full_predictor_data_directory"]):::skipped --> x29f706fde685a66b["africa_full_predictor_data"]:::errored
-    x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped --> x29f706fde685a66b["africa_full_predictor_data"]:::errored
-    x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::completed --> x29f706fde685a66b["africa_full_predictor_data"]:::errored
-    x155e2f0b29a20e05(["aspect_preprocessed"]):::skipped --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped
-    xd70b16641fa1b4ef(["soil_preprocessed"]):::skipped --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped
-    x680370f9b58b9f6d(["slope_preprocessed"]):::skipped --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped
-    xdecc37cc7e708cec(["landcover_preprocessed"]):::skipped --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped
-    x1c7b6e6a1c101e59(["bioclim_preprocessed"]):::skipped --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped
-    x0dffb1605751d1b1(["elevation_preprocessed"]):::skipped --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped
-    x82990a83bfa4db45(["glw_preprocessed"]):::skipped --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::skipped
-    x18d8fc5297d7838e(["dates_to_process"]):::completed --> x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::completed
-    x680f7450837c9229["forecasts_anomalies"]:::completed --> x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::completed
-    xf9b79e824823a870["ndvi_anomalies"]:::errored --> x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::completed
-    x01b9e03cb52b7b05["weather_anomalies"]:::errored --> x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::completed
-    x42a5375a64b48216(["aspect_directory"]):::skipped --> x155e2f0b29a20e05(["aspect_preprocessed"]):::skipped
-    x213d1d2657d00cd0(["aspect_urls"]):::skipped --> x155e2f0b29a20e05(["aspect_preprocessed"]):::skipped
-    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x155e2f0b29a20e05(["aspect_preprocessed"]):::skipped
-    xe8b8ca5535fe5f2a(["bioclim_directory"]):::skipped --> x1c7b6e6a1c101e59(["bioclim_preprocessed"]):::skipped
-    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x1c7b6e6a1c101e59(["bioclim_preprocessed"]):::skipped
-    xe3c4533ec81ef618(["continent_polygon"]):::skipped --> xba6244832b5285ba(["continent_raster_template"]):::skipped
-    xe3c4533ec81ef618(["continent_polygon"]):::skipped --> x53c4b2fb80542353(["country_bounding_boxes"]):::skipped
-    x8d531cfe4886deda(["ecmwf_lead_months"]):::skipped --> x73599238bfebd1c5(["ecmwf_forecasts_api_parameters"]):::completed
-    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x73599238bfebd1c5(["ecmwf_forecasts_api_parameters"]):::completed
-    x73599238bfebd1c5(["ecmwf_forecasts_api_parameters"]):::completed --> x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::skipped
-    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::skipped
-    x16ce463b7b647c1e(["ecmwf_forecasts_transformed_directory"]):::skipped --> x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::skipped
-    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x0dffb1605751d1b1(["elevation_preprocessed"]):::skipped
-    x0381132b9136146c(["elevation_directory"]):::skipped --> x0dffb1605751d1b1(["elevation_preprocessed"]):::skipped
-    x2cc4f7a921353fe4(["forecasts_anomalies_sources"]):::completed --> x680f7450837c9229["forecasts_anomalies"]:::completed
-    xbd6b5d8fe3154d5a(["weather_historical_means"]):::skipped --> x680f7450837c9229["forecasts_anomalies"]:::completed
-    x8ff15aa322c64802(["forecasts_anomalies_directory"]):::skipped --> x680f7450837c9229["forecasts_anomalies"]:::completed
-    xdac479b8154aa4e0(["forecast_intervals"]):::skipped --> x680f7450837c9229["forecasts_anomalies"]:::completed
-    x18d8fc5297d7838e(["dates_to_process"]):::completed --> x2cc4f7a921353fe4(["forecasts_anomalies_sources"]):::completed
-    x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::skipped --> x2cc4f7a921353fe4(["forecasts_anomalies_sources"]):::completed
-    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x82990a83bfa4db45(["glw_preprocessed"]):::skipped
-    x4d4a15b2f0f1851f(["glw_urls"]):::skipped --> x82990a83bfa4db45(["glw_preprocessed"]):::skipped
-    x5448b80c3909d641(["glw_directory"]):::skipped --> x82990a83bfa4db45(["glw_preprocessed"]):::skipped
-    xba6244832b5285ba(["continent_raster_template"]):::skipped --> xdecc37cc7e708cec(["landcover_preprocessed"]):::skipped
-    x8894af119fe2eaa1(["landcover_directory"]):::skipped --> xdecc37cc7e708cec(["landcover_preprocessed"]):::skipped
-    x684d7fe78b0e841d(["landcover_types"]):::skipped --> xdecc37cc7e708cec(["landcover_preprocessed"]):::skipped
-    x3f3ba2f9e89a9591(["modis_ndvi_token"]):::completed --> xcfc776190ac6b73c["modis_ndvi_bundle_request"]:::skipped
-    xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::completed --> xcfc776190ac6b73c["modis_ndvi_bundle_request"]:::skipped
-    xcfc776190ac6b73c["modis_ndvi_bundle_request"]:::skipped --> xb64343d9bc0ef12e(["modis_ndvi_requests"]):::skipped
-    xe3c4533ec81ef618(["continent_polygon"]):::skipped --> xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::completed
-    xb406dc4c2762194f(["modis_task_end_dates"]):::skipped --> xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::completed
-    xdc843e2504e22144(["modis_ndvi_transformed_directory"]):::skipped --> xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::completed
-    x3f3ba2f9e89a9591(["modis_ndvi_token"]):::completed --> xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::completed
-    xb64343d9bc0ef12e(["modis_ndvi_requests"]):::skipped --> x5130788afbe32544["modis_ndvi_transformed"]:::skipped
-    xdc843e2504e22144(["modis_ndvi_transformed_directory"]):::skipped --> x5130788afbe32544["modis_ndvi_transformed"]:::skipped
-    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x5130788afbe32544["modis_ndvi_transformed"]:::skipped
-    x3f3ba2f9e89a9591(["modis_ndvi_token"]):::completed --> x5130788afbe32544["modis_ndvi_transformed"]:::skipped
-    x18d8fc5297d7838e(["dates_to_process"]):::completed --> x63a0e22e7393f7fe(["months_to_process"]):::completed
-    x63a0e22e7393f7fe(["months_to_process"]):::completed --> x0548e231345702f7["nasa_weather_transformed"]:::skipped
-    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x0548e231345702f7["nasa_weather_transformed"]:::skipped
-    x711dc87df29f0a9c(["nasa_weather_transformed_directory"]):::skipped --> x0548e231345702f7["nasa_weather_transformed"]:::skipped
-    xe2329877730e44b5(["ndvi_anomalies_directory"]):::skipped --> xf9b79e824823a870["ndvi_anomalies"]:::errored
-    x44345ceb9b3d4a81(["ndvi_historical_means"]):::skipped --> xf9b79e824823a870["ndvi_anomalies"]:::errored
-    xb8d88361e3190fbf["ndvi_transformed"]:::errored --> xf9b79e824823a870["ndvi_anomalies"]:::errored
-    x5130788afbe32544["modis_ndvi_transformed"]:::skipped --> x44345ceb9b3d4a81(["ndvi_historical_means"]):::skipped
-    xa4eb23442420052a["sentinel_ndvi_transformed"]:::skipped --> x44345ceb9b3d4a81(["ndvi_historical_means"]):::skipped
-    x7fef416d6ce259f3(["ndvi_historical_means_directory"]):::skipped --> x44345ceb9b3d4a81(["ndvi_historical_means"]):::skipped
-    x704a24502f5bfcb5(["ndvi_transformed_directory"]):::skipped --> xb8d88361e3190fbf["ndvi_transformed"]:::errored
-    x40d4d27d6a4a2824(["ndvi_transformed_sources"]):::skipped --> xb8d88361e3190fbf["ndvi_transformed"]:::errored
-    xa4eb23442420052a["sentinel_ndvi_transformed"]:::skipped --> x40d4d27d6a4a2824(["ndvi_transformed_sources"]):::skipped
-    x5130788afbe32544["modis_ndvi_transformed"]:::skipped --> x40d4d27d6a4a2824(["ndvi_transformed_sources"]):::skipped
-    x63a0e22e7393f7fe(["months_to_process"]):::completed --> x40d4d27d6a4a2824(["ndvi_transformed_sources"]):::skipped
-    xb406dc4c2762194f(["modis_task_end_dates"]):::skipped --> x5173ee721c44ebc0(["ndvi_years"]):::skipped
-    x3ea733d22e9c32e7(["sentinel_ndvi_transformed_directory"]):::skipped --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::skipped
-    xba6244832b5285ba(["continent_raster_template"]):::skipped --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::skipped
-    x6e1924e349d8e6e8(["sentinel_ndvi_api_parameters"]):::skipped --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::skipped
-    x45b75d590706329f(["sentinel_ndvi_token_file"]):::completed --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::skipped
-    x1ef0d1881ff89dbd(["slope_urls"]):::skipped --> x680370f9b58b9f6d(["slope_preprocessed"]):::skipped
-    x165085d61327782d(["slope_directory"]):::skipped --> x680370f9b58b9f6d(["slope_preprocessed"]):::skipped
-    xba6244832b5285ba(["continent_raster_template"]):::skipped --> x680370f9b58b9f6d(["slope_preprocessed"]):::skipped
-    xba6244832b5285ba(["continent_raster_template"]):::skipped --> xd70b16641fa1b4ef(["soil_preprocessed"]):::skipped
-    x9c14f0532ee1f83c(["soil_directory"]):::skipped --> xd70b16641fa1b4ef(["soil_preprocessed"]):::skipped
-    x0548e231345702f7["nasa_weather_transformed"]:::skipped --> x01b9e03cb52b7b05["weather_anomalies"]:::errored
-    xf94f7486eed9869c(["weather_anomalies_directory"]):::skipped --> x01b9e03cb52b7b05["weather_anomalies"]:::errored
-    xbd6b5d8fe3154d5a(["weather_historical_means"]):::skipped --> x01b9e03cb52b7b05["weather_anomalies"]:::errored
-    x0548e231345702f7["nasa_weather_transformed"]:::skipped --> xbd6b5d8fe3154d5a(["weather_historical_means"]):::skipped
-    x4407a62768444c3e(["weather_historical_means_directory"]):::skipped --> xbd6b5d8fe3154d5a(["weather_historical_means"]):::skipped
-    x4847fdb918188b25(["country_polygons"]):::skipped
+    x308dbc26c1784375(["africa_full_predictor_data_directory"]):::queued --> x29f706fde685a66b["africa_full_predictor_data"]:::queued
+    x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::queued --> x29f706fde685a66b["africa_full_predictor_data"]:::queued
+    x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::queued --> x29f706fde685a66b["africa_full_predictor_data"]:::queued
+    x155e2f0b29a20e05(["aspect_preprocessed"]):::queued --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::queued
+    xd70b16641fa1b4ef(["soil_preprocessed"]):::queued --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::queued
+    x680370f9b58b9f6d(["slope_preprocessed"]):::queued --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::queued
+    xdecc37cc7e708cec(["landcover_preprocessed"]):::queued --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::queued
+    x1c7b6e6a1c101e59(["bioclim_preprocessed"]):::queued --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::queued
+    x0dffb1605751d1b1(["elevation_preprocessed"]):::queued --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::queued
+    x82990a83bfa4db45(["glw_preprocessed"]):::queued --> x6b068058ab0e9c52(["africa_full_predictor_data_sources_static"]):::queued
+    x18d8fc5297d7838e(["dates_to_process"]):::queued --> x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::queued
+    x680f7450837c9229["forecasts_anomalies"]:::queued --> x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::queued
+    xf9b79e824823a870["ndvi_anomalies"]:::queued --> x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::queued
+    x01b9e03cb52b7b05["weather_anomalies"]:::queued --> x5cd8db251f348655(["africa_full_predictor_data_sources_temporal"]):::queued
+    x42a5375a64b48216(["aspect_directory"]):::queued --> x155e2f0b29a20e05(["aspect_preprocessed"]):::queued
+    x213d1d2657d00cd0(["aspect_urls"]):::queued --> x155e2f0b29a20e05(["aspect_preprocessed"]):::queued
+    xba6244832b5285ba(["continent_raster_template"]):::queued --> x155e2f0b29a20e05(["aspect_preprocessed"]):::queued
+    xe8b8ca5535fe5f2a(["bioclim_directory"]):::queued --> x1c7b6e6a1c101e59(["bioclim_preprocessed"]):::queued
+    xba6244832b5285ba(["continent_raster_template"]):::queued --> x1c7b6e6a1c101e59(["bioclim_preprocessed"]):::queued
+    xe3c4533ec81ef618(["continent_polygon"]):::queued --> xba6244832b5285ba(["continent_raster_template"]):::queued
+    xe3c4533ec81ef618(["continent_polygon"]):::queued --> x53c4b2fb80542353(["country_bounding_boxes"]):::queued
+    x8d531cfe4886deda(["ecmwf_lead_months"]):::queued --> x73599238bfebd1c5(["ecmwf_forecasts_api_parameters"]):::queued
+    xba6244832b5285ba(["continent_raster_template"]):::queued --> x73599238bfebd1c5(["ecmwf_forecasts_api_parameters"]):::queued
+    x73599238bfebd1c5(["ecmwf_forecasts_api_parameters"]):::queued --> x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::queued
+    xba6244832b5285ba(["continent_raster_template"]):::queued --> x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::queued
+    x16ce463b7b647c1e(["ecmwf_forecasts_transformed_directory"]):::queued --> x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::queued
+    xba6244832b5285ba(["continent_raster_template"]):::queued --> x0dffb1605751d1b1(["elevation_preprocessed"]):::queued
+    x0381132b9136146c(["elevation_directory"]):::queued --> x0dffb1605751d1b1(["elevation_preprocessed"]):::queued
+    x2cc4f7a921353fe4(["forecasts_anomalies_sources"]):::queued --> x680f7450837c9229["forecasts_anomalies"]:::queued
+    xbd6b5d8fe3154d5a(["weather_historical_means"]):::queued --> x680f7450837c9229["forecasts_anomalies"]:::queued
+    x8ff15aa322c64802(["forecasts_anomalies_directory"]):::queued --> x680f7450837c9229["forecasts_anomalies"]:::queued
+    xdac479b8154aa4e0(["forecast_intervals"]):::queued --> x680f7450837c9229["forecasts_anomalies"]:::queued
+    x18d8fc5297d7838e(["dates_to_process"]):::queued --> x2cc4f7a921353fe4(["forecasts_anomalies_sources"]):::queued
+    x3b5d33025a7856bb["ecmwf_forecasts_transformed"]:::queued --> x2cc4f7a921353fe4(["forecasts_anomalies_sources"]):::queued
+    xba6244832b5285ba(["continent_raster_template"]):::queued --> x82990a83bfa4db45(["glw_preprocessed"]):::queued
+    x4d4a15b2f0f1851f(["glw_urls"]):::queued --> x82990a83bfa4db45(["glw_preprocessed"]):::queued
+    x5448b80c3909d641(["glw_directory"]):::queued --> x82990a83bfa4db45(["glw_preprocessed"]):::queued
+    xba6244832b5285ba(["continent_raster_template"]):::queued --> xdecc37cc7e708cec(["landcover_preprocessed"]):::queued
+    x8894af119fe2eaa1(["landcover_directory"]):::queued --> xdecc37cc7e708cec(["landcover_preprocessed"]):::queued
+    x684d7fe78b0e841d(["landcover_types"]):::queued --> xdecc37cc7e708cec(["landcover_preprocessed"]):::queued
+    x3f3ba2f9e89a9591(["modis_ndvi_token"]):::queued --> xcfc776190ac6b73c["modis_ndvi_bundle_request"]:::queued
+    xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::queued --> xcfc776190ac6b73c["modis_ndvi_bundle_request"]:::queued
+    xcfc776190ac6b73c["modis_ndvi_bundle_request"]:::queued --> xb64343d9bc0ef12e(["modis_ndvi_requests"]):::queued
+    xe3c4533ec81ef618(["continent_polygon"]):::queued --> xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::queued
+    xb406dc4c2762194f(["modis_task_end_dates"]):::queued --> xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::queued
+    xdc843e2504e22144(["modis_ndvi_transformed_directory"]):::queued --> xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::queued
+    x3f3ba2f9e89a9591(["modis_ndvi_token"]):::queued --> xa5bc51cd67d5e6c0["modis_ndvi_task_id_continent"]:::queued
+    xb64343d9bc0ef12e(["modis_ndvi_requests"]):::queued --> x5130788afbe32544["modis_ndvi_transformed"]:::queued
+    xdc843e2504e22144(["modis_ndvi_transformed_directory"]):::queued --> x5130788afbe32544["modis_ndvi_transformed"]:::queued
+    xba6244832b5285ba(["continent_raster_template"]):::queued --> x5130788afbe32544["modis_ndvi_transformed"]:::queued
+    x3f3ba2f9e89a9591(["modis_ndvi_token"]):::queued --> x5130788afbe32544["modis_ndvi_transformed"]:::queued
+    x18d8fc5297d7838e(["dates_to_process"]):::queued --> x63a0e22e7393f7fe(["months_to_process"]):::queued
+    x63a0e22e7393f7fe(["months_to_process"]):::queued --> x0548e231345702f7["nasa_weather_transformed"]:::queued
+    xba6244832b5285ba(["continent_raster_template"]):::queued --> x0548e231345702f7["nasa_weather_transformed"]:::queued
+    x711dc87df29f0a9c(["nasa_weather_transformed_directory"]):::queued --> x0548e231345702f7["nasa_weather_transformed"]:::queued
+    xe2329877730e44b5(["ndvi_anomalies_directory"]):::queued --> xf9b79e824823a870["ndvi_anomalies"]:::queued
+    x44345ceb9b3d4a81(["ndvi_historical_means"]):::queued --> xf9b79e824823a870["ndvi_anomalies"]:::queued
+    xb8d88361e3190fbf["ndvi_transformed"]:::queued --> xf9b79e824823a870["ndvi_anomalies"]:::queued
+    x5130788afbe32544["modis_ndvi_transformed"]:::queued --> x44345ceb9b3d4a81(["ndvi_historical_means"]):::queued
+    xa4eb23442420052a["sentinel_ndvi_transformed"]:::queued --> x44345ceb9b3d4a81(["ndvi_historical_means"]):::queued
+    x7fef416d6ce259f3(["ndvi_historical_means_directory"]):::queued --> x44345ceb9b3d4a81(["ndvi_historical_means"]):::queued
+    x704a24502f5bfcb5(["ndvi_transformed_directory"]):::queued --> xb8d88361e3190fbf["ndvi_transformed"]:::queued
+    x40d4d27d6a4a2824(["ndvi_transformed_sources"]):::queued --> xb8d88361e3190fbf["ndvi_transformed"]:::queued
+    xa4eb23442420052a["sentinel_ndvi_transformed"]:::queued --> x40d4d27d6a4a2824(["ndvi_transformed_sources"]):::queued
+    x5130788afbe32544["modis_ndvi_transformed"]:::queued --> x40d4d27d6a4a2824(["ndvi_transformed_sources"]):::queued
+    x63a0e22e7393f7fe(["months_to_process"]):::queued --> x40d4d27d6a4a2824(["ndvi_transformed_sources"]):::queued
+    xb406dc4c2762194f(["modis_task_end_dates"]):::queued --> x5173ee721c44ebc0(["ndvi_years"]):::queued
+    x3ea733d22e9c32e7(["sentinel_ndvi_transformed_directory"]):::queued --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::queued
+    xba6244832b5285ba(["continent_raster_template"]):::queued --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::queued
+    x6e1924e349d8e6e8(["sentinel_ndvi_api_parameters"]):::queued --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::queued
+    x45b75d590706329f(["sentinel_ndvi_token_file"]):::queued --> xa4eb23442420052a["sentinel_ndvi_transformed"]:::queued
+    x1ef0d1881ff89dbd(["slope_urls"]):::queued --> x680370f9b58b9f6d(["slope_preprocessed"]):::queued
+    x165085d61327782d(["slope_directory"]):::queued --> x680370f9b58b9f6d(["slope_preprocessed"]):::queued
+    xba6244832b5285ba(["continent_raster_template"]):::queued --> x680370f9b58b9f6d(["slope_preprocessed"]):::queued
+    xba6244832b5285ba(["continent_raster_template"]):::queued --> xd70b16641fa1b4ef(["soil_preprocessed"]):::queued
+    x9c14f0532ee1f83c(["soil_directory"]):::queued --> xd70b16641fa1b4ef(["soil_preprocessed"]):::queued
+    x0548e231345702f7["nasa_weather_transformed"]:::queued --> x01b9e03cb52b7b05["weather_anomalies"]:::queued
+    xf94f7486eed9869c(["weather_anomalies_directory"]):::queued --> x01b9e03cb52b7b05["weather_anomalies"]:::queued
+    xbd6b5d8fe3154d5a(["weather_historical_means"]):::queued --> x01b9e03cb52b7b05["weather_anomalies"]:::queued
+    x0548e231345702f7["nasa_weather_transformed"]:::queued --> xbd6b5d8fe3154d5a(["weather_historical_means"]):::queued
+    x4407a62768444c3e(["weather_historical_means_directory"]):::queued --> xbd6b5d8fe3154d5a(["weather_historical_means"]):::queued
+    x4847fdb918188b25(["country_polygons"]):::queued
   end
 ```
 
