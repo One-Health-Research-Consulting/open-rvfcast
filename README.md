@@ -3,10 +3,6 @@
 
 # An open-source framework for Rift Valley Fever forecasting
 
-NOTE: Much of this info is still good, but some is out of date – readme
-needs a bit of updating. See docs/openRVFcast_Walkthrough.docx for the
-most up-to-date details on the modeling pipeline.
-
 <!-- badges: start -->
 
 [![Project Status: WIP – Initial development is in progress, but there
@@ -24,55 +20,60 @@ CC-BY-4.0](https://img.shields.io/badge/License%20(for%20text)-CC_BY_4.0-blue.sv
 
 # Overview of OpenRVFcast
 
-The goal of EcoHealth Alliance’s ongoing OpenRVFcast project the
-development of a generalizable, open-source modeling framework for
-predicting Rift Valley Fever (RVF) outbreaks in Africa, funded by the
-Wellcome Trust’s climate-sensitive infectious disease [modeling
+The goal of this ongoing `OpenRVFcast` project is the development of a
+generalizable, open-source modeling framework for predicting Rift Valley
+Fever (RVF) outbreaks in Africa, funded by the Wellcome Trust’s
+climate-sensitive infectious disease [modeling
 initiative](https://wellcome.org/news/digital-tools-climate-sensitive-infectious-disease).
 We aim to integrate open data sets of climatic and vegetation data with
 internationally-reported outbreak data to build an modeling pipeline
 that can be adapted to varying local conditions in RVF-prone regions
 across the continent.
 
-This project is a collaborative effort between [EcoHealth
-Alliance](https://www.ecohealthalliance.org/), \[INSERT PARTNER LINKS\]
-
 ### Pipeline Structure
 
-The project pipeline is organized into two distinct modules: 1) the
-**Data Acquisition Module** and 2) the **Modeling Framework Module**.
-Both modules are orchestrated using the `targets` package in R, a
-powerful tool for creating reproducible and efficient data analysis
-workflows. By defining a workflow of interdependent tasks, known as
-‘targets’, this package ensures that each step in the workflow is only
-executed when its inputs or code change, thereby optimizing
-computational efficiency. A modular, scalable, and transparent design
-makes `targets` an ideal choice for managing pipelines in reproducible
-research and production environments. An introduction to workflow
-management using `targets` can be found
-[here](https://books.ropensci.org/targets/). This project also uses the
-[{renv}](https://rstudio.github.io/renv/) framework to track R package
-dependencies and versions which are recorded in the `renv.lock` file.
-Code used to manage dependencies is in `renv/` and other files in the
-root project directory. On starting an R session in the working
-directory, run \``renv::hydrate()` and `renv::restore()` to install
-required R packags and dependencies.
+**Important**: The full modeling pipeline is described in detail in
+docs/openRVFcast_Walkthrough.docx.
+
+In brief, the project pipeline is organized into three distinct
+“modules” that join together sequentially to form the overall
+OpenRVFcast pipeline: 1) the **Data Acquisition Module**, 2) the **Data
+Preparation Module**, 3) and the **Modeling Framework Module**. Each
+module is orchestrated using the `targets` package in R, a powerful tool
+for creating reproducible and efficient data analysis workflows. By
+defining a workflow of interdependent tasks, known as ‘targets’, this
+package ensures that each step in the workflow is only executed when its
+inputs or code change, thereby optimizing computational efficiency. A
+modular, scalable, and transparent design makes `targets` an ideal
+choice for managing pipelines in reproducible research and production
+environments. An introduction to workflow management using `targets` can
+be found [here](https://books.ropensci.org/targets/).
+
+This project also uses the [{renv}](https://rstudio.github.io/renv/)
+framework to track R package dependencies and versions which are
+recorded in the `renv.lock` file. Code used to manage dependencies is in
+`renv/` and other files in the root project directory. On starting an R
+session in the working directory, run \``renv::hydrate()` and
+`renv::restore()` to install required R packags and dependencies.
 
 ### Repository Structure
 
 Project code is available on the
-[open-rvfcast](https://github.com/ecohealthalliance/open-rvfcast) GitHub
-repository which is organized with the following structure:
+[open-rvfcast](https://github.com/One-Health-Research-Consulting/open-rvfcast)
+GitHub repository which is organized with the following structure:
 
 - `data/` contains downloaded and transformed data sources. These data
   are .gitignored and are available with access to S3-compatible cloud
   storage or the raw data can be downloaded and processed.
 - `R/` contains functions used in this analysis.
 - `docs/` contains documentation:
+  - `openRVFcast_Walkthrough.docx` - comprehensive details on the full
+    modeling pipeline
   - `dynamic_branching_guide.md` - comprehensive guide to the dynamic
     branching implementation
-  - `manual.md` - user manual for running the pipeline
-- `outputs/` contains visualization outputs (maps, animations).
+  - `manual.md` - some additional info for running the pipeline
+- `outputs/` contains visualization outputs (maps, animations) and
+  stores intermediate saved products created in the modeling module
 
 ### Data Storage
 
@@ -87,14 +88,18 @@ scalability when working with large, distributed data sources.
 
 #### Accessing the Complete Dataset
 
-The final cleaned data can be accessed directly from the cloud by
-opening the following connection. **Important**: The
-`africa_full_predictor_data` dataset only contains dates for which data
-was successfully retrieved from **all** predictor sources. If any
-predictor is missing for a given date, that date will not be included in
-the final dataset. This ensures data completeness - if a file is present
-in the `africa_full_predictor_data` folder, it is guaranteed to contain
-all predictors for that date.
+The first of the modules generates approximately 500 300mb files (meant
+to be stored in `data/africa_full_predictor_data`). These data can be
+accessed from the cloud (see .env for credentials). The second of the
+modules generates a single 800mb file; this file is also accessible from
+the cloud (BUT ATM email Noam Ross or Morgan Kain); this file should be
+stored in `data/pan_hex_joined_response_data` for the third module
+(modeling). **Important**: The `africa_full_predictor_data` dataset only
+contains dates for which data was successfully retrieved from **all**
+predictor sources. If any predictor is missing for a given date, that
+date will not be included in the final dataset. This ensures data
+completeness - if a file is present in the `africa_full_predictor_data`
+folder, it is guaranteed to contain all predictors for that date.
 
 For more details on how the pipeline handles data dependencies and
 incremental updates, see
@@ -130,10 +135,12 @@ single day:
     dataset
 
 However, due to computational demands of such large data, the model
-analysis pipeline will download the data in entirety before analysis. In
-addition, the dataset has been subsetted to two randomly chosen days per
-month between 2007 and 2024. Future work will provide the entire dataset
-for every day between 2005 and the current year.
+analysis pipeline will download the data in entirety before analysis.
+**Important**: The current modeling pipeline uses two randomly chosen
+days per month between 2007 and 2024; however, the entire dataset is
+available for every day between 2005 and the current year (though none
+of the data processing has been run on this “temporally complete”
+dataset).
 
 The current full africa predictor dataset is ~1.9 TB. Note that the data
 could be stored in a more compact format, but is provided in this
@@ -153,6 +160,10 @@ The data targets that are subsetted this way are:
 
 ## 1. Data Acquisition Module
 
+**Important**: The full modeling pipeline is described in detail in
+docs/openRVFcast_Walkthrough.docx. However, some important notes, in
+brief:
+
 ### Cloud Storage
 
 Many of the computational steps in the first module can be time
@@ -163,7 +174,8 @@ storage). The pipeline will still run without access to cloud storage,
 but users can add their own S3-compatible storage credentials to the
 `.env` file to enable cloud storage and collaboration with team members.
 
-**S3-compatible cloud storage credentials** to add to the .env file:
+**S3-compatible cloud storage credentials** to add to the .env file
+(already present and set to a bucket owned by Noam Ross):
 
     AWS_DEFAULT_REGION=auto
     AWS_REGION=auto
@@ -234,7 +246,7 @@ provided by the [World Animal Health Information System
 [database](https://www.dolthub.com/csv/ecohealthalliance/wahisdb/main/wahis_outbreaks)
 of cleaned outbreak data managed by EcoHealth Alliance.
 
-1.  RVF_occurance: A binary factor reflecting RVF occurance at each
+1.  RVF_occurance: A binary factor reflecting RVF occurrence at each
     location across the 5 forecast intervals.
 
 #### Static Data
@@ -453,6 +465,7 @@ separate parquet file of ~500Mb.
 
 For detailed documentation on the pipeline’s dynamic branching
 implementation and how incremental updates work, see
+docs/openRVFcast_Walkthrough.docx, as well as
 [`docs/dynamic_branching_guide.md`](docs/dynamic_branching_guide.md).
 For operational usage instructions, see
 [`docs/manual.md`](docs/manual.md).
@@ -564,102 +577,37 @@ graph LR
   end
 ```
 
-## 2. Rift Valley Fever (RVF) risk model pipeline
+## 2. Data Preparation
 
-### Data Partitioning
+In this module the raw (minorly cleaned) data saved to disk in Module 1
+is further cleaned and combined into the single master tibble covariate
+stack that is used in model fitting in Module 3. The key steps in this
+module are combining covariates with cases, building lagged variables,
+and collapsing data into w/e spatial aggregation is chosen (currently H3
+hex or ADM2).
 
-Splitting data into training, validation, and test sets is an important
-step for building robust and reliable models. The training set is used
-to learn model parameters, the validation set helps fine-tune
-hyperparameters and prevent overfitting, and the test set provides an
-unbiased evaluation of the model’s performance on unseen data. Proper
-splitting ensures the model generalizes well to new data, avoiding
-issues like data leakage or over-optimistic performance estimates.
+For complete details see docs/openRVFcast_Walkthrough.docx
 
-However, splitting outbreak data can be particularly challenging due to
-spatial and temporal clustering, which can lead to imbalanced or
-non-representative splits. Ensuring that all three splits contain
-representative data, including both outbreak presence and absence, is
-critical for robust model evaluation.
+## 3. Data Preparation
 
-#### Spatial splitting
+This module contains all of the modeling steps from hyperparameter
+tuning through to final model fitting, prediction visualization, and
+automated report generation.
 
-Spatial splitting was accomplished by [spatial
-blocking](https://nsojournals.onlinelibrary.wiley.com/doi/10.1111/ecog.02881)
-using the spatial_block_cv() function of the
-[spatialsample](https://spatialsample.tidymodels.org/) to create spatial
-cross-validation folds. This ensures that each split contains distinct
-spatial regions, at the level of municipality that contain representive
-information in all three splits.
+For complete details see docs/openRVFcast_Walkthrough.docx
 
-#### Temporal splitting
+A key aspect of the modeling pipeline is our spatial and temporal
+splitting strategy for cross validation (starting on page 8 of
+docs/openRVFcast_Walkthrough.docx). Splitting data into training,
+validation, and test sets is an important step for building robust and
+reliable models. The training set is used to learn model parameters, the
+validation set helps fine-tune hyperparameters and prevent overfitting,
+and the test set provides an unbiased evaluation of the model’s
+performance on unseen data. Proper splitting ensures the model
+generalizes well to new data, avoiding issues like data leakage or
+over-optimistic performance estimates.
 
-In addition to spatial clustering, outbreak data is time-series by
-nature, necessitating techniques like expanding window splitting where
-the training set grows incrementally over time as more data becomes
-available. This approach is particularly suited for scenarios where
-temporal dependencies exist, and models must be evaluated on their
-ability to generalize to future, unseen data. When outbreaks are rare,
-subdividing the limited positive detections can exacerbate the
-imbalance, making it harder to accurately assess the model’s performance
-and generalizability.
-
-### Model Structure
-
-### Evaluating Model Performance
-
-### Generating Dynamic Documentation and Reports
-
-### Targets Pipeline
-
-A visualization of the data acquisition module can be found below.
-
-    targets::tar_make(script = "model_framework_targets.R")
-
-The schematic figure below summarizes the steps of the model framework
-module. The figure is generated using `mermaid.js` syntax and should
-display as a graph on GitHub. It can also be viewed by pasting the code
-into <https://mermaid.live>.)
-
-<!-- NOTE: Temporarily commented out due to syntax error in model_framework_targets.R -->
-
-<!-- ```{r, echo=FALSE, message = FALSE, results='asis'} -->
-
-<!-- mer <- targets::tar_mermaid(targets_only = TRUE, -->
-
-<!--                             outdated = FALSE, -->
-
-<!--                             legend = FALSE, -->
-
-<!--                             color = FALSE, -->
-
-<!--                             script = "model_framework_targets.R", -->
-
-<!--                             exclude = c("readme", contains("AWS"))) -->
-
-<!-- cat( -->
-
-<!--   "```mermaid", -->
-
-<!--   mer[1], -->
-
-<!--   #'Objects([""Objects""]) --- Functions>""Functions""]', -->
-
-<!--   'subgraph Project Workflow', -->
-
-<!--   mer[3:length(mer)], -->
-
-<!--   'linkStyle 0 stroke-width:0px;', -->
-
-<!--   "```", -->
-
-<!--   sep = "\n" -->
-
-<!-- ) -->
-
-<!-- ``` -->
-
-[`Waywiser`](https://github.com/ropensci/waywiser)
+### More resources
 
 Follow the links for more information about:
 
