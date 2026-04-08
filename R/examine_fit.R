@@ -16,34 +16,17 @@
 
 examine_fits_within <- function(model_out, test_data, regions, larger_districts
                                 , africa_sf, region_to_sum, p_thresh, using_hexes
-                                , outpath, overwrite
-                                ) {
+                                , outpath, overwrite) {
   
   print(model_out$outer_fold_id)
   
   if (is.null(region_to_sum)) {
-    outname <- paste(paste(outpath, "/", sep = ""), "predictions_raw_", model_out$outer_fold_id, ".Rds", sep = "")
+    outname <- paste(paste(outpath, "/", sep = ""), "predictions_raw_", model_out$outer_fold_id, ".qs", sep = "")
   } else {
-    outname <- paste(paste(outpath, "/", sep = ""), "predictions_collapsed_", model_out$outer_fold_id, ".Rds", sep = "")
+    outname <- paste(paste(outpath, "/", sep = ""), "predictions_collapsed_", model_out$outer_fold_id, ".qs", sep = "")
   }
   
-  if (file.exists(outname) & !overwrite) {
-    return(outname)
-  }
-
-  ## Load the previously created / saved Africa map of sub-regions per Country
-  if (!using_hexes) {
-    africa_sf <- readRDS(africa_sf) %>%
-      mutate(country_norm = norm_key(country),
-             region_norm  = norm_key(region))
-  } else {
-    africa_sf <- regions[[1]] %>% 
-      rename(region_norm = shapeName) %>% mutate(country_norm = "null")
-    if (!is.null(larger_districts)) {
-      eval_regions <- larger_districts[[1]] 
-      africa_sf    <- africa_sf %>% mutate(shapeName = h3jsr::get_parent(region_norm, 2)) 
-    }
-  }
+  if (file.exists(outname) & !overwrite) { return(outname) }
   
   ## Combine predictions with the data
   dat_with_pred <- model_out$preds[[1]] %>% 
@@ -56,35 +39,43 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
     rename(outbreak_pred = outbreak) %>%
     left_join(
       .
-    , test_data %>% filter(index %in% model_out$assess_data[[1]]) 
+      , test_data %>% filter(index %in% model_out$assess_data[[1]]) 
     )
-  
-  ## Add in the larger H3 hexes
-  if (!is.null(larger_districts)) {
-  dat_with_pred <- dat_with_pred %>%
-    rename(region_norm = shapeName) %>% 
-    left_join(africa_sf %>% as.data.frame() %>% dplyr::select(region_norm, shapeName)) %>%
-    relocate(shapeName, .after = "region_norm")
+
+  ## Load the previously created / saved Africa map of sub-regions per Country
+  if (!using_hexes) {
+    africa_sf <- readRDS(africa_sf) %>%
+      mutate(country_norm = norm_key(country),
+             region_norm  = norm_key(region))
+  } else {
+    africa_sf     <- larger_districts[[1]] %>% rename(region_norm = shapeName) %>% mutate(country_norm = "null")
+    eval_regions  <- regions[[1]]
+    dat_with_pred <- dat_with_pred %>% mutate(region_norm = h3jsr::get_parent(shapeName, 2), .after = shapeName)
   }
   
   ## And finally other country-level or regions if desired
   if (!is.null(region_to_sum)) {
     
-    intersecting_hexes <- st_intersects(region_to_sum[[1]], africa_sf) %>% as.data.frame() %>%
+    intersecting_hexes <- st_intersects(region_to_sum[[1]], eval_regions) %>% as.data.frame() %>%
       rename(area_index = row.id, index = col.id)
     
-    dat_with_pred <- dat_with_pred %>% 
-      rename(region_norm = shapeName) %>% 
+    dat_with_pred <- dat_with_pred %>%
       left_join(
         .
-      , africa_sf %>% as.data.frame() %>% dplyr::select(region_norm) %>%
-         mutate(index = seq(n())) %>% left_join(intersecting_hexes) %>% 
-         filter(!is.na(area_index)) %>% dplyr::select(-index)
-      ) %>% filter(!is.na(area_index)) %>%
-      left_join(
-        .
-      , region_to_sum[[1]] %>% as.data.frame() %>% dplyr::select(shapeName) %>% mutate(area_index = seq(n()))
-      ) 
+        , eval_regions %>% as.data.frame() %>% dplyr::select(shapeName) %>%
+          mutate(index = seq(n())) %>% left_join(intersecting_hexes) %>% 
+          filter(!is.na(area_index)) %>% dplyr::select(-index) %>%
+          left_join(
+            .
+            , region_to_sum[[1]] %>% as.data.frame() %>% dplyr::select(shapeName) %>%
+              mutate(area_index = seq(n())) %>% rename(ADM2_name = shapeName)
+          )
+      ) %>% relocate(
+        c(area_index, ADM2_name), .after = region_norm
+      ) %>% dplyr::filter(!is.na(ADM2_name)) %>%
+      dplyr::select(-region_norm) %>% 
+      rename(region_norm = ADM2_name)
+    
   }
   
   ## Do all of the performance summaries for each date, for:
@@ -93,10 +84,10 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
    ## C) Temporal aggregation: small hexes across forecast windows
    ## D) Double aggregation: larger hexes across forecast windows
   aggregation_list <- list(
-      "No aggregation"       = c("date", "region_norm", "forecast_interval")
-    , "Spatial aggregation"  = c("date", "shapeName", "forecast_interval")
-    , "Temporal aggregation" = c("date", "region_norm")
-    , "Double aggregation"   = c("date", "shapeName")
+      "No aggregation"       = c("date", "shapeName", "forecast_interval")
+    , "Spatial aggregation"  = c("date", "region_norm", "forecast_interval")
+    , "Temporal aggregation" = c("date", "shapeName")
+    , "Double aggregation"   = c("date", "region_norm")
   )
   
  out_list <- purrr::pmap(list(aggregation_list, names(aggregation_list)), .f = function(x, z) {
@@ -110,20 +101,27 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
       ) %>% ungroup()
     
     ## Build calibration curves
-    calcurves <- generate_calibration_curve(
-      preds      = dat.s
-    , test_data  = splitted_data$test_data[[1]]
-    , predname   = "prob_pred"
-    , truename   = "true_out"
-    , splitgrp   = ifelse("forecast_interval" %in% x, "forecast_interval", NA)
-    )
+    calcurves <- try({
+      generate_calibration_curve(
+        preds      = dat.s
+        , test_data  = splitted_data$test_data[[1]]
+        , predname   = "prob_pred"
+        , truename   = "true_out"
+        , splitgrp   = ifelse("forecast_interval" %in% x, "forecast_interval", NA)
+      )
+    }, silent = T)
     
-    plotted_calibration <- plot_calibration(
-      caltib      = calcurves
-    , xg          = NULL 
-    , yg          = ifelse("forecast_interval" %in% x, "forecast_interval", NA)
-    , forcastvals = if("forecast_interval" %in% x){c(30, 90, 150)}else{NA}
-    )
+    if (class(calcurves)[1] != "try-error") {
+      plotted_calibration <- plot_calibration(
+        caltib      = calcurves
+        , xg          = NULL 
+        , yg          = ifelse("forecast_interval" %in% x, "forecast_interval", NA)
+        , forcastvals = if("forecast_interval" %in% x){c(30, 90, 150)}else{NA}
+      )
+    } else {
+      calcurves           <- NULL
+      plotted_calibration <- NULL
+    }
     
     ## Summary table
     summary_probs <- dat.s %>% dplyr::group_by(across(all_of(
@@ -219,16 +217,14 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
     
     map_list <- lapply(unique(dat.s$date) %>% as.list(), FUN = function(d) {
       
-      if ("shapeName" %in% x) {
-        if (!is.null(larger_districts) & !is.null(region_to_sum)) {
-          stop("Exactly one of larger_districts or region_to_sum should be NULL")
-        } else if (!is.null(larger_districts)) {
-          map.dat.s <- eval_regions %>% left_join(., dat.s)
-        } else {
-          map.dat.s <- region_to_sum[[1]] %>% left_join(., dat.s)
-        }
+      if ("region_norm" %notin% x) {
+        map.dat.s <- eval_regions %>% left_join(., dat.s) %>% filter(!is.na(prob_pred))
       } else {
-        map.dat.s <- africa_sf %>% left_join(., dat.s)
+        if (is.null(region_to_sum)) {
+          map.dat.s <- africa_sf %>% left_join(., dat.s) %>% filter(!is.na(prob_pred))
+        } else {
+          map.dat.s <- region_to_sum[[1]] %>% rename(region_norm = shapeName) %>% left_join(., dat.s) %>% filter(!is.na(prob_pred))
+        }
       }
       
       map.dat.s %>% 
@@ -284,7 +280,7 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
     , metrics        = model_out$metrics
    )
  
- saveRDS(out_list, outname)
+ qsave(out_list, outname)
  
  return(outname)
   

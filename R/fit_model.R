@@ -8,6 +8,7 @@
 #' @param raw_data complete set of raw data
 #' @param threshold For assigning a 1 | estimated prob
 #' @param weightings weight assigned to 1s in binomial loss metric 
+#' @param start_p initilization point for base intercept 
 #' @param id_cols Columns that define a unique data point
 #' @param out_dir Where to save output
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
@@ -16,7 +17,7 @@
 #' @author Morgan Kain
 #' @export
 
-fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weightings, id_cols, out_dir, overwrite, DEBUG) {
+fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weightings, start_p, id_cols, out_dir, overwrite, DEBUG) {
 
   ## Set filenames
   save_filename <- paste(
@@ -91,14 +92,14 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weighting
       , .after = "index"
     )
   
-  if (DEBUG) { outer_tbl_train  <- outer_tbl_train[1:10000, ] }
+  if (DEBUG) { outer_tbl_train  <- outer_tbl_train[sample(1:nrow(outer_tbl_train), 100000), ] }
   
   ## Attempt to clear up some ram
   rm(raw_data); gc()
   
   ## Set up and fit the final model for this outer fold
   rec       <- make_recipe(outer_tbl_train, id_cols = id_cols)
-  mod       <- make_model(params = final_hyper_set)
+  mod       <- make_model(params = final_hyper_set, start_p = start_p)
   wf        <- workflow() %>% add_model(mod) %>% add_recipe(rec) %>% add_case_weights(weights)
   model_fit <- fit(wf, data = outer_tbl_train)
   

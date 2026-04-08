@@ -4,8 +4,6 @@
 
 ## NOTES / ToDo ----------------------------------------------------------------
 
-## 1) Somewhat of a bare-bones non-dynamic report made
- ## A) Non-dynamic, need to change path to each and every figure if code changes which is bad practice
 
 ## Setup / Preamble ------------------------------------------------------------
 
@@ -57,7 +55,7 @@ model_data_targets <- tar_plan(
   tar_target(region_name, if(using_hexes){"pan_hex"}else{"pan"})
 , tar_target(region_data_path
              , paste("data/", region_name, "_joined_response_data/"
-             , region_name, "_joined_response_data_final_with_sero.parquet"
+             , region_name, "_joined_response_data_final.parquet"
              , sep = ""), format  = "file")
 
   ## Load and mask forecast data so that forecasts further out than the summarized
@@ -90,7 +88,7 @@ model_data_targets <- tar_plan(
 
   ## Load the previously saved spatial hexes. 
    ## Saved as part of the rvf_data_processing_targets.R pipeline phase
-, tar_target(region_hexes, readRDS("data/region_hexes.Rds"))
+, tar_target(region_hexes, readRDS("data/region_hexes_small.Rds"))
 
   ## Load previous saved larger spatial hexes for summarizing output 
 , tar_target(performance_hexes, readRDS("data/region_hexes_for_evaluation.Rds"))
@@ -278,10 +276,13 @@ model_tuning_targets <- tar_plan(
   outer_fold_id == 16 & inner_fold_id == 1 |
   outer_fold_id == 16 & inner_fold_id == 10 |   
   outer_fold_id == 18 & inner_fold_id == 5  |
-  outer_fold_id == 18 & inner_fold_id == 7 
+  outer_fold_id == 18 & inner_fold_id == 7 |
+  outer_fold_id == 14 & inner_fold_id == 11  |
+  outer_fold_id == 5 & inner_fold_id == 13 
     ) %>% filter(index %in% c(15)) %>% 
     dplyr::select(-assess_inner, -has_outbreak, -nrow)})
-, tar_target(folded_data_training_DEBUG, folded_data_training %>% filter(outer_fold_id %in% inner_fold_id_finalized_DEBUG$outer_fold_id))
+, tar_target(folded_data_training_DEBUG, folded_data_training %>% 
+               filter(outer_fold_id %in% inner_fold_id_finalized_DEBUG$outer_fold_id))
 , tar_target(folded_data_testing_DEBUG , folded_data_testing %>% filter(outer_fold_id %in% c(1, 2, 3)))
 
   ## Fit across tuning_grid across all inner folds of all outer folds
@@ -295,11 +296,11 @@ model_tuning_targets <- tar_plan(
     , start_p     = 0.005
     , id_cols     = id_cols
     , out_dir     = outer_folds_dir
-    , overwrite   = FALSE
+    , overwrite   = TRUE
     , DEBUG       = FALSE)
-  , pattern = map(inner_fold_id_finalized)
-  , error   = "null"
-  , format  = "file")
+    , pattern     = map(inner_fold_id_finalized)
+    , error       = "null"
+    , format      = "file")
 
   ## Join together all tuned inner folds and select the best per outer fold
 , tar_target(tuned_results_joined, join_tuned_inner_folds(
@@ -327,13 +328,14 @@ model_tuning_targets <- tar_plan(
   , threshold      = positive_threshold
   , hyperparm_sets = tuned_results_joined
   , weightings     = weightings_on_ones
+  , start_p        = 0.005
   , id_cols        = id_cols
   , out_dir        = outer_folds_dir2
   , overwrite      = TRUE
   , DEBUG          = TRUE)
-  , pattern = map(folded_data_training_DEBUG)
-  , error   = "null"
-  , format  = "file")
+  , pattern        = map(folded_data_training_DEBUG)
+  , error          = "null"
+  , format         = "file")
 
   ## Extract the best parameter set
 , tar_target(finalized_hyperparameters, finalize_hyperparameters(
@@ -357,13 +359,14 @@ model_fitting_targets <- tar_plan(
   , raw_data        = splitted_data_fitting
   , threshold       = positive_threshold
   , weightings      = weightings_on_ones
+  , start_p         = 0.005
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
-  , overwrite       = TRUE
-  , DEBUG           = TRUE)
-  , pattern = map(folded_data_testing)
-  , error   = "null"
-  , format  = "file")
+  , overwrite       = FALSE
+  , DEBUG           = FALSE)
+  , pattern         = map(folded_data_testing)
+  , error           = "null"
+  , format          = "file")
   
   ## Join fitted_model paths to folded_data_testing for parallel processing for model eval
 , tar_target(model_out_for_eval, build_model_out_for_eval(
@@ -381,7 +384,7 @@ model_evaluation_targets <- tar_plan(
   tar_target(variable_importance_prep_a, prep_for_variable_importance_a(
     model_dat     = model_out_for_eval
   , splitted_data = splitted_data) 
-  , pattern = map(model_out_for_eval))
+  , pattern       = map(model_out_for_eval))
 
 ## Actually do the variable importance calculation, now loading far fewer targets
 , tar_target(variable_importance, calculate_variable_importance(
@@ -390,7 +393,7 @@ model_evaluation_targets <- tar_plan(
   , fitdir          = outer_folds_dir3
   , recdir          = outer_folds_dir3
   , num_vars        = 10)
-  , pattern = map(variable_importance_prep_a))
+  , pattern         = map(variable_importance_prep_a))
 
 ## And a quick comparison of the shapes of the partial dependence plots among fits
 , tar_target(variable_importance_among, compare_vi(variable_importance = variable_importance))
@@ -408,7 +411,7 @@ model_evaluation_targets <- tar_plan(
   , p_thresh         = positive_threshold
   , using_hexes      = using_hexes
   , outpath          = "outputs/examined_fits"
-  , overwrite        = FALSE)
+  , overwrite        = TRUE)
   , pattern          = map(model_out_for_eval)
   , error            = "null"
   , format           = "file")
@@ -417,26 +420,29 @@ model_evaluation_targets <- tar_plan(
     model_out        = model_out_for_eval
   , test_data        = splitted_data$test_data[[1]]
   , regions          = region_map
-  , larger_districts = NULL
+  , larger_districts = performance_hexes
   , africa_sf        = path_to_simplifed_regions
   , region_to_sum    = region_districts
   , p_thresh         = positive_threshold
-  , using_hexes      = using_hexes)
+  , using_hexes      = using_hexes
+  , outpath          = "outputs/examined_fits"
+  , overwrite        = TRUE)
   , pattern          = map(model_out_for_eval)
-  , error            = "null")
+  , error            = "null"
+  , format           = "file")
 
 ## For speed and RAM considerations, extract out pieces for individual exploration as
  ## targets, and can the more easily plot / explore from these extracted pieces
 , tar_target(ex_fits.summary_probs_raw  , {
   
-  filepath <- "outputs/summarized_fits/ex_fits.summary_probs_raw.Rds"
+  filepath <- "outputs/summarized_fits/ex_fits.summary_probs_raw.qs"
   if (file.exists(filepath)) {return(filepath)}
   
     tf <- purrr::map(examined_fits_within_pan, .f = function(x) {
-        readRDS(x) %>% dplyr::select(outer_fold_id, aggregation, summary_probs) %>% unnest(summary_probs)
+        qread(x) %>% dplyr::select(outer_fold_id, aggregation, summary_probs) %>% unnest(summary_probs)
       }) %>% bind_rows()
     
-    saveRDS(tf, filepath)
+    qsave(tf, filepath)
     return(filepath)
   }, error   = "null", format  = "file")
 , tar_target(ex_fits.summary_probs      , {
@@ -455,7 +461,7 @@ model_evaluation_targets <- tar_plan(
   if (file.exists(filepath)) {return(filepath)}
   
     tf <- purrr::map(examined_fits_within_pan, .f = function(x) {
-      readRDS(x) %>% dplyr::select(outer_fold_id, aggregation, plotted_calibration) %>% unnest(plotted_calibration)
+      qread(x) %>% dplyr::select(outer_fold_id, aggregation, plotted_calibration) %>% unnest(plotted_calibration)
     }) %>% bind_rows()
   
     qsave(tf, filepath)
@@ -468,7 +474,7 @@ model_evaluation_targets <- tar_plan(
   if (file.exists(filepath)) {return(filepath)}
   
   tf <- purrr::map(examined_fits_within_pan, .f = function(x) {
-    readRDS(x) %>% dplyr::select(outer_fold_id, aggregation, prob_dens_plot)
+    qread(x) %>% dplyr::select(outer_fold_id, aggregation, prob_dens_plot)
   }) %>% bind_rows()
   
     qsave(tf, filepath)
@@ -481,7 +487,7 @@ model_evaluation_targets <- tar_plan(
   if (file.exists(filepath)) {return(filepath)}
   
   tf <- purrr::map(examined_fits_within_pan, .f = function(x) {
-    readRDS(x) %>% dplyr::select(outer_fold_id, aggregation, date_range, map_split) %>% unnest(c(date_range, map_split))
+    qread(x) %>% dplyr::select(outer_fold_id, aggregation, date_range, map_split) %>% unnest(c(date_range, map_split))
   }) %>% bind_rows()
   
     qsave(tf, filepath)
@@ -493,32 +499,33 @@ model_evaluation_targets <- tar_plan(
   , outpath   = "reports/figure_pieces/calibration/"
   , idinfo    = model_out_for_eval
   , plotname  = "calplot.opt"
-  , overwrite = FALSE))
+  , overwrite = TRUE))
 , tar_target(plotted_calibration.plot_export_even, save_fig_pieces(
     input     = ex_fits.plotted_calibration
   , outpath   = "reports/figure_pieces/calibration/"
   , idinfo    = model_out_for_eval
   , plotname  = "calplot.even"
-  , overwrite = FALSE))
+  , overwrite = TRUE))
 , tar_target(prob_dens.plot_export, save_fig_pieces(
     input     = ex_fits.prob_dens_plot
   , outpath   = "reports/figure_pieces/dens/"
   , idinfo    = model_out_for_eval
   , plotname  = "prob_dens_plot"
-  , overwrite = FALSE))
+  , overwrite = TRUE))
 , tar_target(map_split.plot_export, save_fig_pieces(
     input     = ex_fits.map_split
   , outpath   = "reports/figure_pieces/map_split/"
   , idinfo    = model_out_for_eval
   , plotname  = "map_split"
-  , overwrite = FALSE))
+  , overwrite = TRUE))
 
 )
 
 ## Reports ---------------------------------------------------------------------
 report_targets <- tar_plan(
   
-  ## Somewhat of a poor, non-dynamic report. See figures in report
+  ## Somewhat of a poor, non-dynamic report; need to change path to each and every figure if code changes which is bad practice
+   ## See figures in report
   tar_quarto(
     remit_report
   , path  = "reports/openRVFcast_report.qmd"

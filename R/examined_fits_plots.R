@@ -8,9 +8,8 @@
 #' @author Morgan Kain
 #' @export
 
-
 plot.summary_probs <- function(dat) {
-  td <- readRDS(dat)
+  td <- qread(dat)
   td %>% 
     mutate(
       forecast_interval = ifelse(is.na(forecast_interval), "Collapsed", forecast_interval)

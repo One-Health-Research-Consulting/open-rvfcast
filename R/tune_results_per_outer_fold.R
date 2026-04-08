@@ -290,6 +290,7 @@ join_tuned_inner_folds <- function(inner_folds, training_dat, metric, weightval,
 #' @param raw_data complete set of raw data
 #' @param threshold For assigning a 1 | estimated prob
 #' @param weightings weight assigned to 1s in binomial loss metric 
+#' @param start_p initilization point for base intercept 
 #' @param hyperparm_sets maximized hyperparameter sets across all inner folds of all outer folds
 #' @param id_cols Columns that define a unique data point
 #' @param out_dir Where to save output
@@ -299,7 +300,7 @@ join_tuned_inner_folds <- function(inner_folds, training_dat, metric, weightval,
 #' @author Morgan Kain
 #' @export
 
-tune_results_across_outer_folds <- function(outer_data, raw_data, threshold, weightings
+tune_results_across_outer_folds <- function(outer_data, raw_data, threshold, weightings, start_p 
                                           , hyperparm_sets, id_cols, out_dir, overwrite, DEBUG) {
   
   ## The best hyperparameter set for this outer fold across all inner folds for this outer fold
@@ -358,7 +359,7 @@ tune_results_across_outer_folds <- function(outer_data, raw_data, threshold, wei
   
   ## Set up and fit the final model for this outer fold
   rec <- make_recipe(outer_tbl_train, id_cols = id_cols)
-  mod <- make_model(params = hyper_set)
+  mod <- make_model(params = hyper_set, start_p = start_p)
   wf  <- workflow() %>% add_model(mod) %>% add_recipe(rec) %>% add_case_weights(weights)
   fit <- fit(wf, data = outer_tbl_train)
   

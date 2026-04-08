@@ -37,7 +37,8 @@ calculate_variable_importance   <- function(model_dat, final_hyper_set, fitdir, 
   VIP.xgb     <- xgboost::xgb.importance(model = xgb_booster, feature_names = xgb_booster$feature_names) 
   VIP.xgb.p   <- VIP.xgb %>% xgboost::xgb.plot.importance(top_n = 30)
   
-  vartt <- imp_tbl[1:num_vars, 1]$Variable
+  ## Can be some NA issues when DEBUG is TRUE and the data is small
+  vartt <- imp_tbl[1:num_vars, 1]%>% filter(!is.na(Variable)) %>% pull(Variable)
   
 for (i in seq_along(vartt)) {
   p1 <- pdp::partial(
