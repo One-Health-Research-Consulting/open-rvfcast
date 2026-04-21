@@ -4,14 +4,16 @@
 
 ## NOTES / ToDo ----------------------------------------------------------------
 
+## 1) Ready to rerun pipeline, but waiting on a machine to run the computation
 
 ## Setup / Preamble ------------------------------------------------------------
 
 ## Re-record current dependencies for CAPSULE users
 if (Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true"))
-  capsule::capshot(c("packages.R",
-                     list.files(pattern = "_targets.*\\.(r|R)$", full.names = TRUE),
-                     list.files("R", pattern = "\\.(R|r)$", full.names = TRUE)))
+  capsule::capshot(c(
+    "packages.R"
+  , list.files(pattern = "_targets.*\\.(r|R)$", full.names = TRUE)
+  , list.files("R", pattern = "\\.(R|r)$", full.names = TRUE)))
 
 ## Load packages (in packages.R) and load project-specific functions in R folder
 suppressPackageStartupMessages(source("packages.R"))
@@ -43,8 +45,10 @@ using_hexes     <- TRUE
  ## the previous pipeline (rvf_data_processing_targets.R) is "shapeName"
  ## NOTE: code was originally built for using_hexes == FALSE (hex option added later)
  ## so some code was added here and there to add using_hexes == FALSE language to the
- ## object created with using_hexes == TRUE. So currently, not fully dynamic. The
- ## short of it is shapeName is fine for now regardless of the above choice
+ ## object created with using_hexes == TRUE. 
+ ## The short of it is shapeName is fine for now regardless of the above choice, 
+ ## however leaving this here for flexibility in case some input layers change. Easier to
+ ## adjust here than everywhere in the code
 district_id_col <- "shapeName"
 
 ## Targets for loading needed data ---------------------------------------------
@@ -79,11 +83,13 @@ model_data_targets <- tar_plan(
 , tar_target(path_to_clustered_regions, paste("data/clustered_" , region_name, "_regions.Rds", sep = ""))
 , tar_target(path_to_simplifed_regions, paste("data/simplified_", region_name, "_sf.Rds", sep = ""))
 
-  ## Pulls all African countries. Alternatively can just provide a single country
-   ## directly to get_region_districts below
+  ## The main pipeline predicts for all African countries. 
+   ## Alternatively can just provide a single country to subset predictions to a single region
+   ## (the model will still run for all of Africa, but predictions will also be summarized into 
+   ## ADM2 regions for the chosen country here)
 , tar_target(which_countries, "South Africa")
 
-  ## Sub-regions of region[s] of interest
+  ## Sub-regions of region[s] of interest (here ADM2 regions are returned)
 , tar_target(region_districts, get_region_districts(which_countries))
 
   ## Load the previously saved spatial hexes. 
@@ -97,11 +103,15 @@ model_data_targets <- tar_plan(
 , tar_target(region_map, if(using_hexes){region_hexes}else{region_districts})
 
   ## Last date of the training data set (all data beyond this date will be set aside for final model evaluation)
+   ## NOTE: No 100% principled way to choose this date. This date was chosen to make both training and test
+   ## data sets large enough and to have some outbreaks in the test set (fewer recorded outrbeaks very near
+   ## the present)
 , tar_target(end_date, as.Date("2020-12-19"))
-
-  ## As in the comment in the preamble, testing my mental map of the problem and working on code dev for
-   ## one forecast horizon for now
+  
+  ## Forecast windows into the future as established in the previous steps of the pipeline
 , tar_target(forecast_horizon, c(30, 60, 90, 120, 150))
+
+  ## Establishes a small gap between training windows to have no overlap
 , tar_target(max_lag_period, 90)
   
 )
@@ -109,20 +119,21 @@ model_data_targets <- tar_plan(
 ## Targets for preparing for model tuning --------------------------------------
 cross_validation_targets <- tar_plan(
   
-  ## Best to split the data first then fold on the training data. Can do so on end_date
-   ## Going for name of target as a noun (even if it is a funny nonsense word like it is here)
+  ## Split the data first then fold on the training data. 
+   ## General NOTE: Name of target as nouns (even if it is a funny nonsense word like it is here)
    ## and the function as the related verb
   tar_target(splitted_data, split_data(
      dat      = region_data
-    ## Prevent overlap in training and test, so start test after the end of the forecast horizon 
-     ## from the last training date
+    ## Option available to leave gaps between the end of one test set time window and the start of the
+     ## next if desired. If end_date = end_date the next window will start directly after the previous ends
    , end_date = end_date
-     ## If we want to reduce the dataset for model fitting speed. Uncertain about this
-      ## Details in function (could potentially be pulled out for greater transparency)
+     ## Minor reduction in the data set for model fitting speed. Drops map pixels with outlines in terms
+      ## of the joint covariate stack where outbreaks have never been recorded
+      ## See further details in function
    , reduce   = TRUE
    ))
   
-  ## And split data for fitting (no reduction)
+  ## And split data for making predictions on full map once model is tuned
 , tar_target(splitted_data_fitting, split_data(
     dat      = region_data
   , end_date = end_date
@@ -133,9 +144,9 @@ cross_validation_targets <- tar_plan(
 , tar_target(n_spatial_folds, 20)
 
   ## Generate n_spatial_folds clusters of all Africa regions
-   ## Note: all functions in spatial_helpers.R
-  ## Slightly unwieldy because many of these steps are not needed if using_hexes
-  ## but functioning fine, so leaving for now
+   ## NOTE: Most of the helper functions referenced inside this function are
+   ## only used if using_hexes == FALSE (all functions in spatial_helpers.R)
+   ## If using_hexes == TRUE, this is a pretty simple step
 , tar_target(clustered_Africa_districts, make_area_clusters(
      sf_list                   = region_map
    , using_hexes               = using_hexes
@@ -171,20 +182,26 @@ cross_validation_targets <- tar_plan(
    , sf_districts      = clustered_Africa_districts
      ## Skip through time by the max forecast horizon + max time variables are lagged
    , assess_time_chunk = max(forecast_horizon)
-     ## Time gap between the end of the previous fold and the start of the next fold. For now setting to
-      ## the max forecast time so that there isn't overlap
+     ## Time gap between the starting date for each temporal fold in the training data. 
+      ## Setting step_size = max(forecast_horizon) [150] + max_lag_period [90] leads to 
+      ## no overlap of any data between temporally adjacent folds because the first day of the
+      ## 3 months of lagged covariates in fold n+1 start after the last day in the 150 day
+      ## forecast window in fold n. Could conceivably let these overlap as it isn't *much*
+      ## data overlap, but probably best to keep now overlap
    , step_size         = max(forecast_horizon) + max_lag_period
    , district_id_col   = district_id_col
    , seed              = 10001))
     
-  ## Collapse these based on some criteria of "information content" 
+  ## Drop a few folds that don't achieve some minimal data requirements  
 , tar_target(folded_data_training, clean_folded_data(
      raw_data                 = splitted_data$train_data
    , folded_data              = folded_data_training_raw
    , epidemic_threshold_total = 10
    , epidemic_threshold_space = 3))
 
- ## Generate test cases for assessing model performance
+ ## Generate folds for test data for assessing model performance.
+  ## NOTE: Splitting into multiple windows to test performance as the amount of data
+  ## used to fit the model grows
 , tar_target(folded_data_testing, fold_data(
     data              = tibble(test_data = region_data %>% list())
   , type              = "test_data"
@@ -201,6 +218,7 @@ cross_validation_targets <- tar_plan(
 ## Targets for conducting model tuning -----------------------------------------
 model_tuning_targets <- tar_plan(
   
+  ## Model tuning parameters
   tar_target(tune_pars, data.frame(
     tree_min       = 100
   , tree_max       = 1500
@@ -218,26 +236,29 @@ model_tuning_targets <- tar_plan(
   
 , tar_target(tuning_grid,
     with(tune_pars
-      ## Number of alternative grid options available, this seems fine
-       ## Possible that some of the parameter space has some combination of 
-       ## hyperparameters that don't make a lot of sense
+      ## Number of alternative grid options available, but space_filling efficient
+       ## NOTE: Could possibly do a bit better to save some computation time by
+       ## cutting out some of the parameter space where the combination of has some 
+       ## combination of hyperparameters that don't make a lot of sense
     , grid_space_filling(
         trees(range          = c(tree_min, tree_max))
       , tree_depth(range     = c(tree_dep_min, tree_dep_max))
       , learn_rate(range     = c(learn_rate_min, learn_rate_max), trans = NULL)
       , min_n(range          = c(minn_min, minn_max))
       , loss_reduction(range = c(loss_red_min, loss_red_max))
-      ## Arbitrary choice here in which train_inner, shouldn't really matter
-      , finalize(mtry()      , folded_data_training$inner_folds[[10]] %>% 
+      ## Arbitrary choice here in which train_inner, doesn't matter which
+      , finalize(mtry(), folded_data_training$inner_folds[[10]] %>% 
                    left_join(., splitted_data$train_data[[1]], by = "index") %>% filter(cluster != 1))
       ## Total number of combinations of hyperparameters
       , size = size)) %>% mutate(index = seq(n()), .before = 1))
 
+  ## Set up list of a id columns for grouping, summarizing, etc. that are usde in a few spots
 , tar_target(id_cols, c("shapeName", "Proportion_Country", "ADM2", "Proportion_ADM2", "date", "index"))
 
-  ## probability value over which a one is assigned
+  ## probability value for which an outbreak is considered "likely"
 , tar_target(positive_threshold, seq(0.05, 0.95, by = 0.05))
-  ## How much to weight 1s relative to 0s in predictions
+
+  ## How much to weight ones (detected outbreaks) relative to zeros (no outbreaks)
 , tar_target(weightings_on_ones, c(1, 10, 100, 1000))
 
   ## Set up location for saving intermediate output
@@ -248,9 +269,9 @@ model_tuning_targets <- tar_plan(
 , tar_target(outer_folds_dir3, create_data_directory(
     directory_path = paste("outputs/", region_name, "_final_model_fits_ws", sep = "")))
 
-## Final prep step for parallel processing for tuning across all inner folds is to
- ## evaluate which of all of the inner folds across all outer folds actually have
- ## 1s in the assessment set
+  ## Final prep steps for parallel processing for tuning across all inner folds are to
+   ## 1) Evaluate which of all of the inner folds across all outer folds actually have
+   ## ones (outbreaks) in the assessment set
 , tar_target(inner_fold_id, prep_fold_ids(
     folded_data = folded_data_training
   , raw_data    = splitted_data
@@ -259,26 +280,26 @@ model_tuning_targets <- tar_plan(
   filter(inner_fold_id %in% unique(inner_fold_id)) %>% 
   ungroup())
 
-## AND which of the outer_fold_ids for ALL of the train_data have at least a single
-## 1 in the assess_data. There is no point in wasting computation on inner folds if
-## the best inner fold hyperparameter set cant be evaluated on the whole training_set
-## for this outer_fold because there is no outbreak in the assess_data
+  ## 2) AND which of the outer_fold_ids for ALL of the train_data have at least a single
+   ## one in the assess_data. There is no point in wasting computation on inner folds if
+   ## the best inner fold hyperparameter set cant be evaluated on the whole training_set
+   ## for this outer_fold because there is no outbreak in the assess_data
 , tar_target(inner_fold_id_finalized, {
-  tfolds <- prep_outer_ids(
-    folded_data = folded_data_training
+   tfolds <- prep_outer_ids(
+      folded_data = folded_data_training
     , raw_data    = splitted_data
     , inner_ids   = inner_fold_id)
   tfolds[sample(nrow(tfolds)), ]})
 
-  ## NOTE: temp check for debugging purposes
+  ## Extract a haphazard selection of hyperparameter -by- fold sets for debugging purposes
 , tar_target(inner_fold_id_finalized_DEBUG, {
     inner_fold_id_finalized %>% filter(
-  outer_fold_id == 16 & inner_fold_id == 1 |
+  outer_fold_id == 16 & inner_fold_id == 1  |
   outer_fold_id == 16 & inner_fold_id == 10 |   
   outer_fold_id == 18 & inner_fold_id == 5  |
-  outer_fold_id == 18 & inner_fold_id == 7 |
-  outer_fold_id == 14 & inner_fold_id == 11  |
-  outer_fold_id == 5 & inner_fold_id == 13 
+  outer_fold_id == 18 & inner_fold_id == 7  |
+  outer_fold_id == 14 & inner_fold_id == 11 |
+  outer_fold_id == 5  & inner_fold_id == 13 
     ) %>% filter(index %in% c(15)) %>% 
     dplyr::select(-assess_inner, -has_outbreak, -nrow)})
 , tar_target(folded_data_training_DEBUG, folded_data_training %>% 
@@ -286,10 +307,10 @@ model_tuning_targets <- tar_plan(
 , tar_target(folded_data_testing_DEBUG , folded_data_testing %>% filter(outer_fold_id %in% c(1, 2, 3)))
 
   ## Fit across tuning_grid across all inner folds of all outer folds
-  ## NOTE: temporary minimal for working on downstream pipeline
+   ## NOTE: for debugging add _DEBUG after the two instances of inner_fold_id_finalized
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
       folded_data = folded_data_training %>% dplyr::select(outer_fold_id, inner_folds)
-    , inner_ids   = inner_fold_id_finalized
+    , inner_ids   = inner_fold_id_finalized_DEBUG
     , raw_data    = splitted_data$train_data[[1]]
     , threshold   = positive_threshold
     , weightings  = weightings_on_ones
@@ -298,7 +319,7 @@ model_tuning_targets <- tar_plan(
     , out_dir     = outer_folds_dir
     , overwrite   = TRUE
     , DEBUG       = FALSE)
-    , pattern     = map(inner_fold_id_finalized)
+    , pattern     = map(inner_fold_id_finalized_DEBUG)
     , error       = "null"
     , format      = "file")
 
@@ -322,6 +343,7 @@ model_tuning_targets <- tar_plan(
   , direction    = "max"))
 
   ## Fit each outer fold with the best inner fold hyperparameter for each of these outer folds
+   ## NOTE: for debugging add _DEBUG after the two instances of folded_data_training
 , tar_target(tuned_results_across_outer_folds, tune_results_across_outer_folds(
     outer_data     = folded_data_training_DEBUG
   , raw_data       = splitted_data
@@ -332,7 +354,7 @@ model_tuning_targets <- tar_plan(
   , id_cols        = id_cols
   , out_dir        = outer_folds_dir2
   , overwrite      = TRUE
-  , DEBUG          = TRUE)
+  , DEBUG          = FALSE)
   , pattern        = map(folded_data_training_DEBUG)
   , error          = "null"
   , format         = "file")
@@ -341,7 +363,7 @@ model_tuning_targets <- tar_plan(
 , tar_target(finalized_hyperparameters, finalize_hyperparameters(
     outer_folds  = tuned_results_across_outer_folds
   , training_dat = splitted_data$train_data[[1]]
-    ## See notes in tuned_results_joined
+    ## See notes for/in tuned_results_joined
   , metric       = "mix"
   , weightval    = 1E-5
   , direction    = "max"))
@@ -368,7 +390,7 @@ model_fitting_targets <- tar_plan(
   , error           = "null"
   , format          = "file")
   
-  ## Join fitted_model paths to folded_data_testing for parallel processing for model eval
+  ## Join fitted_model paths to folded_data_testing for parallel processing for model evaluation
 , tar_target(model_out_for_eval, build_model_out_for_eval(
     model_fits = fitted_model
   , full_data  = folded_data_testing))
@@ -378,15 +400,16 @@ model_fitting_targets <- tar_plan(
 ## Asses model performance -----------------------------------------------------
 model_evaluation_targets <- tar_plan(
   
-## Struggling with RAM useage because targets is deciding to load a huge amount
- ## of stuff it doesn't actually need to run my previous larger function, so
-  ## splitting this up
+  ## Setup function to extract needed pieces for getting variable importance
+   ## to be a bit more RAM efficient (so targets doesn't have to load a bunch of
+   ## not needed stuff to run calculate_variable_importance) 
   tar_target(variable_importance_prep_a, prep_for_variable_importance_a(
     model_dat     = model_out_for_eval
   , splitted_data = splitted_data) 
   , pattern       = map(model_out_for_eval))
 
-## Actually do the variable importance calculation, now loading far fewer targets
+  ## Actually do the variable importance calculation, now loading far fewer targets
+   ## given variable_importance_prep_a
 , tar_target(variable_importance, calculate_variable_importance(
     model_dat       = variable_importance_prep_a
   , final_hyper_set = finalized_hyperparameters
@@ -395,12 +418,13 @@ model_evaluation_targets <- tar_plan(
   , num_vars        = 10)
   , pattern         = map(variable_importance_prep_a))
 
-## And a quick comparison of the shapes of the partial dependence plots among fits
+  ## Simple comparison of the shapes of the partial dependence plots among fits
 , tar_target(variable_importance_among, compare_vi(variable_importance = variable_importance))
   
   ## Evaluate fit in a few other ways apart from calibration curves:
-   ## comparing prob to truth across space and time, distributions of probabilities for true ones, confusion matrix 
-   ## as a function of different probability cutoffs, etc.
+   ## A) comparing prob to truth across space and time
+   ## B) distributions of predicted probabilities for true ones (places where outbreaks occurred)
+   ## C) confusion matrix as a function of different probability cutoffs
 , tar_target(examined_fits_within_pan, examine_fits_within(
     model_out        = model_out_for_eval
   , test_data        = splitted_data$test_data[[1]]
@@ -416,6 +440,7 @@ model_evaluation_targets <- tar_plan(
   , error            = "null"
   , format           = "file")
 
+  ## Similar steps as above but for the chosen country of interest (see target which_countries)
 , tar_target(examined_fits_within_country, examine_fits_within(
     model_out        = model_out_for_eval
   , test_data        = splitted_data$test_data[[1]]
@@ -431,8 +456,8 @@ model_evaluation_targets <- tar_plan(
   , error            = "null"
   , format           = "file")
 
-## For speed and RAM considerations, extract out pieces for individual exploration as
- ## targets, and can the more easily plot / explore from these extracted pieces
+  ## For speed and RAM considerations, extract out pieces for individual exploration as
+   ## targets, and can the more easily plot / explore from these extracted pieces
 , tar_target(ex_fits.summary_probs_raw  , {
   
   filepath <- "outputs/summarized_fits/ex_fits.summary_probs_raw.qs"
@@ -494,6 +519,7 @@ model_evaluation_targets <- tar_plan(
     return(filepath)
   }, error   = "null", format  = "file")
 
+  ## Some targets for saving prediction figures
 , tar_target(plotted_calibration.plot_export_opt, save_fig_pieces(
     input     = ex_fits.plotted_calibration
   , outpath   = "reports/figure_pieces/calibration/"
@@ -524,8 +550,8 @@ model_evaluation_targets <- tar_plan(
 ## Reports ---------------------------------------------------------------------
 report_targets <- tar_plan(
   
-  ## Somewhat of a poor, non-dynamic report; need to change path to each and every figure if code changes which is bad practice
-   ## See figures in report
+  ## Somewhat of a poor, non-dynamic report; need to change path to each and every figure
+   ## if code changes which is a bad practice. See figures in report
   tar_quarto(
     remit_report
   , path  = "reports/openRVFcast_report.qmd"

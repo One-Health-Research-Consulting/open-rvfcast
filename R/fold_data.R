@@ -49,8 +49,8 @@ fold_data <- function(
   ## Generate fold start dates
   fold_starts <- seq.Date(
     from = as.Date(start_date)
-    , to   = as.Date(end_date)
-    , by   = paste(step_size, "days")
+  , to   = as.Date(end_date)
+  , by   = paste(step_size, "days")
   )
   
   fold_starts <- fold_starts[(fold_starts + step_size) < end_date]
