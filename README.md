@@ -74,6 +74,8 @@ GitHub repository which is organized with the following structure:
   - `manual.md` - some additional info for running the pipeline
 - `outputs/` contains visualization outputs (maps, animations) and
   stores intermediate saved products created in the modeling module
+- `www/` contains R shiny application for visualizing predictions and
+  data needed for this application
 
 ### Data Storage
 
