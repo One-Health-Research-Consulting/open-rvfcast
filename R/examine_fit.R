@@ -16,7 +16,7 @@
 
 examine_fits_within <- function(model_out, test_data, regions, larger_districts
                                 , africa_sf, region_to_sum, p_thresh, using_hexes
-                                , outpath, overwrite) {
+                                , outpath, outpath_for_app, overwrite) {
   
   print(model_out$outer_fold_id)
   
@@ -104,10 +104,10 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
     calcurves <- try({
       generate_calibration_curve(
         preds      = dat.s
-        , test_data  = splitted_data$test_data[[1]]
-        , predname   = "prob_pred"
-        , truename   = "true_out"
-        , splitgrp   = ifelse("forecast_interval" %in% x, "forecast_interval", NA)
+      , test_data  = splitted_data$test_data[[1]]
+      , predname   = "prob_pred"
+      , truename   = "true_out"
+      , splitgrp   = ifelse("forecast_interval" %in% x, "forecast_interval", NA)
       )
     }, silent = T)
     
@@ -203,9 +203,9 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
           scale_fill_brewer(palette = "Dark2") +
           theme(
             axis.text.x  = element_text(size = 10)
-            , axis.text.y  = element_text(size = 10)
-            , axis.title.x = element_text(size = 12)
-            , axis.title.y = element_text(size = 12)
+          , axis.text.y  = element_text(size = 10)
+          , axis.title.x = element_text(size = 12)
+          , axis.title.y = element_text(size = 12)
           ) +
           xlab("Predicted Probability of Outbreak (logit scale)") +
           ylab("Density") +
@@ -218,7 +218,7 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
     map_list <- lapply(unique(dat.s$date) %>% as.list(), FUN = function(d) {
       
       if ("region_norm" %notin% x) {
-        map.dat.s <- eval_regions %>% left_join(., dat.s) %>% filter(!is.na(prob_pred))
+          map.dat.s <- eval_regions %>% left_join(., dat.s) %>% filter(!is.na(prob_pred))
       } else {
         if (is.null(region_to_sum)) {
           map.dat.s <- africa_sf %>% left_join(., dat.s) %>% filter(!is.na(prob_pred))
@@ -226,6 +226,15 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
           map.dat.s <- region_to_sum[[1]] %>% rename(region_norm = shapeName) %>% left_join(., dat.s) %>% filter(!is.na(prob_pred))
         }
       }
+      
+      qsave(
+        map.dat.s
+      , paste(
+        outpath_for_app, "/", "outer_id_", model_out$outer_fold_id
+      , "_narrow_region_", ifelse(is.null(region_to_sum), "FALSE", "TRUE")
+      , "_", gsub(" ", "_", z), ".qs"
+      , sep = "")
+      )
       
       map.dat.s %>% 
         mutate(true_out = as.factor(true_out)) %>% 

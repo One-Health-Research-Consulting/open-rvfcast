@@ -384,7 +384,7 @@ model_fitting_targets <- tar_plan(
   , start_p         = 0.005
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
-  , overwrite       = FALSE
+  , overwrite       = TRUE
   , DEBUG           = FALSE)
   , pattern         = map(folded_data_testing)
   , error           = "null"
@@ -435,6 +435,7 @@ model_evaluation_targets <- tar_plan(
   , p_thresh         = positive_threshold
   , using_hexes      = using_hexes
   , outpath          = "outputs/examined_fits"
+  , outpath_for_app  = "outputs/for_app"
   , overwrite        = TRUE)
   , pattern          = map(model_out_for_eval)
   , error            = "null"
@@ -451,10 +452,18 @@ model_evaluation_targets <- tar_plan(
   , p_thresh         = positive_threshold
   , using_hexes      = using_hexes
   , outpath          = "outputs/examined_fits"
+  , outpath_for_app  = "outputs/for_app"
   , overwrite        = TRUE)
   , pattern          = map(model_out_for_eval)
   , error            = "null"
   , format           = "file")
+
+  ## Export out the pieces needed for the shiny
+, tar_target(app_file_needs, paste("outputs/for_app", list.files("outputs/for_app"), sep = "/"))
+, tar_target(built_app_components, build_app_components(
+    predictions = app_file_needs
+  , outpath     = "www"
+  ))
 
   ## For speed and RAM considerations, extract out pieces for individual exploration as
    ## targets, and can the more easily plot / explore from these extracted pieces
