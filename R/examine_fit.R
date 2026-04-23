@@ -112,6 +112,25 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
     }, silent = T)
     
     if (class(calcurves)[1] != "try-error") {
+      
+      calcurves_for_export <- rbind(
+        calcurves$calibration_curves.opt[[1]] %>% mutate(Method = "Optimum Bins")
+      , calcurves$calibration_curves.even[[1]] %>% mutate(Method = "Even Bins")
+      ) %>% mutate(
+        min_date = min(dat.s$date)
+      , max_date = max(dat.s$date)
+      , .before = 1
+      )
+      
+      qsave(
+        calcurves_for_export
+        , paste(
+          outpath_for_app, "/", "outer_id_", model_out$outer_fold_id
+          , "_narrow_region_", ifelse(is.null(region_to_sum), "FALSE", "TRUE")
+          , "_", gsub(" ", "_", z), "_calcurves", ".qs"
+          , sep = "")
+      )
+      
       plotted_calibration <- plot_calibration(
         caltib      = calcurves
         , xg          = NULL 
@@ -232,7 +251,7 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
       , paste(
         outpath_for_app, "/", "outer_id_", model_out$outer_fold_id
       , "_narrow_region_", ifelse(is.null(region_to_sum), "FALSE", "TRUE")
-      , "_", gsub(" ", "_", z), ".qs"
+      , "_", gsub(" ", "_", z), "_predictions", ".qs"
       , sep = "")
       )
       
