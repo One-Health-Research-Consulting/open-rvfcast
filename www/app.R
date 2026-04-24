@@ -462,7 +462,7 @@ server <- function(input, output, session) {
         providers$CartoDB.DarkMatter,
         options = tileOptions(opacity = 0.85)
       ) %>%
-      setView(lng = 15, lat = -4, zoom = 3) 
+      setView(lng = 15, lat = -4, zoom = 3)
   })
   
   ## PANEL 1: Update polygons when date or data changes
