@@ -10,29 +10,33 @@
 
 get_region_districts <- function(countries) {
 
-  all_boundaries <- lapply(countries %>% as.list(), FUN = function(x) {
-      a <- try({rgeoboundaries::geoboundaries(x, "adm2")}, silent = T)
+  all_boundaries <- lapply(countries |> as.list(), FUN = function(x) {
+      a <- try({
+        rgeoboundaries::geoboundaries(x, "adm2")
+      }, silent = TRUE)
     if (class(a)[1] == "try-error") {
-      a <- try({rgeoboundaries::geoboundaries(x, "adm1")}, silent = T)
+      a <- try({
+        rgeoboundaries::geoboundaries(x, "adm1")
+      }, silent = TRUE)
     }
     if (class(a)[1] == "try-error") {
       a <- try({
-        geodata::gadm(country = x, level = 1, version = "4.1", path = tempdir()) %>%
-          sf::st_as_sf(.) %>% 
-          dplyr::select(GID_0, NAME_1, geometry) %>% 
-          rename(shapeGroup = GID_0, shapeName = NAME_1) %>%
+        geodata::gadm(country = x, level = 1, version = "4.1", path = tempdir()) |>
+          sf::st_as_sf() |>
+          dplyr::select(GID_0, NAME_1, geometry) |>
+          rename(shapeGroup = GID_0, shapeName = NAME_1) |>
           mutate(shapeType = "gadm-1", .after = shapeGroup)
-      }, silent = T)
+      }, silent = TRUE)
     }
     a
   })
-  
+
   which_errored <- which(lapply(all_boundaries, class) == "try-error")
-  
+
   if (length(which_errored) > 0) {
     all_boundaries <- all_boundaries[-which(lapply(all_boundaries, class) == "try-error")]
   }
-  
-  return(all_boundaries)
-  
+
+  all_boundaries
+
 }

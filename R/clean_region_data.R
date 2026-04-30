@@ -13,8 +13,8 @@ clean_region_data <- function(dat) {
   ## Drop all columns that already have a scaled counterpart
   scaled_cols <- names(dat)[str_detect(names(dat), "_scaled_")]
   base_cols   <- str_replace(scaled_cols, "_scaled_", "_")
-  dat         <- dat %>% select(-any_of(base_cols))
-  
+  dat         <- dat |> select(-any_of(base_cols))
+
   ## Not ideal as this will need to be manually adjusted, but ok for now. Scale
    ## all of these
   vars_to_scale <- c(
@@ -28,9 +28,9 @@ clean_region_data <- function(dat) {
   , "Precipitation_of_Driest_Quarter", "Precipitation_of_Warmest_Quarter", "Precipitation_of_Coldest_Quarter"
   , "pred_sero"
   )
-  
-  dat <- dat %>% mutate(across(all_of(vars_to_scale), ~ as.numeric(scale(.x)[, 1])))
-    
-  return(dat)
-  
+
+  dat <- dat |> mutate(across(all_of(vars_to_scale), ~ as.numeric(scale(.x)[, 1])))
+
+  dat
+
 }
