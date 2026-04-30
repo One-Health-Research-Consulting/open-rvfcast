@@ -2,7 +2,7 @@ update_env_key <- function(key, value, file_path = ".env") {
 
   # Read the file
   lines <- readLines(file_path)
-  
+
   # Check if the key exists
   key_exists <- FALSE
   for (i in seq_along(lines)) {
@@ -13,12 +13,12 @@ update_env_key <- function(key, value, file_path = ".env") {
       break
     }
   }
-  
+
   # If the key doesn't exist, append it
   if (!key_exists) {
     lines <- c(lines, paste0(key, "=", value))
   }
-  
+
   # Write the modified lines back to the file
   writeLines(lines, file_path)
 }
