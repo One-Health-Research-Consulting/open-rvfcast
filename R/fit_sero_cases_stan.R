@@ -4,20 +4,20 @@
 
 #' @param stan_dat prepped stan data
 #' @param outpath path to save fitted model
-#' @param overwrite boolean if true ignores if there is a saved file and refits 
+#' @param overwrite boolean if true ignores if there is a saved file and refits
 #' @return tibble of data
 #' @author Morgan Kain
 #' @export
 
 fit_sero_cases_stan <- function(stan_dat, outpath, overwrite) {
-  
-  if (file.exists(outpath) & !overwrite) {
+
+  if (file.exists(outpath) && !overwrite) {
     print("Model already fit, returning previously saved model")
     return(outpath)
   }
-    
+
     stan_fit <- stan(
-      file    = "models/sero_kernel_icar_base.stan"
+      file     = "models/sero_kernel_icar_base.stan"
     , data    = stan_dat
     , chains  = 4
     , iter    = 20000
@@ -25,13 +25,12 @@ fit_sero_cases_stan <- function(stan_dat, outpath, overwrite) {
     , seed    = 10001
     , control = list(adapt_delta = 0.95, max_treedepth = 13)
     )
-    
+
     samps <- as.array(stan_fit)
-    the_bs      <- samps[,,which(grepl("b\\[", sampnames))]
-    param_samps <- samps[,,c(1:4, which(grepl("b\\[", sampnames)))]
+    the_bs      <- samps[, , which(grepl("b\\[", sampnames))]
+    param_samps <- samps[, , c(1:4, which(grepl("b\\[", sampnames)))]
     saveRDS(param_samps, outpath)
 
-    return(outpath)
-    
-}
+    outpath
 
+}
