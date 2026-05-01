@@ -435,6 +435,24 @@ model_evaluation_targets <- tar_plan(
   ## Simple comparison of the shapes of the partial dependence plots among fits
 , tar_target(variable_importance_among, compare_vi(variable_importance = variable_importance))
 
+  ## Prep data for SHAP-by-forecast-interval (stratified by shapeName, month, and forecast_interval)
+, tar_target(shap_prep_a, prep_for_shap_a(
+    model_dat     = model_out_for_eval
+  , splitted_data = splitted_data)
+  , pattern       = map(model_out_for_eval))
+
+  ## Compute per-row SHAP values and summarize as mean |SHAP| per feature per forecast_interval
+, tar_target(shap_by_forecast_interval, calculate_shap_by_forecast_interval(
+    model_dat       = shap_prep_a
+  , final_hyper_set  = finalized_hyperparameters
+  , fitdir           = outer_folds_dir3
+  , recdir          = outer_folds_dir3)
+  , pattern         = map(shap_prep_a))
+
+  ## Aggregate across outer folds and produce heatmap and line plots
+, tar_target(shap_comparison, compare_shap_by_forecast_interval(
+    shap_results = shap_by_forecast_interval))
+
   ## Evaluate fit in a few other ways apart from calibration curves:
    ## A) comparing prob to truth across space and time
    ## B) distributions of predicted probabilities for true ones (places where outbreaks occurred)
@@ -476,6 +494,7 @@ model_evaluation_targets <- tar_plan(
 , tar_target(app_file_needs, paste("outputs/for_app", list.files("outputs/for_app"), sep = "/"))
 , tar_target(built_app_components, build_app_components(
     predictions = app_file_needs
+  , shapvals    = shap_comparison
   , outpath     = "www"
   ))
 

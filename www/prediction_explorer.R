@@ -10,7 +10,7 @@ library(leaflet)
 library(sf)
 library(ggplot2)
 library(dplyr)
-library(h3jsr)  
+library(h3jsr)
 library(scales)
 library(bslib)
 library(shinyWidgets)
@@ -20,8 +20,10 @@ library(shinyWidgets)
 ## targets pipeline puts this is the correct folder
 ## examined_fits_within_country saves component prediction files to outpath_for_app
 ## then built_app_components saves "data_for_app.qs" to "www/"
-map_dat          <- qread("data_for_app.qs")  
+map_dat          <- qread("data_for_app.qs")
 cal_dat          <- map_dat$cal.tib[[1]]
+## !!! Temporarily drop mangroves, weird issue with those data, need to check before refitting
+shap.dat         <- map_dat$shap.tib[[1]] |> filter(feature != "mangroves")
 map_dat          <- map_dat$map.tib[[1]]
 dat.no_agg       <- map_dat$no_agg[[1]]
 dat.double_agg   <- map_dat$double_agg[[1]]
@@ -33,31 +35,31 @@ cal.double_agg   <- cal_dat$double_agg[[1]]
 
 ## Build colours
 prob_palette <- colorNumeric(
-  palette = c("#f7fbff", "#6baed6", "#08306b")  ## white -- steel -- navy
-, domain  = c(0, 1)                             ## predictions are probabilities
+  palette  = c("#f7fbff", "#6baed6", "#08306b")  ## white -- steel -- navy
+, domain   = c(0, 1)                             ## predictions are probabilities
 , na.color = "#cccccc"
 )
 
 true_out_color <- "#e34a33"   ## bold orange-red outline for outbreaks that occurred
 
-## Derive the parent -to- child hex lookup once 
+## Derive the parent -to- child hex lookup once
 make_parent_lookup <- function(small_ids, large_ids) {
   ## Infer the resolution of the large hexes from the first valid id
   large_res <- h3jsr::get_res(large_ids[1])
   ## Map every small hex to its parent at the large resolution
   parents   <- h3jsr::get_parent(small_ids, large_res)
-  data.frame(shapeName   = small_ids, region_norm = parents, stringsAsFactors = FALSE)
+  data.frame(shapeName = small_ids, region_norm = parents, stringsAsFactors = FALSE)
 }
 build_parent_frame <- function(hex_ids, scale_up) {
-  
+
   child_parent <- data.frame(
     small_ids  = hex_ids
   , h3_address = h3jsr::get_parent(hex_ids, scale_up))
-  
-  cell_to_polygon(unique(child_parent$h3_address), simple = FALSE) %>% 
-    left_join(., child_parent, by = "h3_address") %>%
+
+  cell_to_polygon(unique(child_parent$h3_address), simple = FALSE) |>
+    left_join(child_parent, by = "h3_address") |>
     rename(large_ids = h3_address)
-  
+
 }
 
 ## Build lookup (runs once at startup)
@@ -85,14 +87,14 @@ num_lab <- scales::label_number(accuracy = 0.01)
 ####
 
 ## Fully aggregated hexes across the full time series
-avg_map_data <- dat.double_agg %>%
-  group_by(region_norm) %>%
+avg_map_data <- dat.double_agg |>
+  group_by(region_norm) |>
   summarise(
     prob_pred   = mean(prob_pred, na.rm = TRUE)
   , an_outbreak = max(true_out)
   , geometry    = dplyr::first(geometry)
   , .groups     = "drop"
-  ) %>%
+  ) |>
   st_as_sf()
 
 ####
@@ -103,37 +105,37 @@ avg_map_data <- dat.double_agg %>%
 sorted_forecast_intervals <- unique(dat.spatial_agg$forecast_interval)
 
 ## Get even larger hexes for third tab
-grand_to_child        <- build_parent_frame(
+grand_to_child <- build_parent_frame(
   hex_ids  = unique(dat.temporal_agg$shapeName)
 , scale_up = 2)
 
-no_agg_with_big_hexes <- dat.spatial_agg %>% 
-  as.data.frame() %>%
-  dplyr::select(-geometry) %>% 
-  rename(small_ids = region_norm) #%>% 
-  #left_join(., grand_to_child) 
+no_agg_with_big_hexes <- dat.spatial_agg |>
+  as.data.frame() |>
+  dplyr::select(-geometry) |>
+  rename(small_ids = region_norm) #|>
+  #left_join(., grand_to_child)
 
-#uni_large_hex_geom <- no_agg_with_big_hexes %>% 
-#  group_by(large_ids) %>%
-#  dplyr::slice(1) %>%
+#uni_large_hex_geom <- no_agg_with_big_hexes |>
+#  group_by(large_ids) |>
+#  dplyr::slice(1) |>
 #  dplyr::select(large_ids, geometry)
 
 ## Biggest hexes for map for third tab for click for summarizing forecast interval
  ## success to largest hex
-#average_map_big_hexes <- no_agg_with_big_hexes %>% 
-#  group_by(large_ids, forecast_interval) %>%
+#average_map_big_hexes <- no_agg_with_big_hexes |>
+#  group_by(large_ids, forecast_interval) |>
 #  summarize(
-#    prob_pred   = mean(prob_pred) %>% sqrt()
+#    prob_pred   = mean(prob_pred) |> sqrt()
 #  , an_outbreak = max(true_out)
-#  ) %>%
-#  ungroup() %>%
-#  left_join(., uni_large_hex_geom, by = "large_ids") %>%
+#  ) |>
+#  ungroup() |>
+#  left_join(., uni_large_hex_geom, by = "large_ids") |>
 #  st_as_sf()
 
-average_map_big_hexes <- avg_map_data %>% rename(small_ids = region_norm) 
+average_map_big_hexes <- avg_map_data |> rename(small_ids = region_norm)
 
-#no_agg_with_big_hexes <- no_agg_with_big_hexes %>% 
-#  as.data.frame() %>%
+#no_agg_with_big_hexes <- no_agg_with_big_hexes |>
+#  as.data.frame() |>
 #  dplyr::select(-geometry)
 
 #### User Interface ===============================================================
@@ -145,7 +147,7 @@ ui <- fluidPage(
     , base_font    = font_google("IBM Plex Sans")
     , heading_font = font_google("IBM Plex Mono")
     , bootswatch   = NULL)
-  
+
   ## various html style pieces
 , tags$head(tags$style(HTML("
     body { background: #0f1117; }
@@ -181,7 +183,7 @@ ui <- fluidPage(
     .irs--shiny .irs-from,
     .irs--shiny .irs-to,
     .irs--shiny .irs-single       { background: #4a9eff; }
-    
+
     .irs { width: 100% !important; }
     .irs--shiny .irs { height: 60px !important; }
     .irs-grid-text { font-size: 10px !important; color: #9ca3af !important; }
@@ -229,42 +231,54 @@ ui <- fluidPage(
     /* leaflet dark basemap tint */
     .leaflet-container { background: #0f1117 !important; }
   ")))
-  
+
 , tabsetPanel(
-    
-    ## MAIN TAB (map over time) 
+
+    ## MAIN TAB (map over time)
     tabPanel(
-      
+
     title = "Predictions over through time"
-  
-    ## header 
+
+    ## header
   , div(class = "app-header"
         , p(class = "app-title",  "Prediction Explorer")
         , p(class = "app-subtitle", "Spatial · Temporal · Multi-scale"))
-  
-    ## forecast interval slider 
+
+    ## forecast interval slider
   , div(class = "date-bar"
         , shinyWidgets::sliderTextInput(
           inputId  = "selected_date"
-          , label    = NULL
-          , choices  = as.character(sorted_dates)
-          , selected = as.character(sorted_dates[1])
-          , width    = "100%"
-          , animate  = TRUE
-          , grid     = TRUE
+        , label    = NULL
+        , choices  = as.character(sorted_dates)
+        , selected = as.character(sorted_dates[1])
+        , width    = "100%"
+        , animate  = TRUE
+        , grid     = TRUE
         )
   )
-  
+
+  , div(class = "date-bar"
+          , shinyWidgets::sliderTextInput(
+            inputId  = "selected_forecast_interval_tab1"
+          , label    = NULL
+          , choices  = as.character(sorted_forecast_intervals)
+          , selected = as.character(sorted_forecast_intervals[1])
+          , width    = "100%"
+          , animate  = FALSE
+          , grid     = TRUE
+          )
+    )
+
   ## main layout
 , fluidRow(
-    
+
     ## left: primary map
     column(
       6
       , div(class = "map-card"
             , div(class = "card-label", "Date-Specific Forecast  ·  click a hex to drill down")
             , leafletOutput("main_map", height = "620px")))
-    
+
     ## detail panels
     , column(
       3
@@ -277,7 +291,7 @@ ui <- fluidPage(
             , div(class = "card-label", "Forecast Horizon Profile")
             , div(class = "plot-inner", plotOutput("timeseries_plot", height = "280px")
             )))
-    
+
     ## second layer of detail panels
     , column(
         3
@@ -289,23 +303,23 @@ ui <- fluidPage(
             , div(class = "card-label", "Calibration Curve")
             , div(class = "plot-inner", plotOutput("calibration_plot", height = "280px")
             )))
-    
+
   ))
-  
+
   ## SECOND TAB (hex specific forecasts over time) =================================
 , tabPanel(
-    
+
    title = "Predictions by Forecast Time Horizon and Hex Over Time"
-    
+
     , fluidRow(
-      
+
       ## left: primary map
       column(
         6
         , div(class = "map-card"
               , div(class = "card-label", "Average p(outbreak)  ·  click a hex to drill down")
               , leafletOutput("average_map", height = "620px")))
-      
+
       ## detail panels
       , column(
         6
@@ -319,41 +333,41 @@ ui <- fluidPage(
               , div(class = "plot-inner", plotOutput("hex_timeseries_full_child", height = "310px")
               ))
     ))
-  
+
   )
 
 ## THIRD TAB (More detailed forecast diagnostics) =================================
 , tabPanel(
-  
+
   title = "Error Rates by Forecast Time Horizon"
-  
+
   , fluidPage(
-    
+
     div(class = "app-header",
         p(class = "app-title", "Error by Forecast Horizon"),
         p(class = "app-subtitle", "False-positive and negative rates | forecast horizon"))
-    
+
   , div(class = "date-bar"
           , shinyWidgets::sliderTextInput(
-            inputId  = "selected_forecast_interval"
-            , label    = NULL
-            , choices  = as.character(sorted_forecast_intervals)
-            , selected = as.character(sorted_forecast_intervals[1])
-            , width    = "100%"
-            , animate  = FALSE
-            , grid     = TRUE
+            inputId  = "selected_forecast_interval_tab3"
+          , label    = NULL
+          , choices  = as.character(sorted_forecast_intervals)
+          , selected = as.character(sorted_forecast_intervals[1])
+          , width    = "100%"
+          , animate  = FALSE
+          , grid     = TRUE
           )
     )
-    
+
   , fluidRow(
-    
+
     ## left: primary map
     column(
       6
       , div(class = "map-card"
             , div(class = "card-label", "Average p(sqrt(outbreak))  ·  click a hex to drill down")
             , leafletOutput("average_map_big_hexes", height = "620px")))
-    
+
     ## detail panels
     , column(
       6
@@ -371,83 +385,152 @@ ui <- fluidPage(
             , div(class = "plot-inner", plotOutput("interval_preds_hex_single", height = "310px")
             ))
     ))
-  
-  )))
-  
+
+  ))
+
+## FOURTH TAB (Forecast-specific variable importance) ==============================
+, tabPanel(
+
+  title = "Variable Importance by Forecast Horizon"
+
+  , fluidPage(
+
+    div(class = "app-header",
+        p(class = "app-title", "Variable Importance by Forecast Horizon"),
+        p(class = "app-subtitle", "VI | forecast horizon"))
+
+  , div(class = "date-bar"
+          , shinyWidgets::sliderTextInput(
+            inputId  = "selected_forecast_interval_tab4"
+          , label    = NULL
+          , choices  = as.character(sorted_forecast_intervals)
+          , selected = as.character(sorted_forecast_intervals[1])
+          , width    = "100%"
+          , animate  = FALSE
+          , grid     = TRUE
+          )
+    )
+
+  , fluidRow(
+
+    ## left: VI figures 1-2
+    column(
+      6
+      , div(class = "plot-card"
+            , div(class = "card-label", "Shap variable importance raw values")
+            , div(class = "plot-inner", plotOutput("shap_heatmap_raw", height = "310px")
+            ))
+      , div(class = "plot-card"
+            , div(class = "card-label", "Shap variable importance relative values")
+            , div(class = "plot-inner", plotOutput("shap_heatmap_rel", height = "310px")
+            ))
+    )
+
+    ## right VI figures 3-4
+    , column(
+      6
+      , div(class = "plot-card"
+            , div(class = "card-label", "Shap variable importance forecast covariates")
+            , div(class = "plot-inner", plotOutput("shap_lineplot_A", height = "310px")
+            ))
+      , div(class = "plot-card"
+            , div(class = "card-label", "Shap variable importance non-forecast covariates")
+            , div(class = "plot-inner", plotOutput("shap_lineplot_B", height = "310px")
+            ))
+    ))
+
+  ))
+
+  )
+
 )
 
 #### Server ======================================================================
 server <- function(input, output, session) {
-  
+
   ## Reactive: parse sliderTextInput text back to Date
-  selected_date <- reactive({ as.Date(input$selected_date) })
-  
-  ## Reactive: parse sliderTextInput text back to Date
-  selected_forecast_interval <- reactive({ input$selected_forecast_interval })
-  
-  ## Reactive: date-filtered double-agg layer 
+  selected_date <- reactive({
+    as.Date(input$selected_date)
+  })
+
+  ## Reactive: forecast interval for tab1
+  selected_forecast_interval_tab1 <- reactive({
+    input$selected_forecast_interval_tab1
+  })
+
+  ## Reactive: forecast interval for tab3
+  selected_forecast_interval_tab3 <- reactive({
+    input$selected_forecast_interval_tab3
+  })
+
+  ## Reactive: forecast interval for tab4
+  selected_forecast_interval_tab4 <- reactive({
+      input$selected_forecast_interval_tab4
+  })
+
+  ## Reactive: date-filtered spatial-agg layer
   map_data <- reactive({
-    dat.double_agg %>% filter(date == selected_date())
+    dat.spatial_agg |> filter(date == selected_date(), forecast_interval == selected_forecast_interval_tab1())
   })
-  
+
   calibration_filtered <- reactive({
-    cal.double_agg %>% filter(selected_date() >= as.Date(min_date), selected_date() <= as.Date(max_date))
+    cal.double_agg |> filter(selected_date() >= as.Date(min_date), selected_date() <= as.Date(max_date))
   })
-  
+
   ## Reactive: probabilities for a given forecast window
   forecast_filtered <- reactive({
-    no_agg_with_big_hexes %>% filter(forecast_interval == selected_forecast_interval())
+    no_agg_with_big_hexes |> filter(forecast_interval == selected_forecast_interval_tab3())
   })
-  
-  ## Reactive: clicked hex id 
-  clicked_hex    <- reactiveVal(NULL)
+
+  ## Reactive: clicked hex id
+  clicked_hex <- reactiveVal(NULL)
   clicked_hex_ts <- reactiveVal(NULL)
   clicked_hex_fi <- reactiveVal(NULL)
-  
+
   observeEvent(input$main_map_shape_click, {
     clicked_hex(input$main_map_shape_click$id)
-    
-    leafletProxy("main_map") %>%
-      clearGroup("selected") %>%
+
+    leafletProxy("main_map") |>
+      clearGroup("selected") |>
       addPolygons(
-        data = map_data() %>% filter(region_norm == input$main_map_shape_click$id)
+        data = map_data() |> filter(region_norm == input$main_map_shape_click$id)
       , fill = FALSE
       , color = "#ffff00"
       , weight = 3
       , group = "selected"
       )
-    
+
   })
   observeEvent(input$average_map_shape_click, {
     clicked_hex_ts(input$average_map_shape_click$id)
-    
-    leafletProxy("average_map") %>%
-      clearGroup("selected") %>%
+
+    leafletProxy("average_map") |>
+      clearGroup("selected") |>
       addPolygons(
-        data = avg_map_data %>% filter(region_norm == clicked_hex_ts())
+        data = avg_map_data |> filter(region_norm == clicked_hex_ts())
       , fill = FALSE
       , color = "#ffff00"
       , weight = 3
       , group = "selected"
       )
-    
+
   })
   observeEvent(input$average_map_big_hexes_shape_click, {
     clicked_hex_fi(input$average_map_big_hexes_shape_click$id)
-    
-    leafletProxy("average_map_big_hexes") %>%
-      clearGroup("selected") %>%
+
+    leafletProxy("average_map_big_hexes") |>
+      clearGroup("selected") |>
       addPolygons(
-        data = average_map_big_hexes %>% filter(small_ids == clicked_hex_fi())
-        , fill = FALSE
-        , color = "#ffff00"
-        , weight = 3
-        , group = "selected"
+        data = average_map_big_hexes |> filter(small_ids == clicked_hex_fi())
+      , fill = FALSE
+      , color = "#ffff00"
+      , weight = 3
+      , group = "selected"
       )
-    
+
   })
-  
-  ## Hint text 
+
+  ## Hint text
   output$click_hint_one   <- renderUI({
     if (is.null(clicked_hex())) {
       span("← Select a hex on the map to reveal drill-down panels")
@@ -472,89 +555,89 @@ server <- function(input, output, session) {
            paste0("Tracking hex ", clicked_hex_fi()))
     }
   })
-  
-  ## PANEL 1: Leaflet map 
+
+  ## PANEL 1: Leaflet map
   output$main_map <- renderLeaflet({
-    leaflet(options = leafletOptions(zoomControl = TRUE)) %>%
+    leaflet(options = leafletOptions(zoomControl = TRUE)) |>
       addProviderTiles(
         providers$CartoDB.DarkMatter,
         options = tileOptions(opacity = 0.85)
-      ) %>%
+      ) |>
       setView(lng = 15, lat = -4, zoom = 3)
   })
-  
+
   ## PANEL 1: Update polygons when date or data changes
   shiny::observe({
-    
+
     req(input$main_map_bounds)
-    
-    d    <- map_data()
-    
+
+    d <- map_data()
+
     ## Split into event / non-event for outline styling
-    events     <- d %>% filter(true_out == 1)
-    non_events <- d %>% filter(true_out != 1)
-    
-    proxy <- leafletProxy("main_map") %>%
-      clearShapes() %>%
+    events     <- d |> filter(true_out == 1)
+    non_events <- d |> filter(true_out != 1)
+
+    proxy <- leafletProxy("main_map") |>
+      clearShapes() |>
       clearControls()
-    
+
     ## Non-event hexes
     if (nrow(non_events) > 0) {
-      proxy <- proxy %>%
+      proxy <- proxy |>
         addPolygons(
           data        = non_events
-          , layerId     = ~region_norm
-          , fillColor   = ~prob_palette(prob_pred)
-          , fillOpacity = 0.75
-          , color       = "#2a2d3a"
-          , weight      = 0.8
-          , opacity     = 1
-          , highlightOptions = highlightOptions(
-            weight      = 2
-            , color       = "#ffffff"
-            , fillOpacity = 0.9
-            , bringToFront = TRUE)
+        , layerId     = ~region_norm
+        , fillColor    = ~prob_palette(prob_pred)
+        , fillOpacity  = 0.75
+        , color       = "#2a2d3a"
+        , weight      = 0.8
+        , opacity     = 1
+        , highlightOptions = highlightOptions(
+            weight       = 2
+          , color        = "#ffffff"
+          , fillOpacity   = 0.9
+          , bringToFront = TRUE)
           , label = ~paste0(
             "<b>", region_norm, "</b><br>"
-            , "P(event) = ", round(prob_pred, 3)) %>% 
+          , "P(event) = ", round(prob_pred, 3)) |>
             lapply(htmltools::HTML)
         )
     }
-    
+
     ## Event hexes – bold red outline
     if (nrow(events) > 0) {
-      proxy <- proxy %>%
+      proxy <- proxy |>
         addPolygons(
           data        = events
-          , layerId     = ~region_norm
-          , fillColor   = ~prob_palette(prob_pred)
-          , fillOpacity = 0.75
-          , color       = true_out_color
-          , weight      = 2.5
-          , opacity     = 1
-          , highlightOptions = highlightOptions(
+        , layerId     = ~region_norm
+        , fillColor   = ~prob_palette(prob_pred)
+        , fillOpacity = 0.75
+        , color       = true_out_color
+        , weight      = 2.5
+        , opacity     = 1
+        , highlightOptions = highlightOptions(
             weight      = 3.5
-            , color       = "#ffffff"
-            , fillOpacity = 0.9
-            , bringToFront = TRUE)
+          , color       = "#ffffff"
+          , fillOpacity = 0.9
+          , bringToFront = TRUE)
           , label = ~paste0(
             "<b>", region_norm, "</b><br>",
             "P(event) = ", round(prob_pred, 3), "<br>",
             "<span style='color:", true_out_color, ";'>● Event observed</span>"
-          ) %>% lapply(htmltools::HTML)
+          ) |> lapply(htmltools::HTML)
         )
     }
-    
+
     ## Legend
-    proxy %>%
+    proxy |>
       addLegend(
         position = "bottomright"
-        , pal      = prob_palette
-        , values   = c(0, 1)
-        , title    = "P(event)"
-        , opacity  = 0.85
-        , labFormat = labelFormat(digits = 2)
-      ) %>%
+      , pal      = prob_palette
+      , values   = c(0, 1)
+      , title    = "P(event)"
+      , opacity  = 0.85
+      , labFormat = labelFormat(digits = 2)
+      ) |>
       addControl(
         html = paste0(
           "<div style='background:#16181f;color:#e34a33;",
@@ -562,71 +645,71 @@ server <- function(input, output, session) {
           "border:1px solid #e34a33;'>",
           "&#9646; Event observed</div>")
         , position = "bottomright")
-    
+
     if (!is.null(clicked_hex())) {
-      leafletProxy("main_map") %>%
+      leafletProxy("main_map") |>
         addPolygons(
-          data = d %>% filter(region_norm == clicked_hex())
+          data = d |> filter(region_norm == clicked_hex())
         , fill = FALSE
         , color = "#ffff00"
         , weight = 3
         , group = "selected"
         )
     }
-    
+
   })
-  
+
   ## PANEL 2: Average map for the second panel
   output$average_map <- renderLeaflet({
-    
-    leaflet(avg_map_data) %>%
+
+    leaflet(avg_map_data) |>
       addProviderTiles(
         providers$CartoDB.DarkMatter,
         options = tileOptions(opacity = 0.85)
-      ) %>%
+      ) |>
       setView(lng = 15, lat = -4, zoom = 3)
-    
+
   })
-  
+
   ## PANEL 2: Update polygons when date or data changes
   shiny::observe({
-    
+
     req(input$average_map_bounds)
-    
+
     ## Split into event / non-event for outline styling
-    events     <- avg_map_data %>% filter(an_outbreak == 1)
-    non_events <- avg_map_data %>% filter(an_outbreak != 1)
-    
-    proxy <- leafletProxy("average_map") %>%
-      clearShapes() %>%
+    events     <- avg_map_data |> filter(an_outbreak == 1)
+    non_events <- avg_map_data |> filter(an_outbreak != 1)
+
+    proxy <- leafletProxy("average_map") |>
+      clearShapes() |>
       clearControls()
-    
+
     ## Non-event hexes
     if (nrow(non_events) > 0) {
-      proxy <- proxy %>%
+      proxy <- proxy |>
         addPolygons(
           data        = non_events
-          , layerId     = ~region_norm
-          , fillColor   = ~prob_palette(prob_pred)
-          , fillOpacity = 0.75
-          , color       = "#2a2d3a"
-          , weight      = 0.8
-          , opacity     = 1
-          , highlightOptions = highlightOptions(
+        , layerId     = ~region_norm
+        , fillColor   = ~prob_palette(prob_pred)
+        , fillOpacity = 0.75
+        , color       = "#2a2d3a"
+        , weight      = 0.8
+        , opacity     = 1
+        , highlightOptions = highlightOptions(
             weight      = 2
-            , color       = "#ffffff"
-            , fillOpacity = 0.9
-            , bringToFront = TRUE)
+          , color       = "#ffffff"
+          , fillOpacity = 0.9
+          , bringToFront = TRUE)
           , label = ~paste0(
             "<b>", region_norm, "</b><br>"
-            , "Mean P(event) = ", round(prob_pred, 3)) %>% 
+            , "Mean P(event) = ", round(prob_pred, 3)) |>
             lapply(htmltools::HTML)
         )
     }
-    
+
     ## Event hexes – bold red outline
     if (nrow(events) > 0) {
-      proxy <- proxy %>%
+      proxy <- proxy |>
         addPolygons(
           data        = events
           , layerId     = ~region_norm
@@ -644,20 +727,20 @@ server <- function(input, output, session) {
             "<b>", region_norm, "</b><br>",
             "Mean P(event) = ", round(prob_pred, 3), "<br>",
             "<span style='color:", true_out_color, ";'>● Event observed</span>"
-          ) %>% lapply(htmltools::HTML)
+          ) |> lapply(htmltools::HTML)
         )
     }
-    
+
     ## Legend
-    proxy %>%
+    proxy |>
       addLegend(
         position = "bottomright"
-        , pal      = prob_palette
-        , values   = c(0, 1)
-        , title    = "P(event)"
-        , opacity  = 0.85
-        , labFormat = labelFormat(digits = 2)
-      ) %>%
+      , pal      = prob_palette
+      , values   = c(0, 1)
+      , title    = "P(event)"
+      , opacity  = 0.85
+      , labFormat = labelFormat(digits = 2)
+      ) |>
       addControl(
         html = paste0(
           "<div style='background:#16181f;color:#e34a33;",
@@ -665,100 +748,100 @@ server <- function(input, output, session) {
           "border:1px solid #e34a33;'>",
           "&#9646; Event observed</div>")
         , position = "bottomright")
-    
+
     if (!is.null(clicked_hex_ts())) {
-      leafletProxy("average_map") %>%
+      leafletProxy("average_map") |>
         addPolygons(
-          data = avg_map_data %>% filter(region_norm == clicked_hex_ts())
-          , fill = FALSE
-          , color = "#ffff00"
-          , weight = 3
-          , group = "selected"
+          data = avg_map_data |> filter(region_norm == clicked_hex_ts())
+        , fill = FALSE
+        , color = "#ffff00"
+        , weight = 3
+        , group = "selected"
         )
     }
-    
+
   })
-  
+
   ## PANEL 3: Average map for the third panel
   output$average_map_big_hexes <- renderLeaflet({
-    leaflet(average_map_big_hexes) %>%
+    leaflet(average_map_big_hexes) |>
       addProviderTiles(
         providers$CartoDB.DarkMatter,
         options = tileOptions(opacity = 0.85)
-      ) %>%
+      ) |>
       setView(lng = 15, lat = -4, zoom = 3)
   })
-  
+
   ## PANEL 3: Update polygons when date or data changes
   shiny::observe({
-    
+
     req(input$average_map_big_hexes_bounds)
-    
+
     ## Split into event / non-event for outline styling
-    events     <- average_map_big_hexes %>% filter(an_outbreak == 1)
-    non_events <- average_map_big_hexes %>% filter(an_outbreak != 1)
-      
-      proxy <- leafletProxy("average_map_big_hexes") %>%
-        clearShapes() %>%
+    events     <- average_map_big_hexes |> filter(an_outbreak == 1)
+    non_events <- average_map_big_hexes |> filter(an_outbreak != 1)
+
+      proxy <- leafletProxy("average_map_big_hexes") |>
+        clearShapes() |>
         clearControls()
-      
+
       ## Non-event hexes
       if (nrow(non_events) > 0) {
-        proxy <- proxy %>%
+        proxy <- proxy |>
           addPolygons(
-              data        = non_events
-            , layerId     = ~small_ids
-            , fillColor   = ~prob_palette(prob_pred)
-            , fillOpacity = 0.75
-            , color       = "#2a2d3a"
-            , weight      = 0.8
-            , opacity     = 1
-            , highlightOptions = highlightOptions(
+            data        = non_events
+          , layerId     = ~small_ids
+          , fillColor   = ~prob_palette(prob_pred)
+          , fillOpacity = 0.75
+          , color       = "#2a2d3a"
+          , weight      = 0.8
+          , opacity     = 1
+          , highlightOptions = highlightOptions(
               weight      = 2
-              , color       = "#ffffff"
-              , fillOpacity = 0.9
-              , bringToFront = TRUE)
+            , color       = "#ffffff"
+            , fillOpacity = 0.9
+            , bringToFront = TRUE)
             , label = ~paste0(
               "<b>", small_ids, "</b><br>"
-            , "Mean P(event) = ", round(prob_pred, 3)) %>% 
-              lapply(htmltools::HTML)
+            , "Mean P(event) = ", round(prob_pred, 3)) |>
+               lapply(htmltools::HTML)
           )
       }
-      
+
       ## Event hexes – bold red outline
       if (nrow(events) > 0) {
-        proxy <- proxy %>%
+        proxy <- proxy |>
           addPolygons(
             data        = events
-            , layerId     = ~small_ids
-            , fillColor   = ~prob_palette(prob_pred)
-            , fillOpacity = 0.75
-            , color       = true_out_color
-            , weight      = 2.5
-            , opacity     = 1
-            , highlightOptions = highlightOptions(
+          , layerId     = ~small_ids
+          , fillColor   = ~prob_palette(prob_pred)
+          , fillOpacity = 0.75
+          , color       = true_out_color
+          , weight      = 2.5
+          , opacity     = 1
+          , highlightOptions = highlightOptions(
               weight      = 3.5
-              , color       = "#ffffff"
-              , fillOpacity = 0.9
-              , bringToFront = TRUE)
+            , color       = "#ffffff"
+            , fillOpacity = 0.9
+            , bringToFront = TRUE)
             , label = ~paste0(
               "<b>", small_ids, "</b><br>",
               "Mean P(event) = ", round(prob_pred, 3), "<br>",
               "<span style='color:", true_out_color, ";'>● Event observed</span>"
-            ) %>% lapply(htmltools::HTML)
+            ) |> lapply(htmltools::HTML)
           )
       }
-      
+
       ## Legend
-      proxy %>%
+      proxy |>
         addLegend(
           position = "bottomright"
-          , pal      = prob_palette
-          , values   = c(0, 1)
-          , title    = "P(event)"
-          , opacity  = 0.85
-          , labFormat = labelFormat(digits = 2)
-        ) %>%
+        , pal      = prob_palette
+        , values   = c(0, 1)
+        , title    = "P(event)"
+        , opacity  = 0.85
+        , labFormat = labelFormat(digits = 2)
+        ) |>
         addControl(
           html = paste0(
             "<div style='background:#16181f;color:#e34a33;",
@@ -766,54 +849,54 @@ server <- function(input, output, session) {
             "border:1px solid #e34a33;'>",
             "&#9646; Event observed</div>")
           , position = "bottomright")
-      
+
       if (!is.null(clicked_hex_fi())) {
-        leafletProxy("average_map_big_hexes") %>%
+        leafletProxy("average_map_big_hexes") |>
           addPolygons(
-            data = average_map_big_hexes %>% filter(small_ids == clicked_hex_fi())
-            , fill = FALSE
-            , color = "#ffff00"
-            , weight = 3
-            , group = "selected"
+            data = average_map_big_hexes |> filter(small_ids == clicked_hex_fi())
+          , fill = FALSE
+          , color = "#ffff00"
+          , weight = 3
+          , group = "selected"
           )
       }
-      
+
   })
-  
-  ## PANEL 1: sub-hex spatial plot 
+
+  ## PANEL 1: sub-hex spatial plot
   output$subhex_plot <- renderPlot({
     req(clicked_hex())
     hex_id <- clicked_hex()
-    
+
     ## Find child hex ids belonging to this parent
-    children <- parent_lookup %>%
-      filter(region_norm == hex_id) %>%
+    children <- parent_lookup |>
+      filter(region_norm == hex_id) |>
       pull(shapeName)
-    
-    sub_data <- dat.temporal_agg %>%
-      filter(shapeName %in% children, date == input$selected_date) %>%
+
+    sub_data <- dat.temporal_agg |>
+      filter(shapeName %in% children, date == input$selected_date) |>
       st_as_sf()
-    
+
     shiny::validate(need(nrow(sub_data) > 0, "No sub-hex data for this selection."))
-    
+
     ## Identify event sub-hexes for outline
-    sub_data <- sub_data %>%
+    sub_data <- sub_data |>
       mutate(outline_col = if_else(true_out == 1, true_out_color, "#3a3d4a"),
              outline_wt  = if_else(true_out == 1, 1.2, 0.3))
-    
+
     ggplot(sub_data) +
       geom_sf(
         aes(fill = prob_pred)
-        , colour = sub_data$outline_col
-        , linewidth = sub_data$outline_wt) +
+      , colour = sub_data$outline_col
+      , linewidth = sub_data$outline_wt) +
       scale_fill_gradient(
-        low    = "#f7fbff"
+          low    = "#f7fbff"
         , high   = "#08306b"
         , limits = c(0, 1)
         , name   = "P(event)"
       ) +
       labs(
-        title    = paste0("Sub-hexes  ·  ", format(as.Date(input$selected_date), "%b %d, %Y"))
+          title    = paste0("Sub-hexes  ·  ", format(as.Date(input$selected_date), "%b %d, %Y"))
         , subtitle = paste0("Parent hex: ", hex_id)
         , caption  = paste0(
           if (any(sub_data$true_out == 1))
@@ -824,7 +907,7 @@ server <- function(input, output, session) {
       ) +
       theme_void(base_family = "IBM Plex Sans") +
       theme(
-        plot.background  = element_rect(fill = "#16181f", colour = NA)
+          plot.background  = element_rect(fill = "#16181f", colour = NA)
         , panel.background = element_rect(fill = "#16181f", colour = NA)
         , plot.title       = element_text(colour = "#e8eaf0", size = 11, face = "bold", margin = margin(b = 2))
         , plot.subtitle    = element_text(colour = "#6b7280", size = 8)
@@ -835,41 +918,42 @@ server <- function(input, output, session) {
         , legend.key.width  = unit(0.3, "cm")
         , plot.margin      = margin(6, 6, 4, 6))
   }, bg = "#16181f")
-  
+
   ## PANEL 1: forecast horizon time series
   output$timeseries_plot <- renderPlot({
     req(clicked_hex())
     hex_id <- clicked_hex()
-    
-    ts_data <- dat.spatial_agg %>%
-      filter(region_norm == hex_id, date == input$selected_date) %>%
+
+    ts_data <- dat.spatial_agg |>
+      filter(region_norm == hex_id, date == input$selected_date) |>
       arrange(forecast_interval)
-    
+
     shiny::validate(need(nrow(ts_data) > 0, "No forecast-interval data for this hex."))
-    
+
     ## true_out: if any interval has true_out == 1, draw a vertical band
-    true_intervals <- ts_data %>% filter(true_out == 1) %>% pull(forecast_interval)
-    
+    true_intervals <- ts_data |> filter(true_out == 1) |> pull(forecast_interval)
+
     p <- ggplot(ts_data, aes(x = forecast_interval, y = prob_pred)) +
-      
+
       ## event-observed vertical lines (one per interval with true_out==1)
-      { if (length(true_intervals) > 0)
+      {
+        if (length(true_intervals) > 0)
         geom_vline(xintercept = true_intervals
                    , colour = true_out_color, linewidth = 0.8
                    , linetype = "dashed", alpha = 0.85)
         else list()
       } +
-      
+
       ## ribbon for visual weight (fake ±0 band – swap for CI if available)
       geom_ribbon(aes(
-        ymin = pmax(prob_pred - 0.05, 0)
+          ymin = pmax(prob_pred - 0.05, 0)
         , ymax = pmin(prob_pred + 0.05, 1))
         , fill = "#4a9eff", alpha = 0.15) +
       geom_line(colour  = "#4a9eff", linewidth = 1.1) +
       geom_point(colour = "#ffffff", fill = "#4a9eff", shape = 21, size = 2.8, stroke = 1.1) +
       scale_x_continuous(name   = "Days ahead", breaks = ts_data$forecast_interval) +
       scale_y_continuous(
-        name   = "P(event)"
+          name   = "P(event)"
         , limits = c(0, 1)
         , breaks = seq(0, 1, .25)
         , labels = num_lab) +
@@ -883,7 +967,7 @@ server <- function(input, output, session) {
       ) +
       theme_minimal(base_family = "IBM Plex Sans") +
       theme(
-        plot.background  = element_rect(fill = "#16181f", colour = NA)
+          plot.background  = element_rect(fill = "#16181f", colour = NA)
         , panel.background = element_rect(fill = "#16181f", colour = NA)
         , panel.grid.major = element_line(colour = "#2a2d3a", linewidth = 0.4)
         , panel.grid.minor = element_blank()
@@ -893,11 +977,11 @@ server <- function(input, output, session) {
         , plot.subtitle    = element_text(colour = true_out_color, size = 7.5)
         , plot.margin      = margin(6, 10, 4, 6)
       )
-    
+
     ## Annotate event lines
     if (length(true_intervals) > 0) {
       p <- p + annotate(
-        "text"
+          "text"
         , x     = true_intervals
         , y     = 0.97
         , label = "● observed"
@@ -906,23 +990,24 @@ server <- function(input, output, session) {
         , hjust  = -0.1
         , family = "IBM Plex Sans")
     }
-    
+
     p
   }, bg = "#16181f")
-  
+
   ## PANEL 1: density plot
   output$density_plot <- renderPlot({
-    
+
     d <- map_data()
-    
+
     shiny::validate(need(nrow(d) > 0, "No data for selected date"))
-    
-    d %>% mutate(
+
+    d.t <- d |> mutate(
         true_out = plyr::mapvalues(true_out, from = c(0, 1), to = c("No", "Yes"))
       , true_out  = as.factor(true_out)
       , prob_pred = qlogis(prob_pred)
-      ) %>% {
-        ggplot(., aes(x = prob_pred)) + 
+      )
+
+        ggplot(d.t, aes(x = prob_pred)) +
           geom_density(aes(fill = true_out), alpha = 0.5, colour = NA) +
           scale_fill_brewer(palette = "Dark2", name = "Outbreak
 Recorded") +
@@ -939,21 +1024,21 @@ Recorded") +
           ylab("Density") +
           ggtitle(paste(
             "Prediction Date = "
-          , strsplit(as.character(unique(d$date)), " ")[[1]] %>% paste(., collapse = " - ")
+          , paste(strsplit(as.character(unique(d$date)), " ")[[1]], collapse = " - ")
           ))
-      }
-    
+
   }, bg = "#16181f")
-  
+
   ## PANEL 1: calibration curves plot
   output$calibration_plot <- renderPlot({
-    
+
     d <- calibration_filtered()
-    
+
     shiny::validate(need(nrow(d) > 0, "No calibration data for selected date"))
-    
-    d %>% filter(truth > 0) %>% {
-      ggplot(., aes(grp_mean, predicted_grp_med)) +
+
+    d.t <- d |> filter(truth > 0)
+
+      ggplot(d.t, aes(grp_mean, predicted_grp_med)) +
         geom_abline(color = "gray50") +
         geom_errorbarh(aes(xmin = grp_lwr, xmax = grp_upr, colour = Method), linewidth = 0.5, height = 0) +
         geom_errorbar(aes(ymin = predicted_grp_lwr, ymax = predicted_grp_upr, colour = Method), linewidth = 0.5, width = 0) +
@@ -974,28 +1059,27 @@ Predicted
         , panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
         , panel.grid.minor = element_line(color = "grey95", linewidth = 0.3)
         , panel.background = element_rect(fill = "white")
-        ) 
-    }
-    
+        )
+
   }, bg = "#16181f")
-  
+
   ## PANEL 2: Prediction probabilities for all inner hexes
   output$hex_timeseries_full_child <- renderPlot({
-    
+
     req(clicked_hex_ts())
-    
+
     hex_id <- clicked_hex_ts()
-    
+
     ## Find child hex ids belonging to this parent
-    children <- parent_lookup %>%
-      filter(region_norm == hex_id) %>%
+    children <- parent_lookup |>
+      filter(region_norm == hex_id) |>
       pull(shapeName)
-    
-    ts_data <- dat.no_agg %>% filter(shapeName %in% children) %>%
+
+    ts_data <- dat.no_agg |> filter(shapeName %in% children) |>
       mutate(forecast_interval = as.factor(forecast_interval))
-    
+
     shiny::validate(need(nrow(ts_data) > 0, "No sub-hex data for this selection."))
-    
+
     ## Time series for the hexes internal to this hex
     ggplot(ts_data, aes(date, prob_pred)) +
       annotate("rect", xmin = min(ts_data$date), xmax = max(ts_data$date)
@@ -1011,7 +1095,7 @@ Predicted
       xlab("Date") +
       ylab("Predicted Outbreak Probability") +
       scale_y_log10() +
-      geom_vline(data = ts_data %>% filter(true_out == 1)
+      geom_vline(data = ts_data |> filter(true_out == 1)
                  , aes(xintercept = date, colour = forecast_interval, linetype = shapeName)
                  , alpha = 0.4, linetype = "dotdash") +
       theme(
@@ -1021,21 +1105,21 @@ Predicted
       , panel.grid.major = element_line(color = "grey90")
       , panel.grid.minor = element_line(color = "grey95")
       )
-    
+
   }, bg = "#16181f")
-  
+
   ## PANEL 2: Prediction probabilities for the summary hex
   output$hex_timeseries_full_parent <- renderPlot({
-    
+
     req(clicked_hex_ts())
-    
+
     hex_id <- clicked_hex_ts()
-    
-    ts_data <- dat.spatial_agg %>% filter(region_norm == hex_id) %>%
+
+    ts_data <- dat.spatial_agg |> filter(region_norm == hex_id) |>
       mutate(forecast_interval = as.factor(forecast_interval))
-    
+
     shiny::validate(need(nrow(ts_data) > 0, "No sub-hex data for this selection."))
-    
+
     ## Time series for the hexes internal to this hex
     ggplot(ts_data, aes(date, prob_pred)) +
       annotate("rect", xmin = min(ts_data$date), xmax = max(ts_data$date)
@@ -1051,7 +1135,7 @@ Predicted
       xlab("Date") +
       ylab("Predicted Outbreak Probability") +
       scale_y_log10() +
-      geom_vline(data = ts_data %>% filter(true_out == 1)
+      geom_vline(data = ts_data |> filter(true_out == 1)
                  , aes(xintercept = date, colour = forecast_interval)
                  , alpha = 0.4, linetype = "dotdash") +
       theme(
@@ -1060,19 +1144,20 @@ Predicted
       , panel.background = element_rect(fill = "white")
       , panel.grid.major = element_line(color = "grey90")
       , panel.grid.minor = element_line(color = "grey95"))
-    
+
   }, bg = "#16181f")
-  
+
   ## PANEL 3: Forecast probability overall
   output$interval_preds_overall <- renderPlot({
-    
-    no_agg_with_big_hexes %>%
+
+    d.t <- no_agg_with_big_hexes |>
       mutate(
         forecast_interval = as.factor(forecast_interval)
       , true_out          = plyr::mapvalues(true_out, from = c(0, 1), to = c("No", "Yes"))
       , true_out          = as.factor(true_out)
-      ) %>% {
-        ggplot(., aes(forecast_interval, prob_pred)) + 
+      )
+
+        ggplot(d.t, aes(forecast_interval, prob_pred)) +
           annotate("rect", xmin = -Inf, xmax = Inf, ymin = 0.001, ymax = 0.01, fill = "grey80", alpha = 0.2) +
           annotate("rect", xmin = -Inf, xmax = Inf, ymin = 0.01, ymax = 0.1, fill = "grey80", alpha = 0.35) +
           annotate("rect", xmin = -Inf, xmax = Inf, ymin = 0.1, ymax = 0.5, fill = "grey80", alpha = 0.50) +
@@ -1092,28 +1177,28 @@ Predicted
             , panel.grid.major = element_line(color = "grey90")
             , panel.grid.minor = element_line(color = "grey95")
           )
-      }
-    
+
   }, bg = "#16181f")
-  
+
   ## PANEL 3: Forecast probability by hex
   output$interval_preds_hex <- renderPlot({
-    
+
     req(clicked_hex_fi())
-    
+
     hex_id <- clicked_hex_fi()
-  
-    fi_data <- no_agg_with_big_hexes %>% filter(small_ids == hex_id)
-    
+
+    fi_data <- no_agg_with_big_hexes |> filter(small_ids == hex_id)
+
     shiny::validate(need(nrow(fi_data) > 0, "No sub-hex data for this selection."))
-    
-    fi_data %>%
+
+    d.t <- fi_data |>
       mutate(
         forecast_interval = as.factor(forecast_interval)
       , true_out          = plyr::mapvalues(true_out, from = c(0, 1), to = c("No", "Yes"))
       , true_out          = as.factor(true_out)
-      ) %>% {
-        ggplot(., aes(forecast_interval, prob_pred)) + 
+      )
+
+        ggplot(d.t, aes(forecast_interval, prob_pred)) +
           annotate("rect", xmin = -Inf, xmax = Inf, ymin = 0.001, ymax = 0.01, fill = "grey80", alpha = 0.2) +
           annotate("rect", xmin = -Inf, xmax = Inf, ymin = 0.01, ymax = 0.1, fill = "grey80", alpha = 0.35) +
           annotate("rect", xmin = -Inf, xmax = Inf, ymin = 0.1, ymax = 0.5, fill = "grey80", alpha = 0.50) +
@@ -1132,28 +1217,28 @@ Predicted
           ) +
           scale_y_log10() +
           xlab("Forecast Interval (Days)") +
-          ylab("Predicted Outbreak Probability") 
-      }
-    
+          ylab("Predicted Outbreak Probability")
+
   }, bg = "#16181f")
-  
+
   ## PANEL 3: Forecast probability by hex single forecast window
   output$interval_preds_hex_single <- renderPlot({
-    
+
     req(clicked_hex_fi())
-    
+
     hex_id  <- clicked_hex_fi()
-    
-    fi_data <- forecast_filtered() %>% filter(small_ids == hex_id)
-    
+
+    fi_data <- forecast_filtered() |> filter(small_ids == hex_id)
+
     shiny::validate(need(nrow(fi_data) > 0, "No sub-hex data for this selection."))
-    
-    fi_data %>% mutate(
-      true_out    = plyr::mapvalues(true_out, from = c(0, 1), to = c("No", "Yes"))
+
+    d.t <- fi_data |> mutate(
+        true_out    = plyr::mapvalues(true_out, from = c(0, 1), to = c("No", "Yes"))
       , true_out  = as.factor(true_out)
       , prob_pred = qlogis(prob_pred)
-    ) %>% {
-      ggplot(., aes(x = prob_pred)) + 
+    )
+
+      ggplot(d.t, aes(x = prob_pred)) +
         geom_density(aes(fill = true_out), alpha = 0.5, colour = NA) +
         scale_fill_brewer(palette = "Dark2", name = "Outbreak
 Recorded") +
@@ -1176,10 +1261,77 @@ Recorded") +
           "Forecast Interval = "
         , as.character(unique(fi_data$forecast_interval))
         ))
-    }
-    
+
   }, bg = "#16181f")
-  
+
+ ## PANEL 4: Temp VI plot 1
+ output$shap_heatmap_raw <- renderPlot({
+
+   ggplot(shap.dat, aes(x = forecast_interval, y = feature, fill = mean_abs_shap)) +
+       geom_tile() +
+       scale_fill_viridis_c(name = "Mean |SHAP|") +
+       labs(x = "Forecast interval (days)", y = NULL) +
+       theme_minimal() +
+       theme(
+           axis.text.x = element_text(size = 10),
+           axis.text.y = element_text(size = 8)
+       )
+
+ }, bg = "#16181f")
+
+## PANEL 4: Temp VI plot 2
+ output$shap_heatmap_rel <- renderPlot({
+
+  ggplot(shap.dat, aes(x = forecast_interval, y = feature, fill = rel_shap)) +
+    geom_tile() +
+    scale_fill_viridis_c(name = "Relative SHAP") +
+    labs(x = "Forecast interval (days)", y = NULL) +
+    theme_minimal() +
+    theme(
+        axis.text.x = element_text(size = 10)
+      , axis.text.y = element_text(size = 8)
+    )
+
+ }, bg = "#16181f"
+ )
+
+ ## PANEL 4: Lineplot for forecast covariates
+ output$shap_lineplot_A <- renderPlot({
+
+  d.t <- shap.dat |> dplyr::mutate(forecast_interval_num = as.numeric(as.character(forecast_interval)))
+
+  ggplot(
+    d.t |> filter(grepl("forecast", feature))
+  , aes(x = forecast_interval_num, y = mean_abs_shap, color = feature)) +
+    geom_line() +
+    geom_point() +
+    scale_x_continuous(breaks = sort(unique(d.t$forecast_interval_num))) +
+    labs(x = "Forecast interval (days)", y = "Mean |SHAP|", color = "Feature") +
+    theme_minimal() +
+    scale_y_log10()
+
+ }, bg = "#16181f"
+ )
+
+ ## PANEL 4: Lineplot for non-forecast covariates
+ output$shap_lineplot_B <- renderPlot(
+     {
+         d.t <- shap.dat |> dplyr::mutate(forecast_interval_num = as.numeric(as.character(forecast_interval)))
+
+         ggplot(
+             d.t |> filter(!grepl("forecast", feature)),
+             aes(x = forecast_interval_num, y = mean_abs_shap, color = feature)
+         ) +
+             geom_line() +
+             geom_point() +
+             scale_x_continuous(breaks = sort(unique(d.t$forecast_interval_num))) +
+             labs(x = "Forecast interval (days)", y = "Mean |SHAP|", color = "Feature") +
+             theme_minimal() +
+             scale_y_log10()
+     },
+     bg = "#16181f"
+ )
+
 }
 
 #### Run app

@@ -4,12 +4,13 @@
 #' @title build_app_components
 
 #' @param predictions target examined_fits_within_pan
+#' @param shapvals shap values
 #' @param outpath path to save file for app
 #' @return path to saved file
 #' @author Morgan Kain
 #' @export
 
-build_app_components <- function(predictions, outpath) {
+build_app_components <- function(predictions, shapvals, outpath) {
 
   predictions.map <- predictions[grepl("predictions", predictions)]
   predictions.cal <- predictions[grepl("calcurves", predictions)]
@@ -68,10 +69,15 @@ build_app_components <- function(predictions, outpath) {
   , spatial_agg  = spatial_agg.cal |> list()
   )
 
+  shap.tib <- shapvals |>
+      dplyr::select(shap_summary) |>
+      rename(shap.tib = shap_summary)
+
   tibble(
-    map.tib = map.tib |> list()
-  , cal.tib = cal.tib |> list()
+    map.tib  = map.tib |> list()
+  , cal.tib  = cal.tib |> list()
   ) |>
+  bind_cols(shap.tib) |>
   qsave(paste(outpath, "/data_for_app.qs", sep = ""))
 
   paste(outpath, "/data_for_app.qs", sep = "")
