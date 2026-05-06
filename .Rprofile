@@ -1,4 +1,13 @@
-source("renv/activate.R")
+# Derive the project root from R_PROFILE_USER when set (e.g. crew workers that
+# inherit it via Sys.setenv in packages.R), otherwise assume cwd is project root
+local({
+  renv_script <- if (nzchar(Sys.getenv("R_PROFILE_USER"))) {
+    file.path(dirname(Sys.getenv("R_PROFILE_USER")), "renv/activate.R")
+  } else {
+    "renv/activate.R"
+  }
+  if (file.exists(renv_script)) source(renv_script)
+})
 library(lubridate)
 # Load env vars from any file starting with `.env`. This allows user-specific
 # options to be set in `.env_user` (which is .gitignored), and to have both
@@ -35,11 +44,14 @@ options(timeout = max(300, getOption("timeout")))
 # If project packages have conflicts define them here so as
 # as to manage them across all sessions when building targets
 if(requireNamespace("conflicted", quietly = TRUE)) {
-  conflicted::conflict_prefer("filter", "dplyr", quiet = TRUE)
-  conflicted::conflict_prefer("count", "dplyr", quiet = TRUE)
-  conflicted::conflict_prefer("select", "dplyr", quiet = TRUE)
-  conflicted::conflict_prefer("set_names", "magrittr", quiet = TRUE)
-  conflicted::conflict_prefer("View", "utils", quiet = TRUE)
+  conflicted::conflicts_prefer(
+    dplyr::filter,
+    dplyr::count,
+    dplyr::select,
+    magrittr::set_names,
+    utils::View,
+    .quiet = TRUE
+  )
 }
 
 if(interactive()){
@@ -49,19 +61,15 @@ if(interactive()){
 }
 
 if (interactive() && Sys.getenv("TERM_PROGRAM") == "vscode") {
-
-  options(vsc.dev.args = list(
-    width = 1500,
-    height = 1500,
-    pointsize = 12,
-    res = 300
-  ))
-
   if (requireNamespace("httpgd", quietly = TRUE)) {
+    # Use httpgd for VS Code's plot viewer (avoids XQuartz entirely)
     options(vsc.plot = FALSE)
     options(device = function(...) {
       httpgd::hgd(silent = TRUE)
       .vsc.browser(httpgd::hgd_url(history = FALSE), viewer = "Beside")
     })
+  } else {
+    # Fall back to native macOS quartz to avoid XQuartz focus-stealing behavior
+    options(device = "quartz")
   }
 }

@@ -4,7 +4,6 @@
 
 #### Load needed packages ========================================================
 
-library(qs)
 library(shiny)
 library(leaflet)
 library(sf)
@@ -14,13 +13,45 @@ library(h3jsr)
 library(scales)
 library(bslib)
 library(shinyWidgets)
+library(aws.s3)
+
+#### Local vs deployed mode ======================================================
+
+## SHINY_LOCAL defaults to "1" (local). Set SHINY_LOCAL=0 in the shinyapps.io
+## environment variables dashboard to switch to R2 reads.
+LOCAL <- identical(Sys.getenv("SHINY_LOCAL", "1"), "1")
+
+## Downloads object_key from R2 to /tmp/ (cached for the process lifetime) and
+## returns the local path. No-op if the file was already downloaded this session.
+r2_path <- function(object_key) {
+  ## basename() keeps the /tmp/ cache flat regardless of folder prefixes in the
+  ## R2 object key (e.g. "www/data_for_app.Rds"); the full key is still passed to
+  ## save_object so R2 looks in the correct bucket folder
+  cached <- file.path("/tmp", basename(object_key))
+  if (!file.exists(cached)) {
+    aws.s3::save_object(
+      object   = object_key
+    , bucket   = Sys.getenv("AWS_BUCKET_ID")
+    , file     = cached
+    , region   = ""
+    , key      = Sys.getenv("AWS_ACCESS_KEY_ID")
+    , secret   = Sys.getenv("AWS_SECRET_ACCESS_KEY")
+    , base_url = Sys.getenv("AWS_S3_ENDPOINT")
+    )
+  }
+  cached
+}
 
 #### Read in needed data =========================================================
 
 ## targets pipeline puts this is the correct folder
 ## examined_fits_within_country saves component prediction files to outpath_for_app
-## then built_app_components saves "data_for_app.qs" to "www/"
-map_dat          <- qread("data_for_app.qs")
+## then built_app_components saves "data_for_app.Rds" to "www/"
+map_dat          <- readRDS(if (LOCAL) {
+    "data_for_app.rds"
+  } else {
+    r2_path("www/data_for_app.rds")
+  })
 cal_dat          <- map_dat$cal.tib[[1]]
 ## !!! Temporarily drop mangroves, weird issue with those data, need to check before refitting
 shap.dat         <- map_dat$shap.tib[[1]] |> filter(feature != "mangroves")
@@ -137,6 +168,9 @@ average_map_big_hexes <- avg_map_data |> rename(small_ids = region_norm)
 #no_agg_with_big_hexes <- no_agg_with_big_hexes |>
 #  as.data.frame() |>
 #  dplyr::select(-geometry)
+
+## Serve the app's own directory so guide HTML files are reachable via /guides/
+addResourcePath("guides", ".")
 
 #### User Interface ===============================================================
 ui <- fluidPage(
@@ -440,6 +474,15 @@ ui <- fluidPage(
     ))
 
   ))
+
+## GUIDE TAB ====================================================================
+, tabPanel(
+    title = "User Guide"
+  , tags$iframe(
+      src   = "guides/prediction_explorer_guide.html"
+    , style = "width:100%; height:85vh; border:none; background:#fff;"
+    )
+  )
 
   )
 

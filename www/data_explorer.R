@@ -14,7 +14,8 @@ library(h3jsr)
 library(bslib)
 library(scales)
 library(arrow)
-library(qs)
+library(stringr)
+library(aws.s3)
 
 
 #### Functions ===================================================================
@@ -60,9 +61,42 @@ click_hint_box <- function(msg) {
   )
 }
 
+#### Local vs deployed mode ======================================================
+
+## SHINY_LOCAL defaults to "1" (local). Set SHINY_LOCAL=0 in the shinyapps.io
+## environment variables dashboard to switch to R2 reads.
+LOCAL <- identical(Sys.getenv("SHINY_LOCAL", "1"), "1")
+
+## Downloads object_key from R2 to /tmp/ (cached for the process lifetime) and
+## returns the local path. No-op if the file was already downloaded this session.
+r2_path <- function(object_key) {
+  ## basename() keeps the /tmp/ cache flat regardless of folder prefixes in the
+  ## R2 object key (e.g. "www/hex_sf.Rds"); the full key is still passed to
+  ## save_object so R2 looks in the correct bucket folder
+  cached <- file.path("/tmp", basename(object_key))
+  if (!file.exists(cached)) {
+    aws.s3::save_object(
+      object   = object_key
+    , bucket   = Sys.getenv("AWS_BUCKET_ID")
+    , file     = cached
+    , region   = ""
+    , key      = Sys.getenv("AWS_ACCESS_KEY_ID")
+    , secret   = Sys.getenv("AWS_SECRET_ACCESS_KEY")
+    , base_url = Sys.getenv("AWS_S3_ENDPOINT")
+    )
+  }
+  cached
+}
+
 #### Build required objects ======================================================
 
-df_raw <- read_parquet("../data/pan_hex_joined_response_data/pan_hex_joined_response_data_final.parquet") |>
+df_raw <- read_parquet(
+    if (LOCAL) {
+      "../data/pan_hex_joined_response_data/pan_hex_joined_response_data_final.parquet"
+    } else {
+      r2_path("data/pan_hex_joined_response_data/pan_hex_joined_response_data_final.parquet")
+    }
+  ) |>
   ungroup() |>
   mutate(index = seq_len(n()), .before = 1) |>
   mutate(
@@ -78,47 +112,59 @@ forecast_covars <- all_cols[c(1:3)]
 temporal_covars <- all_cols[c(52)]
 
 
-countries_sf <- sf::st_read("countries.geojson", quiet = TRUE)
+countries_sf <- sf::st_read(
+  if (LOCAL) {
+    "countries.geojson"
+  } else {
+    r2_path("www/countries.geojson")
+  }
+, quiet = TRUE)
 
 #### Pre-processing ==============================================================
 
 df_raw$date <- as.Date(df_raw$date)
 
 ## Build geometry from H3
-if (file.exists("hex_sf.qs")) {
-  hex_sf <- qread("hex_sf.qs")
+if (!LOCAL) {
+  ## Deployed: all three cache files are pre-computed and live in R2
+  hex_sf      <- readRDS(r2_path("www/hex_sf.rds"))
+  df_avg      <- read_parquet(r2_path("www/df_avg.parquet"))
+  hex_summary <- readRDS(r2_path("www/hex_summary.rds"))
 } else {
-  hex_sf <- df_raw |>
-    distinct(shapeName) |>
-    mutate(
-        geometry = h3jsr::cell_to_polygon(shapeName, simple = FALSE) |>
-        pull(geometry)
-    ) |>
-    st_as_sf()
-}
+  ## Local: use cached files if present, otherwise compute on the fly
+  if (file.exists("hex_sf.rds")) {
+    hex_sf <- readRDS("hex_sf.rds")
+  } else {
+    hex_sf <- df_raw |>
+      distinct(shapeName) |>
+      mutate(
+          geometry = h3jsr::cell_to_polygon(shapeName, simple = FALSE) |>
+          pull(geometry)
+      ) |>
+      st_as_sf()
+  }
 
-## Average across forecast intervals (default version)
-if (file.exists("df_avg.parquet")) {
-  df_avg <- read_parquet("df_avg.parquet")
-} else {
-  df_avg <- df_raw |>
-    group_by(shapeName, date) |>
-    summarise(
-      across(
-        all_of(c(static_covars, temporal_covars, lagged_covars, forecast_covars))
-        , mean)
-      , .groups = "drop")
-}
+  if (file.exists("df_avg.parquet")) {
+    df_avg <- read_parquet("df_avg.parquet")
+  } else {
+    df_avg <- df_raw |>
+      group_by(shapeName, date) |>
+      summarise(
+        across(
+          all_of(c(static_covars, temporal_covars, lagged_covars, forecast_covars))
+          , mean)
+        , .groups = "drop")
+  }
 
-## Hex-level summary (for map + scatter)
-if (file.exists("hex_summary.qs")) {
-  hex_summary <- qread("hex_summary.qs")
-} else {
-  hex_summary <- df_avg |>
-    group_by(shapeName) |>
-    summarise(across(-date, mean), .groups = "drop") |>
-    left_join(hex_sf, by = "shapeName") |>
-    st_as_sf()
+  if (file.exists("hex_summary.rds")) {
+    hex_summary <- readRDS("hex_summary.rds")
+  } else {
+    hex_summary <- df_avg |>
+      group_by(shapeName) |>
+      summarise(across(-date, mean), .groups = "drop") |>
+      left_join(hex_sf, by = "shapeName") |>
+      st_as_sf()
+  }
 }
 
 ## Long format for density / scatter
@@ -129,6 +175,8 @@ df_long <- df_avg |>
   , values_to = "value"
   )
 
+## Serve the app's own directory so guide HTML files are reachable via /guides/
+addResourcePath("guides", ".")
 
 #### UI ===========================================================================
 
@@ -323,6 +371,14 @@ ui <- fluidPage(
         )
 
         , plotOutput("density_plot", height = 500)
+        )
+
+      , tabPanel(
+          "User Guide"
+        , tags$iframe(
+            src   = "guides/data_explorer_guide.html"
+          , style = "width:100%; height:85vh; border:none; background:#fff;"
+          )
         )
 
       ) ## tabsetPanel

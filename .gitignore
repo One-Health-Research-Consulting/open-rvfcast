@@ -28,3 +28,4 @@ notes/*
 *.token
 **/*.SEN3
 
+www/.Renviron
