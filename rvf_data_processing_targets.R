@@ -213,7 +213,7 @@ rvf_processing_targets <- tar_plan(
  ## Build smaller more manageable .parquet files composed of the same dates but
 , tar_target(region_data, mask_and_cluster_from_template(
       template        = region_data_template
-    , cov_files       = base_predictors
+    , cov_files        = base_predictors
     , out_dir         = region_data_directory
     , overwrite       = FALSE)
   , pattern = map(base_predictors)

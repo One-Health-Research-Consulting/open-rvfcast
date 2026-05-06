@@ -9,6 +9,7 @@
 #'
 #' @param forecasts_anomalies_sources A single-row tibble with 'date' and 'forecast_file' columns.
 #' @param weather_historical_means Filepath to the historical weather means data.
+#' @param land_pixel_reference Filepath to any static land-only predictor parquet (e.g. elevation_preprocessed); its x/y rows define the valid analysis pixels.
 #' @param forecast_anomalies_directory Directory in which to save the anomalies data.
 #' @param forecast_intervals Lead times for forecasts, which will determine the interval over which anomalies are averaged.
 #' @param overwrite Boolean flag indicating whether existing file should be overwritten. Default is FALSE.
@@ -34,6 +35,7 @@
 #' @export
 calculate_forecast_anomalies <- function(forecasts_anomalies_sources,
                                          weather_historical_means,
+                                         land_pixel_reference,
                                          forecast_anomalies_directory,
                                          basename_template = "forecast_anomaly_{date}.parquet",
                                          forecast_intervals,
@@ -45,7 +47,7 @@ calculate_forecast_anomalies <- function(forecasts_anomalies_sources,
   ecmwf_forecast_transformed <- forecasts_anomalies_sources$forecast_file
 
   # If no forecast file available for this date, return NA
-  if(is.na(ecmwf_forecast_transformed)) {
+  if (is.na(ecmwf_forecast_transformed)) {
     message(glue::glue("No forecast file available for {date}, skipping"))
     return(NA_character_)
   }
@@ -57,16 +59,16 @@ calculate_forecast_anomalies <- function(forecasts_anomalies_sources,
   error_safe_read_parquet <- purrr::possibly(arrow::open_dataset, NULL)
   existing_dataset <- error_safe_read_parquet(save_filename)
 
-  if(!is.null(existing_dataset) & !overwrite) {
+  if (!is.null(existing_dataset) && !overwrite) {
     # Check if file has data - if zero rows, overwrite anyway
     row_count <- existing_dataset |> count() |> collect() |> pull(n)
-    if(row_count > 0) {
+    if (row_count > 0) {
       message(glue::glue("{basename(save_filename)} already exists, has rows, and overwrite is not TRUE, skipping"))
       return(save_filename)
     } else {
       message(glue::glue("{basename(save_filename)} exists but has zero rows, overwriting"))
     }
-  } else if(!is.null(existing_dataset) & overwrite) {
+  } else if (!is.null(existing_dataset) && overwrite) {
     # File exists and overwrite is TRUE
     message(glue::glue("Overwriting existing {basename(save_filename)} for ", date))
   } else {
@@ -109,11 +111,18 @@ calculate_forecast_anomalies <- function(forecasts_anomalies_sources,
     pull(base_date, as_vector = TRUE) |>
     head(n = 1)
 
+  # Read valid analysis pixel coordinates directly from a static land-only predictor.
+  # This guarantees exact x/y coordinate matches with the parquet data and avoids
+  # polygon rasterization issues (CRS, grid origin precision).
+  valid_pixels <- arrow::read_parquet(land_pixel_reference, col_select = c("x", "y")) |>
+    dplyr::distinct(x, y)
+
   forecast_transformed_dataset <- forecast_transformed_dataset |>
     dplyr::filter(base_date == relevant_base_date) |>
     select(-base_date, -month, -year) |>
     mutate(month = lead_month, year = lead_year) |>
-    collect()
+    collect() |>
+    dplyr::semi_join(valid_pixels, by = c("x", "y"))
 
   forecast_anomalies <- map_dfr(1:(length(forecast_intervals) - 1), function(i) {
     lead_interval_start <- forecast_intervals[i]
@@ -138,7 +147,9 @@ calculate_forecast_anomalies <- function(forecasts_anomalies_sources,
     # first before the join.
     # CHECK
     historical_means <- arrow::open_dataset(weather_historical_means) |>
-      dplyr::filter(doy %in% forecast_anomaly$doy)
+      dplyr::filter(doy %in% forecast_anomaly$doy) |>
+      dplyr::collect() |>
+      dplyr::semi_join(valid_pixels, by = c("x", "y"))
 
     # Join historical means based on day of year (doy)
     # CHECK
@@ -161,26 +172,25 @@ calculate_forecast_anomalies <- function(forecasts_anomalies_sources,
     # and across both historical data and forecast data over the days in the model_dates range
     historical_means <- historical_means |>
       group_by(x, y, lead_interval_start, lead_interval_end) |>
-      summarize(across(matches("temperature|precipitation|relative_humidity"), ~ mean(.x, na.rm = T)), .groups = "drop")
+      summarize(across(matches("temperature|precipitation|relative_humidity"), ~ mean(.x, na.rm = TRUE)), .groups = "drop")
 
-    # Calculate temperature anomalies
-    # scaled requires non na values for SD which means there must be variation in temp at that site.
+    # Adjust the near-0 sd to a non-zero value to fix the insane scaled values
+    historical_means <- historical_means |>
+        mutate(
+          temperature_sd_historical = ifelse(temperature_sd_historical < 0.1, 0.1, temperature_sd_historical),
+          precipitation_sd_historical = ifelse(precipitation_sd_historical < 0.1, 0.1, precipitation_sd_historical),
+          relative_humidity_sd_historical = ifelse(relative_humidity_sd_historical < 0.1, 0.1, relative_humidity_sd_historical),
+        )
+
     historical_means <- historical_means |>
       mutate(
+        # Calculate temperature anomalies
         anomaly_forecast_temperature = temperature_forecast - temperature_historical,
-        anomaly_forecast_scaled_temperature = anomaly_forecast_temperature / temperature_sd_historical
-      )
-
-    # Calculate precipitation anomalies
-    historical_means <- historical_means |>
-      mutate(
+        anomaly_forecast_scaled_temperature = anomaly_forecast_temperature / temperature_sd_historical,
+        # Calculate precipitation anomalies
         anomaly_forecast_precipitation = precipitation_forecast - precipitation_historical,
-        anomaly_forecast_scaled_precipitation = anomaly_forecast_precipitation / precipitation_sd_historical
-      )
-
-    # Calculate relative_humidity anomalies
-    historical_means <- historical_means |>
-      mutate(
+        anomaly_forecast_scaled_precipitation = anomaly_forecast_precipitation / precipitation_sd_historical,
+        # Calculate relative_humidity anomalies
         anomaly_forecast_relative_humidity = relative_humidity_forecast - relative_humidity_historical,
         anomaly_forecast_scaled_relative_humidity = anomaly_forecast_relative_humidity / relative_humidity_sd_historical
       )
@@ -204,5 +214,5 @@ calculate_forecast_anomalies <- function(forecasts_anomalies_sources,
 
   rm(forecast_anomalies)
 
-  return(save_filename)
+  save_filename
 }

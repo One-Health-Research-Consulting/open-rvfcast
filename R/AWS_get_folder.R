@@ -52,14 +52,12 @@ AWS_get_folder <- function(local_folder,
     function(file) {
       # Try to open as dataset (more memory efficient for large files)
       dataset <- arrow::open_dataset(file)
-      row_count <- dataset |> 
-        arrow::compute_count() |> 
-        arrow::as_vector()
-      
+      row_count <- nrow(dataset)
+
       # Return row count if successful and has data
       if (row_count > 0) {
         return(row_count)
- 
+
      } else {
         return(0)  # Empty file
       }
@@ -72,7 +70,7 @@ AWS_get_folder <- function(local_folder,
                                        prefix = paste0(local_folder, "/"),
                                        region = aws_region,
                                        base_url = Sys.getenv("AWS_S3_ENDPOINT"))
-                                       
+
   s3_files <- map_chr(df_bucket_data, pluck, "Key")
 
   # Check if S3 has files to download
@@ -89,12 +87,21 @@ AWS_get_folder <- function(local_folder,
   for (file in s3_files) {
     # Only download if file doesn't exist locally AND skip_fetch is FALSE
     if (!(file %in% local_files || skip_fetch)) {
-      # Download the file from S3 using aws.s3
-      aws.s3::save_object(
-        object = file,
-        bucket = Sys.getenv("AWS_BUCKET_ID"),
-        region = aws_region,
-        file = file
+      # Download the file from S3 using aws.s3.
+      # aws.s3 can throw a spurious "if (content != '')" error when the HTTP
+      # response body is empty/NA even though the file downloaded successfully;
+      # catch it and re-throw only if the file is missing.
+      tryCatch(
+        aws.s3::save_object(
+          object = file,
+          bucket = Sys.getenv("AWS_BUCKET_ID"),
+          region = aws_region,
+          file = file
+        ),
+        error = function(e) {
+          if (!file.exists(file)) stop(e)
+          invisible(NULL)
+        }
       )
 
       cat("Downloaded AWS file:", file, "\n")
@@ -134,7 +141,7 @@ AWS_get_folder <- function(local_folder,
 
 #' Upload Transformed Files to AWS S3
 #'
-#' This function uploads transformed files to an AWS S3 bucket, handling large file quantities 
+#' This function uploads transformed files to an AWS S3 bucket, handling large file quantities
 #' through pagination and providing comprehensive file management capabilities.
 #'
 #' @details The function performs several key operations:
@@ -150,19 +157,19 @@ AWS_get_folder <- function(local_folder,
 #'
 #' @param transformed_file_list A character vector of filenames to be uploaded to AWS S3.
 #'   These should be full file paths that have been transformed and are ready for upload.
-#' @param local_folder A character string specifying the local directory containing 
+#' @param local_folder A character string specifying the local directory containing
 #'   the transformed files to be uploaded to AWS S3.
-#' @param overwrite Logical. If \code{TRUE}, files will be uploaded even if they 
+#' @param overwrite Logical. If \code{TRUE}, files will be uploaded even if they
 #'   already exist in the S3 bucket with matching schemas and row counts. Defaults to \code{FALSE}.
-#' @param clean_remote Logical. If \code{TRUE}, files present on AWS but not in the 
+#' @param clean_remote Logical. If \code{TRUE}, files present on AWS but not in the
 #'   \code{transformed_file_list} will be deleted from the S3 bucket. Defaults to \code{FALSE}.
 #'   Use with caution as this can delete files during testing.
 #' @param ... Additional arguments (currently unused).
 #'
-#' @return A character vector of messages describing the outcomes of file upload attempts, 
+#' @return A character vector of messages describing the outcomes of file upload attempts,
 #'   including successful uploads, failed uploads, skipped files, and cleanup operations.
 #'
-#' @note 
+#' @note
 #' Required environment variables:
 #' \itemize{
 #'   \item \code{AWS_ACCESS_KEY_ID}: AWS access key
@@ -171,7 +178,7 @@ AWS_get_folder <- function(local_folder,
 #'   \item \code{AWS_BUCKET_ID}: S3 bucket identifier
 #'   \item \code{AWS_S3_ENDPOINT}: S3 endpoint URL (optional, for custom S3-compatible services)
 #' }
-#' These environment variables must be set prior to calling the function, typically 
+#' These environment variables must be set prior to calling the function, typically
 #' in a .env file or system environment.
 #'
 #' @examples
@@ -181,14 +188,14 @@ AWS_get_folder <- function(local_folder,
 #'   transformed_file_list = c("./data/file1.parquet", "./data/file2.parquet"),
 #'   local_folder = "./data"
 #' )
-#' 
+#'
 #' # Upload with overwrite option
 #' AWS_put_files(
 #'   transformed_file_list = c("./data/file1.parquet", "./data/file2.parquet"),
 #'   local_folder = "./data",
 #'   overwrite = TRUE
 #' )
-#' 
+#'
 #' # Upload and clean remote files not in the transformed list
 #' AWS_put_files(
 #'   transformed_file_list = c("./data/file1.parquet"),
