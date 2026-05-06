@@ -31,6 +31,9 @@ clean_region_data <- function(dat) {
 
   dat <- dat |> mutate(across(all_of(vars_to_scale), ~ as.numeric(scale(.x)[, 1])))
 
+  ## dropping extremely rare land types that are causing model fitting to behave somewhat strangely
+  dat <- dat |> dplyr::select(-c(built, snow, mangroves, moss))
+
   dat
 
 }
