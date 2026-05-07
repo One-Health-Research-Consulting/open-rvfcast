@@ -30,7 +30,7 @@ make_hex_grid_h3     <- function(template_rast, target_area_km2 = 12000, h3_res 
   land_polys <- as.polygons(land_mask, dissolve = TRUE)
 
   ## Convert to sf and ensure lon/lat for building H3 hexagons
-  land_sf <- st_as_sf(land_polys) |> st_make_valid() |> st_transform(., 4326)
+  land_sf <- st_as_sf(land_polys) |> st_make_valid() |> st_transform(4326)
 
   ## terra to sf conversion can create some junk, just need geometry and ID column
   land_sf <- land_sf |> mutate(land_id = 1L) |> select(land_id, geometry)

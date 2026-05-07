@@ -164,9 +164,9 @@ mask_and_cluster_from_template <- function(template, cov_files, out_dir, overwri
   save_filename <- paste(
     out_dir
     , "/"
-    , out_dir |> strsplit("data/") |> unlist() |> pluck(length(.))
+    , out_dir |> strsplit("data/") |> unlist() |> tail(1)
     , "_"
-    , cov_files |> strsplit("data_") |> unlist() |> pluck(length(.))
+    , cov_files |> strsplit("data_") |> unlist() |> tail(1)
     , sep = ""
   )
   message(paste0("Processing ", cov_files))

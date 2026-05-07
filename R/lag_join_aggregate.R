@@ -34,7 +34,7 @@ lag_join_aggregate <- function (
   save_filename <- paste(
     out_dir
     , "/"
-    , paste(out_dir |> strsplit("data/") |> unlist() |> pluck(length(.)), unique(processed_dates$date), sep = "_")
+    , paste(out_dir |> strsplit("data/") |> unlist() |> tail(1), unique(processed_dates$date), sep = "_")
     , ".parquet"
     , sep = ""
   ) |>
@@ -221,7 +221,7 @@ prep_dates <- function(cov_files, rvf_response) {
 
   ## Extract dates from the saved files
   dates_for_predictions <-  sapply(cov_files, FUN = function(x) {
-    strsplit(x, "data_") |> unlist() |> pluck(2) |> strsplit(".parquet") |> unlist() |> pluck(1)
+    strsplit(x, "data_") |> unlist() |> pluck(2) |> strsplit(".parquet") |> unlist() |> head(1)
   }) |>
   unname() |>
   as.Date()
@@ -239,10 +239,10 @@ prep_dates <- function(cov_files, rvf_response) {
       mutate(
         file_nums     = which(dates_for_predictions >= lag_floors & dates_for_predictions <= lag_ceilings) |> list()
       , num_files     = length(file_nums)
-      , closest_date = dates_for_predictions[-i][which((dates_for_predictions[-i] - lag_ceilings) < 0)] |> pluck(length(.)) |> list()
+      , closest_date = dates_for_predictions[-i][which((dates_for_predictions[-i] - lag_ceilings) < 0)] |> tail(1) |> list()
       )
 
-    if (any(sapply(files_to_avg$closest_date, FUN = is.null))) {
+    if (any(sapply(files_to_avg$closest_date, FUN = function(x) length(x)) == 0)) {
       processed_dates[[i]] <- NULL
     } else {
 
@@ -294,7 +294,7 @@ combine_lja <- function(
   save_filename <- paste(
     out_dir
   , "/"
-  , paste(out_dir |> strsplit("data/") |> unlist() |> pluck(length(.)), "final", sep = "_")
+  , paste(out_dir |> strsplit("data/") |> unlist() |> tail(1), "final", sep = "_")
   , ".parquet"
   , sep = ""
   )
