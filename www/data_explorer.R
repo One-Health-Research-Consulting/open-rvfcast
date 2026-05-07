@@ -20,32 +20,6 @@ library(aws.s3)
 
 #### Functions ===================================================================
 
-clean_region_data <- function(dat) {
-
-  ## Drop all columns that already have a scaled counterpart
-  scaled_cols <- names(dat)[str_detect(names(dat), "_scaled_")]
-  base_cols   <- str_replace(scaled_cols, "_scaled_", "_")
-  dat         <- dat |> select(-any_of(base_cols))
-
-  ## Not ideal as this will need to be manually adjusted, but ok for now. Scale
-  ## all of these
-  vars_to_scale <- c(
-      "glw_cattle", "glw_sheep", "glw_goats", "wc2.1_30s_elev", "Annual_Mean_Temperature"
-    , "Mean_Diurnal_Range", "Isothermality", "Temperature_Seasonality", "Max_Temperature_of_Warmest_Month"
-    , "Min_Temperature_of_Coldest_Month", "Temperature_Annual_Range", "Mean_Temperature_of_Wettest_Quarter"
-    , "Mean_Temperature_of_Driest_Quarter", "Mean_Temperature_of_Warmest_Quarter"
-    , "Mean_Temperature_of_Coldest_Quarter", "Annual_Precipitation"
-    , "Precipitation_of_Wettest_Month", "Precipitation_of_Driest_Month"
-    , "Precipitation_Seasonality", "Precipitation_of_Wettest_Quarter"
-    , "Precipitation_of_Driest_Quarter", "Precipitation_of_Warmest_Quarter", "Precipitation_of_Coldest_Quarter"
-    , "pred_sero"
-  )
-
-  dat <- dat |> mutate(across(all_of(vars_to_scale), ~ as.numeric(scale(.x)[, 1])))
-
-  dat
-
-}
 click_hint_box <- function(msg) {
   div(
     style = "
@@ -92,25 +66,18 @@ r2_path <- function(object_key) {
 
 df_raw <- read_parquet(
     if (LOCAL) {
-      "../data/pan_hex_joined_response_data/pan_hex_joined_response_data_final.parquet"
+      "raw_data.parquet"
     } else {
-      r2_path("data/pan_hex_joined_response_data/pan_hex_joined_response_data_final.parquet")
+      r2_path("www/raw_data.parquet")
     }
-  ) |>
-  ungroup() |>
-  mutate(index = seq_len(n()), .before = 1) |>
-  mutate(
-    soil_texture = as.numeric(as.factor(soil_texture))
-  , soil_drainage = as.numeric(as.factor(soil_drainage))) |>
-  clean_region_data()
+  )
 
 ## Non-dynamic, needs to be cleaned up
 all_cols        <- names(df_raw)[-c(1:10)]
-static_covars   <- all_cols[c(4, 5, 6, 7, 8:37, 50, 51)]
-lagged_covars   <- all_cols[c(38:49)]
-forecast_covars <- all_cols[c(1:3)]
-temporal_covars <- all_cols[c(52)]
-
+static_covars   <- all_cols[c(1:3, 4, 5, 6, 7, 8:30, 46, 47)]
+lagged_covars   <- all_cols[c(34:45)]
+forecast_covars <- all_cols[c(31:33)]
+temporal_covars <- all_cols[c(48)]
 
 countries_sf <- sf::st_read(
   if (LOCAL) {

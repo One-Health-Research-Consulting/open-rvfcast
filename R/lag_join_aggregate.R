@@ -200,7 +200,7 @@ lag_join_aggregate <- function (
     relocate(c(Country, Proportion_Country, ADM2, Proportion_ADM2), .after = shapeName)
 
   arrow::write_parquet(fdat.final, save_filename, compression = "gzip", compression_level = 5)
-
+å
   save_filename
 
 }
