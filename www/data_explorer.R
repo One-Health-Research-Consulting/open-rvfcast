@@ -102,7 +102,7 @@ df_raw <- read_parquet(
   mutate(
     soil_texture = as.numeric(as.factor(soil_texture))
   , soil_drainage = as.numeric(as.factor(soil_drainage))) |>
-  clean_region_data(.)
+  clean_region_data()
 
 ## Non-dynamic, needs to be cleaned up
 all_cols        <- names(df_raw)[-c(1:10)]
