@@ -215,7 +215,7 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
           xlab("True Outbreaks") + ylab("Predicted Outbreaks") +
           ggtitle(paste(
             "Prediction Period = "
-            , strsplit(model_out$assess_range, " ")[[1]] |> paste(., collapse = " - ")
+            , strsplit(model_out$assess_range, " ")[[1]] |> paste(.collapse = " - ")
           ))
 
     ## Distribution of probabilities for true 1s and true 0s
@@ -243,7 +243,7 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
           ylab("Density") +
           ggtitle(paste(
             "Prediction Period = "
-          , strsplit(model_out$assess_range, " ")[[1]] |> paste(., collapse = " - ")
+          , strsplit(model_out$assess_range, " ")[[1]] |> paste(collapse = " - ")
           ))
 
     map_list <- lapply(unique(dat.s$date) |> as.list(), FUN = function(d) {

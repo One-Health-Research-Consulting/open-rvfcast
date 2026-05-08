@@ -27,11 +27,10 @@ split_data <- function(dat, end_date, reduce = FALSE) {
     ## *Explored manually*
     can_be_dropped <- train_data |>
       filter(
-        anomaly_forecast_scaled_precipitation > 1
+          anomaly_forecast_scaled_precipitation > 1
         | Temperature_Seasonality > 1.25
         | trees > 0.5
         | wetland > 0.04
-        | mangroves > 0.0025
         | Precipitation_of_Coldest_Quarter > 1
       ) |>
       filter(shapeName %in% all_zero_cells$shapeName) |>

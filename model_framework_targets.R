@@ -9,11 +9,12 @@
 ## Setup / Preamble ------------------------------------------------------------
 
 ## Re-record current dependencies for CAPSULE users
-if (Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true"))
+if (Sys.getenv("USE_CAPSULE") %in% c("1", "TRUE", "true")) {
   capsule::capshot(c(
     "packages.R"
   , list.files(pattern = "_targets.*\\.(r|R)$", full.names = TRUE)
   , list.files("R", pattern = "\\.(R|r)$", full.names = TRUE)))
+}
 
 ## Load packages (in packages.R) and load project-specific functions in R folder
 suppressPackageStartupMessages(source("packages.R"))
@@ -289,7 +290,7 @@ model_tuning_targets <- tar_plan(
 , tar_target(inner_fold_id, prep_fold_ids(
     folded_data = folded_data_training
   , raw_data    = splitted_data) |>
-  cross_join(., tuning_grid) |>
+  cross_join(tuning_grid) |>
   group_by(outer_fold_id) |>
   filter(inner_fold_id %in% unique(inner_fold_id)) |>
   ungroup())
