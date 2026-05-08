@@ -35,9 +35,13 @@ across the continent.
 In brief, the project pipeline is organized into three distinct
 “modules” that join together sequentially to form the overall
 OpenRVFcast pipeline: 1) the **Data Acquisition Module**, 2) the **Data
-Preparation Module**, 3) and the **Modeling Framework Module**. Some
-brief info on each of these modules are described below, while each is
-described in detail in docs/openRVFcast_Walkthrough.docx.
+Preparation Module**, 3) and the **Modeling Framework Module**.
+
+Some brief info on each of these modules are described below, while each
+is described in detail in docs/openRVFcast_Walkthrough.docx.
+
+For further detail on the data and model see docs/model_supplement.html
+(created from docs/model_supplement.qmd).
 
 Each module is orchestrated using the `targets` package in R, a powerful
 tool for creating reproducible and efficient data analysis workflows. By
@@ -168,7 +172,8 @@ storage). The pipeline will still run without access to cloud storage,
 but users can add their own S3-compatible storage credentials to the
 `.env` file to enable cloud storage and collaboration with team members.
 
-For complete details see docs/openRVFcast_Walkthrough.docx
+For complete details see docs/openRVFcast_Walkthrough.docx and
+docs/model_supplement.html (created from docs/model_supplement.qmd).
 
 ## 2. Data Preparation Module
 
@@ -179,7 +184,8 @@ module are combining covariates with cases, building lagged variables,
 and collapsing data into w/e spatial aggregation is chosen (currently H3
 hex or ADM2).
 
-For complete details see docs/openRVFcast_Walkthrough.docx
+For complete details see docs/openRVFcast_Walkthrough.docx and
+docs/model_supplement.html (created from docs/model_supplement.qmd).
 
 ## 3. Modeling Module
 
@@ -187,7 +193,8 @@ This module contains all of the modeling steps from hyperparameter
 tuning through to final model fitting, prediction visualization, and
 automated report generation.
 
-For complete details see docs/openRVFcast_Walkthrough.docx
+For complete details see docs/openRVFcast_Walkthrough.docx and
+docs/model_supplement.html (created from docs/model_supplement.qmd).
 
 A key aspect of the modeling pipeline is our spatial and temporal
 splitting strategy for cross validation (see
