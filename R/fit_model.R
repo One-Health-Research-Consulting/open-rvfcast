@@ -5,7 +5,8 @@
 
 #' @param final_hyper_set The choice of hyperparameters for final model fitting
 #' @param full_data Full training set and test data
-#' @param raw_data complete set of raw data
+#' @param train_data Training data (splitted_data_fitting$train_data[[1]])
+#' @param test_data Test data (splitted_data_fitting$test_data[[1]])
 #' @param threshold For assigning a 1 | estimated prob
 #' @param weightings weight assigned to 1s in binomial loss metric
 #' @param start_p initilization point for base intercept
@@ -17,7 +18,7 @@
 #' @author Morgan Kain
 #' @export
 
-fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weightings, start_p, id_cols, out_dir, overwrite, DEBUG) {
+fit_model <- function(final_hyper_set, full_data, train_data, test_data, threshold, weightings, start_p, id_cols, out_dir, overwrite, DEBUG) {
 
   ## Set filenames
   save_filename <- paste(
@@ -61,11 +62,11 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weighting
   ## 1) full amount of training data (all the stuff from the hyperparameter tuning step)
   ## 2) some portion of the data from the left-out period depending on what forecast window is being predicted
   outer_tbl_train <- rbind(
-    raw_data$train_data[[1]] |>
+    train_data |>
       dplyr::filter(index %in% full_data$train_data[[1]]) |>
       dplyr::select(-c(cases)) |>
       mutate(outbreak = factor(outbreak, levels = c(1, 0)))
-  , raw_data$test_data[[1]] |>
+  , test_data |>
       dplyr::filter(index %in% full_data$train_data[[1]]) |>
       dplyr::select(-c(cases)) |>
       mutate(outbreak = factor(outbreak, levels = c(1, 0)))
@@ -80,7 +81,7 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weighting
     , .after = "index"
     )
 
-  outer_tbl_assess  <- raw_data$test_data[[1]] |>
+  outer_tbl_assess  <- test_data |>
     dplyr::filter(index %in% full_data$assess_data[[1]]) |>
     dplyr::select(-c(cases)) |>
     mutate(outbreak = factor(outbreak, levels = c(1, 0))) |>
@@ -97,7 +98,7 @@ fit_model <- function(final_hyper_set, full_data, raw_data, threshold, weighting
   }
 
   ## Attempt to clear up some ram
-  rm(raw_data)
+  rm(train_data, test_data)
   gc()
 
   ## Set up and fit the final model for this outer fold

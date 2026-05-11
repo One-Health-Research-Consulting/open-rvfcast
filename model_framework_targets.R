@@ -149,6 +149,16 @@ cross_validation_targets <- tar_plan(
   , reduce   = FALSE
   ))
 
+  ## Extract training and test data as standalone targets so workers load only the
+   ## slice they need rather than the full splitted_data object
+, tar_target(train_data, splitted_data$train_data[[1]])
+, tar_target(test_data,  splitted_data$test_data[[1]])
+
+  ## Same extractions for the fitting-phase data (reduce = FALSE, larger than tuning data)
+, tar_target(train_data_fitting, splitted_data_fitting$train_data[[1]])
+, tar_target(test_data_fitting,  splitted_data_fitting$test_data[[1]])
+
+
   ## Number of spatial folds (parameter used in multiple functions)
 , tar_target(n_spatial_folds, 20)
 
@@ -314,6 +324,7 @@ model_tuning_targets <- tar_plan(
   outer_fold_id == 18 & inner_fold_id == 5  |
   outer_fold_id == 18 & inner_fold_id == 7  |
   outer_fold_id == 14 & inner_fold_id == 11 |
+  outer_fold_id == 14 & inner_fold_id == 8 |
   outer_fold_id == 5  & inner_fold_id == 13) |>
     filter(index %in% c(15)) |>
     dplyr::select(-assess_inner, -has_outbreak, -nrow)})
@@ -321,27 +332,66 @@ model_tuning_targets <- tar_plan(
                filter(outer_fold_id %in% inner_fold_id_finalized_DEBUG$outer_fold_id))
 , tar_target(folded_data_testing_DEBUG, folded_data_testing |> filter(outer_fold_id %in% c(1, 2, 3)))
 
+  ## Pre-join inner fold indices with training covariates, one branch per outer fold.
+   ## Workers for tuned_results_per_outer_fold load this small per-fold slice rather than
+   ## the full train_data, and the join is computed once per fold instead of once per
+   ## (inner_fold x tune_grid) branch.
+, tar_target(outer_fold_prejoined
+  , tibble(
+      outer_fold_id = folded_data_training$outer_fold_id
+    , data          = list(
+        folded_data_training$inner_folds[[1]] |>
+        left_join(train_data, by = "index")
+        )
+    )
+  , pattern = map(folded_data_training)
+  )
+
+, tar_target(outer_fold_prejoined_DEBUG
+  , tibble(
+      outer_fold_id = folded_data_training_DEBUG$outer_fold_id
+    , data          = list(
+        folded_data_training_DEBUG$inner_folds[[1]] |>
+        left_join(train_data, by = "index")
+        )
+    )
+  , pattern = map(folded_data_training_DEBUG)
+  )
+
+  ## Subset of inner fold + tune-grid IDs for each outer fold, one branch per outer fold.
+   ## Element-wise alignment with outer_fold_prejoined/_DEBUG via the same map pattern.
+, tar_target(inner_fold_ids_per_outer
+   , inner_fold_id_finalized |>
+     dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id)
+   , pattern = map(folded_data_training)
+  )
+, tar_target(inner_fold_ids_per_outer_DEBUG
+   , inner_fold_id_finalized_DEBUG |>
+     dplyr::filter(outer_fold_id == folded_data_training_DEBUG$outer_fold_id)
+   , pattern = map(folded_data_training_DEBUG)
+  )
+
   ## Fit across tuning_grid across all inner folds of all outer folds
-   ## NOTE: for debugging add _DEBUG after the two instances of inner_fold_id_finalized
+   ## NOTE: for debugging swap outer_fold_prejoined -> outer_fold_prejoined_DEBUG
+   ##       and inner_fold_ids_per_outer -> inner_fold_ids_per_outer_DEBUG
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
-      folded_data = folded_data_training |> dplyr::select(outer_fold_id, inner_folds)
-    , inner_ids   = inner_fold_id_finalized_DEBUG
-    , raw_data    = splitted_data$train_data[[1]]
-    , threshold   = positive_threshold
-    , weightings  = weightings_on_ones
-    , start_p     = 0.005
-    , id_cols     = id_cols
-    , out_dir     = outer_folds_dir
-    , overwrite   = TRUE
-    , DEBUG       = FALSE)
-    , pattern     = map(inner_fold_id_finalized_DEBUG)
-    , error       = "null"
-    , format      = "file")
+      prejoined_data = outer_fold_prejoined
+    , inner_ids_all  = inner_fold_ids_per_outer
+    , threshold      = positive_threshold
+    , weightings     = weightings_on_ones
+    , start_p        = 0.005
+    , id_cols        = id_cols
+    , out_dir        = outer_folds_dir
+    , overwrite      = TRUE
+    , DEBUG          = FALSE
+    , checktime_path = "outputs/timing")
+    , pattern        = map(outer_fold_prejoined, inner_fold_ids_per_outer)
+    , error          = "null"
+    , format         = "file")
 
   ## Join together all tuned inner folds and select the best per outer fold
 , tar_target(tuned_results_joined, join_tuned_inner_folds(
     inner_folds  = tuned_results_per_outer_fold
-  , training_dat = splitted_data$train_data[[1]]
     ## Choices of how to pick the optimal parameter set include
      ## 'mix' for a balance of pr_auc and logloss or 'binomial'
   , metric       = "mix"
@@ -358,10 +408,10 @@ model_tuning_targets <- tar_plan(
   , direction    = "max"))
 
   ## Fit each outer fold with the best inner fold hyperparameter for each of these outer folds
-   ## NOTE: for debugging add _DEBUG after the two instances of folded_data_training
+   ## NOTE: for debugging swap folded_data_training -> folded_data_training_DEBUG in both places
 , tar_target(tuned_results_across_outer_folds, tune_results_across_outer_folds(
     outer_data     = folded_data_training_DEBUG
-  , raw_data       = splitted_data
+  , train_data     = train_data
   , threshold      = positive_threshold
   , hyperparm_sets = tuned_results_joined
   , weightings     = weightings_on_ones
@@ -377,7 +427,6 @@ model_tuning_targets <- tar_plan(
   ## Extract the best parameter set
 , tar_target(finalized_hyperparameters, finalize_hyperparameters(
     outer_folds  = tuned_results_across_outer_folds
-  , training_dat = splitted_data$train_data[[1]]
     ## See notes for/in tuned_results_joined
   , metric       = "mix"
   , weightval    = 1E-5
@@ -393,7 +442,8 @@ model_fitting_targets <- tar_plan(
   tar_target(fitted_model, fit_model(
     final_hyper_set = finalized_hyperparameters
   , full_data       = folded_data_testing
-  , raw_data        = splitted_data_fitting
+  , train_data      = train_data_fitting
+  , test_data       = test_data_fitting
   , threshold       = positive_threshold
   , weightings      = weightings_on_ones
   , start_p         = 0.005
@@ -419,8 +469,9 @@ model_evaluation_targets <- tar_plan(
    ## to be a bit more RAM efficient (so targets doesn't have to load a bunch of
    ## not needed stuff to run calculate_variable_importance)
   tar_target(variable_importance_prep_a, prep_for_variable_importance_a(
-    model_dat     = model_out_for_eval
-  , splitted_data = splitted_data)
+    model_dat  = model_out_for_eval
+  , train_data = train_data
+  , test_data  = test_data)
   , pattern       = map(model_out_for_eval))
 
   ## Actually do the variable importance calculation, now loading far fewer targets
@@ -438,8 +489,9 @@ model_evaluation_targets <- tar_plan(
 
   ## Prep data for SHAP-by-forecast-interval (stratified by shapeName, month, and forecast_interval)
 , tar_target(shap_prep_a, prep_for_shap_a(
-    model_dat     = model_out_for_eval
-  , splitted_data = splitted_data)
+    model_dat  = model_out_for_eval
+  , train_data = train_data
+  , test_data  = test_data)
   , pattern       = map(model_out_for_eval))
 
   ## Compute per-row SHAP values and summarize as mean |SHAP| per feature per forecast_interval
@@ -460,7 +512,7 @@ model_evaluation_targets <- tar_plan(
    ## C) confusion matrix as a function of different probability cutoffs
 , tar_target(examined_fits_within_pan, examine_fits_within(
     model_out        = model_out_for_eval
-  , test_data        = splitted_data$test_data[[1]]
+  , test_data        = test_data
   , regions          = region_map
   , larger_districts = performance_hexes
   , africa_sf        = path_to_simplifed_regions
@@ -477,7 +529,7 @@ model_evaluation_targets <- tar_plan(
   ## Similar steps as above but for the chosen country of interest (see target which_countries)
 , tar_target(examined_fits_within_country, examine_fits_within(
     model_out        = model_out_for_eval
-  , test_data        = splitted_data$test_data[[1]]
+  , test_data        = test_data
   , regions          = region_map
   , larger_districts = performance_hexes
   , africa_sf        = path_to_simplifed_regions

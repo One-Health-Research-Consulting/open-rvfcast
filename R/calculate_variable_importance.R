@@ -80,12 +80,12 @@ for (i in seq_along(vartt)) {
 
 
 }
-prep_for_variable_importance_a  <- function(model_dat, splitted_data) {
+prep_for_variable_importance_a  <- function(model_dat, train_data, test_data) {
 
   ## Prep data for partial dependence plots
   dat_for_pdp <- rbind(
-    splitted_data$train_data[[1]]
-    , splitted_data$test_data[[1]] |> filter(index %in% model_dat$train_data[[1]])
+    train_data
+    , test_data |> filter(index %in% model_dat$train_data[[1]])
   ) |>
     dplyr::select(-cases) |>
     mutate(

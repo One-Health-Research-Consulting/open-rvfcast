@@ -66,17 +66,18 @@ calculate_shap_by_forecast_interval <- function(model_dat, final_hyper_set, fitd
 #' @title prep_for_shap_a
 
 #' @param model_dat row of model_out_for_eval
-#' @param splitted_data split_data output
+#' @param train_data Training data (splitted_data$train_data[[1]])
+#' @param test_data Test data (splitted_data$test_data[[1]])
 #' @return model_dat with dat_for_shap list-column appended
 #' @author Morgan Kain
 #' @export
 
-prep_for_shap_a <- function(model_dat, splitted_data) {
+prep_for_shap_a <- function(model_dat, train_data, test_data) {
 
   ## Data prep
   dat_for_shap <- rbind(
-    splitted_data$train_data[[1]]
-  , splitted_data$test_data[[1]] |> dplyr::filter(index %in% model_dat$train_data[[1]])
+    train_data
+  , test_data |> dplyr::filter(index %in% model_dat$train_data[[1]])
   ) |>
     dplyr::select(-cases) |>
     dplyr::mutate(
