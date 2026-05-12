@@ -48,19 +48,20 @@ r2_path <- function(object_key) {
 ## examined_fits_within_country saves component prediction files to outpath_for_app
 ## then built_app_components saves "data_for_app.Rds" to "www/"
 map_dat          <- readRDS(if (LOCAL) {
-    "data_for_app.rds"
+    "app_data_processed.Rds"
   } else {
-    r2_path("www/data_for_app.rds")
+    r2_path("www/app_data_processed.Rds")
   })
-cal_dat          <- map_dat$cal.tib[[1]]
-## !!! Temporarily drop mangroves, weird issue with those data, need to check before refitting
-shap.dat         <- map_dat$shap.tib[[1]] |> filter(feature != "mangroves")
-map_dat          <- map_dat$map.tib[[1]]
-dat.no_agg       <- map_dat$no_agg[[1]]
-dat.double_agg   <- map_dat$double_agg[[1]]
-dat.temporal_agg <- map_dat$temporal_agg[[1]]
-dat.spatial_agg  <- map_dat$spatial_agg[[1]]
-cal.double_agg   <- cal_dat$double_agg[[1]]
+
+parent_lookup <- map_dat$parent_lookup
+no_agg_with_big_hexes <- map_dat$no_agg_with_big_hexes
+avg_map_data <- map_dat$avg_map_data
+cal.double_agg <- map_dat$cal.double_agg
+dat.no_agg <- map_dat$dat.no_agg
+parent_lookup <- map_dat$parent_lookup
+dat.temporal_agg <- map_dat$dat.temporal_agg
+dat.spatial_agg <- map_dat$dat.spatial_agg
+shap.dat        <- map_dat$shap.dat
 
 #### Various setup needs =========================================================
 
@@ -73,101 +74,15 @@ prob_palette <- colorNumeric(
 
 true_out_color <- "#e34a33"   ## bold orange-red outline for outbreaks that occurred
 
-## Derive the parent -to- child hex lookup once
-make_parent_lookup <- function(small_ids, large_ids) {
-  ## Infer the resolution of the large hexes from the first valid id
-  large_res <- h3jsr::get_res(large_ids[1])
-  ## Map every small hex to its parent at the large resolution
-  parents   <- h3jsr::get_parent(small_ids, large_res)
-  data.frame(shapeName = small_ids, region_norm = parents, stringsAsFactors = FALSE)
-}
-build_parent_frame <- function(hex_ids, scale_up) {
-
-  child_parent <- data.frame(
-    small_ids  = hex_ids
-  , h3_address = h3jsr::get_parent(hex_ids, scale_up))
-
-  cell_to_polygon(unique(child_parent$h3_address), simple = FALSE) |>
-    left_join(child_parent, by = "h3_address") |>
-    rename(large_ids = h3_address)
-
-}
-
-## Build lookup (runs once at startup)
-parent_lookup <- make_parent_lookup(
-  small_ids = unique(dat.temporal_agg$shapeName)
-, large_ids = unique(dat.double_agg$region_norm))
-
-## Ensure date columns are Date class
-dat.no_agg$date         <- as.Date(dat.no_agg$date)
-dat.double_agg$date     <- as.Date(dat.double_agg$date)
-dat.temporal_agg$date   <- as.Date(dat.temporal_agg$date)
-dat.spatial_agg$date    <- as.Date(dat.spatial_agg$date)
-cal.double_agg$min_date <- as.Date(cal.double_agg$min_date)
-cal.double_agg$max_date <- as.Date(cal.double_agg$max_date)
-
 ## Deal with dates for slider bar
-sorted_dates <- sort(unique(dat.double_agg$date))
+sorted_dates <- sort(unique(dat.temporal_agg$date))
 date_index   <- data.frame(idx = seq_along(sorted_dates), date = sorted_dates)
 
 ## For labeling of dates for side plots
 num_lab <- scales::label_number(accuracy = 0.01)
 
-####
-## Setup for second tab
-####
-
-## Fully aggregated hexes across the full time series
-avg_map_data <- dat.double_agg |>
-  group_by(region_norm) |>
-  summarise(
-    prob_pred   = mean(prob_pred, na.rm = TRUE)
-  , an_outbreak = max(true_out)
-  , geometry    = dplyr::first(geometry)
-  , .groups     = "drop"
-  ) |>
-  st_as_sf()
-
-####
-## Setup for third tab
-####
-
 ## Unique forecast intervals
 sorted_forecast_intervals <- unique(dat.spatial_agg$forecast_interval)
-
-## Get even larger hexes for third tab
-grand_to_child <- build_parent_frame(
-  hex_ids  = unique(dat.temporal_agg$shapeName)
-, scale_up = 2)
-
-no_agg_with_big_hexes <- dat.spatial_agg |>
-  as.data.frame() |>
-  dplyr::select(-geometry) |>
-  rename(small_ids = region_norm) #|>
-  #left_join(., grand_to_child)
-
-#uni_large_hex_geom <- no_agg_with_big_hexes |>
-#  group_by(large_ids) |>
-#  dplyr::slice(1) |>
-#  dplyr::select(large_ids, geometry)
-
-## Biggest hexes for map for third tab for click for summarizing forecast interval
- ## success to largest hex
-#average_map_big_hexes <- no_agg_with_big_hexes |>
-#  group_by(large_ids, forecast_interval) |>
-#  summarize(
-#    prob_pred   = mean(prob_pred) |> sqrt()
-#  , an_outbreak = max(true_out)
-#  ) |>
-#  ungroup() |>
-#  left_join(., uni_large_hex_geom, by = "large_ids") |>
-#  st_as_sf()
-
-average_map_big_hexes <- avg_map_data |> rename(small_ids = region_norm)
-
-#no_agg_with_big_hexes <- no_agg_with_big_hexes |>
-#  as.data.frame() |>
-#  dplyr::select(-geometry)
 
 ## Serve the app's own directory so guide HTML files are reachable via /guides/
 addResourcePath("guides", ".")
@@ -410,10 +325,6 @@ ui <- fluidPage(
             , div(class = "card-label", "Overall Predicted Outbreak Probability across Forecast Horizons")
             , div(class = "plot-inner", plotOutput("interval_preds_overall", height = "310px")
             ))
-#      , div(class = "plot-card"
-#            , div(class = "card-label", "Hex-Specific Predicted Outbreak Probability across Forecast Horizons")
-#            , div(class = "plot-inner", plotOutput("interval_preds_hex", height = "310px")
-#            ))
       , div(class = "plot-card"
             , div(class = "card-label", "Hex-Specific Predicted Outbreak Probability for a Forecast Horizon")
             , div(class = "plot-inner", plotOutput("interval_preds_hex_single", height = "310px")
@@ -564,7 +475,9 @@ server <- function(input, output, session) {
     leafletProxy("average_map_big_hexes") |>
       clearGroup("selected") |>
       addPolygons(
-        data = average_map_big_hexes |> filter(small_ids == clicked_hex_fi())
+        data = avg_map_data |>
+          rename(small_ids = region_norm) |>
+          filter(small_ids == clicked_hex_fi())
       , fill = FALSE
       , color = "#ffff00"
       , weight = 3
@@ -807,7 +720,10 @@ server <- function(input, output, session) {
 
   ## PANEL 3: Average map for the third panel
   output$average_map_big_hexes <- renderLeaflet({
-    leaflet(average_map_big_hexes) |>
+    leaflet(
+        avg_map_data |>
+        rename(small_ids = region_norm)
+        ) |>
       addProviderTiles(
         providers$CartoDB.DarkMatter,
         options = tileOptions(opacity = 0.85)
@@ -821,8 +737,8 @@ server <- function(input, output, session) {
     req(input$average_map_big_hexes_bounds)
 
     ## Split into event / non-event for outline styling
-    events     <- average_map_big_hexes |> filter(an_outbreak == 1)
-    non_events <- average_map_big_hexes |> filter(an_outbreak != 1)
+    events     <- avg_map_data |> rename(small_ids = region_norm) |> filter(an_outbreak == 1)
+    non_events <- avg_map_data |> rename(small_ids = region_norm) |> filter(an_outbreak != 1)
 
       proxy <- leafletProxy("average_map_big_hexes") |>
         clearShapes() |>
@@ -896,7 +812,9 @@ server <- function(input, output, session) {
       if (!is.null(clicked_hex_fi())) {
         leafletProxy("average_map_big_hexes") |>
           addPolygons(
-            data = average_map_big_hexes |> filter(small_ids == clicked_hex_fi())
+            data = avg_map_data |>
+              rename(small_ids = region_norm) |>
+              filter(small_ids == clicked_hex_fi())
           , fill = FALSE
           , color = "#ffff00"
           , weight = 3
@@ -1118,7 +1036,8 @@ Predicted
       filter(region_norm == hex_id) |>
       pull(shapeName)
 
-    ts_data <- dat.no_agg |> filter(shapeName %in% children) |>
+    ts_data <- dat.no_agg |>
+      filter(shapeName %in% children) |>
       mutate(forecast_interval = as.factor(forecast_interval))
 
     shiny::validate(need(nrow(ts_data) > 0, "No sub-hex data for this selection."))
@@ -1220,47 +1139,6 @@ Predicted
             , panel.grid.major = element_line(color = "grey90")
             , panel.grid.minor = element_line(color = "grey95")
           )
-
-  }, bg = "#16181f")
-
-  ## PANEL 3: Forecast probability by hex
-  output$interval_preds_hex <- renderPlot({
-
-    req(clicked_hex_fi())
-
-    hex_id <- clicked_hex_fi()
-
-    fi_data <- no_agg_with_big_hexes |> filter(small_ids == hex_id)
-
-    shiny::validate(need(nrow(fi_data) > 0, "No sub-hex data for this selection."))
-
-    d.t <- fi_data |>
-      mutate(
-        forecast_interval = as.factor(forecast_interval)
-      , true_out          = plyr::mapvalues(true_out, from = c(0, 1), to = c("No", "Yes"))
-      , true_out          = as.factor(true_out)
-      )
-
-        ggplot(d.t, aes(forecast_interval, prob_pred)) +
-          annotate("rect", xmin = -Inf, xmax = Inf, ymin = 0.001, ymax = 0.01, fill = "grey80", alpha = 0.2) +
-          annotate("rect", xmin = -Inf, xmax = Inf, ymin = 0.01, ymax = 0.1, fill = "grey80", alpha = 0.35) +
-          annotate("rect", xmin = -Inf, xmax = Inf, ymin = 0.1, ymax = 0.5, fill = "grey80", alpha = 0.50) +
-          annotate("rect", xmin = -Inf, xmax = Inf, ymin = 0.5, ymax = 1, fill = "grey80", alpha = 0.65) +
-          geom_violin(aes(fill = true_out), colour = NA, alpha = 0.4) +
-          scale_fill_brewer(
-            palette = "Dark2", name = "Outbreak") +
-          theme(
-            axis.text.x  = element_text(size = 10)
-          , axis.text.y  = element_text(size = 10)
-          , axis.title.x = element_text(size = 12)
-          , axis.title.y = element_text(size = 12)
-          , panel.background = element_rect(fill = "white")
-          , panel.grid.major = element_line(color = "grey90")
-          , panel.grid.minor = element_line(color = "grey95")
-          ) +
-          scale_y_log10() +
-          xlab("Forecast Interval (Days)") +
-          ylab("Predicted Outbreak Probability")
 
   }, bg = "#16181f")
 

@@ -49,3 +49,90 @@ saveRDS(hex_sf, "www/hex_sf.rds")
 write_parquet(df_avg, "www/df_avg.parquet", compression = "gzip", compression_level = 5)
 saveRDS(hex_summary, "www/hex_summary.rds")
 
+map_dat <- readRDS("www/data_for_app.rds")
+
+cal_dat <- map_dat$cal.tib[[1]]
+## !!! Temporarily drop mangroves, weird issue with those data, need to check before refitting
+shap.dat <- map_dat$shap.tib[[1]] |>
+    filter(feature != "mangroves")
+map_dat <- map_dat$map.tib[[1]]
+dat.no_agg <- map_dat$no_agg[[1]] |>
+    as.data.frame() |>
+    dplyr::select(-geometry)
+dat.double_agg <- map_dat$double_agg[[1]]
+dat.temporal_agg <- map_dat$temporal_agg[[1]]
+dat.spatial_agg <- map_dat$spatial_agg[[1]]
+cal.double_agg <- cal_dat$double_agg[[1]]
+
+rm(cal_dat)
+
+## Derive the parent -to- child hex lookup once
+make_parent_lookup <- function(small_ids, large_ids) {
+    ## Infer the resolution of the large hexes from the first valid id
+    large_res <- h3jsr::get_res(large_ids[1])
+    ## Map every small hex to its parent at the large resolution
+    parents <- h3jsr::get_parent(small_ids, large_res)
+    data.frame(shapeName = small_ids, region_norm = parents, stringsAsFactors = FALSE)
+}
+build_parent_frame <- function(hex_ids, scale_up) {
+    child_parent <- data.frame(
+        small_ids = hex_ids,
+        h3_address = h3jsr::get_parent(hex_ids, scale_up)
+    )
+
+    cell_to_polygon(unique(child_parent$h3_address), simple = FALSE) |>
+        left_join(child_parent, by = "h3_address") |>
+        rename(large_ids = h3_address)
+}
+
+## Build lookup (runs once at startup)
+parent_lookup <- make_parent_lookup(
+    small_ids = unique(dat.temporal_agg$shapeName),
+    large_ids = unique(dat.double_agg$region_norm)
+)
+
+## Ensure date columns are Date class
+dat.no_agg$date <- as.Date(dat.no_agg$date)
+dat.double_agg$date <- as.Date(dat.double_agg$date)
+dat.temporal_agg$date <- as.Date(dat.temporal_agg$date)
+dat.spatial_agg$date <- as.Date(dat.spatial_agg$date)
+cal.double_agg$min_date <- as.Date(cal.double_agg$min_date)
+cal.double_agg$max_date <- as.Date(cal.double_agg$max_date)
+
+####
+## Setup for second tab
+####
+
+## Fully aggregated hexes across the full time series
+avg_map_data <- dat.double_agg |>
+    group_by(region_norm) |>
+    summarise(
+        prob_pred = mean(prob_pred, na.rm = TRUE),
+        an_outbreak = max(true_out),
+        geometry = dplyr::first(geometry),
+        .groups = "drop"
+    ) |>
+    st_as_sf()
+
+rm(dat.double_agg)
+gc()
+
+no_agg_with_big_hexes <- dat.spatial_agg |>
+    as.data.frame() |>
+    dplyr::select(-geometry) |>
+    rename(small_ids = region_norm)
+
+saveRDS(
+  list(
+  parent_lookup = parent_lookup
+, no_agg_with_big_hexes = no_agg_with_big_hexes
+, avg_map_data = avg_map_data
+, cal.double_agg = cal.double_agg
+, dat.no_agg = dat.no_agg
+, parent_lookup = parent_lookup
+, dat.temporal_agg = dat.temporal_agg
+, dat.spatial_agg = dat.spatial_agg
+, shap.dat        = shap.dat
+  )
+, "www/app_data_processed.Rds"
+)
