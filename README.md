@@ -38,10 +38,11 @@ OpenRVFcast pipeline: 1) the **Data Acquisition Module**, 2) the **Data
 Preparation Module**, 3) and the **Modeling Framework Module**.
 
 Some brief info on each of these modules are described below, while each
-is described in detail in docs/openRVFcast_Walkthrough.docx.
+is described in detail in documentation/openRVFcast_Walkthrough.docx.
 
-For further detail on the data and model see docs/model_supplement.html
-(created from docs/model_supplement.qmd).
+For further detail on the data and model see
+documentation/model_supplement.html (created from
+documentation/model_supplement.qmd).
 
 Each module is orchestrated using the `targets` package in R, a powerful
 tool for creating reproducible and efficient data analysis workflows. By
@@ -70,12 +71,13 @@ GitHub repository which is organized with the following structure:
   are .gitignored and are available with access to S3-compatible cloud
   storage or the raw data can be downloaded and processed.
 - `R/` contains functions used in this analysis.
-- `docs/` contains documentation:
+- `documentation/` contains documentation:
   - `openRVFcast_Walkthrough.docx` - comprehensive details on the full
     modeling pipeline
   - `dynamic_branching_guide.md` - comprehensive guide to the dynamic
     branching implementation
   - `manual.md` - some additional info for running the pipeline
+- `docs/` contains shinylive app for visualizing predictions
 - `outputs/` contains visualization outputs (maps, animations) and
   stores intermediate saved products created in the modeling module
 - `www/` contains R shiny application for visualizing predictions and
@@ -109,7 +111,7 @@ folder, it is guaranteed to contain all predictors for that date.
 
 For more details on how the pipeline handles data dependencies and
 incremental updates, see
-[`docs/dynamic_branching_guide.md`](docs/dynamic_branching_guide.md).
+[`documentation/dynamic_branching_guide.md`](documentation/dynamic_branching_guide.md).
 
 While the data acquisition module requires the processing of large
 datasets, the final cleaned data can be accessed directly from the
@@ -172,8 +174,9 @@ storage). The pipeline will still run without access to cloud storage,
 but users can add their own S3-compatible storage credentials to the
 `.env` file to enable cloud storage and collaboration with team members.
 
-For complete details see docs/openRVFcast_Walkthrough.docx and
-docs/model_supplement.html (created from docs/model_supplement.qmd).
+For complete details see documentation/openRVFcast_Walkthrough.docx and
+documentation/model_supplement.html (created from
+documentation/model_supplement.qmd).
 
 ## 2. Data Preparation Module
 
@@ -184,8 +187,9 @@ module are combining covariates with cases, building lagged variables,
 and collapsing data into w/e spatial aggregation is chosen (currently H3
 hex or ADM2).
 
-For complete details see docs/openRVFcast_Walkthrough.docx and
-docs/model_supplement.html (created from docs/model_supplement.qmd).
+For complete details see documentation/openRVFcast_Walkthrough.docx and
+documentation/model_supplement.html (created from
+documentation/model_supplement.qmd).
 
 ## 3. Modeling Module
 
@@ -193,18 +197,19 @@ This module contains all of the modeling steps from hyperparameter
 tuning through to final model fitting, prediction visualization, and
 automated report generation.
 
-For complete details see docs/openRVFcast_Walkthrough.docx and
-docs/model_supplement.html (created from docs/model_supplement.qmd).
+For complete details see documentation/openRVFcast_Walkthrough.docx and
+documentation/model_supplement.html (created from
+documentation/model_supplement.qmd).
 
 A key aspect of the modeling pipeline is our spatial and temporal
 splitting strategy for cross validation (see
-docs/openRVFcast_Walkthrough.docx). Splitting data into training,
-validation, and test sets is an important step for building robust and
-reliable models. The training set is used to learn model parameters, the
-validation set helps fine-tune hyperparameters and prevent overfitting,
-and the test set provides an unbiased evaluation of the model’s
-performance on unseen data. Proper splitting ensures the model
-generalizes well to new data, avoiding issues like data leakage or
+documentation/openRVFcast_Walkthrough.docx). Splitting data into
+training, validation, and test sets is an important step for building
+robust and reliable models. The training set is used to learn model
+parameters, the validation set helps fine-tune hyperparameters and
+prevent overfitting, and the test set provides an unbiased evaluation of
+the model’s performance on unseen data. Proper splitting ensures the
+model generalizes well to new data, avoiding issues like data leakage or
 over-optimistic performance estimates.
 
 ### More resources
@@ -212,6 +217,6 @@ over-optimistic performance estimates.
 Follow the links for more information about:
 
 - [`targets`](https://ecohealthalliance.github.io/eha-ma-handbook/3-projects.html#targets)
-- [`renv`](https://ecohealthalliance.github.io/eha-ma-handbook/3-projects.html#package-management-with-renv)  
+- [`renv`](https://ecohealthalliance.github.io/eha-ma-handbook/3-projects.html#package-management-with-renv)
 - [`git-crypt`](https://ecohealthalliance.github.io/eha-ma-handbook/16-encryption.html)
 - [`Reproducible workflows`](https://github.com/ecohealthalliance/building-blocks-of-reproducibility)
