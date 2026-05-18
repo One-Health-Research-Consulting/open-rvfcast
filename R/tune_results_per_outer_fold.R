@@ -35,10 +35,10 @@ tune_results_per_outer_fold <- function(prejoined_data, inner_ids_all, threshold
 
 checktime_tibble <- tibble(user = numeric(0), sys = numeric(0), elapsed = numeric(0))
 
+checktime_path.full <- paste0(checktime_path, "/outer_fold_", outer_fold_id, ".csv")
+
   for (i in seq_len(nrow(inner_ids_all))) {
-
-checktime <- system.time({
-
+    
     inner_ids   <- inner_ids_all[i, ]
     inner_id    <- inner_ids$inner_fold_id
     tuning_grid <- inner_ids |> dplyr::select(-contains("fold_id"))
@@ -63,9 +63,9 @@ checktime <- system.time({
       save_filenames[i] <- save_filename
       next
     }
-
-    checktime_path.full <- paste0(checktime_path, "/outer_fold_", outer_fold_id, ".csv")
-
+    
+    checktime <- system.time({
+    
     ## Inner training data: exclude one spatial cluster
     inner_tbl_train <- joined_data |>
       dplyr::filter(cluster != inner_id) |>

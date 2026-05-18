@@ -949,7 +949,11 @@ Recorded") +
           , panel.grid.major = element_line(color = "grey90")
           , panel.grid.minor = element_line(color = "grey95")
           ) +
-          xlab("Predicted Probability of Outbreak (logit scale)") +
+          scale_x_continuous(
+            breaks = qlogis(c(0.001, 0.01, 0.1, 0.5, 0.9)),
+            labels = c("0.1%", "1%", "10%", "50%", "90%"),
+            name   = "P(outbreak)"
+          ) +
           ylab("Density") +
           ggtitle(paste(
             "Prediction Date = "
@@ -977,8 +981,8 @@ Recorded") +
         scale_size_continuous(name = "Number
 Predicted
 (log)") +
-        scale_x_log10() +
-        scale_y_log10() +
+        scale_x_log10(labels = scales::label_percent()) +
+        scale_y_log10(labels = scales::label_percent()) +
         labs(y = "Forecasted outbreak probability", x = "Observed outbreak rate", color = "") +
         theme(
           axis.text = element_text(size = 14)
@@ -1024,7 +1028,10 @@ Predicted
       scale_colour_brewer(palette = "Dark2", name = "Forecast Interval") +
       xlab("Date") +
       ylab("Predicted Outbreak Probability") +
-      scale_y_log10() +
+      scale_y_log10(
+        breaks = c(0.001, 0.01, 0.1, 0.5),
+        labels = c("0.1%", "1%", "10%", "50%")
+      ) +
       geom_vline(data = ts_data |> filter(true_out == 1)
                  , aes(xintercept = date, colour = forecast_interval, linetype = shapeName)
                  , alpha = 0.4, linetype = "dotdash") +
@@ -1064,7 +1071,10 @@ Predicted
       scale_colour_brewer(palette = "Dark2", name = "Forecast Interval") +
       xlab("Date") +
       ylab("Predicted Outbreak Probability") +
-      scale_y_log10() +
+      scale_y_log10(
+        breaks = c(0.001, 0.01, 0.1, 0.5),
+        labels = c("0.1%", "1%", "10%", "50%")
+      ) +
       geom_vline(data = ts_data |> filter(true_out == 1)
                  , aes(xintercept = date, colour = forecast_interval)
                  , alpha = 0.4, linetype = "dotdash") +
@@ -1095,7 +1105,10 @@ Predicted
           geom_violin(aes(fill = true_out), colour = NA, alpha = 0.4) +
           scale_fill_brewer(
             palette = "Dark2", name = "Outbreak") +
-          scale_y_log10() +
+          scale_y_log10(
+            breaks = c(0.001, 0.01, 0.1, 0.5),
+            labels = c("0.1%", "1%", "10%", "50%")
+          ) +
           xlab("Forecast Interval (Days)") +
           ylab("Predicted Outbreak Probability") +
           theme(
@@ -1144,7 +1157,11 @@ Recorded") +
         , panel.grid.major = element_line(color = "grey90")
         , panel.grid.minor = element_line(color = "grey95")
         ) +
-        xlab("Predicted Probability of Outbreak (logit scale)") +
+        scale_x_continuous(
+          breaks = qlogis(c(0.001, 0.01, 0.1, 0.5, 0.9)),
+          labels = c("0.1%", "1%", "10%", "50%", "90%"),
+          name   = "P(outbreak)"
+        ) +
         ylab("Density") +
         ggtitle(paste(
           "Forecast Interval = "
@@ -1197,7 +1214,7 @@ Recorded") +
     scale_x_continuous(breaks = sort(unique(d.t$forecast_interval_num))) +
     labs(x = "Forecast interval (days)", y = "Mean |SHAP|", color = "Feature") +
     theme_minimal() +
-    scale_y_log10()
+    scale_y_log10(labels = scales::label_number())
 
  }, bg = "#16181f"
  )
@@ -1216,7 +1233,7 @@ Recorded") +
              scale_x_continuous(breaks = sort(unique(d.t$forecast_interval_num))) +
              labs(x = "Forecast interval (days)", y = "Mean |SHAP|", color = "Feature") +
              theme_minimal() +
-             scale_y_log10()
+             scale_y_log10(labels = scales::label_number())
      },
      bg = "#16181f"
  )

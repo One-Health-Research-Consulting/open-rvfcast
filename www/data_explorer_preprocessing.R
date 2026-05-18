@@ -136,3 +136,12 @@ saveRDS(
   )
 , "www/app_data_processed.Rds"
 )
+
+install.packages("shinylive")
+
+shinylive::export(
+    appdir  = "shinylive/prediction_explorer",
+    destdir = "docs"
+)
+
+shinylive::app_start("docs")

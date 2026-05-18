@@ -382,7 +382,7 @@ model_tuning_targets <- tar_plan(
     , start_p        = 0.005
     , id_cols        = id_cols
     , out_dir        = outer_folds_dir
-    , overwrite      = TRUE
+    , overwrite      = FALSE
     , DEBUG          = FALSE
     , checktime_path = "outputs/timing")
     , pattern        = map(outer_fold_prejoined, inner_fold_ids_per_outer)
