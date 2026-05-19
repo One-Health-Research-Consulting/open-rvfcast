@@ -343,43 +343,23 @@ ui <- fluidPage(
         p(class = "app-title", "Variable Importance by Forecast Horizon"),
         p(class = "app-subtitle", "VI | forecast horizon"))
 
-  , div(class = "date-bar"
-          , shinyWidgets::sliderTextInput(
-            inputId  = "selected_forecast_interval_tab4"
-          , label    = NULL
-          , choices  = as.character(sorted_forecast_intervals)
-          , selected = as.character(sorted_forecast_intervals[1])
-          , width    = "100%"
-          , animate  = FALSE
-          , grid     = TRUE
-          )
-    )
-
   , fluidRow(
 
-    ## left: VI figures 1-2
+    ## left: SHAP heatmap
     column(
       6
       , div(class = "plot-card"
-            , div(class = "card-label", "Shap variable importance raw values")
-            , div(class = "plot-inner", plotOutput("shap_heatmap_raw", height = "310px")
-            ))
-      , div(class = "plot-card"
-            , div(class = "card-label", "Shap variable importance relative values")
-            , div(class = "plot-inner", plotOutput("shap_heatmap_rel", height = "310px")
+            , div(class = "card-label", "Shap variable importance")
+            , div(class = "plot-inner", plotOutput("shap_heatmap_raw", height = "600px")
             ))
     )
 
-    ## right VI figures 3-4
+    ## right: combined SHAP lineplot
     , column(
       6
       , div(class = "plot-card"
-            , div(class = "card-label", "Shap variable importance forecast covariates")
-            , div(class = "plot-inner", plotOutput("shap_lineplot_A", height = "310px")
-            ))
-      , div(class = "plot-card"
-            , div(class = "card-label", "Shap variable importance non-forecast covariates")
-            , div(class = "plot-inner", plotOutput("shap_lineplot_B", height = "310px")
+            , div(class = "card-label", "Shap feature importance by forecast horizon")
+            , div(class = "plot-inner", plotOutput("shap_lineplot", height = "600px")
             ))
     ))
 
@@ -416,11 +396,6 @@ server <- function(input, output, session) {
     input$selected_forecast_interval_tab3
   })
 
-  ## Reactive: forecast interval for tab4
-  selected_forecast_interval_tab4 <- reactive({
-      input$selected_forecast_interval_tab4
-  })
-
   ## Reactive: date-filtered spatial-agg layer
   map_data <- reactive({
     dat.spatial_agg |> filter(date == selected_date(), forecast_interval == selected_forecast_interval_tab1())
@@ -433,6 +408,19 @@ server <- function(input, output, session) {
   ## Reactive: probabilities for a given forecast window
   forecast_filtered <- reactive({
     no_agg_with_big_hexes |> filter(forecast_interval == selected_forecast_interval_tab3())
+  })
+
+  ## Reactive: forecast-interval-filtered map data for Tab 3 (aggregated over time within horizon)
+  avg_map_data_fi <- reactive({
+    dat.spatial_agg |>
+      filter(forecast_interval == selected_forecast_interval_tab3()) |>
+      group_by(region_norm) |>
+      summarise(
+        prob_pred   = mean(prob_pred, na.rm = TRUE),
+        an_outbreak = max(true_out),
+        .groups     = "drop"
+      ) |>
+      rename(small_ids = region_norm)
   })
 
   ## Reactive: clicked hex id
@@ -474,8 +462,7 @@ server <- function(input, output, session) {
     leafletProxy("average_map_big_hexes") |>
       clearGroup("selected") |>
       addPolygons(
-        data = avg_map_data |>
-          rename(small_ids = region_norm) |>
+        data = avg_map_data_fi() |>
           filter(small_ids == clicked_hex_fi())
       , fill = FALSE
       , color = "#ffff00"
@@ -719,10 +706,7 @@ server <- function(input, output, session) {
 
   ## PANEL 3: Average map for the third panel
   output$average_map_big_hexes <- renderLeaflet({
-    leaflet(
-        avg_map_data |>
-        rename(small_ids = region_norm)
-        ) |>
+    leaflet(options = leafletOptions(zoomControl = TRUE)) |>
       addProviderTiles(
         providers$CartoDB.DarkMatter,
         options = tileOptions(opacity = 0.85)
@@ -730,14 +714,16 @@ server <- function(input, output, session) {
       setView(lng = 15, lat = -4, zoom = 3)
   })
 
-  ## PANEL 3: Update polygons when date or data changes
+  ## PANEL 3: Update polygons when forecast interval or data changes
   shiny::observe({
 
     req(input$average_map_big_hexes_bounds)
 
+    d <- avg_map_data_fi()
+
     ## Split into event / non-event for outline styling
-    events     <- avg_map_data |> rename(small_ids = region_norm) |> filter(an_outbreak == 1)
-    non_events <- avg_map_data |> rename(small_ids = region_norm) |> filter(an_outbreak != 1)
+    events     <- d |> filter(an_outbreak == 1)
+    non_events <- d |> filter(an_outbreak != 1)
 
       proxy <- leafletProxy("average_map_big_hexes") |>
         clearShapes() |>
@@ -811,8 +797,7 @@ server <- function(input, output, session) {
       if (!is.null(clicked_hex_fi())) {
         leafletProxy("average_map_big_hexes") |>
           addPolygons(
-            data = avg_map_data |>
-              rename(small_ids = region_norm) |>
+            data = avg_map_data_fi() |>
               filter(small_ids == clicked_hex_fi())
           , fill = FALSE
           , color = "#ffff00"
@@ -1216,58 +1201,31 @@ Recorded") +
 
  }, bg = "#16181f")
 
-## PANEL 4: Temp VI plot 2
- output$shap_heatmap_rel <- renderPlot({
+ ## PANEL 4: Combined SHAP lineplot; forecast covariates distinguished by bolder lines/points
+ output$shap_lineplot <- renderPlot({
 
-  ggplot(shap.dat, aes(x = forecast_interval, y = feature, fill = rel_shap)) +
-    geom_tile() +
-    scale_fill_viridis_c(name = "Relative SHAP") +
-    labs(x = "Forecast interval (days)", y = NULL) +
-    theme_minimal() +
-    theme(
-        axis.text.x = element_text(size = 10)
-      , axis.text.y = element_text(size = 8)
+  d.t <- shap.dat |>
+    dplyr::mutate(
+      forecast_interval_num = as.numeric(as.character(forecast_interval)),
+      is_forecast           = grepl("forecast", feature)
     )
 
- }, bg = "#16181f"
- )
-
- ## PANEL 4: Lineplot for forecast covariates
- output$shap_lineplot_A <- renderPlot({
-
-  d.t <- shap.dat |> dplyr::mutate(forecast_interval_num = as.numeric(as.character(forecast_interval)))
-
-  ggplot(
-    d.t |> filter(grepl("forecast", feature))
-  , aes(x = forecast_interval_num, y = mean_abs_shap, color = feature)) +
-    geom_line() +
-    geom_point() +
+  ggplot(d.t, aes(x = forecast_interval_num, y = mean_abs_shap, color = feature)) +
+    geom_line(aes(linewidth = is_forecast)) +
+    geom_point(aes(size = is_forecast)) +
+    scale_linewidth_manual(values = c(`FALSE` = 0.6, `TRUE` = 1.8), guide = "none") +
+    scale_size_manual(values = c(`FALSE` = 1.5, `TRUE` = 3.5), guide = "none") +
     scale_x_continuous(breaks = sort(unique(d.t$forecast_interval_num))) +
-    labs(x = "Forecast interval (days)", y = "Mean |SHAP|", color = "Feature") +
-    theme_minimal() +
-    scale_y_log10(labels = scales::label_number())
+    scale_y_log10(labels = scales::label_number()) +
+    labs(
+      x       = "Forecast interval (days)"
+    , y       = "Mean |SHAP|"
+    , color   = "Feature"
+    , caption = "Bold lines/points = forecast covariates"
+    ) +
+    theme_minimal()
 
- }, bg = "#16181f"
- )
-
- ## PANEL 4: Lineplot for non-forecast covariates
- output$shap_lineplot_B <- renderPlot(
-     {
-         d.t <- shap.dat |> dplyr::mutate(forecast_interval_num = as.numeric(as.character(forecast_interval)))
-
-         ggplot(
-             d.t |> filter(!grepl("forecast", feature)),
-             aes(x = forecast_interval_num, y = mean_abs_shap, color = feature)
-         ) +
-             geom_line() +
-             geom_point() +
-             scale_x_continuous(breaks = sort(unique(d.t$forecast_interval_num))) +
-             labs(x = "Forecast interval (days)", y = "Mean |SHAP|", color = "Feature") +
-             theme_minimal() +
-             scale_y_log10(labels = scales::label_number())
-     },
-     bg = "#16181f"
- )
+ }, bg = "#16181f")
 
 }
 

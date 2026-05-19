@@ -38,7 +38,7 @@ checktime_tibble <- tibble(user = numeric(0), sys = numeric(0), elapsed = numeri
 checktime_path.full <- paste0(checktime_path, "/outer_fold_", outer_fold_id, ".csv")
 
   for (i in seq_len(nrow(inner_ids_all))) {
-    
+
     inner_ids   <- inner_ids_all[i, ]
     inner_id    <- inner_ids$inner_fold_id
     tuning_grid <- inner_ids |> dplyr::select(-contains("fold_id"))
@@ -63,9 +63,9 @@ checktime_path.full <- paste0(checktime_path, "/outer_fold_", outer_fold_id, ".c
       save_filenames[i] <- save_filename
       next
     }
-    
+
     checktime <- system.time({
-    
+
     ## Inner training data: exclude one spatial cluster
     inner_tbl_train <- joined_data |>
       dplyr::filter(cluster != inner_id) |>
