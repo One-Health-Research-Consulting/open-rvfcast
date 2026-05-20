@@ -18,14 +18,15 @@ temporal_covars <- all_cols[c(48)]
 df_raw$date <- as.Date(df_raw$date)
 
 ## Build geometry from H3
-hex_sf <- df_raw %>%
-  distinct(shapeName) %>%
-  mutate(geometry = h3jsr::cell_to_polygon(shapeName, simple = FALSE) %>% pull(geometry)) %>%
+hex_sf <- df_raw |>
+  distinct(shapeName) |>
+  mutate(geometry = h3jsr::cell_to_polygon(shapeName, simple = FALSE) |>
+  pull(geometry)) |>
   st_as_sf()
 
 ## Average across forecast intervals (default version)
-df_avg <- df_raw %>%
-  group_by(shapeName, date) %>%
+df_avg <- df_raw |>
+  group_by(shapeName, date) |>
   summarise(
     across(
       all_of(c(static_covars, temporal_covars, lagged_covars, forecast_covars))
@@ -33,14 +34,14 @@ df_avg <- df_raw %>%
     , .groups = "drop")
 
 ## Hex-level summary (for map + scatter)
-hex_summary <- df_avg %>%
-  group_by(shapeName) %>%
-  summarise(across(-date, mean), .groups = "drop") %>%
-  left_join(hex_sf, by = "shapeName") %>%
+hex_summary <- df_avg |>
+  group_by(shapeName) |>
+  summarise(across(-date, mean), .groups = "drop") |>
+  left_join(hex_sf, by = "shapeName") |>
   st_as_sf()
 
 ## Long format for density / scatter
-df_long <- df_avg %>%
+df_long <- df_avg |>
   pivot_longer(cols = -c(shapeName, date),
                names_to = "variable",
                values_to = "value")
@@ -49,22 +50,20 @@ saveRDS(hex_sf, "www/hex_sf.rds")
 write_parquet(df_avg, "www/df_avg.parquet", compression = "gzip", compression_level = 5)
 saveRDS(hex_summary, "www/hex_summary.rds")
 
-map_dat <- readRDS("www/data_for_app.rds")
+map_dat <- qread("www/data_for_app.qs")
 
-cal_dat <- map_dat$cal.tib[[1]]
-## !!! Temporarily drop mangroves, weird issue with those data, need to check before refitting
-shap.dat <- map_dat$shap.tib[[1]] |>
-    filter(feature != "mangroves")
-map_dat <- map_dat$map.tib[[1]]
-dat.no_agg <- map_dat$no_agg[[1]] |>
+cal.dat  <- map_dat$cal.tib[[1]]
+shap.dat <- map_dat$shap.tib[[1]]
+map.dat  <- map_dat$map.tib[[1]]
+dat.no_agg <- map.dat$no_agg[[1]] |>
     as.data.frame() |>
     dplyr::select(-geometry)
-dat.double_agg <- map_dat$double_agg[[1]]
-dat.temporal_agg <- map_dat$temporal_agg[[1]]
-dat.spatial_agg <- map_dat$spatial_agg[[1]]
-cal.double_agg <- cal_dat$double_agg[[1]]
+dat.double_agg <- map.dat$double_agg[[1]]
+dat.temporal_agg <- map.dat$temporal_agg[[1]]
+dat.spatial_agg <- map.dat$spatial_agg[[1]]
+cal.double_agg <- cal.dat$double_agg[[1]]
 
-rm(cal_dat)
+rm(cal.dat)
 
 ## Derive the parent -to- child hex lookup once
 make_parent_lookup <- function(small_ids, large_ids) {
