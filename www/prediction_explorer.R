@@ -62,6 +62,9 @@ dat.temporal_agg <- map_dat$dat.temporal_agg
 dat.spatial_agg <- map_dat$dat.spatial_agg
 shap.dat        <- map_dat$shap.dat
 
+## Country border outlines for map overlay (loaded once at startup)
+countries_sf    <- sf::read_sf("countries.geojson")
+
 #### Various setup needs =========================================================
 
 ## Build colours
@@ -502,7 +505,7 @@ server <- function(input, output, session) {
   output$main_map <- renderLeaflet({
     leaflet(options = leafletOptions(zoomControl = TRUE)) |>
       addProviderTiles(
-        providers$CartoDB.DarkMatter,
+        providers$CartoDB.DarkMatterNoLabels,
         options = tileOptions(opacity = 0.85)
       ) |>
       setView(lng = 15, lat = -4, zoom = 3)
@@ -530,14 +533,14 @@ server <- function(input, output, session) {
           data        = non_events
         , layerId     = ~region_norm
         , fillColor    = ~prob_palette(prob_pred)
-        , fillOpacity  = 0.75
+        , fillOpacity  = 0.6
         , color       = "#2a2d3a"
         , weight      = 0.8
         , opacity     = 1
         , highlightOptions = highlightOptions(
             weight       = 2
           , color        = "#ffffff"
-          , fillOpacity   = 0.9
+          , fillOpacity   = 0.85
           , bringToFront = TRUE)
           , label = ~paste0(
             "<b>", region_norm, "</b><br>"
@@ -587,6 +590,17 @@ server <- function(input, output, session) {
           "border:1px solid #e34a33;'>",
           "&#9646; Event observed</div>")
         , position = "bottomright")
+
+    ## Country border outlines on top of hex fills, non-interactive
+    leafletProxy("main_map") |>
+      addPolygons(
+        data        = countries_sf
+      , fill        = FALSE
+      , color       = "#9ca3af"
+      , weight      = 1.5
+      , opacity     = 0.9
+      , options     = pathOptions(interactive = FALSE)
+      )
 
     if (!is.null(clicked_hex())) {
       leafletProxy("main_map") |>
