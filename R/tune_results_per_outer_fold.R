@@ -270,18 +270,21 @@ join_tuned_inner_folds <- function(inner_folds, metric, weightval, direction) {
   bind_rows()
 
   if (metric == "mix") {
+    ## Corrected formula: S_disc and S_calib normalised separately to avoid the
+    ## scale mismatch that arises when n_pos-weighted and n_all-weighted terms
+    ## share a single denominator. See finalize_hyperparameters_from_inner for
+    ## full rationale. The same formula is used here (per outer fold) and in
+    ## finalize_hyperparameters (across outer folds) for a consistent comparison.
     metric_summary.s <- metric_summary |>
-      mutate(
-        weight = if_else(n_pos > 0, n_pos, n_all)
-      , contrib = case_when(
-          n_pos > 0 ~ pr_auc * n_pos
-        , n_pos == 0 ~ -weightval * exlogloss * n_all
-        )) |>
       group_by(outer_fold_id, index) |>
       summarise(
-        final_score = sum(contrib, na.rm = TRUE) / sum(weight, na.rm = TRUE)
-      , .groups     = "drop"
-      )
+        S_disc  = sum(pr_auc * n_pos, na.rm = TRUE) /
+                  pmax(sum(n_pos[n_pos > 0], na.rm = TRUE), 1L)
+      , S_calib = sum(exlogloss * n_all, na.rm = TRUE) /
+                  sum(n_all, na.rm = TRUE)
+      , .groups = "drop"
+      ) |>
+      mutate(final_score = S_disc - weightval * S_calib)
   } else if (metric == "logloss") {
     metric_summary.s <- metric_summary |>
       dplyr::select(outer_fold_id, logloss_weighted, index) |>
@@ -317,15 +320,12 @@ join_tuned_inner_folds <- function(inner_folds, metric, weightval, direction) {
 
   metric_summary.s2 |>
     left_join(
-      metric_summary |> dplyr::select(
-       -interval, -contains("fold_id"), -contains("auc")
-     , -recall, -precision, -contains("log"), -n_pos, -n_all
-     ) |>
-      distinct()
-     ) |>
-      mutate(
-      metric = metric, weightval = weightval, .before = "index"
-    )
+      metric_summary |>
+        dplyr::select(outer_fold_id, index, trees, tree_depth, learn_rate,
+                      min_n, loss_reduction, mtry, has_outbreak) |>
+        distinct()
+    ) |>
+    mutate(metric = metric, weightval = weightval, .before = "index")
 
 }
 
@@ -459,6 +459,79 @@ tune_results_across_outer_folds <- function(outer_data, train_data, threshold, w
 }
 
 
+#' Select finalized hyperparameters by aggregating ALL inner-fold tuning results
+#'
+#' @title finalize_hyperparameters_from_inner
+
+#' @param inner_folds Character vector of all file paths returned by the
+#'   tuned_results_per_outer_fold target (one path per outer x inner x index branch)
+#' @param metric Character; only "mix" is currently supported
+#' @param weightval Numeric >= 0; penalty weight on S_calib relative to S_disc
+#' @param direction Character; must be "max"
+#' @return Single-row tibble containing final_score, S_disc, S_calib,
+#'   n_pos_folds (number of folds with at least one positive case), n_total_folds,
+#'   total_n_pos, metric, weightval, index, and all hyperparameter values
+#'   (trees, tree_depth, learn_rate, min_n, loss_reduction, mtry)
+#' @author Morgan Kain
+#' @export
+
+finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, direction) {
+
+  stopifnot(metric    == "mix")
+  stopifnot(direction == "max")
+  stopifnot(is.numeric(weightval), length(weightval) == 1, weightval >= 0)
+
+  ## Read every per-(outer x inner x index) result file into one long tibble
+  all_results <- apply(inner_folds |> matrix(), 1, FUN = readRDS) |> bind_rows()
+
+  ## Compute the two-component score for each candidate hyperparameter set
+  scores <- all_results |>
+    group_by(index) |>
+    summarise(
+
+      ## S_disc: n_pos-weighted mean pr_auc, restricted to folds with positive cases.
+      ## pmax(..., 1L) guards against the degenerate case where an index was never
+      ## evaluated on any fold with a positive case, returning 0 rather than NaN/Inf.
+      S_disc = sum(pr_auc * n_pos, na.rm = TRUE) /
+               pmax(sum(n_pos[n_pos > 0], na.rm = TRUE), 1L)
+
+      ## S_calib: n_all-weighted mean excess log-loss across ALL folds.
+      ## Separate denominator from S_disc prevents n_all >> n_pos from collapsing scores.
+    , S_calib = sum(exlogloss * n_all, na.rm = TRUE) /
+                sum(n_all, na.rm = TRUE)
+
+      ## Diagnostic columns retained for inspection
+    , n_pos_folds   = sum(n_pos > 0)
+    , n_total_folds = n()
+    , total_n_pos   = sum(n_pos)
+    , .groups       = "drop"
+
+    ) |>
+    mutate(
+      final_score = S_disc - weightval * S_calib
+    , metric      = metric
+    , weightval   = weightval
+    )
+
+  ## Select the single index with the highest combined score
+  best <- scores |>
+    arrange(desc(final_score)) |>
+    dplyr::slice(1)
+
+  ## Recover the hyperparameter values for the winning index.
+  ## trees / tree_depth / learn_rate / min_n / loss_reduction / mtry are constant
+  ## across all rows sharing an index, so distinct() always yields exactly one row.
+  best |>
+    left_join(
+      all_results |>
+        dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
+        distinct()
+    , by = "index"
+    )
+
+}
+
+
 #' Across all outer folds select the single best hyperparameter set for fitting the complete data
 #'
 #'
@@ -472,6 +545,7 @@ tune_results_across_outer_folds <- function(outer_data, train_data, threshold, w
 #' @author Morgan Kain
 #' @export
 
+
 finalize_hyperparameters <- function(outer_folds, metric, weightval, direction) {
 
   joined_files <- apply(outer_folds |> matrix(), 1, FUN = function(x) {
@@ -484,23 +558,25 @@ finalize_hyperparameters <- function(outer_folds, metric, weightval, direction) 
     joined_files <- joined_files[[1]]
   }
 
-    ## Removing the score that was used to choose the hyperparameter set from the inner folding step
-    joined_files <- joined_files |> dplyr::select(-final_score)
+  ## Remove inner-fold score columns so they are recomputed here on outer-fold
+  ## performance (S_disc and S_calib flow through from join_tuned_inner_folds
+  ## via hyper_set; final_score was already removed previously)
+  joined_files <- joined_files |> dplyr::select(-any_of(c("final_score", "S_disc", "S_calib")))
 
-  ## Get waited metric
   if (metric == "mix") {
+    ## Same two-component formula as join_tuned_inner_folds and
+    ## finalize_hyperparameters_from_inner: S_disc and S_calib normalised
+    ## separately to avoid scale mismatch from mixing n_pos and n_all in one denominator
     metric_summary.s <- joined_files |>
-      mutate(
-        weight = ifelse(n_pos > 0, n_pos, n_all)
-      , contrib = case_when(
-        n_pos > 0 ~ pr_auc * n_pos
-      , n_pos == 0 ~ -weightval * exlogloss * n_all
-        )) |>
       group_by(index) |>
       summarise(
-        final_score = sum(contrib, na.rm = TRUE) / sum(weight, na.rm = TRUE)
-      , .groups     = "drop"
-      )
+        S_disc  = sum(pr_auc * n_pos, na.rm = TRUE) /
+                  pmax(sum(n_pos[n_pos > 0], na.rm = TRUE), 1L)
+      , S_calib = sum(exlogloss * n_all, na.rm = TRUE) /
+                  sum(n_all, na.rm = TRUE)
+      , .groups = "drop"
+      ) |>
+      mutate(final_score = S_disc - weightval * S_calib)
   } else if (metric == "logloss") {
     metric_summary.s <- joined_files |>
       dplyr::select(outer_fold_id, logloss_weighted, index) |>
@@ -531,16 +607,15 @@ finalize_hyperparameters <- function(outer_folds, metric, weightval, direction) 
     stop("choose min or max for direction")
   }
 
+  ## Explicit hyperparameter column selection avoids the multi-row join bug that
+  ## arises when has_outbreak differs across outer folds for the same index
   metric_summary.s2 |>
     left_join(
-       joined_files |> dplyr::select(
-        -interval, -contains("fold_id"), -contains("auc")
-        , -recall, -precision, -contains("log"), -n_pos, -n_all
-      ) |>
-      distinct()
-      ) |>
-      mutate(
-        metric = metric, weightval = weightval, .before = "index"
-      )
+      joined_files |>
+        dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
+        distinct()
+    , by = "index"
+    ) |>
+    mutate(metric = metric, weightval = weightval, .before = "index")
 
 }

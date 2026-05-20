@@ -245,15 +245,14 @@ model_tuning_targets <- tar_plan(
     tree_min       = 100
   , tree_max       = 1500
   , tree_dep_min   = 4
-  , tree_dep_max   = 10
-  , learn_rate_min = 0.01
-  , learn_rate_max = 0.5
+  , tree_dep_max   = 9
+  , learn_rate_min = -2
+  , learn_rate_max = -0.52
   , minn_min       = 5
   , minn_max       = 100
-  , loss_red_min   = 0
-  , loss_red_max   = 0.5
-  , mtry_min       = 1
-  , mtry_max       = 3
+  , loss_red_min   = -5
+  , loss_red_max   = -0.3
+  , mtry_min       = 8
   , size           = 150))
 
 , tar_target(tuning_grid,
@@ -265,11 +264,11 @@ model_tuning_targets <- tar_plan(
     , grid_space_filling(
         trees(range          = c(tree_min, tree_max))
       , tree_depth(range     = c(tree_dep_min, tree_dep_max))
-      , learn_rate(range     = c(learn_rate_min, learn_rate_max), trans = NULL)
+      , learn_rate(range     = c(learn_rate_min, learn_rate_max))
       , min_n(range          = c(minn_min, minn_max))
       , loss_reduction(range = c(loss_red_min, loss_red_max))
       ## Arbitrary choice here in which train_inner, doesn't matter which
-      , finalize(mtry(), folded_data_training$inner_folds[[10]] |>
+      , finalize(mtry(range = c(mtry_min, unknown())), folded_data_training$inner_folds[[10]] |>
                    left_join(
                       splitted_data$train_data[[1]], by = "index") |>
                       filter(cluster != 1))
@@ -389,6 +388,20 @@ model_tuning_targets <- tar_plan(
     , error          = "null"
     , format         = "file")
 
+ ## Alternative (possibly better [?] and now the main [?]) strategy for selecting the
+   ## best set of hyperparameters by using all of (one per outer x inner x index combination)
+   ## instead of just the optimal set chosen per outer fold and then choosing from that
+, tar_target(finalized_hyperparameters, finalize_hyperparameters_from_inner(
+    inner_folds = tuned_results_per_outer_fold
+  , metric      = "mix"
+  , weightval   = 0.1
+  , direction   = "max"))
+
+  ## Older stratgey of picking the optimal set of hyperparameters by:
+   ## A) picking single optimal set per outer fold, then fitting across all inner folds
+    ## for that hyperparameter set
+   ## B) from these single sets for each outer fold pick the optimal set overall
+
   ## Join together all tuned inner folds and select the best per outer fold
 , tar_target(tuned_results_joined, join_tuned_inner_folds(
     inner_folds  = tuned_results_per_outer_fold
@@ -403,14 +416,14 @@ model_tuning_targets <- tar_plan(
      ## the more weight given to logloss (and thus penalizing high probabilities
      ## when there are true 0s). In the case of 'binomial' the larger the number the
      ## more weight given to predicting true 1s with high probability
-  , weightval    = 1E-5
+  , weightval    = 0.1
     ## Currently both options are to maximize
   , direction    = "max"))
 
   ## Fit each outer fold with the best inner fold hyperparameter for each of these outer folds
    ## NOTE: for debugging swap folded_data_training -> folded_data_training_DEBUG in both places
 , tar_target(tuned_results_across_outer_folds, tune_results_across_outer_folds(
-    outer_data     = folded_data_training_DEBUG
+    outer_data     = folded_data_training
   , train_data     = train_data
   , threshold      = positive_threshold
   , hyperparm_sets = tuned_results_joined
@@ -418,19 +431,21 @@ model_tuning_targets <- tar_plan(
   , start_p        = 0.005
   , id_cols        = id_cols
   , out_dir        = outer_folds_dir2
-  , overwrite      = TRUE
+  , overwrite      = FALSE
   , DEBUG          = FALSE)
-  , pattern        = map(folded_data_training_DEBUG)
+  , pattern        = map(folded_data_training)
   , error          = "null"
   , format         = "file")
 
-  ## Extract the best parameter set
-, tar_target(finalized_hyperparameters, finalize_hyperparameters(
+  ## Extract the best parameter set from outer fold evaluation (kept for comparison/reporting)
+, tar_target(finalized_hyperparameters_from_outer, finalize_hyperparameters(
     outer_folds  = tuned_results_across_outer_folds
     ## See notes for/in tuned_results_joined
   , metric       = "mix"
-  , weightval    = 1E-5
+  , weightval    = 0.1
   , direction    = "max"))
+
+
 
 )
 
@@ -440,7 +455,7 @@ model_fitting_targets <- tar_plan(
   ## Use the finalized hyperparameters to fit the model for all of the chunks of time that
    ## make up the testing phase
   tar_target(fitted_model, fit_model(
-    final_hyper_set = finalized_hyperparameters
+    final_hyper_set  = finalized_hyperparameters_inner
   , full_data       = folded_data_testing
   , train_data      = train_data_fitting
   , test_data       = test_data_fitting
@@ -449,7 +464,7 @@ model_fitting_targets <- tar_plan(
   , start_p         = 0.005
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
-  , overwrite       = TRUE
+  , overwrite       = FALSE
   , DEBUG           = FALSE)
   , pattern         = map(folded_data_testing)
   , error           = "null"
@@ -472,7 +487,7 @@ model_evaluation_targets <- tar_plan(
     model_dat  = model_out_for_eval
   , train_data = train_data
   , test_data  = test_data)
-  , pattern       = map(model_out_for_eval))
+  , pattern    = map(model_out_for_eval))
 
   ## Actually do the variable importance calculation, now loading far fewer targets
    ## given variable_importance_prep_a
@@ -492,7 +507,7 @@ model_evaluation_targets <- tar_plan(
     model_dat  = model_out_for_eval
   , train_data = train_data
   , test_data  = test_data)
-  , pattern       = map(model_out_for_eval))
+  , pattern    = map(model_out_for_eval))
 
   ## Compute per-row SHAP values and summarize as mean |SHAP| per feature per forecast_interval
 , tar_target(shap_by_forecast_interval, calculate_shap_by_forecast_interval(
@@ -500,11 +515,16 @@ model_evaluation_targets <- tar_plan(
   , final_hyper_set  = finalized_hyperparameters
   , fitdir           = outer_folds_dir3
   , recdir          = outer_folds_dir3)
-  , pattern         = map(shap_prep_a))
+  , pattern         = map(shap_prep_a)
+  , error           = "null")
 
   ## Aggregate across outer folds and produce heatmap and line plots
 , tar_target(shap_comparison, compare_shap_by_forecast_interval(
     shap_results = shap_by_forecast_interval))
+
+  ## Set up path for app files and examined fits
+, tar_target(app_file_path, "outputs/for_app")
+, tar_target(examined_fits_path, "outputs/examined_fits")
 
   ## Evaluate fit in a few other ways apart from calibration curves:
    ## A) comparing prob to truth across space and time
@@ -519,9 +539,9 @@ model_evaluation_targets <- tar_plan(
   , region_to_sum    = NULL
   , p_thresh         = positive_threshold
   , using_hexes      = using_hexes
-  , outpath          = "outputs/examined_fits"
-  , outpath_for_app  = "outputs/for_app"
-  , overwrite        = TRUE)
+  , outpath          = examined_fits_path
+  , outpath_for_app  = app_file_path
+  , overwrite        = FALSE)
   , pattern          = map(model_out_for_eval)
   , error            = "null"
   , format           = "file")
@@ -536,20 +556,35 @@ model_evaluation_targets <- tar_plan(
   , region_to_sum    = region_districts
   , p_thresh         = positive_threshold
   , using_hexes      = using_hexes
-  , outpath          = "outputs/examined_fits"
-  , outpath_for_app  = "outputs/for_app"
-  , overwrite        = TRUE)
+  , outpath          = examined_fits_path
+  , outpath_for_app  = app_file_path
+  , overwrite        = FALSE)
   , pattern          = map(model_out_for_eval)
   , error            = "null"
   , format           = "file")
 
   ## Export out the pieces needed for the shiny
-, tar_target(app_file_needs, paste("outputs/for_app", list.files("outputs/for_app"), sep = "/"))
-, tar_target(built_app_components, build_app_components(
+, tar_target(app_file_needs, {
+    all_files <- paste(app_file_path, list.files("outputs/for_app"), sep = "/")
+    just_hex_files <- all_files[grepl("FALSE", all_files)]
+    just_hex_files
+    }
+    , format = "file"
+  )
+
+  ## Build the data file for the app
+, tar_target(built_app_components_predictions, build_app_components_predictions(
     predictions = app_file_needs
   , shapvals    = shap_comparison
-  , outpath     = "www"
-  ))
+  , outpath     = "www/app_data_processed.Rds"
+  ), format     = "file")
+
+  ## NOTE: poorly non-dynamic, be careful with this (see inside function)
+, tar_target(built_app_components_data, build_app_components_data(
+    df_raw  = region_data
+  , outpath = "www"
+  ), format = "file")
+
 
   ## For speed and RAM considerations, extract out pieces for individual exploration as
    ## targets, and can the more easily plot / explore from these extracted pieces
