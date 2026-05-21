@@ -248,8 +248,8 @@ model_tuning_targets <- tar_plan(
   , tree_dep_max   = 9
   , learn_rate_min = -2
   , learn_rate_max = -0.52
-  , minn_min       = 5
-  , minn_max       = 100
+  , minn_min       = 1
+  , minn_max       = 10
   , loss_red_min   = -5
   , loss_red_max   = -0.3
   , mtry_min       = 8
@@ -397,7 +397,7 @@ model_tuning_targets <- tar_plan(
   , weightval   = 0.1
   , direction   = "max"))
 
-  ## Older stratgey of picking the optimal set of hyperparameters by:
+  ## Older strategy of picking the optimal set of hyperparameters by:
    ## A) picking single optimal set per outer fold, then fitting across all inner folds
     ## for that hyperparameter set
    ## B) from these single sets for each outer fold pick the optimal set overall
@@ -445,8 +445,6 @@ model_tuning_targets <- tar_plan(
   , weightval    = 0.1
   , direction    = "max"))
 
-
-
 )
 
 ## Fitting of model on holdout data --------------------------------------------
@@ -455,7 +453,7 @@ model_fitting_targets <- tar_plan(
   ## Use the finalized hyperparameters to fit the model for all of the chunks of time that
    ## make up the testing phase
   tar_target(fitted_model, fit_model(
-    final_hyper_set  = finalized_hyperparameters_inner
+    final_hyper_set = finalized_hyperparameters
   , full_data       = folded_data_testing
   , train_data      = train_data_fitting
   , test_data       = test_data_fitting
@@ -473,7 +471,7 @@ model_fitting_targets <- tar_plan(
   ## Join fitted_model paths to folded_data_testing for parallel processing for model evaluation
 , tar_target(model_out_for_eval, build_model_out_for_eval(
     model_fits = fitted_model
-  , full_data = folded_data_testing))
+  , full_data  = folded_data_testing))
 
 )
 
@@ -484,7 +482,7 @@ model_evaluation_targets <- tar_plan(
    ## to be a bit more RAM efficient (so targets doesn't have to load a bunch of
    ## not needed stuff to run calculate_variable_importance)
   tar_target(variable_importance_prep_a, prep_for_variable_importance_a(
-    model_dat  = model_out_for_eval
+    model_dat  = model_out_for_eval[1, ]
   , train_data = train_data
   , test_data  = test_data)
   , pattern    = map(model_out_for_eval))
@@ -492,9 +490,9 @@ model_evaluation_targets <- tar_plan(
   ## Actually do the variable importance calculation, now loading far fewer targets
    ## given variable_importance_prep_a
 , tar_target(variable_importance, calculate_variable_importance(
-    model_dat       = variable_importance_prep_a
-  , final_hyper_set  = finalized_hyperparameters
-  , fitdir           = outer_folds_dir3
+    model_dat       = variable_importance_prep_a[1, ]
+  , final_hyper_set = finalized_hyperparameters
+  , fitdir          = outer_folds_dir3
   , recdir          = outer_folds_dir3
   , num_vars        = 10)
   , pattern         = map(variable_importance_prep_a))
@@ -512,8 +510,8 @@ model_evaluation_targets <- tar_plan(
   ## Compute per-row SHAP values and summarize as mean |SHAP| per feature per forecast_interval
 , tar_target(shap_by_forecast_interval, calculate_shap_by_forecast_interval(
     model_dat       = shap_prep_a
-  , final_hyper_set  = finalized_hyperparameters
-  , fitdir           = outer_folds_dir3
+  , final_hyper_set = finalized_hyperparameters
+  , fitdir          = outer_folds_dir3
   , recdir          = outer_folds_dir3)
   , pattern         = map(shap_prep_a)
   , error           = "null")

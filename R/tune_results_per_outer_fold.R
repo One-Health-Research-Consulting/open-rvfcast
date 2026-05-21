@@ -72,28 +72,23 @@ checktime_path.full <- paste0(checktime_path, "/outer_fold_", outer_fold_id, ".c
       relocate(cluster, .after = "date") |>
       dplyr::select(-c(cluster, cases)) |>
       mutate(outbreak = as.factor(outbreak)) |>
-      mutate(forecast_interval = as.factor(forecast_interval)) |>
-      group_by(forecast_interval) |>
-      ## Get class imbalance ratio per forecast horizon
-      mutate(
-        weights = length(which(outbreak == "0")) / length(which(outbreak == "1"))
-      , weights = ifelse(outbreak == "0", 1, weights)
-      , weights = hardhat::importance_weights(weights)
-      , .after = "index"
-      )
+      mutate(forecast_interval = as.factor(forecast_interval))
+
+    ## Class imbalance handled via scale_pos_weight in engine, not case weights
+    spw <- calc_spw(inner_tbl_train)
 
     ## Inner assessment data: extract the held-out spatial cluster
+    ## weights stored as plain numeric (not hardhat_importance_weights) so that
+    ## predict() on a workflow without add_case_weights() does not raise a type error
     inner_tbl_assess <- joined_data |>
       dplyr::filter(cluster == inner_id) |>
       relocate(cluster, .after = "date") |>
       dplyr::select(-c(cluster, cases)) |>
       mutate(outbreak = as.factor(outbreak)) |>
       mutate(forecast_interval = as.factor(forecast_interval)) |>
-      ## Get class imbalance ratio per forecast horizon
       mutate(
-        weights = length(which(outbreak == "0")) / length(which(outbreak == "1"))
+        weights = length(which(outbreak == "0")) / max(length(which(outbreak == "1")), 1)
       , weights = ifelse(outbreak == "0", 1, weights)
-      , weights = hardhat::importance_weights(weights)
       , .after = "index"
       )
 
@@ -103,8 +98,8 @@ checktime_path.full <- paste0(checktime_path, "/outer_fold_", outer_fold_id, ".c
 
     ## Create scaffold recipe + model + workflow and fit model
     rec <- make_recipe(inner_tbl_train, id_cols = id_cols)
-    mod <- make_model(params = tuning_grid, start_p = start_p)
-    wf  <- workflow() |> add_model(mod) |> add_recipe(rec) |> add_case_weights(weights)
+    mod <- make_model(params = tuning_grid, start_p = start_p, spw = spw)
+    wf  <- workflow() |> add_model(mod) |> add_recipe(rec)
 
     print("At model fitting")
     fit <- fit(wf, data = inner_tbl_train)
@@ -379,15 +374,10 @@ tune_results_across_outer_folds <- function(outer_data, train_data, threshold, w
     dplyr::filter(index %in% outer_data$train_data[[1]]) |>
     dplyr::select(-c(cases)) |>
     mutate(outbreak = factor(outbreak, levels = c(1, 0))) |>
-    mutate(forecast_interval = as.factor(forecast_interval)) |>
-    ## Get class imbalance ratio per forecast horizon
-    group_by(forecast_interval) |>
-    mutate(
-      weights = length(which(outbreak == "0")) / length(which(outbreak == "1"))
-    , weights = ifelse(outbreak == "0", 1, weights)
-    , weights = hardhat::importance_weights(weights)
-    , .after = "index"
-    )
+    mutate(forecast_interval = as.factor(forecast_interval))
+
+  ## Class imbalance handled via scale_pos_weight in engine, not case weights
+  spw <- calc_spw(outer_tbl_train)
 
   outer_tbl_assess  <- train_data |>
     dplyr::filter(index %in% outer_data$assess_data[[1]]) |>
@@ -395,9 +385,8 @@ tune_results_across_outer_folds <- function(outer_data, train_data, threshold, w
     mutate(outbreak = factor(outbreak, levels = c(1, 0))) |>
     mutate(forecast_interval = as.factor(forecast_interval)) |>
     mutate(
-      weights = length(which(outbreak == "0")) / length(which(outbreak == "1"))
+      weights = length(which(outbreak == "0")) / max(length(which(outbreak == "1")), 1)
     , weights = ifelse(outbreak == "0", 1, weights)
-    , weights = hardhat::importance_weights(weights)
     , .after = "index"
     )
 
@@ -411,8 +400,8 @@ tune_results_across_outer_folds <- function(outer_data, train_data, threshold, w
 
   ## Set up and fit the final model for this outer fold
   rec <- make_recipe(outer_tbl_train, id_cols = id_cols)
-  mod <- make_model(params = hyper_set, start_p = start_p)
-  wf  <- workflow() |> add_model(mod) |> add_recipe(rec) |> add_case_weights(weights)
+  mod <- make_model(params = hyper_set, start_p = start_p, spw = spw)
+  wf  <- workflow() |> add_model(mod) |> add_recipe(rec)
   fit <- fit(wf, data = outer_tbl_train)
 
   ## Predictions: prob only

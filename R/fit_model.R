@@ -22,7 +22,7 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
 
   ## Set filenames
   save_filename <- paste(
-    out_dir
+      out_dir
     , "/"
     , "model_fit_"
     , full_data$outer_fold_id
@@ -43,7 +43,7 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
     , sep = "")
 
   save_filename3 <- paste(
-    out_dir
+      out_dir
     , "/"
     , "recipe_"
     , full_data$outer_fold_id
@@ -71,15 +71,11 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
       dplyr::select(-c(cases)) |>
       mutate(outbreak = factor(outbreak, levels = c(1, 0)))
   ) |>
-    mutate(forecast_interval = as.factor(forecast_interval)) |>
-    ## Get class imbalance ratio per forecast horizon
-    group_by(forecast_interval) |>
-    mutate(
-      weights = length(which(outbreak == "0")) / length(which(outbreak == "1"))
-    , weights = ifelse(outbreak == "0", 1, weights)
-    , weights = hardhat::importance_weights(weights)
-    , .after = "index"
-    )
+    mutate(forecast_interval = as.factor(forecast_interval))
+
+  ## Class imbalance is handled via scale_pos_weight in the engine rather than
+   ## case weights in the workflow, which corrupts min_child_weight semantics
+  spw <- calc_spw(outer_tbl_train)
 
   outer_tbl_assess  <- test_data |>
     dplyr::filter(index %in% full_data$assess_data[[1]]) |>
@@ -87,9 +83,8 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
     mutate(outbreak = factor(outbreak, levels = c(1, 0))) |>
     mutate(forecast_interval = as.factor(forecast_interval)) |>
     mutate(
-      weights = length(which(outbreak == "0")) / length(which(outbreak == "1"))
+      weights = length(which(outbreak == "0")) / max(length(which(outbreak == "1")), 1)
     , weights = ifelse(outbreak == "0", 1, weights)
-    , weights = hardhat::importance_weights(weights)
     , .after = "index"
     )
 
@@ -103,9 +98,9 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
 
   ## Set up and fit the final model for this outer fold
   rec       <- make_recipe(outer_tbl_train, id_cols = id_cols)
-  mod       <- make_model(params = final_hyper_set, start_p = start_p)
-  wf        <- workflow() |> add_model(mod) |> add_recipe(rec) |> add_case_weights(weights)
-  model_fit  <- fit(wf, data = outer_tbl_train)
+  mod       <- make_model(params = final_hyper_set, start_p = start_p, spw = spw)
+  wf        <- workflow() |> add_model(mod) |> add_recipe(rec)
+  model_fit <- fit(wf, data = outer_tbl_train)
 
   ## Predict probabilities and class labels on outer assessment
   preds <- predict(model_fit, outer_tbl_assess, type = "prob") |>

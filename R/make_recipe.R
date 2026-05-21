@@ -22,14 +22,17 @@ make_recipe <- function(train_data, id_cols) {
 #'
 #' @title make_model
 
-#' @return base model scaffold 
+#' @return base model scaffold
 #' @param params Set of hyperparameters for this fit
-#' @param scale_pos_weight weight for positive responses 
+#' @param start_p base_score initialization; should equal empirical prevalence for calibrated probability output
+#' @param spw scale_pos_weight passed to xgboost engine (n_neg / n_pos); handles class imbalance
+#'   at the gradient level without corrupting min_child_weight semantics via case weights.
+#'   max_delta_step = 1 caps per-tree leaf output to prevent margin accumulation to 0/1 extremes.
 #' @author Morgan Kain
 #' @export
 
-make_model <- function(params, start_p = start_p) {
- 
+make_model <- function(params, start_p, spw) {
+
   boost_tree(
     trees          = params$trees
   , tree_depth     = params$tree_depth
@@ -41,12 +44,14 @@ make_model <- function(params, start_p = start_p) {
     set_mode("classification") %>%
     set_engine(
       "xgboost"
-    , objective = "binary:logistic"
-    , base_score = start_p
-    , nthread   = 1
-    , verbosity = 0
-    ) 
-  
+    , objective        = "binary:logistic"
+    , base_score       = start_p
+    , scale_pos_weight = spw
+    , max_delta_step   = 1
+    , nthread          = 1
+    , verbosity        = 0
+    )
+
 }
 
 ##### Some helpers ----------------------------------------------------------------
