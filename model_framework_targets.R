@@ -482,7 +482,7 @@ model_evaluation_targets <- tar_plan(
    ## to be a bit more RAM efficient (so targets doesn't have to load a bunch of
    ## not needed stuff to run calculate_variable_importance)
   tar_target(variable_importance_prep_a, prep_for_variable_importance_a(
-    model_dat  = model_out_for_eval[1, ]
+    model_dat  = model_out_for_eval
   , train_data = train_data
   , test_data  = test_data)
   , pattern    = map(model_out_for_eval))
@@ -490,7 +490,7 @@ model_evaluation_targets <- tar_plan(
   ## Actually do the variable importance calculation, now loading far fewer targets
    ## given variable_importance_prep_a
 , tar_target(variable_importance, calculate_variable_importance(
-    model_dat       = variable_importance_prep_a[1, ]
+    model_dat       = variable_importance_prep_a
   , final_hyper_set = finalized_hyperparameters
   , fitdir          = outer_folds_dir3
   , recdir          = outer_folds_dir3

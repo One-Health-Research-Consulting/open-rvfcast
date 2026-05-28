@@ -84,7 +84,11 @@ calculate_ndvi_anomalies <- function(ndvi_transformed,
 
     # Filter to this specific date
     ndvi_transformed_dataset <- ndvi_data |>
-      dplyr::filter(date == !!date)
+      dplyr::filter(date == !!date) |>
+      # Round coordinates to guard against floating-point drift when the raster
+      # template is recomputed across pipeline runs; 7dp is well within the
+      # 0.1-degree grid resolution so no actual spatial information is lost
+      dplyr::mutate(x = round(x, 7), y = round(y, 7))
 
     doy_to_process <- as.numeric(lubridate::yday(date))
 
@@ -92,7 +96,8 @@ calculate_ndvi_anomalies <- function(ndvi_transformed,
     historical_means <- arrow::open_dataset(ndvi_historical_means) |>
       dplyr::filter(doy == doy_to_process) |>
       dplyr::collect() |>
-      tidyr::drop_na()
+      tidyr::drop_na() |>
+      dplyr::mutate(x = round(x, 7), y = round(y, 7))
 
     # Join the two datasets by day of year (doy)
     ndvi_transformed_dataset <- dplyr::left_join(ndvi_transformed_dataset, historical_means,

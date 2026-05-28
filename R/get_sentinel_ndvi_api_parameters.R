@@ -1,18 +1,20 @@
-#' Retrieve Sentinel-3 data from Copernicus Open Access Hub 
+#' Retrieve Sentinel-3 10-day NDVI product metadata from Copernicus Data Space
 #'
-#' This function retrieves Sentinel-3 data from the Copernicus Open Access Hub. The function
-#' constructs a URL string based on the given parameters and sends a GET request to the server 
-#' to download the data. The data is received in JSON format and then converted to a list in R.
-#' The function returns a list of features from the Sentinel-3 dataset.
+#' This function retrieves Sentinel-3 SYNERGY SY_2_V10 (10-day NDVI composite)
+#' product metadata from the Copernicus Data Space OData API. It filters for
+#' Africa-covering S3A Near-Real-Time products and returns date ranges and
+#' product identifiers needed to drive the download pipeline.
 #'
 #' @author Emma Mendelsohn
 #'
-#' @param 
+#' @param
 #'
-#' @return A list. Each element of the list corresponds to a feature from the Sentinel-3 dataset.
+#' @return A tibble with columns: id (product UUID), name (product filename),
+#'   start_date (Date), end_date (Date). Each row represents one 10-day
+#'   composite period with non-overlapping date ranges.
 #'
-#' @note This function retrieves satellite data using the HTTP protocol 
-#' from the Copernicus Open Access Hub. 
+#' @note Previously used the Copernicus RESTO API, which was deprecated and
+#'   returns 403 Forbidden as of 2026. Now uses the OData v1 API.
 #'
 #' @examples
 #' #This function doesn't require any arguments.
@@ -21,18 +23,43 @@
 #' @export
 get_sentinel_ndvi_api_parameters <- function() {
 
-  # Query using an arbitrary bounding box from Central Africa - returns list of full Africa files
-  # 229 results as of 2023-03-20, so max records of 500 is safe
-  url <- "https://catalogue.dataspace.copernicus.eu/resto/api/collections/Sentinel3/search.json?maxRecords=500&productType=SY_2_V10___&platform=S3A&box=13.4,7.46,24.0,23.4&timeliness=NT" 
-  resp <- httr::GET(url)
-  out <- jsonlite::fromJSON(rawToChar(resp$content)) |> 
-    pluck("features") |>
-    arrange(properties$startDate) |>
-    mutate(start_date = lubridate::floor_date(lubridate::as_date(properties$startDate), unit = "day"), 
-           end_date = lead(start_date - 1))
-  
-  out$end_date[nrow(out)] <- lubridate::floor_date(lubridate::as_date(out$properties$completionDate[nrow(out)]), unit = "day")
-  
+  # Query Africa S3A Near-Real-Time 10-day NDVI composites via OData API
+  # The RESTO API previously used (catalogue.dataspace.copernicus.eu/resto/api/)
+  # was deprecated and now returns 403; OData v1 is the current replacement
+  resp <- httr::GET(
+    "https://catalogue.dataspace.copernicus.eu/odata/v1/Products",
+    query = list(
+      `$filter`  = paste0(
+        "Collection/Name eq 'SENTINEL-3'",
+        " and Attributes/OData.CSC.StringAttribute/any(att:att/Name eq 'productType'",
+        " and att/OData.CSC.StringAttribute/Value eq 'SY_2_V10___')",
+        " and contains(Name, 'AFRICA')",
+        " and startswith(Name, 'S3A')",
+        " and contains(Name, '_NT_')"
+      ),
+      `$top`     = 1000,
+      `$orderby` = "ContentDate/Start asc"
+    )
+  )
+
+  raw <- jsonlite::fromJSON(rawToChar(resp$content))$value
+
+  # Compute non-overlapping date ranges: each period ends one day before the
+  # next starts. Sentinel data uses inclusive start and end dates that share
+  # a boundary, so we shift the end back by one day to avoid overlap.
+  start_dates <- lubridate::floor_date(lubridate::as_date(raw$ContentDate$Start), unit = "day")
+  end_dates <- c(
+    start_dates[-1] - 1,
+    lubridate::floor_date(lubridate::as_date(tail(raw$ContentDate$End, 1)), unit = "day")
+  )
+
+  out <- tibble::tibble(
+    id         = raw$Id,
+    name       = raw$Name,
+    start_date = start_dates,
+    end_date   = end_dates
+  )
+
   return(out)
 
 }

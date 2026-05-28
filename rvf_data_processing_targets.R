@@ -215,7 +215,7 @@ rvf_processing_targets <- tar_plan(
       template        = region_data_template
     , cov_files        = base_predictors
     , out_dir         = region_data_directory
-    , overwrite       = FALSE)
+    , overwrite       = TRUE)
   , pattern = map(base_predictors)
   , error   = "null"
   , format  = "file")
@@ -245,7 +245,7 @@ rvf_processing_targets <- tar_plan(
   , cov_files        = region_data[-length(region_data)]
   , rvf_response    = rvf_response
   , out_dir         = region_cleaned_data_directory
-  , overwrite       = FALSE)
+  , overwrite       = TRUE)
   , pattern = map(file_path_per_date)
   , error   = "null"
   , format  = "file")
@@ -254,7 +254,7 @@ rvf_processing_targets <- tar_plan(
 , tar_target(joined_region_data, combine_lja(
     in_dir    = cleaned_region_data
   , out_dir   = region_joined_data_directory
-  , overwrite = FALSE)
+  , overwrite = TRUE)
   , error     = "null"
   , format    = "file")
 

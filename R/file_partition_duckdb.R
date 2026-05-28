@@ -116,6 +116,13 @@ file_partition_duckdb <- function(temporal_sources,
       parquet_list <- paste0("SELECT * FROM ", paste(parquet_list, collapse = " NATURAL JOIN "))
     }
 
+    # Round x and y to 7 decimal places so that cells from data processed with
+    # different versions of continent_raster_template (floating-point drift of
+    # ~1e-15) join correctly across all sources
+    parquet_list <- glue::glue(
+      "SELECT ROUND(x, 7) AS x, ROUND(y, 7) AS y, * EXCLUDE (x, y) FROM ({parquet_list})"
+    )
+
     # Set up query to add the table to the database
     query <- glue::glue("CREATE OR REPLACE TABLE {table_name} AS {parquet_list}")
 

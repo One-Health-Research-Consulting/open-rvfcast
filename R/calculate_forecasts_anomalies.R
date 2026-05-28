@@ -112,16 +112,18 @@ calculate_forecast_anomalies <- function(forecasts_anomalies_sources,
     head(n = 1)
 
   # Read valid analysis pixel coordinates directly from a static land-only predictor.
-  # This guarantees exact x/y coordinate matches with the parquet data and avoids
-  # polygon rasterization issues (CRS, grid origin precision).
+  # Round x/y to 7 decimal places so that cells processed with different versions
+  # of continent_raster_template (floating-point drift of ~1e-15) compare as equal.
   valid_pixels <- arrow::read_parquet(land_pixel_reference, col_select = c("x", "y")) |>
-    dplyr::distinct(x, y)
+    dplyr::distinct(x, y) |>
+    dplyr::mutate(x = round(x, 7), y = round(y, 7))
 
   forecast_transformed_dataset <- forecast_transformed_dataset |>
     dplyr::filter(base_date == relevant_base_date) |>
     select(-base_date, -month, -year) |>
     mutate(month = lead_month, year = lead_year) |>
     collect() |>
+    dplyr::mutate(x = round(x, 7), y = round(y, 7)) |>
     dplyr::semi_join(valid_pixels, by = c("x", "y"))
 
   forecast_anomalies <- map_dfr(1:(length(forecast_intervals) - 1), function(i) {
@@ -149,6 +151,7 @@ calculate_forecast_anomalies <- function(forecasts_anomalies_sources,
     historical_means <- arrow::open_dataset(weather_historical_means) |>
       dplyr::filter(doy %in% forecast_anomaly$doy) |>
       dplyr::collect() |>
+      dplyr::mutate(x = round(x, 7), y = round(y, 7)) |>
       dplyr::semi_join(valid_pixels, by = c("x", "y"))
 
     # Join historical means based on day of year (doy)

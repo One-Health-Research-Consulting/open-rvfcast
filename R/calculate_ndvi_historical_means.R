@@ -52,7 +52,11 @@ calculate_ndvi_historical_means <- function(sentinel_ndvi_transformed,
     
     ndvi_data |>
       filter(doy == i) |>
-      group_by(x, y, doy) |> 
+      # Round coordinates before grouping so that cells from different pipeline
+      # runs (where continent_raster_template was recomputed and floating-point
+      # accumulation shifted cell centres by ~1e-15) are treated as the same cell
+      mutate(x = round(x, 7), y = round(y, 7)) |>
+      group_by(x, y, doy) |>
       summarize(ndvi_sd = sd(ndvi, na.rm = T),
                 ndvi = mean(ndvi, na.rm = T),
                 .groups = "drop") |>

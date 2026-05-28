@@ -51,16 +51,21 @@ calculate_weather_historical_means <- function(nasa_weather_transformed,
       return(filename)
     }
     
-    mean_vals <- nasa_weather_data |> 
+    mean_vals <- nasa_weather_data |>
       filter(doy == i) |>
-      group_by(x, y, doy) |> 
-      summarize(across(matches("temperature|precipitation|humidity"), ~mean(.x, na.rm = T)), 
+      # Round before group_by so cells from different pipeline runs (where
+      # continent_raster_template was recomputed and caused ~1e-15 coordinate
+      # drift) are treated as the same cell
+      mutate(x = round(x, 7), y = round(y, 7)) |>
+      group_by(x, y, doy) |>
+      summarize(across(matches("temperature|precipitation|humidity"), ~mean(.x, na.rm = T)),
                        .groups = "drop")
-                
-    sd_vals <- nasa_weather_data |> 
+
+    sd_vals <- nasa_weather_data |>
       filter(doy == i) |>
-      group_by(x, y, doy) |> 
-      summarize(across(matches("temperature|precipitation|humidity"), ~sd(.x, na.rm = T), 
+      mutate(x = round(x, 7), y = round(y, 7)) |>
+      group_by(x, y, doy) |>
+      summarize(across(matches("temperature|precipitation|humidity"), ~sd(.x, na.rm = T),
                 .names = "{.col}_sd"),
                 .groups = "drop")
     
