@@ -213,6 +213,8 @@ AWS_get_folder <- function(local_folder,
 AWS_put_files <- function(transformed_file_list,
                           local_folder,
                           overwrite = FALSE,
+                          first_date = NULL,
+                          all_dates  = NULL,
                           ...) {
 
   library(arrow)
@@ -250,12 +252,21 @@ AWS_put_files <- function(transformed_file_list,
   # Collect outcomes
   outcomes <- c()
 
+  # if !is.null(first_date) reduce transformed_file_list to dates after this date
+  if (!is.null(first_date)) {
+    needed_dates <- all_dates[which(all_dates >= first_date)]
+    transformed_file_list <- purrr::map(needed_dates, .f = function(x) {
+      transformed_file_list[which(grepl(x, transformed_file_list))]
+    }) |> 
+      unlist()
+  }
+  
   # Walk through transformed_file_list (can be a single file or vector of files)
   for (file in transformed_file_list) {
 
     # Get dataset object
     remote_dataset <- error_safe_open_dataset(paste0(Sys.getenv("AWS_BUCKET_ID"), "/", file), fs = s3_fs)
-    local_dataset <- error_safe_open_dataset(file)
+    local_dataset  <- error_safe_open_dataset(file)
 
     if (is.null(remote_dataset) || !remote_dataset$schema$Equals(local_dataset$schema) || remote_dataset$num_rows != local_dataset$num_rows || overwrite == TRUE) {
 
