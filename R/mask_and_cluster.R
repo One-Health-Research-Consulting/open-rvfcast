@@ -140,7 +140,10 @@ mask_and_cluster_build_template <- function(
     relocate(shapeName, .after = ADM2)
 
 
-  df_sorted |> dplyr::select(x, y, Country, ADM2, shapeName)
+  ## Round to 7 decimal places so coordinates match across the pipeline
+  df_sorted |>
+    dplyr::select(x, y, Country, ADM2, shapeName) |>
+    mutate(x = round(x, 7), y = round(y, 7))
 
 }
 
@@ -186,12 +189,14 @@ mask_and_cluster_from_template <- function(template, cov_files, out_dir, overwri
     }
   }
 
-  ## Read one parquet file
-  df <- read_parquet(cov_files)
+  ## Read one parquet file; round coordinates to match template precision
+  df <- read_parquet(cov_files) |>
+    mutate(x = round(x, 7), y = round(y, 7))
 
   ## Join with the template to get the ADM region info
   df_with_adm <- df |>
-    left_join(template) |>
+    left_join(template |>
+                mutate(x = round(x, 7), y = round(y, 7))) |>
     relocate(Country, ADM2, shapeName, .after = y) |>
     filter(!is.na(Country))
 
