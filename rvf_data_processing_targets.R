@@ -31,40 +31,40 @@ using_hexes <- TRUE
 data_import_targets <- tar_plan(
 
   ## Polygon of Africa
-  tar_target(continent_polygon, create_africa_polygon())
+tar_target(continent_polygon, create_africa_polygon())
 
   ## Africa shape object for masking
-  , tar_target(wahis_raster_template, terra::rasterize(
+, tar_target(wahis_raster_template, terra::rasterize(
     terra::vect(continent_polygon)
     ## Mask against a raster filled with 1's
     , terra::rast(
         continent_polygon
         ## Set Resolution
       , resolution = 0.1
-      , vals = 1
+      , vals       = 1
       ## Wrap to avoid problems with targets
     )) |>
     terra::wrap())
 
   ## Import base predictors from the predictor processing project
-  , tar_target(base_predictors_directory,
-               create_data_directory(directory_path = "data/africa_full_predictor_data"))
+, tar_target(base_predictors_directory, create_data_directory(directory_path = "data/africa_full_predictor_data"))
 
   ## Download predictor files from AWS if they don't already exist
-  , tar_target(base_predictors_AWS,
-               AWS_get_folder(
-                 base_predictors_directory
-               , skip_fetch = TRUE
-               , sync_with_remote = FALSE)
-               , error = "continue"
-               , cue   = tar_cue("always"))
+, tar_target(base_predictors_AWS, AWS_get_folder(
+    base_predictors_directory
+  , skip_fetch       = TRUE
+  , sync_with_remote = FALSE)
+  , error            = "continue"
+  , cue              = tar_cue("always"))
 
-  ## Read all parquet files in the directory using Arrow
-  , tar_target(base_predictors,
-               list.files(base_predictors_directory, pattern = "\\.parquet$", full.names = TRUE))
+  ## Collect all parquet file paths — no format so this is a plain character vector target
+, tar_target(base_predictor_paths, list.files(base_predictors_directory, pattern = "\\.parquet$", full.names = TRUE))
+
+  ## One branch per file so downstream map(base_predictors) works; format = "file" tracks changes
+, tar_target(base_predictors, base_predictor_paths, format = "file", pattern = map(base_predictor_paths))
 
   ## Import RVF outbreak data
-  , tar_target(rvf_outbreaks, get_wahis_rvf_outbreaks() |>
+, tar_target(rvf_outbreaks, get_wahis_rvf_outbreaks() |>
                  mutate(
                    start_date = coalesce(outbreak_start_date, outbreak_end_date)
                  , end_date   = coalesce(outbreak_end_date, outbreak_start_date)
@@ -76,75 +76,74 @@ data_import_targets <- tar_plan(
                  mutate(outbreak_id = seq_len(n())))
 
   ## Import RVF seroprevalence data
-  , tar_target(rvf_seroprevalence, readRDS("data/cases_sero.Rds")$sero_data |> mutate(index = seq_len(n())))
+, tar_target(rvf_seroprevalence, readRDS("data/cases_sero.Rds")$sero_data |> mutate(index = seq_len(n())))
 
   ## Set up directory for cleaned case data
-  , tar_target(rvf_response_directory
-    , create_data_directory(directory_path = "data/rvf_response"))
+, tar_target(rvf_response_directory, create_data_directory(directory_path = "data/rvf_response"))
 
   ## Rebuild dates used to generate predictors (also used in previous pipeline)
-  , tar_target(dates_in_predictors, set_model_dates(
-      start_year = 2005
-    , end_year = lubridate::year(Sys.time())
-    , n_per_month = 2
-    , seed = 212)
-  , cue = tar_cue("always"))
+, tar_target(dates_in_predictors, set_model_dates(
+    start_year  = 2005
+  , end_year    = lubridate::year(Sys.time())
+  , n_per_month = 2
+  , seed        = 212)
+  , cue         = tar_cue("always"))
 
   ## Conceivably there could be a situation where we would want to make predictions for
   ## dates that do not perfectly align with the same dates that we used to generate our
   ## predictions, so writing the downstream functions to allow for that.
   ## *However* for now proceeding with these two dates being the same
-  , tar_target(dates_for_predictions, dates_in_predictors)
+, tar_target(dates_for_predictions, dates_in_predictors)
 
   ## dates_for_predictions --> rvf_response --> rvf_model_data
 
   ## Creates a tibble that contains, for each given dates_to_process
   ## and forecast interval, the outbreaks in the forecast interval duration
   ## after the given dates_to_process
-  , tar_target(rvf_response, get_rvf_response(
-      rvf_outbreaks
-    , wahis_raster_template
-    , forecast_intervals = c(1, 30, 60, 90, 120, 150)
-    , dates_to_process   = dates_in_predictors
-    , local_folder       = rvf_response_directory)
-  , format     = "file"
-  , repository = "local")
+, tar_target(rvf_response, get_rvf_response(
+    rvf_outbreaks
+  , wahis_raster_template
+  , forecast_intervals = c(1, 30, 60, 90, 120, 150)
+  , dates_to_process   = dates_in_predictors
+  , local_folder       = rvf_response_directory)
+  , format               = "file"
+  , repository           = "local")
 
   ## Sub Region (e.g., Country) and Sub-Sub Regions (e.g., adm2 -- i.e., district or county) of interest
-  , tar_target(region_name, ifelse(using_hexes, "pan_hex", "pan"))
+, tar_target(region_name, ifelse(using_hexes, "pan_hex", "pan"))
 
-  , tar_target(region_data_directory, create_data_directory(
-      directory_path = paste("data/", region_name, "_full_response_data", sep = "")))
+, tar_target(region_data_directory, create_data_directory(
+    directory_path = paste("data/", region_name, "_full_response_data", sep = "")))
 
   ## Pulls all African countries. Alternatively can just provide a single country
    ## directly to get_region_districts below
-  , tar_target(all_african_countries, {
-    ne_countries(continent = "Africa", returnclass = "sf") |>
-      st_drop_geometry() |>
-      pull(admin) |>
-      sort()})
+, tar_target(all_african_countries, {
+   ne_countries(continent = "Africa", returnclass = "sf") |>
+    st_drop_geometry() |>
+    pull(admin) |>
+    sort()})
 
   ## Sub-regions of region of interest
    ## Takes a character vector of any length
-  , tar_target(region_districts, get_region_districts(c(all_african_countries, "MYT", "COM")))
+, tar_target(region_districts, get_region_districts(c(all_african_countries, "MYT", "COM")))
 
   ## Build the alternative hexagon-based spatial aggregation
-  , tar_target(region_hexes, make_hex_grid_h3(
-      template_rast   = unwrap(wahis_raster_template)
-    , target_area_km2 = 12000
-    , h3_res          = NULL))
+, tar_target(region_hexes, make_hex_grid_h3(
+    template_rast   = unwrap(wahis_raster_template)
+  , target_area_km2 = 12000
+  , h3_res          = NULL))
 
-  , tar_target(region_map, if (using_hexes) {
-      region_hexes
-    } else {
-      region_districts
-    })
+, tar_target(region_map, if (using_hexes) {
+    region_hexes
+  } else {
+    region_districts
+  })
 
   ## Prep the seroprevalence-cases dataset
-  , tar_target(cases_sero, prep_cases_sero_dataset(
-      sero_dat  = rvf_seroprevalence
-    , cases_dat = rvf_outbreaks
-    , map_dat   = region_map))
+, tar_target(cases_sero, prep_cases_sero_dataset(
+    sero_dat  = rvf_seroprevalence
+  , cases_dat = rvf_outbreaks
+  , map_dat   = region_map))
 
 )
 
@@ -186,7 +185,7 @@ modeling_targets <- tar_plan(
   , with_outbreaks = built_sero_for_outbreaks
   , all_dates      = prepped_all_dates
   , outpath        = "data/sero_layer.parquet"
-  , overwrite      = FALSE)
+  , overwrite      = TRUE)
   , error          = "null"
   , format         = "file")
 
@@ -201,7 +200,7 @@ rvf_processing_targets <- tar_plan(
 
 ## Determine the Country and ADM2 (or 1) region and H3 hex for all of the x, y coordinates
  tar_target(region_data_template, mask_and_cluster_build_template(
-    cov_files        = base_predictors[1]
+    cov_files       = base_predictors[1]
   , hex_sf          = region_hexes
   , countries_sf    = region_districts
   , district_id_col = "shapeName"
@@ -212,43 +211,50 @@ rvf_processing_targets <- tar_plan(
  ## with Sub-Sub Regions identified
  ## Build smaller more manageable .parquet files composed of the same dates but
 , tar_target(region_data, mask_and_cluster_from_template(
-      template        = region_data_template
-    , cov_files        = base_predictors
-    , out_dir         = region_data_directory
-    , overwrite       = TRUE)
-  , pattern = map(base_predictors)
-  , error   = "null"
-  , format  = "file")
+    template  = region_data_template
+  , cov_files  = base_predictors
+  , out_dir   = region_data_directory
+  , overwrite = FALSE)
+  , pattern   = map(base_predictors)
+  , error     = "null"
+  , format    = "file")
 
   ## Set up folders for the cleaned data
-  , tar_target(region_cleaned_data_directory, create_data_directory(
-     directory_path = paste("data/", region_name, "_cleaned_response_data", sep = "")))
+, tar_target(region_cleaned_data_directory, create_data_directory(
+   directory_path = paste("data/", region_name, "_cleaned_response_data", sep = "")))
 
-  , tar_target(region_joined_data_directory, create_data_directory(
-     directory_path = paste("data/", region_name, "_joined_response_data", sep = "")))
+, tar_target(region_joined_data_directory, create_data_directory(
+   directory_path = paste("data/", region_name, "_joined_response_data", sep = "")))
 
   ## First step in building the lagged variables of figuring out what files are needed for each
    ## of the lags. Save these details for each individual date in a list of tibbles
-  , tar_target(prepped_dates, prep_dates(
-      cov_files     = region_data[-length(region_data)]
-    , rvf_response = rvf_response))
+, tar_target(prepped_dates, prep_dates(
+    cov_files    = region_data
+  , rvf_response = rvf_response))
 
   ## some finicky bs to get arrow to work. For whatever reason will not work unless I pull these out
    ## of the prepped_dates object
-  , tar_target(file_path_per_date, lapply(prepped_dates, FUN = function(x) x$filename[1]) |> unlist())
+, tar_target(file_path_per_date, lapply(prepped_dates, FUN = function(x) x$filename[1]) |> unlist())
 
   ## Calculate lags, join cases, summarize and build master dataset. Save the output in individual
    ## parquet files by date
 , tar_target(cleaned_region_data, lag_join_aggregate(
-    file_list        = file_path_per_date
+    file_list       = file_path_per_date
   , processed_dates = prepped_dates
-  , cov_files        = region_data[-length(region_data)]
+  , cov_files       = region_data
   , rvf_response    = rvf_response
   , out_dir         = region_cleaned_data_directory
-  , overwrite       = TRUE)
-  , pattern = map(file_path_per_date)
-  , error   = "null"
-  , format  = "file")
+  , overwrite       = FALSE)
+  , pattern         = map(file_path_per_date)
+  , error           = "null"
+  , format          = "file")
+
+  ## Upload to bucket
+, tar_target(cleaned_region_data_AWS_upload, AWS_put_files(
+    transformed_file_list = cleaned_region_data
+  , local_folder          = region_cleaned_data_directory
+  , overwrite             = parse_flag("OVERWRITE_CLEANED_REGION_DATA"))
+  , error                 = "null")
 
   ## Build a single master file
 , tar_target(joined_region_data, combine_lja(
@@ -263,8 +269,15 @@ rvf_processing_targets <- tar_plan(
     region_dat = joined_region_data
   , sero_layer = finished_sero_layer
   , overwrite  = TRUE)
-  , error   = "null"
-  , format  = "file")
+  , error      = "null"
+  , format     = "file")
+
+  ## Upload to bucket
+, tar_target(final_region_data_AWS_upload, AWS_put_files(
+    transformed_file_list = final_region_data
+  , local_folder          = region_joined_data_directory
+  , overwrite             = parse_flag("OVERWRITE_FINAL_REGION_DATA"))
+  , error                 = "null")
 
 )
 
