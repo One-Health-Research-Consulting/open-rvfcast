@@ -22,6 +22,9 @@ for (f in list.files(here::here("R"), full.names = TRUE)) source(f)
 
 aws_bucket <- Sys.getenv("AWS_BUCKET_ID")
 
+## Get the "purpose" of the current run (full model 'train' or 'forecast')
+purpose <- Sys.getenv("PURPOSE")
+
 ## Targets options
 source("_targets_settings.R")
 
@@ -158,7 +161,6 @@ cross_validation_targets <- tar_plan(
 , tar_target(train_data_fitting, splitted_data_fitting$train_data[[1]])
 , tar_target(test_data_fitting,  splitted_data_fitting$test_data[[1]])
 
-
   ## Number of spatial folds (parameter used in multiple functions)
 , tar_target(n_spatial_folds, 20)
 
@@ -234,6 +236,20 @@ cross_validation_targets <- tar_plan(
   , district_id_col   = district_id_col
   , seed              = 10001
   , holdout_start     = end_date))
+
+## Unique folded data for making forecasts from the most recent date. 
+ ## Separate from the fitting and evaluation pipelines focused just on making predictions
+ ##
+, tar_target(folded_data_forecasting, fold_data(
+    data              = tibble(forecasting = region_data |> list())
+  , type              = "forecasting"
+  , sf_districts      = clustered_Africa_districts
+  , assess_time_chunk = max(forecast_horizon)
+  , step_size         = max(forecast_horizon)
+  , n_spatial_folds   = NULL
+  , district_id_col   = district_id_col
+  , seed              = 10001
+  , current_date      = floor_date(Sys.Date(), "month")))
 
 )
 
@@ -394,8 +410,10 @@ model_tuning_targets <- tar_plan(
 , tar_target(finalized_hyperparameters, finalize_hyperparameters_from_inner(
     inner_folds = tuned_results_per_outer_fold
   , metric      = "mix"
+    ## The larger the weightval the more you penalize high predictions for true 0s
   , weightval   = 0.1
-  , direction   = "max"))
+  , direction   = "max"
+  , which_auc   = "roc_auc"))
 
   ## Older strategy of picking the optimal set of hyperparameters by:
    ## A) picking single optimal set per outer fold, then fitting across all inner folds
