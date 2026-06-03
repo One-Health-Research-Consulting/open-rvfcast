@@ -27,7 +27,7 @@ fold_data <- function(
   , ...
   ) {
 
-  if (type %notin% c("train_data", "test_data")) {
+  if (type %notin% c("train_data", "test_data", "forecasting")) {
     stop("Choose train_data or test_data for parameter 'type'")
   }
 
@@ -76,7 +76,7 @@ fold_data <- function(
 
   })
 
-  } else {
+  } else if (type == "test_data") {
 
   start_date <- min(unique(data$date))
   end_date   <- max(unique(data$date)) - step_size
@@ -108,11 +108,33 @@ fold_data <- function(
     )
 
   })
+  
+  outer_folds |> mutate(type = "test_data", .before = 1)
 
-  }
+  ## forecast
+  } else {
+    
+    other_parms <- list(...)
+    
+    start_date <- min(unique(data$date))
+    end_date   <- other_parms$current_date
+    
+    train_end    <- end_date
+    assess_start <- end_date
+    
+    training  <- data |> filter(date <= train_end) |> pull(index)
+    assessing <- data |> filter(date >= assess_start & date <= assess_end) |> pull(index)
+    
+    outer_folds <- tibble(
+      outer_fold_id = 1
+    , train_data    = training |> list()
+    , assess_data   = assessing |> list()
+    , train_range   = paste(min(data$date), train_end)
+    , assess_range  = NA
+    )
+    
+    outer_folds |> mutate(type = "forecasting", .before = 1)
 
-  if (type == "test_data") {
-    return(outer_folds |> mutate(type = "test_data", .before = 1))
   }
 
   ## Join in the pre-created clustered Africa regions from the target clustered_Africa_districts

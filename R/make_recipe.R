@@ -10,10 +10,10 @@
 #' @export
 
 make_recipe <- function(train_data, id_cols) {
-  recipe(outbreak ~ ., data = train_data) %>%
-    update_role(all_of(id_cols), new_role = "ID") %>%
-    step_rm(all_of(id_cols)) %>%
-    step_zv(all_predictors()) %>%
+  recipe(outbreak ~ ., data = train_data) |>
+    update_role(all_of(id_cols), new_role = "ID") |>
+    step_rm(all_of(id_cols)) |>
+    step_zv(all_predictors()) |>
     step_dummy(all_nominal_predictors(), one_hot = TRUE)
 }
 
@@ -40,8 +40,8 @@ make_model <- function(params, start_p, spw) {
   , min_n          = params$min_n
   , loss_reduction = params$loss_reduction
   , mtry           = params$mtry
-  ) %>%
-    set_mode("classification") %>%
+  ) |>
+    set_mode("classification") |>
     set_engine(
       "xgboost"
     , objective        = "binary:logistic"
@@ -64,34 +64,40 @@ compute_metrics_vec <- function(truth, threshold, weightings, caseweights, prob1
   p     <- n_pos / n_all
   q     <- 1 - p
   logloss_baseline <- if(p == 0){0}else{-(p*log(p) + q*log(q))}
-  
+
+  ## Constant predictions produce a degenerate two-point PR curve whose trapezoidal
+  ## AUC equals (1 + prevalence) / 2 regardless of calibration -- appearing near 0.501
+  ## for rare events and scoring far above the true no-skill baseline of prevalence.
+  ## ROC-AUC handles ties correctly (returns 0.5) so needs no special casing.
+  no_discrimination <- diff(range(prob1)) < .Machine$double.eps
+
   ttib <- tibble(
       n_pos     = n_pos
     , n_all     = n_all
-    , pr_auc    = pr_auc_vec(truth, prob1, event_level = event_level)
+    , pr_auc    = if (no_discrimination || n_pos == 0) NA_real_ else pr_auc_vec(truth, prob1, event_level = event_level)
     , roc_auc   = roc_auc_vec(truth, prob1, event_level = event_level)
     , recall    = tibble(
         threshold = threshold
-      , recall    = apply(class_hat, 2, FUN = function(x) recall_vec(truth, x %>% factor(levels = c("1", "0")), event_level = event_level))
-    ) %>% list()
+      , recall    = apply(class_hat, 2, FUN = function(x) recall_vec(truth, x |> factor(levels = c("1", "0")), event_level = event_level))
+    ) |> list()
     , precision = tibble(
         threshold = threshold
-      , precision = apply(class_hat, 2, FUN = function(x) precision_vec(truth, x %>% factor(levels = c("1", "0")), event_level = event_level))
-    ) %>% list()
+      , precision = apply(class_hat, 2, FUN = function(x) precision_vec(truth, x |> factor(levels = c("1", "0")), event_level = event_level))
+    ) |> list()
     , logloss          = yardstick::mn_log_loss_vec(truth, prob1)
     , logloss_weighted = tibble(
         weighting = weightings
-      , precision = apply(weightings %>% matrix(), 1, FUN = function(x) {
+      , precision = apply(weightings |> matrix(), 1, FUN = function(x) {
         tweights <- as.numeric(caseweights)
         tweights <- ifelse(tweights > 1, x, 1)
         yardstick::mn_log_loss_vec(truth, prob1, case_weights = tweights)})
-      ) %>% list()
-  ) %>% mutate(
+      ) |> list()
+  ) |> mutate(
     exlogloss   = max(0, logloss - logloss_baseline)
   )
- 
+
   ttib
-  
+
 }
 
 calc_spw <- function(df, outcome = "outbreak") {
@@ -104,12 +110,12 @@ calc_spw <- function(df, outcome = "outbreak") {
 
 ##### ------------------------------------------------------------------------------------
 
-#' Port the manual splits into a tidymodels object 
+#' Port the manual splits into a tidymodels object
 #'
 #'
 #' @title build_inner_rset
 
-#' @return base model scaffold 
+#' @return base model scaffold
 #' @param inner_train inner fold training data (spatial regions left in)
 #' @param inner_asses inner fold assess data (left out spatial region)
 #' @param outer_train full set of data for the given outer fold
@@ -119,10 +125,10 @@ calc_spw <- function(df, outcome = "outbreak") {
 #' @export
 
 build_inner_rset <- function(inner_train, inner_assess, outer_train, id_cols, inner_fold_id) {
-  
+
   ## Quick check for consistency between outer and inner folds
   stopifnot(all(id_cols %in% names(outer_train)))
-  
+
   ## Steps to map rows of inner folds training and assess back to the complete outer folds data
   keyfun    <- function(df) paste(df[[id_cols[1]]], df[[id_cols[2]]], sep = "||")
   outer_key <- keyfun(outer_train)
@@ -131,10 +137,10 @@ build_inner_rset <- function(inner_train, inner_assess, outer_train, id_cols, in
   tr_idx    <- tr_idx[!is.na(tr_idx)]
   te_idx    <- te_idx[!is.na(te_idx)]
   splits    <- rsample::make_splits(list(analysis = tr_idx, assessment = te_idx), outer_train)
-  
+
   rsample::manual_rset(
-    splits = splits %>% list()
+    splits = splits |> list()
   , ids    = paste("Inner fold", inner_fold_id, sep = " ")
   )
-  
+
 }

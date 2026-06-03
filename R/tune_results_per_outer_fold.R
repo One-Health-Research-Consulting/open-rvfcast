@@ -455,8 +455,9 @@ tune_results_across_outer_folds <- function(outer_data, train_data, threshold, w
 #' @param inner_folds Character vector of all file paths returned by the
 #'   tuned_results_per_outer_fold target (one path per outer x inner x index branch)
 #' @param metric Character; only "mix" is currently supported
-#' @param weightval Numeric >= 0; penalty weight on S_calib relative to S_disc
-#' @param direction Character; must be "max"
+#' @param weightval Numeric >= 0; penalty weight on S_calib relative to S_disc (greater = more penalty on high prob for true 0s)
+#' @param direction Character, max or min
+#' @param which_auc which auc calculation to use ("pr_auc" or "roc_auc"); for our purposes pr_auc generally better but leaving option
 #' @return Single-row tibble containing final_score, S_disc, S_calib,
 #'   n_pos_folds (number of folds with at least one positive case), n_total_folds,
 #'   total_n_pos, metric, weightval, index, and all hyperparameter values
@@ -464,9 +465,10 @@ tune_results_across_outer_folds <- function(outer_data, train_data, threshold, w
 #' @author Morgan Kain
 #' @export
 
-finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, direction) {
+finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, direction, which_auc = "pr_auc") {
 
   stopifnot(metric    == "mix")
+  ## For my current setup only max makes sense
   stopifnot(direction == "max")
   stopifnot(is.numeric(weightval), length(weightval) == 1, weightval >= 0)
 
@@ -481,7 +483,7 @@ finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, 
       ## S_disc: n_pos-weighted mean pr_auc, restricted to folds with positive cases.
       ## pmax(..., 1L) guards against the degenerate case where an index was never
       ## evaluated on any fold with a positive case, returning 0 rather than NaN/Inf.
-      S_disc = sum(pr_auc * n_pos, na.rm = TRUE) /
+      S_disc = sum(get(which_auc) * n_pos, na.rm = TRUE) /
                pmax(sum(n_pos[n_pos > 0], na.rm = TRUE), 1L)
 
       ## S_calib: n_all-weighted mean excess log-loss across ALL folds.
@@ -501,6 +503,8 @@ finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, 
     , metric      = metric
     , weightval   = weightval
     )
+  
+  # scores %>% arrange(final_score) %>% mutate(ii = seq(n()) %>% as.factor()) %>% {ggplot(., aes(ii, final_score)) + geom_point()}
 
   ## Select the single index with the highest combined score
   best <- scores |>
