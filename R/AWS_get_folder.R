@@ -139,6 +139,62 @@ AWS_get_folder <- function(local_folder,
 }
 
 
+#' List Filenames in an AWS S3 Folder
+#'
+#' This function returns the names of all files in a specified folder within the AWS S3 bucket,
+#' without downloading any content.
+#'
+#' @author Morgan P. Kain
+#'
+#' @param folder_name String specifying the remote folder (prefix) within the S3 bucket to list.
+#' @param ... Additional arguments not used by this function but included for generic function compatibility.
+#'
+#' @return A character vector of S3 object keys (file paths) found under the given prefix.
+#'   Returns NULL if no files are found.
+#'
+#' @note This function requires the AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, and
+#'   AWS_BUCKET_ID environment variables to be set. These are typically set in the .env file or
+#'   system environment.
+#'
+#' @examples
+#' AWS_get_filenames(folder_name = "remote/directory")
+#'
+#' @export
+AWS_get_filenames <- function(folder_name, ...) {
+
+  # Check if AWS credentials and region are set in the environment
+  if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
+    msg <- paste(
+      "AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION environment variables",
+      "must all be set to access AWS. Please ensure they are configured correctly,",
+      "probably in the .env file or system environment."
+    )
+    stop(msg)
+  }
+
+  aws_region <- if (Sys.getenv("AWS_REGION") == "auto") "" else Sys.getenv("AWS_REGION")
+
+  # Retrieve the bucket listing for the given folder prefix; max = Inf forces pagination past the default 1000-object S3 limit
+  df_bucket_data <- aws.s3::get_bucket(
+    bucket   = Sys.getenv("AWS_BUCKET_ID"),
+    prefix   = paste0(folder_name, "/"),
+    region   = aws_region,
+    base_url = Sys.getenv("AWS_S3_ENDPOINT"),
+    max      = Inf
+  )
+
+  # Extract the S3 object keys from the bucket listing
+  s3_files <- map_chr(df_bucket_data, pluck, "Key")
+
+  if (length(s3_files) == 0) {
+    cat("No files found in the specified S3 bucket and prefix.\n")
+    return(NULL)
+  }
+
+  s3_files
+}
+
+
 #' Upload Transformed Files to AWS S3
 #'
 #' This function uploads transformed files to an AWS S3 bucket, handling large file quantities
@@ -257,10 +313,10 @@ AWS_put_files <- function(transformed_file_list,
     needed_dates <- all_dates[which(all_dates >= first_date)]
     transformed_file_list <- purrr::map(needed_dates, .f = function(x) {
       transformed_file_list[which(grepl(x, transformed_file_list))]
-    }) |> 
+    }) |>
       unlist()
   }
-  
+
   # Walk through transformed_file_list (can be a single file or vector of files)
   for (file in transformed_file_list) {
 

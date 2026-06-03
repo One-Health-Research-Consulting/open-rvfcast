@@ -89,6 +89,8 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
       message(glue::glue("Failed to fetch {basename(nc_file)}. Response: {response$status_code}"))
       if(response$status_code == 404) message("404 errors generally mean Nasa hasn't added the data for that date to the S3 bucket yet")
       failed_downloads <<- c(failed_downloads, yyyymmdd)
+      # Clean up the error response body written to disk by httr2
+      if(file.exists(nc_file)) file.remove(nc_file)
       return(NULL)
     }
 

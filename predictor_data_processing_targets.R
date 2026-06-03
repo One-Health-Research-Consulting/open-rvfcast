@@ -17,6 +17,9 @@ for (f in list.files(here::here("R"), full.names = TRUE)) source(f)
 
 aws_bucket <- Sys.getenv("AWS_BUCKET_ID")
 
+## Get the "purpose" of the current run (full model 'train' or 'forecast')
+purpose <- Sys.getenv("PURPOSE")
+
 ## Targets options
 source("_targets_settings.R")
 
@@ -132,7 +135,7 @@ static_targets <- tar_plan(
   , repository                = "local")
 
 , tar_target(aspect_preprocessed_AWS_upload, AWS_put_files(
-    transformed_file_list = aspect_preprocessed
+    transformed_file_list  = aspect_preprocessed
   , local_folder          = aspect_directory
   , overwrite             = parse_flag("OVERWRITE_STATIC_DATA"))
     ## Continue the pipeline even on error
@@ -309,12 +312,43 @@ dynamic_targets <- tar_plan(
   ## random draws for the previous years won't change unless the seed is updated.
   ## Ideally we want to make the full dataset for every day and store it then subset
   ## only right before fitting the model.
-  tar_target(dates_to_process, set_model_dates(
+  tar_target(dates_to_process_all, set_model_dates(
     start_year  = 2005
   , end_year    = lubridate::year(Sys.time())
   , n_per_month = 2
   , seed        = 212)
   , cue = tar_cue("always"))
+
+  ## Pull the names of the full africa parquet files from the bucket and figure out what
+   ## files need updating based on which files are missing | the dates in dates_to_process_all
+, tar_target(dates_to_process, {
+    full_parquet_files    <- AWS_get_filenames(africa_full_predictor_data_directory)
+    full_parquet_max_date <- purrr::map(full_parquet_files, .f = function(i) {
+       (strsplit(i, "data_")[[1]][2] |> strsplit(".parquet"))[[1]][1]
+    }) |>
+    unlist() |>
+    sort() |>
+    tail(1)
+    
+    ## Just the dates for the data we do not yet have
+    narrow_dates    <- dates_to_process_all[which(dates_to_process_all > full_parquet_max_date)]
+    
+    ## Drop all dates in the previous month otherwise because nasa weather and ndvi not 
+     ## yet available for these time periods
+    dates_one_month <- Sys.Date() - 31
+    narrow_dates    <- narrow_dates[-which(narrow_dates > dates_one_month)]
+    
+    ## If forecasting add in the last day of the month before last (assuming that we are 
+     ## fitting at the beginning of a month (if we forecast on the first of every
+     ## month this will get the last day two months prior (e.g., April 30
+     ## if it is currently June 1))
+    if (purpose == "forecast") {
+      narrow_dates <- c(narrow_dates, rollbackward(as_date(floor_date(Sys.Date(), "month") - 2)))
+    } 
+    
+    narrow_dates
+
+  })
 
 , tar_target(months_to_process, dates_to_process |> format("%Y-%m") |> unique())
 
@@ -344,7 +378,7 @@ dynamic_targets <- tar_plan(
     sentinel_ndvi_api_parameters        = sentinel_ndvi_api_parameters
   , continent_raster_template           = continent_raster_template
   , sentinel_ndvi_transformed_directory = sentinel_ndvi_transformed_directory
-  , sentinel_ndvi_token_file            = sentinel_ndvi_token_file
+  , sentinel_ndvi_token_file             = sentinel_ndvi_token_file
   , basename_template                   = "transformed_sentinel_NDVI_{start_date}_to_{end_date}.parquet"
   , overwrite                           = parse_flag("OVERWRITE_SENTINEL_NDVI"))
   , pattern                             = map(sentinel_ndvi_api_parameters)
@@ -421,7 +455,7 @@ dynamic_targets <- tar_plan(
   , command = modis_ndvi_bundle_request |>
       arrange(start_date) |>
       ## Remove duplicate file requests
-      group_by(sha256) |> 
+      group_by(sha256) |>
       slice_max(created, n = 1) |>
       ungroup() |>
       mutate(
@@ -450,7 +484,7 @@ dynamic_targets <- tar_plan(
     , format     = "file"
     ## Repos itory local means it isn't stored on AWS just yet.
     , repository = "local"
-    , error      = "null") 
+    , error      = "null")
 
   ## Put modis_ndvi_transformed files on AWS
 , tar_target(modis_ndvi_transformed_AWS_upload, AWS_put_files(
@@ -564,7 +598,7 @@ dynamic_targets <- tar_plan(
   , sync_with_remote = TRUE)
   , error = "null"
   , cue = tar_cue("always"))
-  
+
   ## Download ecmwf forecasts, project to the template and save as arrow dataset
   ## Note: This target takes a while (mostly because the ECMWF API is slow)
   ## and may need to be run more than once if rebuilding data from scratch
@@ -842,17 +876,18 @@ full_data_targets <- tar_plan(
 
   ## Next step put combined_anomalies files on AWS.
 , tar_target(africa_full_predictor_data_AWS_upload, AWS_put_files(
-    transformed_file_list = africa_full_predictor_data,
+    transformed_file_list  = africa_full_predictor_data,
   , local_folder          = africa_full_predictor_data_directory
-  , overwrite             = TRUE # parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA")
-  , first_date            = "2025-01-08"
-  , all_dates             = dates_to_process)
+  , overwrite             = parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA")
+ # , first_date            = "2025-01-08"
+ # , all_dates            = dates_to_process
+ )
   , pattern               = map(africa_full_predictor_data)
   , error                 = "null"))
 
 ## Separate pipeline for building dataset for REMIT project ---------------------
 REMIT_targets <- tar_plan(
-  
+
   tar_target(REMIT_weather_vars, c(
     ## Theoretically can obtain these as well, but have to use nasapower::get_power and for that
     ## have to provide small regions of the map at a time. So if we want these two variables would
@@ -873,7 +908,7 @@ REMIT_targets <- tar_plan(
       , "surface_temp_avg" = "TS"
       , "wind_speed_10m"   = "WS10M"
       , "wind_speed_2m"    = "WS2M"))
-  
+
 , tar_target(REMIT_weather_vars_N, c("evap_land" = "EVLAND", "surface_wetness" = "GWETTOP"))
 
 , tar_target(nasa_weather_transformed_REMIT_N, fetch_and_transform_nasa_weather(
@@ -919,20 +954,20 @@ REMIT_targets <- tar_plan(
 
 , tar_target(africa_full_predictor_data_REMIT, {
     joined_df <- map(africa_full_predictor_data_sources_REMIT %>% unlist()
-                     , .f = function(this_file) { 
-                       arrow::read_parquet(this_file) 
+                     , .f = function(this_file) {
+                       arrow::read_parquet(this_file)
                        }) |>
       reduce(., left_join, by = c("x", "y"))
-    
+
     joined_df <- joined_df[complete.cases(joined_df), ]
-    
+
     joined_df |> arrow::write_parquet(
       "data/africa_full_predictor_data_REMIT/REMIT_data.parquet"
     , compression = "gzip", compression_level = 5
     )
-    
+
     return("data/africa_full_predictor_data_REMIT/REMIT_data.parquet")
-    
+
   })
 
 )
