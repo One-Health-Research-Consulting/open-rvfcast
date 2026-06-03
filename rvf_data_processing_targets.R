@@ -21,6 +21,9 @@ for (f in list.files(here::here("R"), full.names = TRUE)) source(f)
 
 aws_bucket <- Sys.getenv("AWS_BUCKET_ID")
 
+## Get the "purpose" of the current run (full model 'train' or 'forecast')
+purpose <- Sys.getenv("PURPOSE")
+
 ## Targets options
 source("_targets_settings.R")
 
@@ -30,8 +33,20 @@ using_hexes <- TRUE
 ## Targets for loading needed data ---------------------------------------------
 data_import_targets <- tar_plan(
 
+  ## Rebuild dates used to generate predictors (also used in previous pipeline)
+ tar_target(dates_in_predictors, set_model_dates(
+    start_year  = 2005
+  , end_year    = lubridate::year(Sys.time())
+  , n_per_month = 2
+  , seed        = 212)
+  , cue         = tar_cue("always"))
+  
+  ## Start by loading in a previously saved final_region_data file to determine
+   ## what new data needs to summarized to append this file with new data
+# , tar_target()
+  
   ## Polygon of Africa
-tar_target(continent_polygon, create_africa_polygon())
+, tar_target(continent_polygon, create_africa_polygon())
 
   ## Africa shape object for masking
 , tar_target(wahis_raster_template, terra::rasterize(
@@ -80,14 +95,6 @@ tar_target(continent_polygon, create_africa_polygon())
 
   ## Set up directory for cleaned case data
 , tar_target(rvf_response_directory, create_data_directory(directory_path = "data/rvf_response"))
-
-  ## Rebuild dates used to generate predictors (also used in previous pipeline)
-, tar_target(dates_in_predictors, set_model_dates(
-    start_year  = 2005
-  , end_year    = lubridate::year(Sys.time())
-  , n_per_month = 2
-  , seed        = 212)
-  , cue         = tar_cue("always"))
 
   ## Conceivably there could be a situation where we would want to make predictions for
   ## dates that do not perfectly align with the same dates that we used to generate our
