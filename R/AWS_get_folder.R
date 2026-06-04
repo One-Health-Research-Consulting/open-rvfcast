@@ -139,6 +139,64 @@ AWS_get_folder <- function(local_folder,
 }
 
 
+#' Download a Specific Set of Files from AWS S3
+#'
+#' Downloads a named list of S3 object paths to their mirrored local paths.
+#' Skips files that already exist locally. Returns the local file paths.
+#'
+#' @param s3_paths Character vector of S3 object keys (e.g. from AWS_get_filenames).
+#'   Local paths are assumed to mirror S3 keys (same relative path).
+#' @param ... Additional arguments not used by this function.
+#'
+#' @return Character vector of local file paths that were downloaded or already present.
+#'
+#' @export
+AWS_get_files <- function(s3_paths, ...) {
+
+  if (length(s3_paths) == 0) return(character(0))
+
+  if (any(Sys.getenv(c("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION")) == "")) {
+    stop(paste(
+      "AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION environment variables",
+      "must all be set to access AWS."
+    ))
+  }
+
+  aws_region <- if (Sys.getenv("AWS_REGION") == "auto") "" else Sys.getenv("AWS_REGION")
+
+  local_files <- character(length(s3_paths))
+
+  for (i in seq_along(s3_paths)) {
+    s3_path    <- s3_paths[i]
+    local_path <- s3_path  # S3 keys mirror local paths in this project
+
+    if (!file.exists(local_path)) {
+      dir.create(dirname(local_path), showWarnings = FALSE, recursive = TRUE)
+      tryCatch(
+        aws.s3::save_object(
+          object = s3_path
+        , bucket = Sys.getenv("AWS_BUCKET_ID")
+        , region = aws_region
+        , file   = local_path
+        )
+      , error = function(e) {
+          if (!file.exists(local_path)) stop(e)
+          invisible(NULL)
+        }
+      )
+      cat("Downloaded:", basename(local_path), "\n")
+    } else {
+      cat("Already local:", basename(local_path), "\n")
+    }
+
+    local_files[i] <- local_path
+  }
+
+  local_files
+
+}
+
+
 #' List Filenames in an AWS S3 Folder
 #'
 #' This function returns the names of all files in a specified folder within the AWS S3 bucket,

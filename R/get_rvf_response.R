@@ -32,9 +32,16 @@ get_rvf_response <- function(wahis_outbreaks,
                              forecast_intervals,
                              dates_to_process,
                              local_folder = "data/rvf_response",
-                             save_filename = "rvf_response.parquet") {
+                             save_filename = "rvf_response.parquet",
+                             overwrite    = FALSE) {
 
-  save_filename <- file.path(local_folder, save_filename)
+  save_filename            <- file.path(local_folder, save_filename)
+  error_safe_read_parquet <- purrr::possibly(arrow::open_dataset, NULL)
+  existing_dataset        <- error_safe_read_parquet(save_filename)
+
+  if (!is.null(existing_dataset) && !overwrite) {
+    save_filename
+  }
 
   # Unwrap packed template raster
   wahis_raster_template <- terra::rast(wahis_raster_template)

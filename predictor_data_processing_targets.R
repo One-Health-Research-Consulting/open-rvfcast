@@ -85,7 +85,7 @@ static_targets <- tar_plan(
 , tar_target(soil_preprocessed, preprocess_soil(
     soil_directory            = soil_directory
   , continent_raster_template = continent_raster_template
-  , output_filename           = "soil_preprocessed.parquet"
+  , output_filename            = "soil_preprocessed.parquet"
   , overwrite                 = parse_flag("OVERWRITE_STATIC_DATA")
     ## Enforce dependency
   , soil_AWS)
@@ -322,30 +322,33 @@ dynamic_targets <- tar_plan(
   ## Pull the names of the full africa parquet files from the bucket and figure out what
    ## files need updating based on which files are missing | the dates in dates_to_process_all
 , tar_target(dates_to_process, {
-    full_parquet_files    <- AWS_get_filenames(africa_full_predictor_data_directory)
+    full_parquet_files     <- AWS_get_filenames(africa_full_predictor_data_directory)
     full_parquet_max_date <- purrr::map(full_parquet_files, .f = function(i) {
        (strsplit(i, "data_")[[1]][2] |> strsplit(".parquet"))[[1]][1]
     }) |>
     unlist() |>
     sort() |>
     tail(1)
-    
+
     ## Just the dates for the data we do not yet have
     narrow_dates    <- dates_to_process_all[which(dates_to_process_all > full_parquet_max_date)]
-    
-    ## Drop all dates in the previous month otherwise because nasa weather and ndvi not 
+
+    ## Drop all dates in the previous month otherwise because nasa weather and ndvi not
      ## yet available for these time periods
     dates_one_month <- Sys.Date() - 31
     narrow_dates    <- narrow_dates[-which(narrow_dates > dates_one_month)]
-    
-    ## If forecasting add in the last day of the month before last (assuming that we are 
+
+    ## If forecasting add in the last day of the month before last (assuming that we are
      ## fitting at the beginning of a month (if we forecast on the first of every
      ## month this will get the last day two months prior (e.g., April 30
      ## if it is currently June 1))
     if (purpose == "forecast") {
       narrow_dates <- c(narrow_dates, rollbackward(as_date(floor_date(Sys.Date(), "month") - 2)))
-    } 
-    
+
+      ## If the last date happens to be the same as the randomly chosen date that month, drop it
+      narrow_dates <- unique(narrow_dates)
+    }
+
     narrow_dates
 
   })

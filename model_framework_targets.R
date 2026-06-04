@@ -237,7 +237,7 @@ cross_validation_targets <- tar_plan(
   , seed              = 10001
   , holdout_start     = end_date))
 
-## Unique folded data for making forecasts from the most recent date. 
+## Unique folded data for making forecasts from the most recent date.
  ## Separate from the fitting and evaluation pipelines focused just on making predictions
  ##
 , tar_target(folded_data_forecasting, fold_data(
