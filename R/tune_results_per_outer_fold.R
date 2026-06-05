@@ -10,6 +10,8 @@
 #' @param start_p initilization point for base intercept
 #' @param id_cols Columns that define a unique data point
 #' @param out_dir Where to save output
+#' @param tuning_grid_id id of the current tuning grid to track tuning better 
+#' @param hyperparam_path path to where the best hyperparameter file will be / is saved
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
 #' @param DEBUG If TRUE reduce to a small dataset for code testing
 #' @param checktime_path path to save csv tracking computation time
@@ -18,8 +20,15 @@
 #' @export
 
 tune_results_per_outer_fold <- function(prejoined_data, inner_ids_all, threshold
-                                      , weightings, start_p, id_cols, out_dir, overwrite, DEBUG
+                                      , weightings, start_p, id_cols, out_dir
+                                      , tuning_grid_id, hyperparam_path, overwrite, DEBUG
                                       , checktime_path) {
+  
+  ## First, check if this tuning_grid_id already has a saved best parameter set.
+   ## Slightly awkward to 
+  if (file.exists(hyperparam_path)) {
+    return(hyperparam_path)
+  }
 
   ## Extract the outer fold ID and the pre-joined covariate data for this branch.
   ## joined_data already contains inner fold indices left-joined with train_data covariates,
@@ -53,6 +62,8 @@ checktime_path.full <- paste0(checktime_path, "/outer_fold_", outer_fold_id, ".c
       , "_inner_fold_"
       , inner_id
       , "_tune_grid_"
+      , tuning_grid_id
+      , "_tune_index_"
       , tuning_grid$index
       , ".Rds"
       , sep = ""
@@ -161,12 +172,12 @@ checktime_path.full <- paste0(checktime_path, "/outer_fold_", outer_fold_id, ".c
 
   })
 
-checktime_tibble <- bind_rows(
-   checktime_tibble
- , tibble(user = checktime[1], sys = checktime[2], elapsed = checktime[3])
-)
+    checktime_tibble <- bind_rows(
+      checktime_tibble
+    , tibble(user = checktime[1], sys = checktime[2], elapsed = checktime[3])
+    )
 
-write.csv(checktime_tibble, checktime_path.full)
+    write.csv(checktime_tibble, checktime_path.full)
 
   }
 
@@ -458,6 +469,8 @@ tune_results_across_outer_folds <- function(outer_data, train_data, threshold, w
 #' @param weightval Numeric >= 0; penalty weight on S_calib relative to S_disc (greater = more penalty on high prob for true 0s)
 #' @param direction Character, max or min
 #' @param which_auc which auc calculation to use ("pr_auc" or "roc_auc"); for our purposes pr_auc generally better but leaving option
+#' @param tuning_grid_id string for this tuning grid
+#' @param outpath where to save the best hyperparameter set
 #' @return Single-row tibble containing final_score, S_disc, S_calib,
 #'   n_pos_folds (number of folds with at least one positive case), n_total_folds,
 #'   total_n_pos, metric, weightval, index, and all hyperparameter values
@@ -465,8 +478,17 @@ tune_results_across_outer_folds <- function(outer_data, train_data, threshold, w
 #' @author Morgan Kain
 #' @export
 
-finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, direction, which_auc = "pr_auc") {
+finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, direction, which_auc = "pr_auc"
+                                                , tuning_grid_id, outpath) {
+  
+  ## First, check if this tuning_grid_id already has a saved best parameter set
+  if (file.exists(outpath)) {
+    return(outpath)
+  }
 
+  ## Make the outpath if it doesn't exist yet
+  create_data_directory(directory_path = strsplit(outpath, "/best_hyperparameters")[[1]][1])
+  
   stopifnot(metric    == "mix")
   ## For my current setup only max makes sense
   stopifnot(direction == "max")
@@ -514,13 +536,18 @@ finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, 
   ## Recover the hyperparameter values for the winning index.
   ## trees / tree_depth / learn_rate / min_n / loss_reduction / mtry are constant
   ## across all rows sharing an index, so distinct() always yields exactly one row.
-  best |>
+  best <- best |>
     left_join(
       all_results |>
         dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
-        distinct()
-    , by = "index"
+        distinct(), by = "index") |>
+    mutate(
+      tuning_grid_id = tuning_grid_id, .before = index
     )
+  
+  write.csv(best, outpath)
+   
+  outpath
 
 }
 

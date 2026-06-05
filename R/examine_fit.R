@@ -10,26 +10,43 @@
 #' @param africa_sf path to saved previously cleaned combined sf of all sub-regions (created with combine_africa_sf)
 #' @param region_to_sum country or other region type into which to summarize predictions
 #' @param p_thresh probability over which to assign a one
+#' @param using_hexes true or false
+#' @param outpath path to saved exploration
+#' @param outpath_for_for outpath for forecasts to hand off
+#' @param outpath_for_app outpath for internal diagnostics app
+#' @param purpose whether the main purpose of this run is for fitting and evaluation (train) or forecasting (forecast)
+#' @param overwrite overwrite files or not
 #' @return Tibble of summary metrics of model fit
 #' @author Morgan Kain
 #' @export
 
 examine_fits_within <- function(model_out, test_data, regions, larger_districts
                                 , africa_sf, region_to_sum, p_thresh, using_hexes
-                                , outpath, outpath_for_app, overwrite) {
+                                , outpath, outpath_for_for, outpath_for_app
+                                , overwrite, ...) {
 
   print(model_out$outer_fold_id)
+  
+  other_parms <- list(...)
+  
+  if (purpose == "training") {
 
   if (is.null(region_to_sum)) {
-    outname <- paste(paste(outpath, "/", sep = ""), "predictions_raw_", model_out$outer_fold_id, ".qs", sep = "")
+    outname <- paste(paste(outpath, "/", sep = "")
+                     , "predictions_raw_", model_out$type[1], "_"
+                     , model_out$outer_fold_id, ".qs"
+                     , sep = "")
   } else {
-    outname <- paste(paste(outpath, "/", sep = ""), "predictions_collapsed_", model_out$outer_fold_id, ".qs", sep = "")
+    outname <- paste(paste(outpath, "/", sep = "")
+                     , "predictions_collapsed_", model_out$type[1], "_"
+                     , model_out$outer_fold_id, ".qs"
+                     , sep = "")
   }
 
   if (file.exists(outname) && !overwrite) {
     return(outname)
   }
-
+  
   ## Combine predictions with the data
   dat_with_pred <- model_out$preds[[1]] |>
     mutate(
@@ -322,6 +339,65 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
  qsave(out_list, outname)
 
  outname
+ 
+ ## forecasting requires less, can always add to later if desired, though can't really evaluate
+  ## given that these are true forecasts without known info
+ } else {
+    
+   ## Combine predictions with the data
+   dat_with_pred <- model_out$preds[[1]] |>
+     mutate(
+       index    = model_out$assess_data[[1]]
+       , outbreak = as.numeric(as.character(.pred_class))
+       , .before  = 1
+     ) |>
+     dplyr::select(-.pred_class) |>
+     rename(outbreak_pred = outbreak) |>
+     left_join(test_data |> filter(index %in% model_out$assess_data[[1]]))
+   
+   ## Load the previously created / saved Africa map of sub-regions per Country
+   if (!using_hexes) {
+     africa_sf <- readRDS(africa_sf) |>
+       mutate(country_norm = norm_key(country),
+              region_norm  = norm_key(region))
+   } else {
+     africa_sf     <- larger_districts[[1]] |> rename(region_norm = shapeName) |> mutate(country_norm = "null")
+     eval_regions  <- regions[[1]]
+     dat_with_pred <- dat_with_pred |> mutate(region_norm = h3jsr::get_parent(shapeName, 2), .after = shapeName)
+   }
+   
+   dat_with_pred <- dat_with_pred |> 
+     filter(date == max(date)) |> 
+     dplyr::select(
+       shapeName, Country, ADM2, Proportion_ADM2, date
+       , forecast_interval, .pred_1
+     ) |>
+     rename(outbreak_probability = .pred_1, H3 = shapeName)
+   
+   country_preds <- dat_with_pred |> filter(Country == other_parms$country_code)
+   
+   country_preds <- eval_regions %>% 
+     rename(H3 = shapeName) %>% 
+     left_join(., country_preds) %>%
+     filter(!is.na(Proportion_ADM2))
+   
+   country_preds.share <- country_preds |> 
+     as.data.frame() %>% 
+     dplyr::select(-geometry)
+   
+   ## Create folder if it is needed
+   create_data_directory(outpath_for_for)
+   
+   africa_outpath  <- paste0(outpath_for_for, "/forecasts_for_", "Africa", "_", unique(dat_with_pred$date), ".json")
+   country_outpath <- paste0(outpath_for_for, "/forecasts_for_", other_parms$country_code, "_", unique(dat_with_pred$date), ".json")
+   
+   ## Save the two files as JSONs
+   write_json(dat_with_pred, africa_outpath, pretty = TRUE)
+   write_json(country_preds.share, country_outpath, pretty = TRUE)
+   
+   c(africa_outpath, country_outpath)
+    
+}
 
 }
 

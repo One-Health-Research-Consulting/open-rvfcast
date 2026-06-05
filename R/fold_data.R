@@ -75,6 +75,8 @@ fold_data <- function(
     )
 
   })
+  
+  outer_folds <- outer_folds |> mutate(type = "train_data", .before = 1)
 
   } else if (type == "test_data") {
 
@@ -109,18 +111,22 @@ fold_data <- function(
 
   })
   
-  outer_folds |> mutate(type = "test_data", .before = 1)
+  outer_folds <- outer_folds |> mutate(type = "test_data", .before = 1)
 
   ## forecast
   } else {
     
     other_parms <- list(...)
     
-    start_date <- min(unique(data$date))
-    end_date   <- other_parms$current_date
+    all_dates  <- unique(data$date)
+    start_date <- min(all_dates)
     
+    ## Stop the date before 150 days before the present date
+    end_date     <- all_dates[max(which(all_dates < all_dates[length(all_dates)] - 150))]
+
     train_end    <- end_date
-    assess_start <- end_date
+    assess_start <- all_dates[min(which(all_dates > end_date))]
+    assess_end   <- other_parms$current_date
     
     training  <- data |> filter(date <= train_end) |> pull(index)
     assessing <- data |> filter(date >= assess_start & date <= assess_end) |> pull(index)
@@ -130,11 +136,10 @@ fold_data <- function(
     , train_data    = training |> list()
     , assess_data   = assessing |> list()
     , train_range   = paste(min(data$date), train_end)
-    , assess_range  = NA
-    )
-    
-    outer_folds |> mutate(type = "forecasting", .before = 1)
-
+    , assess_range  = paste(assess_start, assess_end)
+    ) |> 
+      mutate(type = "forecasting", .before = 1)
+  
   }
 
   ## Join in the pre-created clustered Africa regions from the target clustered_Africa_districts
@@ -164,8 +169,8 @@ fold_data <- function(
 
   }
 
-  outer_folds |> mutate(type = "train_data", .before = 1)
-
+  outer_folds
+  
 }
 
 

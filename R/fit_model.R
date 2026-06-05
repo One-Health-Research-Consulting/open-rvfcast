@@ -20,13 +20,20 @@
 
 fit_model <- function(final_hyper_set, full_data, train_data, test_data, threshold, weightings, start_p, id_cols, out_dir, overwrite, DEBUG) {
 
+  ## load the csv of the finalized hyperparameter set
+  final_hyper_set <- read.csv(final_hyper_set)
+  
   ## Set filenames
   save_filename <- paste(
       out_dir
     , "/"
     , "model_fit_"
     , full_data$outer_fold_id
-    , "_"
+    , "_for_"
+    , full_data$type[1]
+    , "_tune_grid_"
+    , final_hyper_set$tuning_grid_id
+    , "_tune_index_"
     , final_hyper_set$index
     , ".Rds"
     , sep = "")
@@ -37,7 +44,11 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
     , "/"
     , "parsnip_fit_"
     , full_data$outer_fold_id
-    , "_"
+    , "_for_"
+    , full_data$type[1]
+    , "_tune_grid_"
+    , final_hyper_set$tuning_grid_id
+    , "_tune_index_"
     , final_hyper_set$index
     , ".Rds"
     , sep = "")
@@ -47,7 +58,11 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
     , "/"
     , "recipe_"
     , full_data$outer_fold_id
-    , "_"
+    , "_for_"
+    , full_data$type[1]
+    , "_tune_grid_"
+    , final_hyper_set$tuning_grid_id
+    , "_tune_index_"
     , final_hyper_set$index
     , ".Rds"
     , sep = "")

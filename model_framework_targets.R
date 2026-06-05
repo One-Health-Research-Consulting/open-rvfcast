@@ -25,6 +25,10 @@ aws_bucket <- Sys.getenv("AWS_BUCKET_ID")
 ## Get the "purpose" of the current run (full model 'train' or 'forecast')
 purpose <- Sys.getenv("PURPOSE")
 
+if (purpose %notin% c("train", "forecast")) {
+  stop("Choose 'train' or 'forecast' for PURPOSE in .env")
+}
+
 ## Targets options
 source("_targets_settings.R")
 
@@ -58,13 +62,13 @@ district_id_col <- "shapeName"
 ## Targets for loading needed data ---------------------------------------------
 model_data_targets <- tar_plan(
 
+  ## Get date from which we are forecasting if we are forecasting
+  tar_target(forecast_date, rollbackward(as_date(floor_date(Sys.Date(), "month") - 2)))
+  
   ## Eventually will want to download the data from the S3 bucket, but for now load from local
    ## Sub Region (e.g., Country) and Sub-Sub Regions (e.g., adm2 -- i.e., district or county) of interest
-  tar_target(region_name, if (using_hexes) {
-    "pan_hex"
-  } else {
-    "pan"
-  })
+, tar_target(region_name, ifelse(using_hexes, "pan_hex", "pan"))
+  
 , tar_target(region_data_path
              , paste("data/", region_name, "_joined_response_data/"
              , region_name, "_joined_response_data_final_with_sero.parquet"
@@ -142,15 +146,13 @@ cross_validation_targets <- tar_plan(
      ## Minor reduction in the data set for model fitting speed. Drops map pixels with outlines in terms
       ## of the joint covariate stack where outbreaks have never been recorded
       ## See further details in function
-   , reduce   = TRUE
-   ))
+   , reduce   = TRUE))
 
   ## And split data for making predictions on full map once model is tuned
 , tar_target(splitted_data_fitting, split_data(
     dat      = region_data
   , end_date = end_date
-  , reduce   = FALSE
-  ))
+  , reduce   = FALSE))
 
   ## Extract training and test data as standalone targets so workers load only the
    ## slice they need rather than the full splitted_data object
@@ -239,7 +241,6 @@ cross_validation_targets <- tar_plan(
 
 ## Unique folded data for making forecasts from the most recent date.
  ## Separate from the fitting and evaluation pipelines focused just on making predictions
- ##
 , tar_target(folded_data_forecasting, fold_data(
     data              = tibble(forecasting = region_data |> list())
   , type              = "forecasting"
@@ -249,7 +250,7 @@ cross_validation_targets <- tar_plan(
   , n_spatial_folds   = NULL
   , district_id_col   = district_id_col
   , seed              = 10001
-  , current_date      = floor_date(Sys.Date(), "month")))
+  , current_date      = forecast_date))
 
 )
 
@@ -271,27 +272,14 @@ model_tuning_targets <- tar_plan(
   , mtry_min       = 8
   , size           = 150))
 
-, tar_target(tuning_grid,
-    with(tune_pars
-      ## Number of alternative grid options available, but space_filling efficient
-       ## NOTE: Could possibly do a bit better to save some computation time by
-       ## cutting out some of the parameter space where the combination of has some
-       ## combination of hyperparameters that don't make a lot of sense
-    , grid_space_filling(
-        trees(range          = c(tree_min, tree_max))
-      , tree_depth(range     = c(tree_dep_min, tree_dep_max))
-      , learn_rate(range     = c(learn_rate_min, learn_rate_max))
-      , min_n(range          = c(minn_min, minn_max))
-      , loss_reduction(range = c(loss_red_min, loss_red_max))
-      ## Arbitrary choice here in which train_inner, doesn't matter which
-      , finalize(mtry(range = c(mtry_min, unknown())), folded_data_training$inner_folds[[10]] |>
-                   left_join(
-                      splitted_data$train_data[[1]], by = "index") |>
-                      filter(cluster != 1))
-      ## Total number of combinations of hyperparameters
-      , size = size)) |>
-      mutate(index = seq_len(n()), .before = 1))
-
+, tar_target(tuning_grid, build_hyperparameter_grid(
+    tune_pars            = tune_pars
+  , grid_path            = "data/hypergrid"
+  , folded_data_training = folded_data_training
+  , splitted_data        = splitted_data
+  , overwrite            = FALSE
+  , seed                 = 78261782))
+  
   ## Set up list of a id columns for grouping, summarizing, etc. that are usde in a few spots
 , tar_target(id_cols, c("shapeName", "Proportion_Country", "ADM2", "Proportion_ADM2", "date", "index"))
 
@@ -315,7 +303,7 @@ model_tuning_targets <- tar_plan(
 , tar_target(inner_fold_id, prep_fold_ids(
     folded_data = folded_data_training
   , raw_data    = splitted_data) |>
-  cross_join(tuning_grid) |>
+  cross_join(tuning_grid$par_grid[[1]]) |>
   group_by(outer_fold_id) |>
   filter(inner_fold_id %in% unique(inner_fold_id)) |>
   ungroup())
@@ -331,22 +319,6 @@ model_tuning_targets <- tar_plan(
     , inner_ids   = inner_fold_id)
   tfolds[sample(nrow(tfolds)), ]})
 
-  ## Extract a haphazard selection of hyperparameter -by- fold sets for debugging purposes
-, tar_target(inner_fold_id_finalized_DEBUG, {
-    inner_fold_id_finalized |> filter(
-  outer_fold_id == 16 & inner_fold_id == 1  |
-  outer_fold_id == 16 & inner_fold_id == 10 |
-  outer_fold_id == 18 & inner_fold_id == 5  |
-  outer_fold_id == 18 & inner_fold_id == 7  |
-  outer_fold_id == 14 & inner_fold_id == 11 |
-  outer_fold_id == 14 & inner_fold_id == 8 |
-  outer_fold_id == 5  & inner_fold_id == 13) |>
-    filter(index %in% c(15)) |>
-    dplyr::select(-assess_inner, -has_outbreak, -nrow)})
-, tar_target(folded_data_training_DEBUG, folded_data_training |>
-               filter(outer_fold_id %in% inner_fold_id_finalized_DEBUG$outer_fold_id))
-, tar_target(folded_data_testing_DEBUG, folded_data_testing |> filter(outer_fold_id %in% c(1, 2, 3)))
-
   ## Pre-join inner fold indices with training covariates, one branch per outer fold.
    ## Workers for tuned_results_per_outer_fold load this small per-fold slice rather than
    ## the full train_data, and the join is computed once per fold instead of once per
@@ -356,123 +328,77 @@ model_tuning_targets <- tar_plan(
       outer_fold_id = folded_data_training$outer_fold_id
     , data          = list(
         folded_data_training$inner_folds[[1]] |>
-        left_join(train_data, by = "index")
-        )
-    )
-  , pattern = map(folded_data_training)
-  )
-
-, tar_target(outer_fold_prejoined_DEBUG
-  , tibble(
-      outer_fold_id = folded_data_training_DEBUG$outer_fold_id
-    , data          = list(
-        folded_data_training_DEBUG$inner_folds[[1]] |>
-        left_join(train_data, by = "index")
-        )
-    )
-  , pattern = map(folded_data_training_DEBUG)
-  )
+        left_join(train_data, by = "index")))
+  , pattern = map(folded_data_training))
 
   ## Subset of inner fold + tune-grid IDs for each outer fold, one branch per outer fold.
    ## Element-wise alignment with outer_fold_prejoined/_DEBUG via the same map pattern.
 , tar_target(inner_fold_ids_per_outer
    , inner_fold_id_finalized |>
      dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id)
-   , pattern = map(folded_data_training)
-  )
-, tar_target(inner_fold_ids_per_outer_DEBUG
-   , inner_fold_id_finalized_DEBUG |>
-     dplyr::filter(outer_fold_id == folded_data_training_DEBUG$outer_fold_id)
-   , pattern = map(folded_data_training_DEBUG)
-  )
+   , pattern = map(folded_data_training))
+
+  ## Build the path to where the best hyperparameter set will be saved, which is
+  ## used to determine if tuning has to occur or not
+, tar_target(hyperparam_path, {
+    paste0(
+      "outputs/hyperparameters"
+    , "/best_hyperparameters_"
+    , tuning_grid$grid_id
+    , ".csv") })
 
   ## Fit across tuning_grid across all inner folds of all outer folds
    ## NOTE: for debugging swap outer_fold_prejoined -> outer_fold_prejoined_DEBUG
    ##       and inner_fold_ids_per_outer -> inner_fold_ids_per_outer_DEBUG
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
-      prejoined_data = outer_fold_prejoined
-    , inner_ids_all  = inner_fold_ids_per_outer
-    , threshold      = positive_threshold
-    , weightings     = weightings_on_ones
-    , start_p        = 0.005
-    , id_cols        = id_cols
-    , out_dir        = outer_folds_dir
-    , overwrite      = FALSE
-    , DEBUG          = FALSE
-    , checktime_path = "outputs/timing")
-    , pattern        = map(outer_fold_prejoined, inner_fold_ids_per_outer)
-    , error          = "null"
-    , format         = "file")
+      prejoined_data  = outer_fold_prejoined
+    , inner_ids_all   = inner_fold_ids_per_outer
+    , threshold       = positive_threshold
+    , weightings      = weightings_on_ones
+    , start_p         = 0.005
+    , id_cols         = id_cols
+    , out_dir         = outer_folds_dir
+    , tuning_grid_id  = tuning_grid$grid_id
+    , hyperparam_path = hyperparam_path
+    , overwrite       = FALSE
+    , DEBUG           = FALSE
+    , checktime_path  = "outputs/timing")
+    , pattern         = map(outer_fold_prejoined, inner_fold_ids_per_outer)
+    , error           = "null"
+    , format          = "file")
 
  ## Alternative (possibly better [?] and now the main [?]) strategy for selecting the
    ## best set of hyperparameters by using all of (one per outer x inner x index combination)
    ## instead of just the optimal set chosen per outer fold and then choosing from that
 , tar_target(finalized_hyperparameters, finalize_hyperparameters_from_inner(
-    inner_folds = tuned_results_per_outer_fold
-  , metric      = "mix"
+    inner_folds    = tuned_results_per_outer_fold
+  , metric         = "mix"
     ## The larger the weightval the more you penalize high predictions for true 0s
-  , weightval   = 0.1
-  , direction   = "max"
-  , which_auc   = "roc_auc"))
-
-  ## Older strategy of picking the optimal set of hyperparameters by:
-   ## A) picking single optimal set per outer fold, then fitting across all inner folds
-    ## for that hyperparameter set
-   ## B) from these single sets for each outer fold pick the optimal set overall
-
-  ## Join together all tuned inner folds and select the best per outer fold
-, tar_target(tuned_results_joined, join_tuned_inner_folds(
-    inner_folds  = tuned_results_per_outer_fold
-    ## Choices of how to pick the optimal parameter set include
-     ## 'mix' for a balance of pr_auc and logloss or 'binomial'
-  , metric       = "mix"
-    ## Choices of weighting for 1s vs 0s for either 'mix' or 'binomial'
-     ## If for 'mix' can provide anything, if for 'binomial' must be a value
-     ## given in the 'weightings' vector given in tune_results_per_outer_fold
-    ## In the case of 'mix' the smaller the number (e.g., < 1) causes the hyperparameters
-     ## to be more tuned to pr_auc and thus folds with true 1s. The larger the number
-     ## the more weight given to logloss (and thus penalizing high probabilities
-     ## when there are true 0s). In the case of 'binomial' the larger the number the
-     ## more weight given to predicting true 1s with high probability
-  , weightval    = 0.1
-    ## Currently both options are to maximize
-  , direction    = "max"))
-
-  ## Fit each outer fold with the best inner fold hyperparameter for each of these outer folds
-   ## NOTE: for debugging swap folded_data_training -> folded_data_training_DEBUG in both places
-, tar_target(tuned_results_across_outer_folds, tune_results_across_outer_folds(
-    outer_data     = folded_data_training
-  , train_data     = train_data
-  , threshold      = positive_threshold
-  , hyperparm_sets = tuned_results_joined
-  , weightings     = weightings_on_ones
-  , start_p        = 0.005
-  , id_cols        = id_cols
-  , out_dir        = outer_folds_dir2
-  , overwrite      = FALSE
-  , DEBUG          = FALSE)
-  , pattern        = map(folded_data_training)
-  , error          = "null"
-  , format         = "file")
-
-  ## Extract the best parameter set from outer fold evaluation (kept for comparison/reporting)
-, tar_target(finalized_hyperparameters_from_outer, finalize_hyperparameters(
-    outer_folds  = tuned_results_across_outer_folds
-    ## See notes for/in tuned_results_joined
-  , metric       = "mix"
-  , weightval    = 0.1
-  , direction    = "max"))
+  , weightval      = 0.1
+  , direction      = "max"
+  , which_auc      = "pr_auc"
+  , tuning_grid_id = tuning_grid$grid_id
+  , outpath        = hyperparam_path))
 
 )
 
 ## Fitting of model on holdout data --------------------------------------------
 model_fitting_targets <- tar_plan(
 
+  ## Set up what data is referenced depending on the purpose of this run
+  tar_target(folded_data_for_fitting, {
+    if (purpose == "train") {
+      folded_data_testing
+    } else {
+      folded_data_forecasting
+    }
+  })
+  
   ## Use the finalized hyperparameters to fit the model for all of the chunks of time that
    ## make up the testing phase
-  tar_target(fitted_model, fit_model(
+, tar_target(fitted_model, fit_model(
     final_hyper_set = finalized_hyperparameters
-  , full_data       = folded_data_testing
+  , full_data       = folded_data_for_fitting
   , train_data      = train_data_fitting
   , test_data       = test_data_fitting
   , threshold       = positive_threshold
@@ -482,14 +408,14 @@ model_fitting_targets <- tar_plan(
   , out_dir         = outer_folds_dir3
   , overwrite       = FALSE
   , DEBUG           = FALSE)
-  , pattern         = map(folded_data_testing)
+  , pattern         = map(folded_data_for_fitting)
   , error           = "null"
   , format          = "file")
 
   ## Join fitted_model paths to folded_data_testing for parallel processing for model evaluation
 , tar_target(model_out_for_eval, build_model_out_for_eval(
     model_fits = fitted_model
-  , full_data  = folded_data_testing))
+  , full_data  = folded_data_for_fitting))
 
 )
 
@@ -538,14 +464,16 @@ model_evaluation_targets <- tar_plan(
 , tar_target(shap_comparison, compare_shap_by_forecast_interval(
     shap_results = shap_by_forecast_interval))
 
-  ## Set up path for app files and examined fits
+  ## Set up path for app files and examined fits and forecasts
 , tar_target(app_file_path, "outputs/for_app")
 , tar_target(examined_fits_path, "outputs/examined_fits")
+, tar_target(forecasts_path, "outputs/forecasts")
 
   ## Evaluate fit in a few other ways apart from calibration curves:
    ## A) comparing prob to truth across space and time
    ## B) distributions of predicted probabilities for true ones (places where outbreaks occurred)
    ## C) confusion matrix as a function of different probability cutoffs
+  ## NOTE: Just returns predictions for the most recent date if purpose == "forecast"
 , tar_target(examined_fits_within_pan, examine_fits_within(
     model_out        = model_out_for_eval
   , test_data        = test_data
@@ -556,8 +484,12 @@ model_evaluation_targets <- tar_plan(
   , p_thresh         = positive_threshold
   , using_hexes      = using_hexes
   , outpath          = examined_fits_path
+  , outpath_for_for  = forecasts_path
   , outpath_for_app  = app_file_path
-  , overwrite        = FALSE)
+  , purpose          = purpose
+  , overwrite        = FALSE
+    ## Make predictions for a given country
+  , country_code     = "ZAF")
   , pattern          = map(model_out_for_eval)
   , error            = "null"
   , format           = "file")

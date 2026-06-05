@@ -353,9 +353,9 @@ rvf_processing_targets <- tar_plan(
   ## Calculate lags, join cases, summarize and build master dataset. Save the output in individual
    ## parquet files by date
 , tar_target(cleaned_region_data, lag_join_aggregate(
-    file_list        = file_path_per_date
+    file_list       = file_path_per_date
   , processed_dates = prepped_dates
-  , cov_files        = region_data
+  , cov_files       = region_data
   , rvf_response    = rvf_response
   , out_dir         = region_cleaned_data_directory
   , all_dates       = joined_dates
