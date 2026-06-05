@@ -366,7 +366,7 @@ rvf_processing_targets <- tar_plan(
 
   ## Upload to bucket
 , tar_target(cleaned_region_data_AWS_upload, AWS_put_files(
-    transformed_file_list  = cleaned_region_data
+    transformed_file_list = cleaned_region_data
   , local_folder          = region_cleaned_data_directory
   , overwrite             = parse_flag("OVERWRITE_CLEANED_REGION_DATA"))
   , error                 = "null")
@@ -382,7 +382,7 @@ rvf_processing_targets <- tar_plan(
   ## Append new data to existing joined parquet, join sero, write single _final_with_sero.parquet,
   ## and delete the intermediate _final.parquet left by combine_lja
 , tar_target(final_region_data, append_with_sero(
-    new_files     = cleaned_region_data
+    new_files    = cleaned_region_data
   , existing_dat = joined_region_data
   , sero_layer   = finished_sero_layer
   , out_dir      = region_joined_data_directory)
@@ -391,7 +391,7 @@ rvf_processing_targets <- tar_plan(
 
   ## Upload to bucket
 , tar_target(final_region_data_AWS_upload, AWS_put_files(
-    transformed_file_list  = final_region_data
+    transformed_file_list = final_region_data
   , local_folder          = region_joined_data_directory
   , overwrite             = parse_flag("OVERWRITE_FINAL_REGION_DATA"))
   , error                 = "null")

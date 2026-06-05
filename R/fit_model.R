@@ -70,7 +70,7 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
   ## Loading these Rds are very slow, so just checking that they exist
   if (file.exists(save_filename) && !overwrite) {
     message("file already exists and can be loaded, skipping processing")
-    return(save_filename)
+    return(c(save_filename, save_filename2, save_filename3))
   }
 
   ## Extract the needed data
@@ -167,11 +167,12 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
   saveRDS(model_fit |> extract_fit_parsnip(), save_filename2)
   saveRDS(model_fit |> extract_recipe(estimated = TRUE), save_filename3)
 
-  save_filename
+  c(save_filename, save_filename2, save_filename3)
 
 }
 
 build_model_out_for_eval <- function(model_fits, full_data) {
+  model_fits <- model_fits[grepl("/model_fit_", model_fits)]
   safe_join_names <- purrr::map(seq_along(model_fits), .f = function(i) {
     readRDS(model_fits[i])
   }) |> bind_rows()

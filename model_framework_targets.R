@@ -494,6 +494,26 @@ model_evaluation_targets <- tar_plan(
   , error            = "null"
   , format           = "file")
 
+  ## Upload the new fits and the new forecasts to the S3 bucket
+, tar_target(model_fits_AWS_upload, AWS_put_files(
+    transformed_file_list = fitted_model
+  , local_folder          = outer_folds_dir3
+  , overwrite             = parse_flag("OVERWRITE_FITTED_MODEL"))
+  , error                 = "null")
+
+, tar_target(examined_fits_AWS_upload, {
+   if (purpose == "training") {
+     AWS_put_files(
+       transformed_file_list = examined_fits_within_pan
+     , local_folder          = examined_fits_path
+     , overwrite             = parse_flag("OVERWRITE_EXAMINED_FITS"))
+   } else {
+     AWS_put_files(
+       transformed_file_list = examined_fits_within_pan
+     , local_folder          = forecasts_path
+     , overwrite             = parse_flag("OVERWRITE_FORECASTS"))
+   }}, error                 = "null")
+
   ## Similar steps as above but for the chosen country of interest (see target which_countries)
 , tar_target(examined_fits_within_country, examine_fits_within(
     model_out        = model_out_for_eval
