@@ -138,7 +138,10 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
     stop(glue::glue("{basename(transformed_file)} could not be read."))
   }
 
-  if(length(failed_downloads) > 0) stop(glue::glue("Some NASA POWER netcdf files failed to download: {paste(failed_downloads, collapse = ', ')}"))
+  ## Non-fatal: recent dates within the ~5-week NASA POWER lag routinely return 404.
+  ## The partial parquet written above covers whatever dates did succeed; downstream
+  ## targets fall back to ERA5T anomaly files for any date not present in this parquet.
+  if(length(failed_downloads) > 0) message(glue::glue("Some NASA POWER netcdf files failed to download (expected for recent dates): {paste(failed_downloads, collapse = ', ')}"))
   
   # If it can be loaded return file name and path of transformed parquet
   return(transformed_file)

@@ -94,34 +94,52 @@ file_partition_duckdb <- function(temporal_sources,
     file_schemas <- purrr::map(filtered_files, ~ arrow::open_dataset(.x)$schema)
     unified_schema <- all(purrr::map_vec(file_schemas, ~ .x == file_schemas[[1]]))
 
-    parquet_filter <- c()
-    if (!is.null(file_schemas[[1]]$date)) parquet_filter <- c(parquet_filter, paste("date = '", date, "'"))
-    if (length(parquet_filter)) {
-      parquet_filter <- paste("WHERE", paste(parquet_filter, collapse = " AND "))
-    } else {
-      parquet_filter <- ""
-    }
-
     # Check if all schemas are identical
     if (unified_schema) {
       # If all schema are identical: union all files
       files_list <- paste0("'", filtered_files, "'", collapse = ", ")
-      parquet_list <- glue::glue("SELECT * FROM read_parquet([{files_list}]) {parquet_filter}")
+      parquet_list <- glue::glue("SELECT * FROM read_parquet([{files_list}])")
     } else {
       # If not: inner join all files
-      parquet_list <- glue::glue("SELECT * FROM '{filtered_files}' {parquet_filter}")
+      parquet_list <- glue::glue("SELECT * FROM '{filtered_files}'")
       parquet_list <- glue::glue("({parquet_list})")
       as_names <- gsub("\\..*", "", basename(filtered_files))
       parquet_list <- glue::glue("{parquet_list} AS {gsub('-', '_', as_names)}")
       parquet_list <- paste0("SELECT * FROM ", paste(parquet_list, collapse = " NATURAL JOIN "))
     }
 
-    # Round x and y to 7 decimal places so that cells from data processed with
-    # different versions of continent_raster_template (floating-point drift of
-    # ~1e-15) join correctly across all sources
-    parquet_list <- glue::glue(
-      "SELECT ROUND(x, 7) AS x, ROUND(y, 7) AS y, * EXCLUDE (x, y) FROM ({parquet_list})"
-    )
+    # Round x and y to 4 decimal places to unify coordinate precision across sources.
+    # ERA5T anomaly files store coordinates at 4 dp; other sources use full template
+    # precision (~7 dp with ~1e-15 drift). Rounding to 4 dp is safe at 0.1° resolution
+    # (distinct pixels are 0.1° apart, far larger than 1e-4) and handles both issues.
+    #
+    # For temporal sources (those with a date column), override ALL date-derived columns
+    # (date, doy, month, year, day) to values from the target date. This handles NDVI
+    # carry-forward files where the stored composite date (and its doy/month/year) differ
+    # from the target date — mismatched doy causes NATURAL JOIN to return 0 rows.
+    if (!is.null(file_schemas[[1]]$date)) {
+      schema_names    <- names(file_schemas[[1]])
+      date_col_names  <- base::intersect(c("date", "doy", "month", "year", "day"), schema_names)
+      exclude_clause  <- paste(c("x", "y", date_col_names), collapse = ", ")
+
+      # Build SQL literals for each date-derived column present in the schema
+      date_overrides <- c(
+        glue::glue("DATE '{date}' AS date"),
+        if ("doy"   %in% date_col_names) glue::glue("{lubridate::yday(date)} AS doy"),
+        if ("month" %in% date_col_names) glue::glue("{lubridate::month(date)} AS month"),
+        if ("year"  %in% date_col_names) glue::glue("{lubridate::year(date)} AS year"),
+        if ("day"   %in% date_col_names) glue::glue("{lubridate::mday(date)} AS day")
+      )
+      date_overrides_sql <- paste(date_overrides, collapse = ", ")
+
+      parquet_list <- glue::glue(
+        "SELECT ROUND(x, 4) AS x, ROUND(y, 4) AS y, {date_overrides_sql}, * EXCLUDE ({exclude_clause}) FROM ({parquet_list})"
+      )
+    } else {
+      parquet_list <- glue::glue(
+        "SELECT ROUND(x, 4) AS x, ROUND(y, 4) AS y, * EXCLUDE (x, y) FROM ({parquet_list})"
+      )
+    }
 
     # Set up query to add the table to the database
     query <- glue::glue("CREATE OR REPLACE TABLE {table_name} AS {parquet_list}")

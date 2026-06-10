@@ -36,27 +36,6 @@ data_import_targets <- tar_plan(
   ## Sub Region (e.g., Country) and Sub-Sub Regions (e.g., adm2 -- i.e., district or county) of interest
   tar_target(region_name, ifelse(using_hexes, "pan_hex", "pan"))
 
-  ## Same exact function to get the needed dates as generated in the previous pipeline step
-, tar_target(dates_to_process_all, {
-
-    narrow_dates <- set_model_dates(
-      start_year  = 2005
-    , end_year    = lubridate::year(Sys.time())
-    , n_per_month = 2
-    , seed        = 212)
-
-    if (purpose == "forecast") {
-      narrow_dates <- c(narrow_dates, rollbackward(as_date(floor_date(Sys.Date(), "month") - 2)))
-
-      ## If the last date happens to be the same as the randomly chosen date that month, drop it
-      narrow_dates <- unique(narrow_dates)
-    }
-
-    narrow_dates
-
-  }, cue         = tar_cue("always"))
-
-
   ## Path to the saved full africa data from the previous pipeline step and
   ## set up folders for the "raw" hex combined data and cleaned data
 , tar_target(base_predictors_directory, create_data_directory(directory_path = "data/africa_full_predictor_data"))
@@ -66,6 +45,15 @@ data_import_targets <- tar_plan(
    directory_path = paste("data/", region_name, "_full_response_data", sep = "")))
 , tar_target(region_cleaned_data_directory, create_data_directory(
    directory_path = paste("data/", region_name, "_cleaned_response_data", sep = "")))
+
+## Same exact function to get the needed dates as generated in the previous pipeline step
+, tar_target(dates_to_process_all, {
+  set_model_dates(
+    start_year  = 2005
+    , end_year    = lubridate::year(Sys.time())
+    , n_per_month = 2
+    , seed        = 212)
+}, cue         = tar_cue("always"))
 
   ## get all of the file paths to all of the full africa data data in the S3 bucket. Determined
   ## later in the pipeline which are needed
@@ -78,18 +66,13 @@ data_import_targets <- tar_plan(
 
    ## Load the already-processed response parquet to determine what dates have been built
  , tar_target(region_data_dates, {
-
-     loaded_region_data <- read_parquet(
-       paste0(region_joined_data_directory, "/pan_hex_joined_response_data_final_with_sero.parquet"))
+     loaded_region_data <- read_parquet(paste0(region_joined_data_directory, "/pan_hex_joined_response_data_final_with_sero.parquet"))
      max_date           <- max(loaded_region_data$date)
-
      tibble(all_dates = unique(loaded_region_data$date))
-
    }, cue = tar_cue("always"))
 
   ## Check the last date available in the files created from the previous pipeline
 , tar_target(africa_data_dates, {
-
     full_parquet_dates <- purrr::map(base_predictor_paths_AWS, .f = function(i) {
        (strsplit(i, "data_")[[1]][2] |> strsplit(".parquet"))[[1]][1]
     }) |>
@@ -102,7 +85,7 @@ data_import_targets <- tar_plan(
    full_parquet_dates <- full_parquet_dates[-c(1:6)]
 
     tibble(
-      all_dates = full_parquet_dates
+      all_dates  = full_parquet_dates
     , file_paths = base_predictor_paths_AWS[-c(1:6)]
     )
 

@@ -4,7 +4,7 @@
 
 ## NOTES / ToDo ----------------------------------------------------------------
 
-## 1) Ready to rerun pipeline, but waiting on a machine to run the computation
+## 1) See github issue
 
 ## Setup / Preamble ------------------------------------------------------------
 
@@ -64,11 +64,11 @@ model_data_targets <- tar_plan(
 
   ## Get date from which we are forecasting if we are forecasting
   tar_target(forecast_date, rollbackward(as_date(floor_date(Sys.Date(), "month") - 2)))
-  
+
   ## Eventually will want to download the data from the S3 bucket, but for now load from local
    ## Sub Region (e.g., Country) and Sub-Sub Regions (e.g., adm2 -- i.e., district or county) of interest
 , tar_target(region_name, ifelse(using_hexes, "pan_hex", "pan"))
-  
+
 , tar_target(region_data_path
              , paste("data/", region_name, "_joined_response_data/"
              , region_name, "_joined_response_data_final_with_sero.parquet"
@@ -279,7 +279,7 @@ model_tuning_targets <- tar_plan(
   , splitted_data        = splitted_data
   , overwrite            = FALSE
   , seed                 = 78261782))
-  
+
   ## Set up list of a id columns for grouping, summarizing, etc. that are usde in a few spots
 , tar_target(id_cols, c("shapeName", "Proportion_Country", "ADM2", "Proportion_ADM2", "date", "index"))
 
@@ -393,7 +393,7 @@ model_fitting_targets <- tar_plan(
       folded_data_forecasting
     }
   })
-  
+
   ## Use the finalized hyperparameters to fit the model for all of the chunks of time that
    ## make up the testing phase
 , tar_target(fitted_model, fit_model(

@@ -121,7 +121,7 @@ static_targets <- tar_plan(
 , tar_target(aspect_preprocessed, get_remote_rasters(
     urls                      = aspect_urls
   , output_dir                = aspect_directory
-  , output_filename           = "aspect.parquet"
+  , output_filename            = "aspect.parquet"
   , continent_raster_template = continent_raster_template
     ## What is the dominant aspect for each point?
   , aggregate_method          = "which.max"
@@ -166,7 +166,7 @@ static_targets <- tar_plan(
 , tar_target(slope_preprocessed, get_remote_rasters(
     urls             = slope_urls
   , output_dir       = slope_directory
-  , output_filename  = "slope.parquet"
+  , output_filename   = "slope.parquet"
   , continent_raster_template
     ## What is the dominant slope for each point?
   , aggregate_method = "which.max"
@@ -322,31 +322,37 @@ dynamic_targets <- tar_plan(
   ## Pull the names of the full africa parquet files from the bucket and figure out what
    ## files need updating based on which files are missing | the dates in dates_to_process_all
 , tar_target(dates_to_process, {
-    full_parquet_files     <- AWS_get_filenames(africa_full_predictor_data_directory)
-    full_parquet_max_date <- purrr::map(full_parquet_files, .f = function(i) {
+
+    full_parquet_files <- AWS_get_filenames(africa_full_predictor_data_directory)
+
+    ## Extract the date string embedded in each parquet filename
+    processed_dates <- purrr::map_chr(full_parquet_files, .f = function(i) {
        (strsplit(i, "data_")[[1]][2] |> strsplit(".parquet"))[[1]][1]
     }) |>
-    unlist() |>
-    sort() |>
-    tail(1)
+    na.omit()
 
-    ## Just the dates for the data we do not yet have
-    narrow_dates    <- dates_to_process_all[which(dates_to_process_all > full_parquet_max_date)]
+    ## Process only the dates_to_process_all dates that have not yet been written.
+    ## Using membership rather than max-date comparison avoids skipping unprocessed
+    ## historical dates when a more recent forecast anchor parquet already exists.
+    narrow_dates <- dates_to_process_all[!as.character(dates_to_process_all) %in% processed_dates]
 
-    ## Drop all dates in the previous month otherwise because nasa weather and ndvi not
-     ## yet available for these time periods
-    dates_one_month <- Sys.Date() - 31
-    narrow_dates    <- narrow_dates[-which(narrow_dates > dates_one_month)]
-
-    ## If forecasting add in the last day of the month before last (assuming that we are
-     ## fitting at the beginning of a month (if we forecast on the first of every
-     ## month this will get the last day two months prior (e.g., April 30
-     ## if it is currently June 1))
     if (purpose == "forecast") {
-      narrow_dates <- c(narrow_dates, rollbackward(as_date(floor_date(Sys.Date(), "month") - 2)))
 
-      ## If the last date happens to be the same as the randomly chosen date that month, drop it
-      narrow_dates <- unique(narrow_dates)
+      ## Forecast anchor = last day of the previous complete month.
+      ## ERA5T for the previous month is always fully available by the time the
+      ## pipeline runs (end-of-month is well past the 5-day ERA5T lag).
+      ## Anchoring to floor_date - 1 prevents current-month ERA5T download failures.
+      era5t_anchor <- lubridate::floor_date(Sys.Date(), "month") - 1L
+
+      ## Exclude current-month dates: ERA5T is not yet available for the current month.
+      ## NASA downloads whatever is available for each month; fetch_and_transform_nasa_weather
+      ## handles 404s gracefully, and africa_full_predictor_data_sources_temporal falls
+      ## back to ERA5T anomaly files for any date without a NASA anomaly file.
+      narrow_dates <- narrow_dates[narrow_dates <= era5t_anchor]
+
+      ## Anchor is always appended so the pipeline always has a fresh forecast date.
+      ## unique() removes the duplicate when era5t_anchor is already in narrow_dates.
+      narrow_dates <- unique(c(narrow_dates, era5t_anchor))
     }
 
     narrow_dates
@@ -390,7 +396,7 @@ dynamic_targets <- tar_plan(
   , repository                          = "local")
 
 , tar_target(sentinel_ndvi_transformed_AWS_upload, AWS_put_files(
-    transformed_file_list = sentinel_ndvi_transformed
+    transformed_file_list  = sentinel_ndvi_transformed
   , local_folder          = sentinel_ndvi_transformed_directory
   , overwrite             = parse_flag("OVERWRITE_SENTINEL_NDVI"))
   , error                 = "null")
@@ -469,7 +475,8 @@ dynamic_targets <- tar_plan(
       , interval = end_date - start_date, 10))
 
   ## Download data, project to the template and save as parquets
-  ## TODO NAs outside of the continent
+  ## ToDo NAs outside of the continent (though masked anyway so would just save some
+  ## space, which is nice but not necessary)
   ## Not Found HTTP 404 means the bundle request hasn't finished processing
   ## transform_modis_ndvi()
 , tar_target(modis_ndvi_transformed, map_vec(
@@ -492,9 +499,9 @@ dynamic_targets <- tar_plan(
   ## Put modis_ndvi_transformed files on AWS
 , tar_target(modis_ndvi_transformed_AWS_upload, AWS_put_files(
     transformed_file_list = modis_ndvi_transformed
-  , local_folder          = modis_ndvi_transformed_directory
-  , overwrite             = parse_flag("OVERWRITE_MODIS_NDVI"))
-  , error                 = "null")
+  , local_folder         = modis_ndvi_transformed_directory
+  , overwrite            = parse_flag("OVERWRITE_MODIS_NDVI"))
+  , error                = "null")
 
   ## Combine Sentinel an MODIS ndvi data and interopolate to daily interval
   ## Check if modis_ndvi files already exists on AWS and can be loaded
@@ -571,10 +578,113 @@ dynamic_targets <- tar_plan(
 
   ## Put nasa_weather files on AWS
 , tar_target(nasa_weather_transformed_AWS_upload, AWS_put_files(
-    transformed_file_list = nasa_weather_transformed
+    transformed_file_list  = nasa_weather_transformed
   , local_folder          = nasa_weather_transformed_directory
   , overwrite             = parse_flag("OVERWRITE_NASA_WEATHER"))
   , error                 = "null")
+
+  ## ERA5T Near Real-Time Weather -----------------------------------------------------------
+  ## ERA5T (ECMWF ERA5 near real-time) mirrors the same three variables as NASA POWER MERRA-2
+  ## (temperature, relative humidity, precipitation) but is available with only a ~5-day lag,
+  ## allowing monthly forecast runs that cannot wait for MERRA-2's ~5-week lag.
+  ## Uses the same CDS credentials (ECMWF_USERID, ECMWF_TOKEN) as the ECMWF seasonal forecasts.
+  ## Output parquets share the schema of nasa_weather_transformed so downstream anomaly and
+  ## prediction targets can consume either source without changes.
+  ## NOTE: Before first use, accept the ERA5 license at:
+  ## https://cds.climate.copernicus.eu/datasets/derived-era5-single-levels-daily-statistics
+, tar_target(era5t_weather_transformed_directory, create_data_directory(directory_path = "data/era5t_weather_transformed"))
+
+  ## Check if ERA5T weather files already exist on AWS
+, tar_target(era5t_weather_transformed_AWS, AWS_get_folder(
+    local_folder     = era5t_weather_transformed_directory
+  , skip_fetch       = Sys.getenv("SKIP_FETCH") == "TRUE"
+  , sync_with_remote = TRUE)
+  , error            = "null"
+  , cue              = tar_cue("always"))
+
+  ## ERA5T months to download: exactly the months containing dates in dates_to_process.
+  ## This avoids downloading months that are already fully covered by NASA anomaly files.
+  ## ERA5T files that overlap with NASA-covered dates are written but never used by
+  ## create_africa_full_predictor_data_sources (ERA5T only substitutes where NASA is absent).
+  ## Cue always so newly available months are picked up on every run.
+, tar_target(months_to_process_era5t,
+    dates_to_process |> format("%Y-%m") |> unique()
+  , cue = tar_cue("always"))
+
+  ## Fetch ERA5T daily weather from CDS and transform to continental parquets.
+  ## Branches over months_to_process_era5t
+   ## For forecasting, don't need many months
+, tar_target(era5t_weather_transformed, fetch_and_transform_era5t_weather(
+    months_to_process         = months_to_process_era5t
+  , continent_raster_template = continent_raster_template
+  , local_folder              = era5t_weather_transformed_directory
+  , basename_template         = "era5t_weather_transformed_{months_to_process}.parquet"
+  , overwrite                 = parse_flag("OVERWRITE_ERA5T_WEATHER")
+  , era5t_weather_transformed_AWS)
+  , pattern                   = map(months_to_process_era5t)
+  , error                     = "null"
+  , format                    = "file")
+
+  ## Upload ERA5T weather parquets to AWS
+, tar_target(era5t_weather_transformed_AWS_upload, AWS_put_files(
+    transformed_file_list  = era5t_weather_transformed
+  , local_folder          = era5t_weather_transformed_directory
+  , overwrite             = parse_flag("OVERWRITE_ERA5T_WEATHER"))
+  , error                 = "null")
+
+  ## ERA5T Bias Correction -----------------------------------------------------------
+  ## Derives per-pixel mean(ERA5T_scaled - MERRA2_scaled) over a calibration period.
+  ## The existing 24-month ERA5T window is supplemented with n_extra_calibration_months
+  ## of additional historical ERA5 data downloaded to a temporary folder and deleted
+  ## after the correction parquet is written. Apply at forecast time as:
+  ##   ERA5T_anomaly_corrected = ERA5T_anomaly_scaled - bias_offset
+, tar_target(era5t_bias_correction_file, get_or_compute_era5t_bias_correction(
+      era5t_weather_dir              = era5t_weather_transformed_directory
+    , weather_anomalies_dir          = weather_anomalies_directory
+    , weather_historical_means_dir   = weather_historical_means_directory
+    , continent_raster_template      = continent_raster_template
+    , output_file                     = "outputs/anomaly_bias_correction/era5t_bias_correction.parquet"
+    , n_calibration_months           = 72
+    ## Override w/e n_calibration_months says and use w/e is present
+    ## basically a debug parameter if / when ecmwf API is down like it was the
+    ## afternoon of June 8
+    , skip_download                  = TRUE
+    , overwrite                      = parse_flag("OVERWRITE_ERA5T_BIAS_CORRECTION"))
+  , format                           = "file"
+  , cue                              = tar_cue("always"))
+
+  ## ERA5T Weather Anomalies -----------------------------------------------------------
+  ## Converts ERA5T monthly parquets to bias-corrected scaled anomaly parquets, one per date.
+  ## Written to data/weather_anomalies_era5t/ (separate from data/weather_anomalies/ for NASA
+  ## POWER). The predictor data assembly step checks NASA POWER first and falls back to these
+  ## ERA5T files only for dates where NASA POWER has a ~5-week lag.
+, tar_target(era5t_weather_anomalies_directory, create_data_directory(directory_path = "data/weather_anomalies_era5t"))
+
+, tar_target(era5t_weather_anomalies_AWS, AWS_get_folder(
+    local_folder     = era5t_weather_anomalies_directory
+  , skip_fetch       = Sys.getenv("SKIP_FETCH") == "TRUE"
+  , sync_with_remote = TRUE)
+  , error            = "null"
+  , cue              = tar_cue("always"))
+
+, tar_target(era5t_weather_anomalies, calculate_era5t_weather_anomalies(
+    era5t_weather_transformed_file       = era5t_weather_transformed
+  , bias_correction_file                 = era5t_bias_correction_file
+  , weather_historical_means_dir        = weather_historical_means_directory
+  , weather_anomalies_era5t_directory   = era5t_weather_anomalies_directory
+  , overwrite                           = parse_flag("OVERWRITE_ERA5T_WEATHER_ANOMALIES")
+  , era5t_weather_anomalies_AWS)
+  , pattern                             = map(era5t_weather_transformed)
+  , error                               = "null"
+  , format                              = "file"
+  , repository                          = "local")
+
+, tar_target(era5t_weather_anomalies_AWS_upload, AWS_put_files(
+    transformed_file_list    = era5t_weather_anomalies
+  , local_folder            = era5t_weather_anomalies_directory
+  , overwrite               = parse_flag("OVERWRITE_ERA5T_WEATHER_ANOMALIES"))
+  , pattern                 = map(era5t_weather_anomalies)
+  , error                   = "null")
 
   ## How many months out are we forecasting?
 , tar_target(ecmwf_lead_months, seq(1, 6))
@@ -626,7 +736,7 @@ dynamic_targets <- tar_plan(
 
   ## Next step put ecmwf_forecasts files on AWS.
 , tar_target(ecmwf_forecasts_transformed_AWS_upload, AWS_put_files(
-    transformed_file_list = ecmwf_forecasts_transformed
+    transformed_file_list  = ecmwf_forecasts_transformed
   , local_folder          = ecmwf_forecasts_transformed_directory
   , overwrite = parse_flag("OVERWRITE_ECMWF_FORECASTS"))
   , error = "null")
@@ -654,35 +764,35 @@ derived_data_targets <- tar_plan(
   , cue = tar_cue("always"))
 
 , tar_target(weather_historical_means, calculate_weather_historical_means(
-    nasa_weather_transformed
+    nasa_weather_transformed_directory
   , weather_historical_means_directory
   , basename_template = "weather_historical_mean_doy_{i}.parquet"
   , overwrite         = parse_flag("OVERWRITE_HISTORICAL_MEANS")
   , weather_historical_means_AWS)
-  , format = "file"
-  , repository = "local"
-  , cue = tar_cue_age(
+  , format            = "file"
+  , repository        = "local"
+  , cue               = tar_cue_age(
      name = weather_historical_means
      ## Recalculate every 6 months
-   , age = as.difftime(180, units = "days")))
+   , age  = as.difftime(180, units = "days")))
 
   ## Next step put weather_historical_means files on AWS.
 , tar_target(weather_historical_means_AWS_upload, AWS_put_files(
-    transformed_file_list = weather_historical_means
+    transformed_file_list  = weather_historical_means
   , local_folder          = weather_historical_means_directory
-  , overwrite = parse_flag("OVERWRITE_HISTORICAL_MEANS"))
-  , error = "null")
+  , overwrite             = parse_flag("OVERWRITE_HISTORICAL_MEANS"))
+  , error                 = "null")
 
 , tar_target(weather_anomalies_directory, create_data_directory(directory_path = "data/weather_anomalies"))
 
   # Check if weather_historical_means parquet files already exists on AWS and can be loaded
   # The only important one is the directory. The others are there to enforce dependencies.
 , tar_target(weather_anomalies_AWS, AWS_get_folder(
-    local_folder = weather_anomalies_directory
-  , skip_fetch = Sys.getenv("SKIP_FETCH") == "TRUE"
+    local_folder     = weather_anomalies_directory
+  , skip_fetch       = Sys.getenv("SKIP_FETCH") == "TRUE"
   , sync_with_remote = TRUE)
-  , error = "null"
-  , cue = tar_cue("always"))
+  , error            = "null"
+  , cue              = tar_cue("always"))
 
   ## Weather anomalies are deviations from the historical mean
   ## Branch over months (nasa_weather_transformed) instead of dates
@@ -694,10 +804,10 @@ derived_data_targets <- tar_plan(
   , basename_template = "weather_anomaly_{date}.parquet"
   , overwrite         = parse_flag("OVERWRITE_WEATHER_ANOMALIES")
   , weather_anomalies_AWS)
-  , pattern    = map(nasa_weather_transformed)
-  , error      = "null"
-  , format     = "file"
-  , repository = "local")
+  , pattern           = map(nasa_weather_transformed)
+  , error             = "null"
+  , format            = "file"
+  , repository        = "local")
 
   ## Next step put weather_historical_means files on AWS.
 , tar_target(weather_anomalies_AWS_upload, AWS_put_files(
@@ -838,26 +948,29 @@ full_data_targets <- tar_plan(
       local_folder     = africa_full_predictor_data_directory
     , skip_fetch       = Sys.getenv("SKIP_FETCH") == "TRUE"
     , sync_with_remote = TRUE)
-    , error = "null"
-    , cue = tar_cue("always"))
+    , error            = "null"
+    , cue              = tar_cue("always"))
 
 , tar_target(africa_full_predictor_data_sources_static,
     list(
-      soil_preprocessed = soil_preprocessed
-    , aspect_preprocessed = aspect_preprocessed
-    , slope_preprocessed = slope_preprocessed
-    , glw_preprocessed = glw_preprocessed
+      soil_preprocessed      = soil_preprocessed
+    , aspect_preprocessed    = aspect_preprocessed
+    , slope_preprocessed     = slope_preprocessed
+    , glw_preprocessed       = glw_preprocessed
     , elevation_preprocessed = elevation_preprocessed
-    , bioclim_preprocessed = bioclim_preprocessed
+    , bioclim_preprocessed   = bioclim_preprocessed
     , landcover_preprocessed = landcover_preprocessed))
 
-  ## Create intermediary target pairing each date with its predictor files
+  ## Create intermediary target pairing each date with its predictor files.
+  ## ERA5T weather anomalies serve as a fallback for dates where NASA POWER has a ~5-week lag.
+  ## NDVI anomalies are carried forward up to 21 days when an exact-date file is absent.
 , tar_target(africa_full_predictor_data_sources_temporal,
     create_africa_full_predictor_data_sources(
       forecasts_anomalies
     , weather_anomalies
-    , ndvi_anomalies,
-      dates_to_process) |>
+    , era5t_weather_anomalies
+    , ndvi_anomalies
+    , dates_to_process) |>
       group_by(date) |>
       tar_group()
     , iteration = "group")
@@ -866,16 +979,16 @@ full_data_targets <- tar_plan(
   ## error needs to be null here because some predictors (like wahis_outbreak_sources) aren't
   ## present in all times.
 , tar_target(africa_full_predictor_data, file_partition_duckdb(
-    temporal_sources = africa_full_predictor_data_sources_temporal
-  , static_sources = africa_full_predictor_data_sources_static
-  , local_folder = africa_full_predictor_data_directory
+    temporal_sources  = africa_full_predictor_data_sources_temporal
+  , static_sources    = africa_full_predictor_data_sources_static
+  , local_folder      = africa_full_predictor_data_directory
   , basename_template = "africa_full_predictor_data_{date}.parquet"
-  , overwrite = parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA")
+  , overwrite         = parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA")
   , africa_full_predictor_data_AWS)
-  , pattern = map(africa_full_predictor_data_sources_temporal)
-  , format = "file"
-  , repository = "local"
-  , error = "null")
+  , pattern           = map(africa_full_predictor_data_sources_temporal)
+  , format            = "file"
+  , repository        = "local"
+  , error             = "null")
 
   ## Next step put combined_anomalies files on AWS.
 , tar_target(africa_full_predictor_data_AWS_upload, AWS_put_files(
