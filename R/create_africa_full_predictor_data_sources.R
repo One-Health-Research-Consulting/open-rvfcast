@@ -4,25 +4,14 @@
 #' Reads actual data files to determine which dates are present in each file.
 #' Uses left joins to preserve all dates and maintain consistent branch identity.
 #'
-#' Two fallback mechanisms handle dates near the current time where data are not yet available:
-#'
-#'   - Weather anomalies: if NASA POWER MERRA-2 anomaly is absent for a date, the ERA5T
-#'     bias-corrected anomaly from era5t_weather_anomalies is used instead. NASA POWER is
-#'     preferred because the model was trained on MERRA-2 anomalies; ERA5T is bias-corrected
-#'     to the same scale but not identical. When NASA POWER data eventually becomes available,
-#'     a re-run with OVERWRITE_AFRICA_FULL_PREDICTOR_DATA will replace the ERA5T-derived rows.
-#'
-#'   - NDVI anomalies: if no exact-date NDVI anomaly exists, the most recent available NDVI
-#'     anomaly file within ndvi_carryforward_days is used as a proxy. Sentinel-3 composites
-#'     have a ~14-day effective lag; carrying the last available composite forward up to 21 days
-#'     avoids losing the most recent forecast date.
+#' weather_anomalies is now computed from ERA5T for all dates, so no separate
+#' fallback is needed. NDVI anomalies are carried forward up to ndvi_carryforward_days
+#' when an exact-date file is absent (Sentinel-3 composites have a ~14-day effective lag).
 #'
 #' @author Assistant and Nathan Layman
 #'
 #' @param forecasts_anomalies Character vector of forecast anomaly file paths
-#' @param weather_anomalies Character vector of NASA POWER weather anomaly file paths
-#' @param era5t_weather_anomalies Character vector of ERA5T weather anomaly file paths
-#'   (bias-corrected; used when weather_anomalies has no file for a date)
+#' @param weather_anomalies Character vector of weather anomaly file paths
 #' @param ndvi_anomalies Character vector of NDVI anomaly file paths
 #' @param dates_to_process Vector of dates to process
 #' @param ndvi_carryforward_days Integer. Maximum number of days to carry the most recent
@@ -33,7 +22,6 @@
 #' @export
 create_africa_full_predictor_data_sources <- function(forecasts_anomalies,
                                                       weather_anomalies,
-                                                      era5t_weather_anomalies,
                                                       ndvi_anomalies,
                                                       dates_to_process,
                                                       ndvi_carryforward_days = 21) {
@@ -69,29 +57,13 @@ create_africa_full_predictor_data_sources <- function(forecasts_anomalies,
   weather_lookup   <- build_lookup(weather_anomalies,   "weather_anomalies")
   ndvi_lookup      <- build_lookup(ndvi_anomalies,       "ndvi_anomalies")
 
-  # ERA5T lookup is optional; build only when files are available
-  era5t_lookup <- if (!is.null(era5t_weather_anomalies) && length(era5t_weather_anomalies) > 0) {
-    build_lookup(era5t_weather_anomalies, "era5t_weather_anomalies")
-  } else {
-    tibble::tibble(date = as.Date(character(0)), era5t_weather_anomalies = character(0))
-  }
-
   # Start with dates_to_process and left join all predictors.
   # Left joins preserve all dates to maintain consistent tar_group numbers;
-  # missing predictors will be NA, which downstream can handle with error = "null".
+  # missing predictors will be NA, which downstream handles with error = "null".
   result <- tibble::tibble(date = dates_to_process) |>
     dplyr::left_join(forecasts_lookup, by = "date") |>
     dplyr::left_join(weather_lookup,   by = "date") |>
-    dplyr::left_join(era5t_lookup,     by = "date") |>
-    dplyr::left_join(ndvi_lookup,      by = "date") |>
-    # Use ERA5T weather anomaly when NASA POWER anomaly is not yet available
-    dplyr::mutate(
-      weather_anomalies = dplyr::if_else(
-        is.na(weather_anomalies) & !is.na(era5t_weather_anomalies)
-      , era5t_weather_anomalies
-      , weather_anomalies)
-    ) |>
-    dplyr::select(-era5t_weather_anomalies)
+    dplyr::left_join(ndvi_lookup,      by = "date")
 
   # Apply NDVI carry-forward: when no exact-date NDVI file exists, substitute the most
   # recent available NDVI anomaly within ndvi_carryforward_days days prior to the target date

@@ -56,7 +56,7 @@ lag_join_aggregate <- function (
   ## see https://cteco.uconn.edu/guides/Soils_Drainage.htm
   soil_drainage_key <- data.frame(
     old = c("E", "SE", "W", "MW", "I", "P", "VP")
-    , new = c(1, 2, 3, 4, 5, 6, 7)
+  , new = c(1, 2, 3, 4, 5, 6, 7)
   )
 
   ## 2) Build lagged variables, 3) Join cases, and 4) Summarize covariate data and outbreaks to sub regions
@@ -118,11 +118,11 @@ lag_join_aggregate <- function (
 
     lag_gap <- as.numeric(this_set$date - this_set$lag_floors)
 
-    file_nums     <- this_set$file_nums[[1]]
+    file_nums    <- this_set$file_nums[[1]]
     needed_dates <- all_dates[file_nums, ]$dates
-    needed_files  <- purrr::map(needed_dates, .f = function(x) cov_files[grepl(x, cov_files)]) |> unlist()
+    needed_files <- purrr::map(needed_dates, .f = function(x) cov_files[grepl(x, cov_files)]) |> unlist()
 
-    tdat <- arrow::open_dataset(cov_files) |>
+    tdat <- arrow::open_dataset(needed_files) |>
       collect() |>
       ungroup() |>
       dplyr::select(x, y, shapeName, Country, all_of(lagging_names))
@@ -275,73 +275,9 @@ prep_dates <- function(cov_files, rvf_response, dates_all) {
 }
 
 
-#' A follow up function to lag_join_aggregate to combine all of the aggregated parquet files
-#'
-#'
-#' @title combine_lja
-
-#' @param in_dir vector of paths to all of the summarized parquet files from lag_join_aggregate
-#' @param out_dir location to save the single final joined file
-#' @param overwrite Boolean to recalculate and save over a previously saved file or not
-#' @return character vector path to parquet file
-#' @author Morgan Kain
-#' @export
-
-combine_lja <- function(
-    in_dir
-  , out_dir
-  , overwrite
-  ) {
-
-  ## 0) Logistics stuff
-
-  ## Set filename
-  save_filename <- paste(
-    out_dir
-  , "/"
-  , paste(out_dir |> strsplit("data/") |> unlist() |> tail(1), "final", sep = "_")
-  , ".parquet"
-  , sep = ""
-  )
-
-  ## Return existing file unchanged when no new data files are available
-  if (length(in_dir) == 0) return(save_filename)
-
-  ## Check if file already exists and can be read
-  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
-
-  if (!is.null(error_safe_read_parquet(save_filename)) && !overwrite) {
-    message("file already exists and can be loaded, skipping processing")
-    return(save_filename)
-  }
-
-  new_data <- lapply(in_dir |> as.list(), FUN = function(x) {
-    tf <- read_parquet(x)
-  }) |>
-  bind_rows()
-
-  ## Append new rows to existing data if present; if _final.parquet is missing (deleted after
-  ## append_with_sero ran last cycle), fall back to _final_with_sero.parquet stripping pred_sero
-  safe_read     <- possibly(arrow::read_parquet, NULL)
-  existing_data <- safe_read(save_filename)
-  if (is.null(existing_data)) {
-    with_sero_file <- gsub("final.parquet", "final_with_sero.parquet", save_filename)
-    existing_data  <- safe_read(with_sero_file) |> dplyr::select(-dplyr::any_of("pred_sero"))
-  }
-  all_out <- if (!is.null(existing_data)) bind_rows(existing_data, new_data) else new_data
-
-  arrow::write_parquet(all_out, save_filename, compression = "gzip", compression_level = 5)
-
-  save_filename
-
-}
-
-
 #' @title append_with_sero
 #' @description Appends new cleaned model data to an existing joined dataset, joins in the
-#'   seroprevalence layer, and writes a single _final_with_sero.parquet. Replaces the separate
-#'   join_in_sero_layer step and leaves only one file in the joined data directory by deleting
-#'   the intermediate _final.parquet after writing.
+#'   seroprevalence layer, and writes a single _final_with_sero.parquet.
 #' @param new_files character vector of paths to new cleaned parquet files (cleaned_region_data)
 #' @param existing_dat path to the existing _final.parquet produced by combine_lja
 #' @param sero_layer path to the sero layer parquet (finished_sero_layer)
@@ -349,25 +285,17 @@ combine_lja <- function(
 #' @return character path to the written _final_with_sero.parquet
 #' @author Morgan Kain
 #' @export
-append_with_sero <- function(new_files, existing_dat, sero_layer, out_dir) {
-
-  save_filename <- paste(
-    out_dir
-  , "/"
-  , paste(out_dir |> strsplit("data/") |> unlist() |> tail(1), "final_with_sero", sep = "_")
-  , ".parquet"
-  , sep = ""
-  )
+combine_lja_and_append_with_sero <- function(new_files, existing_dat, sero_layer, out_dir) {
 
   ## Return existing output file unchanged when there is nothing new to add
-  if (length(new_files) == 0) return(save_filename)
+  if (length(new_files) == 0) return(existing_dat)
 
   ## Read new cleaned files
   new_data <- lapply(as.list(new_files), read_parquet) |> bind_rows()
 
   ## Read existing base data; drop pred_sero in case existing_dat is itself a _with_sero file
   safe_read   <- possibly(arrow::read_parquet, NULL)
-  base_data   <- safe_read(existing_dat) |> dplyr::select(-dplyr::any_of("pred_sero"))
+  base_data   <- safe_read(existing_dat) 
   all_data    <- if (!is.null(base_data)) bind_rows(base_data, new_data) else new_data
 
   ## Join sero layer predictions to the full combined dataset
@@ -376,13 +304,12 @@ append_with_sero <- function(new_files, existing_dat, sero_layer, out_dir) {
 
   arrow::write_parquet(fdat, save_filename, compression = "gzip", compression_level = 5)
 
-  ## Delete the intermediate _final.parquet so only _final_with_sero.parquet remains
-  unlink(existing_dat)
-
+  ## Delete the intermediate files
+  unlink(new_files)
+  
   save_filename
 
 }
-
 
 join_in_sero_layer <- function(region_dat, sero_layer, overwrite) {
 
