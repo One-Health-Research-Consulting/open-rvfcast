@@ -141,18 +141,47 @@ lag_join_aggregate <- function (
     reduce(left_join, by = c("x", "y", "shapeName", "Country"))
 
   ## Build the final covariate data frame
-  fdat.fc <- fdat.f |>
-    left_join(all_lags, by = c("x", "y", "shapeName", "Country"))
+  fdat.fc <- fdat.f |> left_join(all_lags, by = c("x", "y", "shapeName", "Country"))
 
   ## join cases
   cases.t <- cases |>
     filter(date == unique(fdat.fc$date)) |>
-    dplyr::select(-forecast_start, -forecast_end)
+    dplyr::select(-forecast_start, -forecast_end) |>
+    ## Safety
+    dplyr::mutate(x = round(x, 4), y = round(y, 4))
+
+  ## Issue persisting with projection into the template leading to small differences in
+  ## x y coordinates. Best I can come up with to remedy this is to snap each case to the nearest
+  ## (x, y) pair that actually exists in fdat.fc so we use sf::st_nearest_feature to
+  ## find the nearest real covariate cell.
+  if (nrow(cases.t) > 0) {
+    fdat_xy <- fdat.fc |>
+      ## Safety
+      mutate(x = round(x, 4), y = round(y, 4)) |>
+      distinct(x, y) |>
+      sf::st_as_sf(coords = c("x", "y"))
+
+    nearest_idx <- sf::st_nearest_feature(sf::st_as_sf(cases.t, coords = c("x", "y")), fdat_xy)
+    snapped_xy  <- sf::st_coordinates(fdat_xy[nearest_idx, ])
+
+    cases.t <- cases.t |>
+      mutate(x = snapped_xy[, 1], y = snapped_xy[, 2]) |>
+      group_by(x, y, date, forecast_interval) |>
+      summarize(cases = sum(cases, na.rm = TRUE), .groups = "drop")
+  }
 
   fdat.fcc <- fdat.fc |>
+    ## Safety
+    mutate(x = round(x, 4), y = round(y, 4)) |>
     left_join(cases.t, by = c("x", "y", "date", "forecast_interval")) |>
     relocate(cases, .after = shapeName) |>
     mutate(cases = ifelse(is.na(cases), 0, cases))
+
+  ## check join issue
+  cases_a <- cases.t$cases |> sum()
+  cases_b <- fdat.fcc |> filter(cases > 0) |> pull(cases) |> sum()
+
+  if (cases_a != cases_b) stop("join issue with cases")
 
   ## Finally, first step in dealing with NAN or infinite: 1) convert to NA so that it does not contribute to the mean
   fdat.fcc <-  fdat.fcc |>
@@ -164,7 +193,8 @@ lag_join_aggregate <- function (
     dplyr::select(-c(x, y, doy, month, year)) |>
     group_by(shapeName, date, forecast_interval) |>
     summarize(
-      across(where(is.numeric), ~ mean(.x, na.rm = TRUE))
+      cases = sum(cases, na.rm = TRUE)
+    , across(where(is.numeric) & !all_of("cases"), ~ mean(.x, na.rm = TRUE))
     , across(where(is.factor), ~ stat_mode(.x, na.rm = TRUE))
     , .groups = "keep") |>
     mutate(outbreak = ifelse(cases > 0, 1, 0), .after = cases) |>
@@ -173,6 +203,10 @@ lag_join_aggregate <- function (
     mutate(across(starts_with("anomaly"), ~ replace(., is.na(.), 0))) |>
     mutate(across(starts_with("anomaly"), ~ replace(., is.infinite(.), 0))) |>
     ungroup()
+
+  ## Triple check no cases have been lost
+  cases_c <- fdat.final |> filter(cases > 0) |> pull(cases) |> sum()
+  if (cases_a != cases_c) stop("join issue with cases")
 
   ## and get country and ADM2 region for each hex and the proportion of that hex in that country and ADM2 region
   dominant_country <- fdat.fcc |>
@@ -216,13 +250,12 @@ lag_join_aggregate <- function (
 #' @title prep_dates
 
 #' @param cov_files list of covariate parquet files. Here the masked and clustered data
-#' @param rvf_response summarized case data
 #' @param dates_all full list of dates
 #' @return List of tibbles that contain which files are needed for each of the lags
 #' @author Morgan Kain
 #' @export
 
-prep_dates <- function(cov_files, rvf_response, dates_all) {
+prep_dates <- function(cov_files, dates_all) {
 
   ## Extract dates from the saved files
   dates_for_predictions <-  sapply(cov_files, FUN = function(x) {
@@ -230,20 +263,20 @@ prep_dates <- function(cov_files, rvf_response, dates_all) {
   }) |>
   unname() |>
   as.Date()
+
   processed_dates       <- vector("list", length(dates_for_predictions))
-  cases                 <- read_parquet(rvf_response)
 
   ## 1) Determine which parquet files are needed to build the lagged covariates
   for (i in seq_along(cov_files)) {
 
     files_to_avg <- data.frame(
-      lag_floors    = dates_for_predictions[i] - c(30, 60, 90)
+      lag_floors   = dates_for_predictions[i] - c(30, 60, 90)
     , lag_ceilings = dates_for_predictions[i] - c(1, 31, 61)
     ) |>
     rowwise() |>
       mutate(
-        file_nums     = which(dates_all >= lag_floors & dates_all <= lag_ceilings) |> list()
-      , num_files     = length(file_nums)
+        file_nums    = which(dates_all >= lag_floors & dates_all <= lag_ceilings) |> list()
+      , num_files    = length(file_nums)
       , closest_date = dates_all[-i][which((dates_all[-i] - lag_ceilings) < 0)] |> tail(1) |> list()
       )
 
@@ -275,28 +308,100 @@ prep_dates <- function(cov_files, rvf_response, dates_all) {
 }
 
 
+#' A follow up function to lag_join_aggregate to combine all of the aggregated parquet files
+#'
+#'
+#' @title combine_lja
+
+#' @param in_dir vector of paths to all of the summarized parquet files from lag_join_aggregate
+#' @param out_dir location to save the single final joined file
+#' @param overwrite Boolean to recalculate and save over a previously saved file or not
+#' @return character vector path to parquet file
+#' @author Morgan Kain
+#' @export
+
+combine_lja <- function(in_dir, out_dir, overwrite) {
+    ## 0) Logistics stuff
+
+    ## Set filename
+    save_filename <- paste(
+        out_dir
+      , "/"
+      , paste(out_dir |> strsplit("data/") |> unlist() |> tail(1), "final", sep = "_")
+      , ".parquet"
+      , sep = "")
+
+    ## Return existing file unchanged when no new data files are available
+    if (length(in_dir) == 0) {
+      return(save_filename)
+    }
+
+    ## Check if file already exists and can be read
+    error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
+
+    if (!is.null(error_safe_read_parquet(save_filename)) && !overwrite) {
+      message("No new data, returning saved file")
+      return(save_filename)
+    }
+
+    new_data <- lapply(in_dir |> as.list(), FUN = function(x) {
+        tf <- read_parquet(x)
+    }) |>
+        bind_rows()
+
+    ## Append new rows to existing data if present; if _final.parquet is missing (deleted after
+    ## append_with_sero ran last cycle), fall back to _final_with_sero.parquet stripping pred_sero
+    safe_read     <- possibly(arrow::read_parquet, NULL)
+    existing_data <- safe_read(save_filename)
+    if (is.null(existing_data)) {
+        with_sero_file <- gsub("final.parquet", "final_with_sero.parquet", save_filename)
+        existing_data <- safe_read(with_sero_file)
+
+        if (is.null(existing_data)) {
+         existing_data <- NULL
+        } else {
+         existing_data <- existing_data |> dplyr::select(-dplyr::any_of("pred_sero"))
+        }
+    }
+    all_out <- if (!is.null(existing_data)) bind_rows(existing_data, new_data) else new_data
+
+    arrow::write_parquet(all_out, save_filename, compression = "gzip", compression_level = 5)
+
+    save_filename
+}
+
+
 #' @title append_with_sero
 #' @description Appends new cleaned model data to an existing joined dataset, joins in the
 #'   seroprevalence layer, and writes a single _final_with_sero.parquet.
 #' @param new_files character vector of paths to new cleaned parquet files (cleaned_region_data)
-#' @param existing_dat path to the existing _final.parquet produced by combine_lja
+#' @param save_filename path to the existing _final.parquet produced by combine_lja
 #' @param sero_layer path to the sero layer parquet (finished_sero_layer)
 #' @param out_dir directory to write the output file
+#' @param overwrite Boolean to recalculate and save over a previously saved file or not
 #' @return character path to the written _final_with_sero.parquet
 #' @author Morgan Kain
 #' @export
-combine_lja_and_append_with_sero <- function(new_files, existing_dat, sero_layer, out_dir) {
+combine_lja_and_append_with_sero <- function(new_files, save_filename, sero_layer, out_dir, overwrite) {
 
   ## Return existing output file unchanged when there is nothing new to add
-  if (length(new_files) == 0) return(existing_dat)
+  if (length(new_files) == 0) return(save_filename)
+
+  ## Check if file already exists and can be read
+  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
+
+  if (!is.null(error_safe_read_parquet(save_filename)) && !overwrite) {
+    message("No new data, returning saved file")
+    return(save_filename)
+  }
 
   ## Read new cleaned files
   new_data <- lapply(as.list(new_files), read_parquet) |> bind_rows()
 
-  ## Read existing base data; drop pred_sero in case existing_dat is itself a _with_sero file
-  safe_read   <- possibly(arrow::read_parquet, NULL)
-  base_data   <- safe_read(existing_dat) 
-  all_data    <- if (!is.null(base_data)) bind_rows(base_data, new_data) else new_data
+  ## Read existing base data; drop pred_sero in case existing_dat (save_filename) is itself a _with_sero file
+  safe_read <- possibly(arrow::read_parquet, NULL)
+  base_data <- safe_read(save_filename)
+  all_data  <- if (!is.null(base_data)) bind_rows(base_data, new_data) else new_data
 
   ## Join sero layer predictions to the full combined dataset
   slay <- read_parquet(sero_layer) |> rename(shapeName = h3_id)
@@ -305,11 +410,12 @@ combine_lja_and_append_with_sero <- function(new_files, existing_dat, sero_layer
   arrow::write_parquet(fdat, save_filename, compression = "gzip", compression_level = 5)
 
   ## Delete the intermediate files
-  unlink(new_files)
-  
+  # unlink(new_files)
+
   save_filename
 
 }
+
 
 join_in_sero_layer <- function(region_dat, sero_layer, overwrite) {
 

@@ -22,6 +22,9 @@ mask_and_cluster_build_template <- function(
   , out_dir
 ) {
 
+  ## If is.na(cov_files) it means there is no new data so propagate NA
+  
+  
   ## Check that we're only working on one date at a time
   stopifnot(length(cov_files) == 1)
 

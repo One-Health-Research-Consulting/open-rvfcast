@@ -387,7 +387,7 @@ dynamic_targets <- tar_plan(
     sentinel_ndvi_api_parameters        = sentinel_ndvi_api_parameters
   , continent_raster_template           = continent_raster_template
   , sentinel_ndvi_transformed_directory = sentinel_ndvi_transformed_directory
-  , sentinel_ndvi_token_file             = sentinel_ndvi_token_file
+  , sentinel_ndvi_token_file            = sentinel_ndvi_token_file
   , basename_template                   = "transformed_sentinel_NDVI_{start_date}_to_{end_date}.parquet"
   , overwrite                           = parse_flag("OVERWRITE_SENTINEL_NDVI"))
   , pattern                             = map(sentinel_ndvi_api_parameters)
@@ -396,7 +396,7 @@ dynamic_targets <- tar_plan(
   , repository                          = "local")
 
 , tar_target(sentinel_ndvi_transformed_AWS_upload, AWS_put_files(
-    transformed_file_list  = sentinel_ndvi_transformed
+    transformed_file_list = sentinel_ndvi_transformed
   , local_folder          = sentinel_ndvi_transformed_directory
   , overwrite             = parse_flag("OVERWRITE_SENTINEL_NDVI"))
   , error                 = "null")
@@ -976,10 +976,10 @@ full_data_targets <- tar_plan(
 
   ## Next step put combined_anomalies files on AWS.
 , tar_target(africa_full_predictor_data_AWS_upload, AWS_put_files(
-    transformed_file_list  = africa_full_predictor_data
+    transformed_file_list = africa_full_predictor_data
   , local_folder          = africa_full_predictor_data_directory
-  , overwrite             = parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA")
- # , first_date            = "2025-01-08"
+  , overwrite             = FALSE #parse_flag("OVERWRITE_AFRICA_FULL_PREDICTOR_DATA")
+ # , first_date           = "2025-01-08"
  # , all_dates            = dates_to_process
  )
   , pattern               = map(africa_full_predictor_data)

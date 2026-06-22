@@ -50,10 +50,10 @@ data_import_targets <- tar_plan(
 , tar_target(dates_to_process_all, {
   set_model_dates(
     start_year  = 2005
-    , end_year    = lubridate::year(Sys.time())
-    , n_per_month = 2
-    , seed        = 212)
-}, cue         = tar_cue("always"))
+  , end_year    = lubridate::year(Sys.time())
+  , n_per_month = 2
+  , seed        = 212)
+}, cue          = tar_cue("always"))
 
   ## get all of the file paths to all of the full africa data data in the S3 bucket. Determined
   ## later in the pipeline which are needed
@@ -66,9 +66,15 @@ data_import_targets <- tar_plan(
 
    ## Load the already-processed response parquet to determine what dates have been built
  , tar_target(region_data_dates, {
-     loaded_region_data <- read_parquet(paste0(region_joined_data_directory, "/pan_hex_joined_response_data_final_with_sero.parquet"))
-     max_date           <- max(loaded_region_data$date)
-     tibble(all_dates = unique(loaded_region_data$date))
+     loaded_region_data <- try(
+        read_parquet(paste0(region_joined_data_directory, "/pan_hex_joined_response_data_final_with_sero.parquet"))
+      , silent = TRUE)
+      if (class(loaded_region_data)[1] == "try-error") {
+        return(tibble(all_dates = character(0) |> as.Date()))
+      } else {
+        max_date <- max(loaded_region_data$date)
+        return(tibble(all_dates = unique(loaded_region_data$date)))
+      }
    }, cue = tar_cue("always"))
 
   ## Check the last date available in the files created from the previous pipeline
@@ -82,7 +88,7 @@ data_import_targets <- tar_plan(
 
     ## Because of how the lags work, need to drop all files in the first three months,
      ## which is the first 6 files
-   full_parquet_dates <- full_parquet_dates[-c(1:6)]
+    full_parquet_dates <- full_parquet_dates[-c(1:6)]
 
     tibble(
       all_dates  = full_parquet_dates
@@ -115,20 +121,22 @@ data_import_targets <- tar_plan(
 
   }, cue = tar_cue("always"))
 
-  ## Subset predictor paths to only dates not yet in the response data;
-  ## empty vector when dates_in_predictors is NA so base_predictors has 0 branches
+  ## Subset predictor paths to only dates not yet in the response data.
+  ## When there are no new files, return the most recently processed path as a non-empty
+  ## sentinel so downstream branching targets always receive a non-empty vector; branch
+  ## functions use overwrite = FALSE and skip reprocessing of already-completed files.
 , tar_target(new_predictor_paths, {
 
     ## New predictor dates exist when africa_data max is ahead of what's already processed
-    file_paths <- joined_dates |>
-        filter(processed == 0) |>
-        pull(file_paths)
-    needs_updating <- ifelse(length(file_paths) > 0, TRUE, FALSE)
+    file_paths     <- joined_dates |> filter(processed == 0) |> pull(file_paths)
+    needs_updating <- length(file_paths) > 0
 
-    if (needs_updating) {
-        needed_paths <- file_paths
-    } else {
-        file_paths <- character(0)
+    if (!needs_updating) {
+      ## Sentinel: the last already-processed file; non-empty so branching never errors
+      file_paths <- tail(joined_dates$file_paths, 1)
+      ## Ensure the sentinel file exists locally so format = "file" targets can hash it;
+      ## users may clean the predictor folder to save disk space
+      if (!file.exists(file_paths)) AWS_get_files(file_paths)
     }
 
    file_paths
@@ -142,16 +150,12 @@ data_import_targets <- tar_plan(
   ## Polygon of Africa
 , tar_target(continent_polygon, create_africa_polygon())
 
-  ## Africa shape object for masking
+  ## Africa shape object for masking.
+  ## Uses ext(continent_polygon) — the same call as continent_raster_template in
+  ## predictor_data_processing_targets.R — so both rasters share an identical grid.
 , tar_target(wahis_raster_template, terra::rasterize(
     terra::vect(continent_polygon)
-    ## Mask against a raster filled with 1's
-    , terra::rast(
-        continent_polygon
-        ## Set Resolution
-      , resolution = 0.1
-      , vals       = 1
-      ## Wrap to avoid problems with targets
+  , terra::rast(ext(continent_polygon), resolution = 0.1
     )) |>
     terra::wrap())
 
@@ -179,19 +183,14 @@ data_import_targets <- tar_plan(
   ## Creates a tibble that contains, for each given dates_to_process
   ## and forecast interval, the outbreaks in the forecast interval duration
   ## after the given dates_to_process
-, tar_target(rvf_response, {
-    ## Guard: if no new predictor dates, cancel so the existing parquet is preserved and
-    ## downstream targets see no change. get_rvf_response has no overwrite check, so without
-    ## this guard it would overwrite the parquet with empty data when dates_to_process = NA.
-    tar_cancel(all(is.na(dates_in_predictors)))
+, tar_target(rvf_response,
     get_rvf_response(
       wahis_outbreaks       = rvf_outbreaks
     , wahis_raster_template = wahis_raster_template
     , forecast_intervals    = c(1, 30, 60, 90, 120, 150)
     , dates_to_process      = joined_dates$dates
     , local_folder          = rvf_response_directory
-    , overwrite             = ifelse(all(is.na(dates_in_predictors)), FALSE, TRUE))
-  }
+    , overwrite             = FALSE)
   , format                  = "file"
   , repository              = "local")
 
@@ -243,9 +242,9 @@ modeling_targets <- tar_plan(
    ## for this computationally expensive step
    ## *NOTE: the target joined_region_data is built near the end of this targets script*
 , tar_target(prepped_pairs, prep_all_pairs(
-    sero_cases_dat     = cases_sero
-  , cov_dat            = joined_region_data
-  , map_dat            = region_map[[1]]))
+    sero_cases_dat = cases_sero
+  , cov_dat        = joined_region_data
+  , map_dat        = region_map[[1]]))
 
   ## adjusted extracted samples from the fitted model
 , tar_target(prepped_samps, prep_samps(fitted_stan_model = sero_stan_model, time_adjustment = TRUE))
@@ -280,14 +279,18 @@ modeling_targets <- tar_plan(
 rvf_processing_targets <- tar_plan(
 
 ## Determine the Country and ADM2 (or 1) region and H3 hex for all of the x, y coordinates
- tar_target(region_data_template, mask_and_cluster_build_template(
-    ## Arbitrary which we use as a template, so just grab one that we know we have
-     ## from earlier in the pipeline
-    cov_files        = minimal_date_needs[1]
-  , hex_sf          = region_hexes
-  , countries_sf    = region_districts
-  , district_id_col = "shapeName"
-  , out_dir         = region_data_directory))
+ tar_target(region_data_template, {
+    ## No new files to process; preserve the previously-built template in the targets store
+    tar_cancel(length(minimal_date_needs) == 0)
+    mask_and_cluster_build_template(
+      ## Arbitrary which we use as a template, so just grab one that we know we have
+       ## from earlier in the pipeline
+      cov_files        = minimal_date_needs[1]
+    , hex_sf          = region_hexes
+    , countries_sf    = region_districts
+    , district_id_col = "shapeName"
+    , out_dir         = region_data_directory)
+  })
 
 ## Use the template to categorize all x, y, coordinates for all of the data (by date)
  ## Mask to the Sub-Region of interest (drop nothing if pan-African is desired) and
@@ -296,7 +299,7 @@ rvf_processing_targets <- tar_plan(
 , tar_target(region_data_minimal_date, mask_and_cluster_from_template(
     template  = region_data_template
     ## First processing step for the new date[s]
-  , cov_files  = minimal_date_needs
+  , cov_files = minimal_date_needs
   , out_dir   = region_data_directory
   , overwrite = FALSE)
   , pattern   = map(minimal_date_needs)
@@ -306,14 +309,14 @@ rvf_processing_targets <- tar_plan(
   ## First step in building the lagged variables of figuring out what files are needed for each
    ## of the lags. Save these details for each individual date in a list of tibbles
 , tar_target(prepped_dates, prep_dates(
-    cov_files     = region_data_minimal_date
-  , rvf_response = rvf_response
-  , dates_all    = joined_dates$dates |> as.Date()))
+    cov_files  = region_data_minimal_date
+  , dates_all = joined_dates$dates |> as.Date()))
 
   ## some finicky bs to get arrow to work. For whatever reason will not work unless I pull these out
    ## of the prepped_dates object
    ## Returns NULL if there isn't outbreak data for the given date
-, tar_target(file_path_per_date, lapply(prepped_dates, FUN = function(x) x$filename[1]) |> unlist())
+  ## as.character() coerces NULL (from empty prepped_dates) to character(0) for safe 0-branch mapping
+, tar_target(file_path_per_date, lapply(prepped_dates, FUN = function(x) x$filename[1]) |> unlist() |> as.character())
 
   ## Make sure these needed files for the lag dates are downloaded
 , tar_target(all_needed_full_africa_files, {
@@ -362,22 +365,28 @@ rvf_processing_targets <- tar_plan(
   , error     = "null"
   , format    = "file")
 
+  ## Store the name of the existing model data file
+, tar_target(model_data_file_name, {
+    paste0(region_joined_data_directory, "/pan_hex_joined_response_data_final_with_sero.parquet")
+  })
+
   ## Append new data to existing joined parquet, join sero, write single _final_with_sero.parquet,
   ## and delete the intermediate _final.parquet left by combine_lja
-, tar_target(final_region_data, append_with_sero(
-    new_files    = cleaned_region_data
-  , existing_dat = joined_region_data
-  , sero_layer   = finished_sero_layer
-  , out_dir      = region_joined_data_directory)
-  , error        = "null"
-  , format       = "file")
+, tar_target(final_region_data, combine_lja_and_append_with_sero(
+    new_files     = cleaned_region_data
+  , save_filename = model_data_file_name
+  , sero_layer    = finished_sero_layer
+  , out_dir       = region_joined_data_directory
+  , overwrite     = ifelse(all(is.na(dates_in_predictors)), FALSE, TRUE))
+  , error         = "null"
+  , format        = "file")
 
   ## Upload to bucket
 , tar_target(final_region_data_AWS_upload, AWS_put_files(
     transformed_file_list = final_region_data
-  , local_folder          = region_joined_data_directory
-  , overwrite             = parse_flag("OVERWRITE_FINAL_REGION_DATA"))
-  , error                 = "null")
+  , local_folder         = region_joined_data_directory
+  , overwrite            = parse_flag("OVERWRITE_FINAL_REGION_DATA"))
+  , error                = "null")
 
 )
 
