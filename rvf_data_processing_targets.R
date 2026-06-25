@@ -104,6 +104,10 @@ data_import_targets <- tar_plan(
     , region_data_dates |> rename(dates = all_dates) |> mutate(processed = 1)
     ) |>
     mutate(processed = ifelse(is.na(processed), 0, 1))
+  
+  ## Temporary adjustment to add newly obtained case data
+  # ttt %>% mutate(processed = ifelse(dates > "2024-01-03", 0, 1))
+
   })
 
   ## Determine if / what dates need to run
@@ -162,17 +166,24 @@ data_import_targets <- tar_plan(
   ## One branch per new file only; format = "file" tracks content changes
 , tar_target(base_predictors, new_predictor_paths, format = "file", pattern = map(new_predictor_paths))
 
-  ## Import RVF outbreak data
-, tar_target(rvf_outbreaks, get_wahis_rvf_outbreaks() |>
-                 mutate(
-                   start_date = coalesce(outbreak_start_date, outbreak_end_date)
-                 , end_date   = coalesce(outbreak_end_date, outbreak_start_date)
-                 ) |>
-                 filter(grepl("sheep|cattle|camelidae|goat", species)) |>
-                 select(cases, start_date, end_date, latitude, longitude) |>
-                 distinct() |>
-                 arrange(end_date) |>
-                 mutate(outbreak_id = seq_len(n())))
+  ## WAHIS data outpath
+, tar_target(wahis_file_path, "data/WAHIS/outbreak_report_tables.Rds")
+
+  ## Obtain 'raw' outbreak data
+, tar_target(wahis_rvf_tables
+   , update_wahis_rvf_tables(output_path = wahis_file_path)
+   , format = "file"
+   , cue    = tar_cue(mode = "always"))
+
+  ## Upload to S3 bucket
+, tar_target(wahis_rvf_tables_AWS_upload, AWS_put_files(
+    transformed_file_list = wahis_rvf_tables
+  , local_folder          = wahis_file_path
+  , overwrite             = parse_flag("OVERWRITE_WAHIS"))
+  , error                 = "null")
+
+  ## Clean raw outbreak data into form needed for analysis (Step 1)
+, tar_target(rvf_outbreaks, clean_rvf_outbreaks(output_path = wahis_file_path))
 
   ## Import RVF seroprevalence data
 , tar_target(rvf_seroprevalence, readRDS("data/cases_sero.Rds")$sero_data |> mutate(index = seq_len(n())))
@@ -180,6 +191,7 @@ data_import_targets <- tar_plan(
   ## Set up directory for cleaned case data
 , tar_target(rvf_response_directory, create_data_directory(directory_path = "data/rvf_response"))
 
+  ## Clean raw outbreak data into form needed for analysis (Step 2)
   ## Creates a tibble that contains, for each given dates_to_process
   ## and forecast interval, the outbreaks in the forecast interval duration
   ## after the given dates_to_process
@@ -191,8 +203,8 @@ data_import_targets <- tar_plan(
     , dates_to_process      = joined_dates$dates
     , local_folder          = rvf_response_directory
     , overwrite             = FALSE)
-  , format                  = "file"
-  , repository              = "local")
+    , format                = "file"
+    , repository            = "local")
 
   ## Pulls all African countries. Alternatively can just provide a single country
    ## directly to get_region_districts below
@@ -361,7 +373,7 @@ rvf_processing_targets <- tar_plan(
 , tar_target(joined_region_data, combine_lja(
     in_dir    = cleaned_region_data
   , out_dir   = region_joined_data_directory
-  , overwrite = ifelse(all(is.na(dates_in_predictors)), FALSE, TRUE))
+  , overwrite = TRUE) # ifelse(all(is.na(dates_in_predictors)), FALSE, TRUE))
   , error     = "null"
   , format    = "file")
 
@@ -377,7 +389,7 @@ rvf_processing_targets <- tar_plan(
   , save_filename = model_data_file_name
   , sero_layer    = finished_sero_layer
   , out_dir       = region_joined_data_directory
-  , overwrite     = ifelse(all(is.na(dates_in_predictors)), FALSE, TRUE))
+  , overwrite     = TRUE) #ifelse(all(is.na(dates_in_predictors)), FALSE, TRUE))
   , error         = "null"
   , format        = "file")
 

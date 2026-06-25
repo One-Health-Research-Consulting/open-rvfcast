@@ -6,6 +6,7 @@
 #' @author Emma Mendelsohn
 #'
 #' @param wahis_rvf_outbreaks_raw Raw WAHIS data including RVF outbreaks. 
+#' @param country_code_id_col Name of the column with three digit country codes
 #'
 #' @return A dataframe of filtered and preprocessed WAHIS RVF outbreak data, including only African data with proper country ISO codes.
 #'
@@ -15,13 +16,16 @@
 #' preprocess_wahis_rvf_outbreaks(wahis_rvf_outbreaks_raw = raw_data)
 #'
 #' @export
-preprocess_wahis_rvf_outbreaks <- function(wahis_rvf_outbreaks_raw) {
+preprocess_wahis_rvf_outbreaks <- function(wahis_rvf_outbreaks_raw, country_code_id_col) {
 
-  wahis_rvf_outbreaks_raw$continent <- countrycode::countrycode(wahis_rvf_outbreaks_raw$country_unique_code, origin = "iso3c", destination = "continent")
+  wahis_rvf_outbreaks_raw$continent <- countrycode::countrycode(
+    wahis_rvf_outbreaks_raw |> pull(get(country_code_id_col))
+  , origin = "iso3c", destination = "continent")
+  
   wahis_rvf_outbreaks <- wahis_rvf_outbreaks_raw |> 
     filter(continent == "Africa")  |> 
-    mutate(iso_code = toupper(country_unique_code)) |> 
-    select(-country_unique_code)
+    mutate(iso_code = toupper(get(country_code_id_col))) |> 
+    select(-!!country_code_id_col)
   
   return(wahis_rvf_outbreaks)
 
