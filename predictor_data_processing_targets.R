@@ -28,7 +28,8 @@ source("_targets_settings.R")
 ## otherwise we always want to check.
 parse_flag <- function(flags, cue = NULL) {
   stopifnot(cue %in% c(NULL, "never", "always"))
-  flag <- any(as.logical(Sys.getenv(flags, unset = "FALSE")))
+  ## default to false
+  flag <- any(as.logical(Sys.getenv(flags, unset = "FALSE")), na.rm = TRUE)
   if (!is.null(cue)) flag <- targets::tar_cue(ifelse(flag, cue, ifelse(cue == "never", "always", "thorough")))
   flag
 }
@@ -376,8 +377,12 @@ dynamic_targets <- tar_plan(
   ## Should last 10 minutes. If it fails renew the token and try again.
 , tar_target(sentinel_ndvi_token_file, get_sentinel_ndvi_token(), cue = tar_cue("always"))
 
-  # get API parameters
-, tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters())
+  # get API parameters; always re-query so new Copernicus products trigger new pattern branches
+, tar_target(sentinel_ndvi_api_parameters, get_sentinel_ndvi_api_parameters(
+    sentinel_ndvi_transformed_directory = sentinel_ndvi_transformed_directory
+  , basename_template = "transformed_sentinel_NDVI_{start_date}_to_{end_date}.parquet"
+  , get_sentinel_ndvi_AWS)
+  , cue = tar_cue("always"))
 
   ## MAX SESSION = 4! Can't parallel this one due to API restrictions
   ## Sentinel data is weekly so we also expand out so every day has a value
@@ -387,7 +392,7 @@ dynamic_targets <- tar_plan(
     sentinel_ndvi_api_parameters        = sentinel_ndvi_api_parameters
   , continent_raster_template           = continent_raster_template
   , sentinel_ndvi_transformed_directory = sentinel_ndvi_transformed_directory
-  , sentinel_ndvi_token_file            = sentinel_ndvi_token_file
+  , sentinel_ndvi_token_file             = sentinel_ndvi_token_file
   , basename_template                   = "transformed_sentinel_NDVI_{start_date}_to_{end_date}.parquet"
   , overwrite                           = parse_flag("OVERWRITE_SENTINEL_NDVI"))
   , pattern                             = map(sentinel_ndvi_api_parameters)
@@ -412,10 +417,11 @@ dynamic_targets <- tar_plan(
   ## still works. It requests a new token and updates the .env file if not.
 , tar_target(modis_ndvi_token, get_modis_ndvi_token(), cue = tar_cue("always"))
 
-  ## The last day of every years we want to request ndvi data.
-  ## Ordered by end date so that the current year will request new data ever new
-  ## day the pipeline is run.
-, tar_target(modis_task_end_dates, c(seq(as.Date("2005-12-31"), Sys.Date(), by = "year"), Sys.Date()) |> unique()),
+  ## The last day of every year we want to request ndvi data.
+  ## Years with complete local data (a December parquet file exists) are skipped.
+  ## The current year is always included so new composites are fetched each run.
+, tar_target(modis_task_end_dates, get_modis_task_end_dates(modis_ndvi_transformed_directory, modis_ndvi_transformed_AWS)
+   , cue = tar_cue("always"))
 
   ## Set parameters and submit request for full continent
   ## Bundle requests take quite a while to finish processing depending on the size.
@@ -424,15 +430,14 @@ dynamic_targets <- tar_plan(
   ## Set OVERWRITE_MODIS_NDVI to TRUE in the .env file to force re-download and processing of
   ## previous years. The current year will always re-run regardless of this setting.
   ## If a year isn't complete (i.e there are missing days) it will re-run that year.
-  tar_target(modis_ndvi_task_id_continent, submit_modis_ndvi_task_request_continent(
+, tar_target(modis_ndvi_task_id_continent, submit_modis_ndvi_task_request_continent(
     end_date                         = modis_task_end_dates
   , modis_ndvi_token                 = modis_ndvi_token
     ## Add an extra 10 degrees of width to avoid weird circle that cuts off Somalia. Due to modis's native sinusoidal crs
   , bbox_coords                      = sf::st_bbox(continent_polygon) + c(0, 0, 10, 0)
   , modis_ndvi_transformed_directory = modis_ndvi_transformed_directory
   , overwrite                        = parse_flag("OVERWRITE_MODIS_NDVI"))
-  , pattern                          = map(modis_task_end_dates)
-  , cue                              = tar_cue("always"))
+  , pattern                          = map(modis_task_end_dates))
 
   ## Set up modis_ndvi data requests
 , tar_target(modis_ndvi_bundle_request, submit_modis_ndvi_bundle_request(
@@ -521,7 +526,7 @@ dynamic_targets <- tar_plan(
 , tar_target(ndvi_transformed_sources, create_ndvi_transformed_sources(
     modis_ndvi_transformed
   , sentinel_ndvi_transformed
-  , months_to_process_all) |>
+  , months_to_process) |>
     group_by(month) |>
     tar_group()
   , iteration = "group")
@@ -532,7 +537,9 @@ dynamic_targets <- tar_plan(
     ndvi_transformed_sources
   , ndvi_transformed_directory
   , basename_template = "ndvi_transformed_{.y}_{.m}.parquet"
-  , overwrite  = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED")))
+  , overwrite  = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED"))
+    ## Enforce dependency so S3 files are synced locally before the file-exists check
+  , ndvi_transformed_AWS)
   , pattern    = map(ndvi_transformed_sources)
   , format     = "file"
   , error      = "null"
@@ -543,37 +550,7 @@ dynamic_targets <- tar_plan(
     ndvi_transformed
   , ndvi_transformed_directory
   , overwrite = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED")))
-  , error = "null")
-
-  ## NASA POWER recorded weather -----------------------------------------------------------
-  ## Replaced by ERA5T as the primary weather source (ERA5T covers the full historical record
-  ## at ~5-day lag vs MERRA-2's ~5-week lag, making the mixed NASA+ERA5T approach unnecessary).
-  ## Targets retained as comments to allow rollback if needed.
-  ##
-  # , tar_target(nasa_weather_transformed_directory, create_data_directory(directory_path = "data/nasa_weather_transformed"))
-  # , tar_target(nasa_weather_transformed_AWS, AWS_get_folder(
-  #     local_folder     = nasa_weather_transformed_directory
-  #   , skip_fetch       = Sys.getenv("SKIP_FETCH") == "TRUE"
-  #   , sync_with_remote = TRUE)
-  #   , error            = "null"
-  #   , cue              = tar_cue("always"))
-  # , tar_target(nasa_weather_transformed, fetch_and_transform_nasa_weather(
-  #     months_to_process         = months_to_process
-  #   , nasa_weather_variables    = c("relative_humidity" = "RH2M", "temperature" = "T2M", "precipitation" = "PRECTOTCORR")
-  #   , continent_raster_template = continent_raster_template
-  #   , local_folder              = nasa_weather_transformed_directory
-  #   , basename_template         = "nasa_weather_transformed_{months_to_process}.parquet"
-  #   , endpoint                  = "https://power-datastore.s3.amazonaws.com/v10/daily/{year}/{month}/power_10_daily_{yyyymmdd}_merra2_lst.nc"
-  #   , overwrite                 = parse_flag("OVERWRITE_NASA_WEATHER")
-  #   , nasa_weather_transformed_AWS)
-  #   , pattern                   = map(months_to_process)
-  #   , error                     = "null"
-  #   , format                    = "file")
-  # , tar_target(nasa_weather_transformed_AWS_upload, AWS_put_files(
-  #     transformed_file_list  = nasa_weather_transformed
-  #   , local_folder          = nasa_weather_transformed_directory
-  #   , overwrite             = parse_flag("OVERWRITE_NASA_WEATHER"))
-  #   , error                 = "null")
+  , error     = "null")
 
   ## ERA5T Near Real-Time Weather -----------------------------------------------------------
   ## ERA5T (ECMWF ERA5 near real-time) mirrors the same three variables as NASA POWER MERRA-2
@@ -594,27 +571,19 @@ dynamic_targets <- tar_plan(
   , error            = "null"
   , cue              = tar_cue("always"))
 
-  ## months_to_process_era5t was a narrow window for the NASA fallback period; now that ERA5T
-  ## is the sole weather source, era5t_weather_transformed uses months_to_process_all directly.
-  # , tar_target(months_to_process_era5t,
-  #     dates_to_process |> format("%Y-%m") |> unique()
-  #   , cue = tar_cue("always"))
-
 , tar_target(months_to_process_all, dates_to_process_all |> format("%Y-%m") |> unique())
 
   ## Fetch ERA5T daily weather from CDS and transform to continental parquets.
   ## Branches over months_to_process_era5t
    ## For forecasting, don't need many months
 , tar_target(era5t_weather_transformed, fetch_and_transform_era5t_weather(
-    #months_to_process        = months_to_process_era5t
-    months_to_process         = months_to_process_all
+    months_to_process         = months_to_process
   , continent_raster_template = continent_raster_template
   , local_folder              = era5t_weather_transformed_directory
   , basename_template         = "era5t_weather_transformed_{months_to_process}.parquet"
   , overwrite                 = parse_flag("OVERWRITE_ERA5T_WEATHER")
   , era5t_weather_transformed_AWS)
-  , #pattern                   = map(months_to_process_era5t)
-  , pattern                   = map(months_to_process_all)
+  , pattern                   = map(months_to_process)
   , error                     = "null"
   , format                    = "file")
 
@@ -624,51 +593,6 @@ dynamic_targets <- tar_plan(
   , local_folder          = era5t_weather_transformed_directory
   , overwrite             = parse_flag("OVERWRITE_ERA5T_WEATHER"))
   , error                 = "null")
-
-  ## ERA5T Bias Correction -----------------------------------------------------------
-  ## Was needed when ERA5T served as a fallback for NASA POWER to correct systematic
-  ## ERA5T-vs-MERRA-2 offsets. Now that ERA5T is the sole source and weather_historical_means
-  ## is computed from ERA5T data, anomalies are ERA5T vs ERA5T means — no bias offset needed.
-  # , tar_target(era5t_bias_correction_file, get_or_compute_era5t_bias_correction(
-  #       era5t_weather_dir              = era5t_weather_transformed_directory
-  #     , weather_anomalies_dir          = weather_anomalies_directory
-  #     , weather_historical_means_dir   = weather_historical_means_directory
-  #     , continent_raster_template      = continent_raster_template
-  #     , output_file                    = "outputs/anomaly_bias_correction/era5t_bias_correction.parquet"
-  #     , n_calibration_months           = 72
-  #     , skip_download                  = TRUE
-  #     , overwrite                      = parse_flag("OVERWRITE_ERA5T_BIAS_CORRECTION"))
-  #   , format                           = "file"
-  #   , cue                              = tar_cue("always"))
-
-  ## ERA5T Weather Anomalies -----------------------------------------------------------
-  ## calculate_era5t_weather_anomalies was a separate fallback path that applied bias
-  ## correction before ERA5T became the primary source. weather_anomalies now uses
-  ## calculate_weather_anomalies directly on ERA5T monthly parquets (same schema).
-  # , tar_target(era5t_weather_anomalies_directory, create_data_directory(directory_path = "data/weather_anomalies_era5t"))
-  # , tar_target(era5t_weather_anomalies_AWS, AWS_get_folder(
-  #     local_folder     = era5t_weather_anomalies_directory
-  #   , skip_fetch       = Sys.getenv("SKIP_FETCH") == "TRUE"
-  #   , sync_with_remote = TRUE)
-  #   , error            = "null"
-  #   , cue              = tar_cue("always"))
-  # , tar_target(era5t_weather_anomalies, calculate_era5t_weather_anomalies(
-  #     era5t_weather_transformed_file      = era5t_weather_transformed
-  #   , bias_correction_file                = era5t_bias_correction_file
-  #   , weather_historical_means_dir        = weather_historical_means_directory
-  #   , weather_anomalies_era5t_directory   = era5t_weather_anomalies_directory
-  #   , overwrite                           = parse_flag("OVERWRITE_ERA5T_WEATHER_ANOMALIES")
-  #   , era5t_weather_anomalies_AWS)
-  #   , pattern                             = map(era5t_weather_transformed)
-  #   , error                               = "null"
-  #   , format                              = "file"
-  #   , repository                          = "local")
-  # , tar_target(era5t_weather_anomalies_AWS_upload, AWS_put_files(
-  #     transformed_file_list    = era5t_weather_anomalies
-  #   , local_folder            = era5t_weather_anomalies_directory
-  #   , overwrite               = parse_flag("OVERWRITE_ERA5T_WEATHER_ANOMALIES"))
-  #   , pattern                 = map(era5t_weather_anomalies)
-  #   , error                   = "null")
 
   ## How many months out are we forecasting?
 , tar_target(ecmwf_lead_months, seq(1, 6))
@@ -684,7 +608,10 @@ dynamic_targets <- tar_plan(
   , variables     = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation")
     ## product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
   , product_types = c("monthly_mean")
-  , lead_months   = ecmwf_lead_months)
+  , lead_months   = ecmwf_lead_months
+  , ecmwf_forecasts_transformed_directory = ecmwf_forecasts_transformed_directory
+  , basename_template = "ecmwf_seasonal_forecast_{month}_{year}.parquet"
+  , get_ecmwf_forecasts_AWS)
   , cue           = tar_cue("always"))
 
   ## Check if ecmwf files already exists on AWS and can be loaded
@@ -825,7 +752,8 @@ derived_data_targets <- tar_plan(
   ## Only includes dates up to the latest forecast month
 , tar_target(forecasts_anomalies_sources, create_forecasts_anomalies_sources(
       ecmwf_forecasts_transformed
-    , dates_to_process_all) |>
+    , dates_to_process
+    , ecmwf_forecasts_transformed_directory) |>
       group_by(date) |>
       tar_group()
     , iteration = "group")
@@ -869,8 +797,10 @@ derived_data_targets <- tar_plan(
     sentinel_ndvi_transformed
   , modis_ndvi_transformed
   , ndvi_historical_means_directory
-  , basename_template = "ndvi_historical_mean_doy_{i}.parquet"
-  , overwrite         = parse_flag("OVERWRITE_HISTORICAL_MEANS")
+  , basename_template                  = "ndvi_historical_mean_doy_{i}.parquet"
+  , overwrite                          = parse_flag("OVERWRITE_HISTORICAL_MEANS")
+  , modis_ndvi_transformed_directory   = modis_ndvi_transformed_directory
+  , sentinel_ndvi_transformed_directory = sentinel_ndvi_transformed_directory
   , ndvi_historical_means_AWS)
   , format            = "file"
   , repository        = "local"
@@ -954,7 +884,8 @@ full_data_targets <- tar_plan(
       forecasts_anomalies
     , weather_anomalies
     , ndvi_anomalies
-    , dates_to_process_all) |>
+    , dates_to_process
+    , ndvi_anomalies_directory = ndvi_anomalies_directory) |>
       group_by(date) |>
       tar_group()
     , iteration = "group")

@@ -28,10 +28,13 @@ get_grib_metadata <- function(grib_file) {
   metadata_text <- gdalinfo_text[metadata_start_index:length(gdalinfo_text)] 
   metadata_text <- metadata_text[!str_detect(metadata_text, "^Band|BAND|Metadata|METADATA")]
   
-  metadata <- map_dfr(metadata_text, ~stringr::str_split(.x[1], "=")[[1]] |> 
+  metadata <- map_dfr(metadata_text, ~stringr::str_split(.x[1], "=")[[1]] |>
                              stringr::str_squish() |> setNames(c("name", "value"))) |>
-    mutate(band = cumsum(name == "Description")) |> 
-    pivot_wider(names_from = "name", values_from = "value")
+    mutate(band = cumsum(name == "Description")) |>
+    # values_fn = first guards against duplicate metadata keys within a band (observed
+    # in some GRIB files where e.g. GRIB_REF_TIME appears more than once per layer),
+    # which would otherwise produce list columns that propagate to arrow::write_parquet.
+    pivot_wider(names_from = "name", values_from = "value", values_fn = first)
   
   metadata
 }

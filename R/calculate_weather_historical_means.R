@@ -36,9 +36,13 @@ calculate_weather_historical_means <- function(nasa_weather_transformed,
   # Set up safe way to read parquet files
   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
 
-  # Open dataset can handle multi-file datasets larger than can
-  # fit in memory
-  nasa_weather_data <- arrow::open_dataset(nasa_weather_transformed)
+  # nasa_weather_data is opened lazily — only when a DOY file actually needs to be
+  # (re)computed. Opening unconditionally would silently compute means from incomplete
+  # data if the user has deleted historical ERA5T files to save disk space and then
+  # sets overwrite = TRUE. Lazy opening means: (a) skipped DOY files never touch the
+  # dataset, and (b) if source files are missing on an overwrite run, the error is
+  # immediate and loud rather than producing corrupted means.
+  nasa_weather_data <- NULL
 
   # Fast because we can avoid collecting until write_parquet
   weather_historical_means <- map_vec(1:366, .progress = TRUE, function(i) {
@@ -46,9 +50,14 @@ calculate_weather_historical_means <- function(nasa_weather_transformed,
     filename <- file.path(weather_historical_means_directory, glue::glue(basename_template))
 
     # Check if parquet files exist and can be read and that we don't want to overwrite them.
-    if(!is.null(error_safe_read_parquet(filename)) & !overwrite) {
+    if (!is.null(error_safe_read_parquet(filename)) & !overwrite) {
       message(glue::glue("{filename} already exists and can be loaded, skipping"))
       return(filename)
+    }
+
+    # Open the ERA5T dataset the first time a DOY file needs recomputing.
+    if (is.null(nasa_weather_data)) {
+      nasa_weather_data <<- arrow::open_dataset(nasa_weather_transformed)
     }
 
     mean_vals <- nasa_weather_data |>

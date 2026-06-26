@@ -27,7 +27,10 @@ set_ecmwf_api_parameter <- function(start_year = 2005,
                                     bbox_coords = continent_bounding_box,
                                     variables = c("2m_dewpoint_temperature", "2m_temperature", "total_precipitation"),
                                     product_types = c("monthly_mean", "monthly_maximum", "monthly_minimum", "monthly_standard_deviation"),
-                                    lead_months = seq(1, 6)) {
+                                    lead_months = seq(1, 6),
+                                    ecmwf_forecasts_transformed_directory = NULL,
+                                    basename_template = "ecmwf_seasonal_forecast_{month}_{year}.parquet",
+                                    ...) {
 
 
   # API details from:
@@ -68,19 +71,38 @@ set_ecmwf_api_parameter <- function(start_year = 2005,
                       "S" = unname(bbox_coords["ymin"]),
                       "E" = unname(bbox_coords["xmax"]))
   
-  # Up till last month.
-  # dates <- seq.Date(ymd("2017-9-01"), floor_date(today() - months(1), "month"), by = "month")
-  dates <- seq.Date(lubridate::ymd(start_year, truncated = 2L), floor_date(today() - months(1), "month"), by = "month")
-  dates <- seq.Date(lubridate::ymd(start_year, truncated = 2L), floor_date(today(), "month") - months(1), by = "month")
+  # Include the current month once ECMWF has had time to publish it (typically within the
+  # first 7 days of the month). Before that, use the previous month as the upper bound.
+  ecmwf_publish_lag_days <- 7
+  end_date <- if (lubridate::day(lubridate::today()) > ecmwf_publish_lag_days) {
+    lubridate::floor_date(lubridate::today(), "month")
+  } else {
+    lubridate::floor_date(lubridate::today(), "month") - lubridate::months(1)
+  }
+  dates <- seq.Date(lubridate::ymd(start_year, truncated = 2L), end_date, by = "month")
 
   seasonal_forecast_parameters <- tibble(year = year(dates), month = month(dates))
-  
+
+  # When the output directory is known, skip months whose parquet already exists —
+  # except the current month, which always re-runs in case the forecast has been updated.
+  # This prevents ecmwf_forecasts_transformed from branching over all 250+ historical
+  # months on every pipeline run; only missing months and the current month get branches.
+  if (!is.null(ecmwf_forecasts_transformed_directory)) {
+    current_year  <- as.integer(format(Sys.Date(), "%Y"))
+    current_month <- as.integer(format(Sys.Date(), "%m"))
+    seasonal_forecast_parameters <- seasonal_forecast_parameters |>
+      mutate(output_file = file.path(ecmwf_forecasts_transformed_directory,
+                                     glue::glue_data(pick(everything()), basename_template))) |>
+      filter((year == current_year & month == current_month) | !file.exists(output_file)) |>
+      select(-output_file)
+  }
+
   message(glue::glue("Preparing to fetch ecmwf {product_types}"))
-  
+
   # 2m_temperature (monthly mean) is the average 2-meter air temperature over the calendar month.
   # 2m_dewpoint_temperature is the average dew point temperature over the same period.
   # total_precipitation is typically the total accumulation for the month (not an average). Check metadata to confirm, as some datasets might report mean daily precipitation rates.
-  
+
   seasonal_forecast_parameters |>
     mutate(spatial_bounds = list(spatial_bounds)) |> 
     mutate(variables = list(variables)) |> 

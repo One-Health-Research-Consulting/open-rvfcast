@@ -21,7 +21,9 @@
 #' get_sentinel_ndvi_api_parameters()
 #'
 #' @export
-get_sentinel_ndvi_api_parameters <- function() {
+get_sentinel_ndvi_api_parameters <- function(sentinel_ndvi_transformed_directory = NULL,
+                                              basename_template = "transformed_sentinel_NDVI_{start_date}_to_{end_date}.parquet",
+                                              ...) {
 
   # Query Africa S3A Near-Real-Time 10-day NDVI composites via OData API
   # The RESTO API previously used (catalogue.dataspace.copernicus.eu/resto/api/)
@@ -59,6 +61,32 @@ get_sentinel_ndvi_api_parameters <- function() {
     start_date = start_dates,
     end_date   = end_dates
   )
+
+  # Filter to only products where the output parquet does not yet exist. Sentinel
+  # products are historical observations that do not change once published, so
+  # there is no need to re-run a branch whose parquet is already present. This
+  # prevents sentinel_ndvi_transformed from dispatching hundreds of branches on
+  # every pipeline run when only a few new products have appeared since last time.
+  if (!is.null(sentinel_ndvi_transformed_directory)) {
+    out <- out |>
+      mutate(output_file = file.path(sentinel_ndvi_transformed_directory,
+                                     glue::glue_data(pick(everything()), basename_template))) |>
+      filter(!file.exists(output_file)) |>
+      select(-output_file)
+  }
+
+  # targets cannot branch over a 0-row tibble. When all sentinel parquets already
+  # exist the filter above returns nothing; return one NA sentinel row so the
+  # pattern = map() branch dispatches exactly once and transform_sentinel_ndvi
+  # can short-circuit immediately without downloading anything.
+  if (nrow(out) == 0) {
+    return(tibble::tibble(
+      id         = NA_character_,
+      name       = NA_character_,
+      start_date = as.Date(NA),
+      end_date   = as.Date(NA)
+    ))
+  }
 
   return(out)
 

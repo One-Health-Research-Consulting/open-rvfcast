@@ -104,7 +104,7 @@ data_import_targets <- tar_plan(
     , region_data_dates |> rename(dates = all_dates) |> mutate(processed = 1)
     ) |>
     mutate(processed = ifelse(is.na(processed), 0, 1))
-  
+
   ## Temporary adjustment to add newly obtained case data
   # ttt %>% mutate(processed = ifelse(dates > "2024-01-03", 0, 1))
 
@@ -311,7 +311,7 @@ rvf_processing_targets <- tar_plan(
 , tar_target(region_data_minimal_date, mask_and_cluster_from_template(
     template  = region_data_template
     ## First processing step for the new date[s]
-  , cov_files = minimal_date_needs
+  , cov_files  = minimal_date_needs
   , out_dir   = region_data_directory
   , overwrite = FALSE)
   , pattern   = map(minimal_date_needs)
@@ -351,9 +351,9 @@ rvf_processing_targets <- tar_plan(
   ## Calculate lags, join cases, summarize and build master dataset. Save the output in individual
    ## parquet files by date
 , tar_target(cleaned_region_data, lag_join_aggregate(
-    file_list       = file_path_per_date
+    file_list        = file_path_per_date
   , processed_dates = prepped_dates
-  , cov_files       = region_data
+  , cov_files        = region_data
   , rvf_response    = rvf_response
   , out_dir         = region_cleaned_data_directory
   , all_dates       = joined_dates
@@ -365,15 +365,15 @@ rvf_processing_targets <- tar_plan(
   ## Upload to bucket
 , tar_target(cleaned_region_data_AWS_upload, AWS_put_files(
     transformed_file_list = cleaned_region_data
-  , local_folder          = region_cleaned_data_directory
-  , overwrite             = parse_flag("OVERWRITE_CLEANED_REGION_DATA"))
-  , error                 = "null")
+  , local_folder         = region_cleaned_data_directory
+  , overwrite            = parse_flag("OVERWRITE_CLEANED_REGION_DATA"))
+  , error                = "null")
 
   ## Build a single master file
 , tar_target(joined_region_data, combine_lja(
     in_dir    = cleaned_region_data
   , out_dir   = region_joined_data_directory
-  , overwrite = TRUE) # ifelse(all(is.na(dates_in_predictors)), FALSE, TRUE))
+  , overwrite = ifelse(all(is.na(dates_in_predictors)), FALSE, TRUE))
   , error     = "null"
   , format    = "file")
 
@@ -387,11 +387,11 @@ rvf_processing_targets <- tar_plan(
 , tar_target(final_region_data, combine_lja_and_append_with_sero(
     new_files     = cleaned_region_data
   , save_filename = model_data_file_name
-  , sero_layer    = finished_sero_layer
-  , out_dir       = region_joined_data_directory
-  , overwrite     = TRUE) #ifelse(all(is.na(dates_in_predictors)), FALSE, TRUE))
-  , error         = "null"
-  , format        = "file")
+  , sero_layer   = finished_sero_layer
+  , out_dir      = region_joined_data_directory
+  , overwrite    = ifelse(all(is.na(dates_in_predictors)), FALSE, TRUE))
+  , error        = "null"
+  , format       = "file")
 
   ## Upload to bucket
 , tar_target(final_region_data_AWS_upload, AWS_put_files(

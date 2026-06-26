@@ -58,10 +58,30 @@ fetch_and_transform_era5t_weather <- function(
   transformed_file         <- file.path(local_folder, glue::glue(basename_template))
   error_safe_read_parquet <- purrr::possibly(arrow::open_dataset, NULL)
   existing_data           <- error_safe_read_parquet(transformed_file)
+  last_day_of_month        <- lubridate::ceiling_date(start_date, "month") - lubridate::days(1)
 
   if (!is.null(existing_data) && !overwrite) {
-    message(glue::glue("{basename(transformed_file)} already exists, has rows, and overwrite is not TRUE, skipping"))
-    return(transformed_file)
+    if (last_day_of_month <= era5t_cutoff) {
+      # Full month is now available from ERA5T; only skip if the parquet already covers it
+      max_parquet_date <- existing_data |>
+        dplyr::summarise(max_date = max(date, na.rm = TRUE)) |>
+        dplyr::collect() |>
+        dplyr::pull(max_date) |>
+        as.Date()
+      if (max_parquet_date >= last_day_of_month) {
+        message(glue::glue("{basename(transformed_file)} is complete through {last_day_of_month}, skipping"))
+        return(transformed_file)
+      }
+      message(glue::glue(
+        "{basename(transformed_file)} covers only through {max_parquet_date} but full month is now ",
+        "available; reprocessing to fill in remaining days."
+      ))
+      # Fall through to re-download and reprocess
+    } else {
+      # Month not yet fully available from ERA5T; existing partial parquet is the best we can do
+      message(glue::glue("{basename(transformed_file)} already exists and month is not yet complete, skipping"))
+      return(transformed_file)
+    }
   }
 
   # Authenticate with CDS using the same credentials as the ECMWF seasonal forecasts
@@ -85,6 +105,11 @@ fetch_and_transform_era5t_weather <- function(
   nc_t2m_file    <- file.path(local_folder, glue::glue("era5t_t2m_{year}_{month}.nc"))
   nc_d2m_file    <- file.path(local_folder, glue::glue("era5t_d2m_{year}_{month}.nc"))
   nc_precip_file <- file.path(local_folder, glue::glue("era5t_precip_{year}_{month}.nc"))
+
+  # Remove nc files left from a previous failed run. download_era5t_nc skips existing files,
+  # so stale nc files (covering fewer days than now available) would otherwise be silently
+  # reused. Clearing them here forces a fresh CDS download for each processing attempt.
+  purrr::walk(c(nc_t2m_file, nc_d2m_file, nc_precip_file), ~if (file.exists(.x)) file.remove(.x))
 
   download_era5t_nc(
     variable     = "2m_temperature"
@@ -123,13 +148,23 @@ fetch_and_transform_era5t_weather <- function(
   ## because the time dimension encoding varies and is not always parsed correctly
   dates_in_month <- seq(start_date, end_date, by = "day")
 
-  ## Guard against CDS returning a different number of days than requested
-  if (terra::nlyr(temp_rast) != length(dates_in_month)) {
-    stop(glue::glue(
-      "Temperature raster has {terra::nlyr(temp_rast)} layers but expected {length(dates_in_month)} ",
-      "days for {months_to_process}. CDS may have returned incomplete data."
+  ## Use however many layers are actually present across all three nc files.
+  ## CDS sometimes returns fewer days than requested for months near the ERA5T
+  ## availability cutoff, and the nc files for a previous failed run may also
+  ## be stale. Truncating dates_in_month produces a parquet with available data
+  ## rather than a hard failure.
+  n_available <- min(terra::nlyr(temp_rast), terra::nlyr(dew_rast), terra::nlyr(precip_rast))
+  if (n_available == 0) {
+    message(glue::glue("ERA5T nc files for {months_to_process} contain no data layers, skipping"))
+    return(NULL)
+  }
+  if (n_available < length(dates_in_month)) {
+    message(glue::glue(
+      "ERA5T nc files for {months_to_process} have {n_available} of {length(dates_in_month)} ",
+      "expected days; writing parquet with available data only."
     ))
   }
+  dates_in_month <- dates_in_month[seq_len(n_available)]
 
   ## Process each day: convert units, derive relative humidity, resample to template
   era5t_weather <- purrr::map_df(seq_along(dates_in_month), function(i) {

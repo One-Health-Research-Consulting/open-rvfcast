@@ -24,7 +24,8 @@ create_africa_full_predictor_data_sources <- function(forecasts_anomalies,
                                                       weather_anomalies,
                                                       ndvi_anomalies,
                                                       dates_to_process,
-                                                      ndvi_carryforward_days = 21) {
+                                                      ndvi_carryforward_days = 21,
+                                                      ndvi_anomalies_directory = NULL) {
 
   # Reusable function to build lookup from file list
   # Opens all files as a single dataset for faster metadata reading
@@ -52,10 +53,20 @@ create_africa_full_predictor_data_sources <- function(forecasts_anomalies,
       dplyr::rename(!!column_name := original_path)
   }
 
+  # Scan the full ndvi_anomalies directory when provided. ndvi_anomalies may only
+  # contain the current run's new files when the pipeline is running in incremental
+  # monthly mode; the directory scan ensures all historical anomaly files are
+  # available for the NDVI carry-forward look-back (up to ndvi_carryforward_days prior).
+  ndvi_anomaly_files <- if (!is.null(ndvi_anomalies_directory)) {
+    list.files(ndvi_anomalies_directory, pattern = "\\.parquet$", full.names = TRUE)
+  } else {
+    ndvi_anomalies[!is.na(ndvi_anomalies)]
+  }
+
   # Build lookups for each predictor type
-  forecasts_lookup <- build_lookup(forecasts_anomalies, "forecasts_anomalies")
-  weather_lookup   <- build_lookup(weather_anomalies,   "weather_anomalies")
-  ndvi_lookup      <- build_lookup(ndvi_anomalies,       "ndvi_anomalies")
+  forecasts_lookup <- build_lookup(forecasts_anomalies,  "forecasts_anomalies")
+  weather_lookup   <- build_lookup(weather_anomalies,    "weather_anomalies")
+  ndvi_lookup      <- build_lookup(ndvi_anomaly_files,   "ndvi_anomalies")
 
   # Start with dates_to_process and left join all predictors.
   # Left joins preserve all dates to maintain consistent tar_group numbers;
