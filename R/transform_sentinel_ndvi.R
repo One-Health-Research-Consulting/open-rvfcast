@@ -36,6 +36,13 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_api_parameters,
   # Create directory if it does not yet exist
   dir.create(sentinel_ndvi_transformed_directory, recursive = TRUE, showWarnings = FALSE)
 
+  # NA sentinel row means all parquets already existed when get_sentinel_ndvi_api_parameters
+  # ran; return an existing file to satisfy format = "file" without downloading anything.
+  if (is.na(sentinel_ndvi_api_parameters$id)) {
+    existing <- list.files(sentinel_ndvi_transformed_directory, pattern = "\\.parquet$", full.names = TRUE)
+    return(existing[1])
+  }
+
   template <- terra::unwrap(continent_raster_template)
 
   # Set up safe way to read parquet files
