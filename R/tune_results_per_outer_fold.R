@@ -334,7 +334,7 @@ finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, 
     )
 
   ## Quick visualization of score across all parameter combinations
-  # scores |> arrange(desc(final_score)) |> mutate(ii = seq(n()) |> as.factor()) |> {ggplot(_, aes(ii, final_score)) + geom_point()}
+  score_plot <- ggplot(scores |> arrange(desc(final_score)) |> mutate(ii = seq(n()) |> as.factor()), aes(ii, final_score)) + geom_point()
 
   ## Select the single index with the highest combined score
   best <- scores |>

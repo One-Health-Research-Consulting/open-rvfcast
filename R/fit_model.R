@@ -1,7 +1,7 @@
-#' Little function to build the model recipe. Model run for a given training dataset
+#' Fit the final model on a given outer fold of the fitting data
 #'
 #'
-#' @title make_recipe
+#' @title fit_model
 
 #' @param final_hyper_set The choice of hyperparameters for final model fitting
 #' @param full_data Full training set and test data
@@ -117,20 +117,21 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
   wf        <- workflow() |> add_model(mod) |> add_recipe(rec)
   model_fit <- fit(wf, data = outer_tbl_train)
 
-  ## Predict probabilities and class labels on outer assessment
+  ## Predict probabilities on outer assessment
   preds <- predict(model_fit, outer_tbl_assess, type = "prob") |>
-    bind_cols(predict(model_fit, outer_tbl_assess, type = "class")) |>
     bind_cols(
         outer_tbl_assess |>
         select(outbreak)
     ) |>
-    mutate(
-      outbreak    = factor(outbreak, levels = c("1", "0"))
-    , .pred_class = factor(.pred_class, levels = c("1", "0"))
-    )
-
-  ## Predictions: prob only
-  prob1     <- predict(model_fit, outer_tbl_assess, type = "prob")$.pred_1
+    mutate(outbreak = factor(outbreak, levels = c("1", "0")))
+  
+  ## Compare distributions of predicted probabilities for 1s vs 0s
+  preds_hist <- ggplot(preds, aes(x = .pred_1)) + 
+    geom_density(aes(fill = outbreak), colour = NA, alpha = 0.3) +
+    scale_fill_brewer(palette = "Dark2")
+    
+  ## Extract predicted probability for class 1 from already-computed preds
+  prob1     <- preds$.pred_1
   truth     <- factor(outer_tbl_assess[["outbreak"]], levels = c("1", "0"))
   class_hat <- apply(
       threshold |> matrix()

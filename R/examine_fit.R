@@ -49,13 +49,7 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
   
   ## Combine predictions with the data
   dat_with_pred <- model_out$preds[[1]] |>
-    mutate(
-      index    = model_out$assess_data[[1]]
-    , outbreak = as.numeric(as.character(.pred_class))
-    , .before  = 1
-    ) |>
-    dplyr::select(-.pred_class) |>
-    rename(outbreak_pred = outbreak) |>
+    mutate(index = model_out$assess_data[[1]], .before = 1) |>
     left_join(test_data |> filter(index %in% model_out$assess_data[[1]]))
 
   ## Load the previously created / saved Africa map of sub-regions per Country
@@ -346,13 +340,7 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
     
    ## Combine predictions with the data
    dat_with_pred <- model_out$preds[[1]] |>
-     mutate(
-       index    = model_out$assess_data[[1]]
-       , outbreak = as.numeric(as.character(.pred_class))
-       , .before  = 1
-     ) |>
-     dplyr::select(-.pred_class) |>
-     rename(outbreak_pred = outbreak) |>
+     mutate(index = model_out$assess_data[[1]], .before = 1) |>
      left_join(test_data |> filter(index %in% model_out$assess_data[[1]]))
    
    ## Load the previously created / saved Africa map of sub-regions per Country
