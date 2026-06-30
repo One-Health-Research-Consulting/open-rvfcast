@@ -61,10 +61,6 @@ compute_metrics_vec <- function(truth, threshold, weightings, caseweights, prob1
 
   n_pos <- length(which(truth == "1"))
   n_all <- length(truth)
-  p     <- n_pos / n_all
-  q     <- 1 - p
-  logloss_baseline <- if(p == 0){0}else{-(p*log(p) + q*log(q))}
-
   ## Constant predictions produce a degenerate two-point PR curve whose trapezoidal
   ## AUC equals (1 + prevalence) / 2 regardless of calibration -- appearing near 0.501
   ## for rare events and scoring far above the true no-skill baseline of prevalence.
@@ -74,17 +70,45 @@ compute_metrics_vec <- function(truth, threshold, weightings, caseweights, prob1
   ttib <- tibble(
       n_pos     = n_pos
     , n_all     = n_all
+      ## Ranking metrics
+      ## Calculate Area Under the Precision-Recall Curve (good for cases where getting
+       ## positives correct is important, but still quite sensitive to huge class imbalance).
+       ## Problem is that being a ranking metric it is insensitive to magnitude. If all 1s are
+       ## predicted with a prob = 0.002 and all 0s predicted with 0.001 the score is perfect.
     , pr_auc    = if (no_discrimination || n_pos == 0) NA_real_ else pr_auc_vec(truth, prob1, event_level = event_level)
+      ## Calculate Receiver Operating Characteristic - Area Under the Curve. 
+       ## Measures ranking ability averaged over all possible thresholds. Not a great 
+       ## metric for large class imbalance. Problem is that with thousands of negatives 
+       ## some hundreds of false-positives can barely shift the score for the worse
     , roc_auc   = roc_auc_vec(truth, prob1, event_level = event_level)
+      ## Measure of sensitivity (see https://yardstick.tidymodels.org/reference/recall.html)
     , recall    = tibble(
         threshold = threshold
-      , recall    = apply(class_hat, 2, FUN = function(x) recall_vec(truth, x |> factor(levels = c("1", "0")), event_level = event_level))
+        , recall    = apply(class_hat, 2, FUN = function(x) recall_vec(truth, x |> factor(levels = c("1", "0")), event_level = event_level))
     ) |> list()
+      ## See https://yardstick.tidymodels.org/reference/precision.html
     , precision = tibble(
         threshold = threshold
       , precision = apply(class_hat, 2, FUN = function(x) precision_vec(truth, x |> factor(levels = c("1", "0")), event_level = event_level))
     ) |> list()
-    , logloss          = yardstick::mn_log_loss_vec(truth, prob1)
+      ## A way to measure deviation from baseline by explicitly considering magnitude;
+       ## potentially a better method for measuring differentiation of estimated 
+       ## probabilities for true positives from simply their relative abundance 
+       ## (i.e., the starting point for fitting, see argument start_p)
+    , logloss     = yardstick::mn_log_loss_vec(truth, prob1)
+      ## When true positives are very rare, class *unconditional* log loss can lead to a
+      ## scenario where a model that predicts nearly all probabilities small, with little
+      ## deviation in probability from the "intercept" (overall relative
+      ## abundance of true 1s) gets a good score
+       ## Different weighting for ones and zeros to help the class imbalance scoring formula problem.
+       ## See finalize_hyperparameters_from_inner for how this is used. Basically allows
+       ## positive deviations in probability for true 1s to be rewarded (with the magintude
+       ## explicity as compared to roc_auc and to a greater degree than pr_auc)
+    , logloss_pos = if (n_pos == 0) NA_real_ else
+                    mean(-log(pmax(prob1[truth == "1"], 1e-15)))
+    , logloss_neg = mean(-log(pmax(1 - prob1[truth == "0"], 1e-15)))
+      ## Another form of logloss where explicitly taking into consideration a weighting
+       ## on positives is used
     , logloss_weighted = tibble(
         weighting = weightings
       , precision = apply(weightings |> matrix(), 1, FUN = function(x) {
@@ -92,8 +116,6 @@ compute_metrics_vec <- function(truth, threshold, weightings, caseweights, prob1
         tweights <- ifelse(tweights > 1, x, 1)
         yardstick::mn_log_loss_vec(truth, prob1, case_weights = tweights)})
       ) |> list()
-  ) |> mutate(
-    exlogloss   = max(0, logloss - logloss_baseline)
   )
 
   ttib

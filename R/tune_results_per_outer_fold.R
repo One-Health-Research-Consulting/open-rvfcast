@@ -10,7 +10,7 @@
 #' @param start_p initilization point for base intercept
 #' @param id_cols Columns that define a unique data point
 #' @param out_dir Where to save output
-#' @param tuning_grid_id id of the current tuning grid to track tuning better 
+#' @param tuning_grid_id id of the current tuning grid to track tuning better
 #' @param hyperparam_path path to where the best hyperparameter file will be / is saved
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
 #' @param DEBUG If TRUE reduce to a small dataset for code testing
@@ -23,9 +23,8 @@ tune_results_per_outer_fold <- function(prejoined_data, inner_ids_all, threshold
                                       , weightings, start_p, id_cols, out_dir
                                       , tuning_grid_id, hyperparam_path, overwrite, DEBUG
                                       , checktime_path) {
-  
-  ## First, check if this tuning_grid_id already has a saved best parameter set.
-   ## Slightly awkward to 
+
+  ## First, check if this tuning_grid_id already has a saved best parameter set
   if (file.exists(hyperparam_path)) {
     return(hyperparam_path)
   }
@@ -255,210 +254,6 @@ prep_outer_ids <- function(folded_data, raw_data, inner_ids) {
 }
 
 
-#' Load in and combine saved output from all inner folds
-#'
-#'
-#' @title join_tuned_inner_folds
-
-#' @param inner_folds list of file paths for all tuned hyperparameter sets across all inner folds of all outer folds
-#' @param metric which metric is being optimized
-#' @param weightval how to scale the weighting on the metric on 1s
-#' @param direction min or max
-#' @return Tibble of best parameter sets
-#' @author Morgan Kain
-#' @export
-
-join_tuned_inner_folds <- function(inner_folds, metric, weightval, direction) {
-
-  metric_summary <- apply(inner_folds |> matrix(), 1, FUN = function(x) {
-    readRDS(x)
-  }) |>
-  bind_rows()
-
-  if (metric == "mix") {
-    ## Corrected formula: S_disc and S_calib normalised separately to avoid the
-    ## scale mismatch that arises when n_pos-weighted and n_all-weighted terms
-    ## share a single denominator. See finalize_hyperparameters_from_inner for
-    ## full rationale. The same formula is used here (per outer fold) and in
-    ## finalize_hyperparameters (across outer folds) for a consistent comparison.
-    metric_summary.s <- metric_summary |>
-      group_by(outer_fold_id, index) |>
-      summarise(
-        S_disc  = sum(pr_auc * n_pos, na.rm = TRUE) /
-                  pmax(sum(n_pos[n_pos > 0], na.rm = TRUE), 1L)
-      , S_calib = sum(exlogloss * n_all, na.rm = TRUE) /
-                  sum(n_all, na.rm = TRUE)
-      , .groups = "drop"
-      ) |>
-      mutate(final_score = S_disc - weightval * S_calib)
-  } else if (metric == "logloss") {
-    metric_summary.s <- metric_summary |>
-      dplyr::select(outer_fold_id, logloss_weighted, index) |>
-      unnest(cols = c(logloss_weighted)) |>
-      filter(weighting == weightval) |>
-      group_by(outer_fold_id, index) |>
-      summarise(
-        final_score = max(precision)
-      , .groups     = "drop"
-      )
-  } else {
-    stop("Choose mix or logloss for metric")
-  }
-
-  if (direction == "min") {
-    if (metric %in% c("mix", "logloss")) {
-      stop("Using either of these metrics and min does not make sense, use max")
-    }
-    metric_summary.s2 <- metric_summary.s |>
-      group_by(outer_fold_id) |>
-      arrange(final_score) |>
-      dplyr::slice(1) |>
-      ungroup()
-  } else if (direction == "max") {
-    metric_summary.s2 <- metric_summary.s |>
-      group_by(outer_fold_id) |>
-      arrange(desc(final_score)) |>
-      dplyr::slice(1) |>
-      ungroup()
-  } else {
-    stop("choose min or max for direction")
-  }
-
-  metric_summary.s2 |>
-    left_join(
-      metric_summary |>
-        dplyr::select(outer_fold_id, index, trees, tree_depth, learn_rate,
-                      min_n, loss_reduction, mtry, has_outbreak) |>
-        distinct()
-    ) |>
-    mutate(metric = metric, weightval = weightval, .before = "index")
-
-}
-
-
-#' Conduct the tuning over the inner folds for a given outer fold
-#'
-#'
-#' @title tune_results_across_outer_folds
-
-#' @param outer_data an outer fold
-#' @param train_data Training data (splitted_data$train_data[[1]])
-#' @param threshold For assigning a 1 | estimated prob
-#' @param weightings weight assigned to 1s in binomial loss metric
-#' @param start_p initilization point for base intercept
-#' @param hyperparm_sets maximized hyperparameter sets across all inner folds of all outer folds
-#' @param id_cols Columns that define a unique data point
-#' @param out_dir Where to save output
-#' @param overwrite Boolean to recalculate and save over a previously saved file or not
-#' @param DEBUG If TRUE reduce to a small dataset for code testing
-#' @return Tibble of folds
-#' @author Morgan Kain
-#' @export
-
-tune_results_across_outer_folds <- function(outer_data, train_data, threshold, weightings, start_p
-                                          , hyperparm_sets, id_cols, out_dir, overwrite, DEBUG) {
-
-  ## The best hyperparameter set for this outer fold across all inner folds for this outer fold
-  hyper_set <- hyperparm_sets |> dplyr::filter(outer_fold_id == outer_data$outer_fold_id)
-
-  ## Set filename
-  save_filename <- paste(
-      out_dir
-    , "/"
-    , "outer_tuning_"
-    , outer_data$outer_fold_id
-    , "_tune_grid_"
-    ,  hyper_set$index
-    , ".Rds"
-    , sep = ""
-  )
-
-  error_safe_read_file <- possibly(readRDS, NULL)
-
-  if (!is.null(error_safe_read_file(save_filename)) && !overwrite) {
-    message("file already exists and can be loaded, skipping processing")
-    return(save_filename)
-  }
-
-  ## Extract the needed data
-  outer_tbl_train   <- train_data |>
-    dplyr::filter(index %in% outer_data$train_data[[1]]) |>
-    dplyr::select(-c(cases)) |>
-    mutate(outbreak = factor(outbreak, levels = c(1, 0))) |>
-    mutate(forecast_interval = as.factor(forecast_interval))
-
-  ## Class imbalance handled via scale_pos_weight in engine, not case weights
-  spw <- calc_spw(outer_tbl_train)
-
-  outer_tbl_assess  <- train_data |>
-    dplyr::filter(index %in% outer_data$assess_data[[1]]) |>
-    dplyr::select(-c(cases)) |>
-    mutate(outbreak = factor(outbreak, levels = c(1, 0))) |>
-    mutate(forecast_interval = as.factor(forecast_interval)) |>
-    mutate(
-      weights = length(which(outbreak == "0")) / max(length(which(outbreak == "1")), 1)
-    , weights = ifelse(outbreak == "0", 1, weights)
-    , .after = "index"
-    )
-
-  if (DEBUG) {
-    outer_tbl_train  <- outer_tbl_train[1:10000, ]
-  }
-
-  ## Clear up some ram
-  rm(train_data)
-  gc()
-
-  ## Set up and fit the final model for this outer fold
-  rec <- make_recipe(outer_tbl_train, id_cols = id_cols)
-  mod <- make_model(params = hyper_set, start_p = start_p, spw = spw)
-  wf  <- workflow() |> add_model(mod) |> add_recipe(rec)
-  fit <- fit(wf, data = outer_tbl_train)
-
-  ## Predictions: prob only
-  prob1     <- predict(fit, outer_tbl_assess, type = "prob")$.pred_1
-  truth     <- factor(outer_tbl_assess[["outbreak"]], levels = c("1", "0"))
-  class_hat <- apply(
-    threshold |> matrix()
-  , 1
-  , FUN = function(x) factor(ifelse(prob1 >= x, "1", "0"), levels = c("1", "0"))
-  )
-  all_intervals     <- outer_tbl_assess$forecast_interval
-  forecast_interval <- all_intervals |> unique() |> as.character() |> as.numeric() |> sort()
-
-  ## Compute metrics
-  metrics <- purrr:::map(forecast_interval, .f = function(this_int) {
-
-    truth.t     <- truth[which(all_intervals     == this_int)]
-    prob1.t     <- prob1[which(all_intervals     == this_int)]
-    class_hat.t <- class_hat[which(all_intervals == this_int), ]
-
-    metrics.t <- compute_metrics_vec(
-        truth       = truth.t
-      , threshold   = threshold
-      , weightings  = weightings
-      , caseweights = outer_tbl_assess |> filter(forecast_interval == this_int) |> pull(weights)
-      , prob1       = prob1.t
-      , class_hat   = class_hat.t
-      , event_level = "first"
-    ) |>
-      mutate(
-      outer_fold_id = outer_data$outer_fold_id
-    , interval      = this_int
-    , .before       = 1
-    ) |>
-      left_join(hyper_set)
-
-  }) |>
-  bind_rows()
-
-  saveRDS(metrics, save_filename)
-
-  save_filename
-
-}
-
-
 #' Select finalized hyperparameters by aggregating ALL inner-fold tuning results
 #'
 #' @title finalize_hyperparameters_from_inner
@@ -466,21 +261,22 @@ tune_results_across_outer_folds <- function(outer_data, train_data, threshold, w
 #' @param inner_folds Character vector of all file paths returned by the
 #'   tuned_results_per_outer_fold target (one path per outer x inner x index branch)
 #' @param metric Character; only "mix" is currently supported
-#' @param weightval Numeric >= 0; penalty weight on S_calib relative to S_disc (greater = more penalty on high prob for true 0s)
+#' @param weightval Numeric >= 0; penalty weight on S_neg_penalty (false-alarm log-loss) relative
+#'   to S_pos (positive log-loss). Larger values suppress false alarms more aggressively at the
+#'   cost of potentially missing outbreaks. Values in the range 1-5 are reasonable for rare events.
 #' @param direction Character, max or min
-#' @param which_auc which auc calculation to use ("pr_auc" or "roc_auc"); for our purposes pr_auc generally better but leaving option
 #' @param tuning_grid_id string for this tuning grid
 #' @param outpath where to save the best hyperparameter set
-#' @return Single-row tibble containing final_score, S_disc, S_calib,
+#' @return Single-row tibble containing final_score, S_pos, S_neg_penalty,
 #'   n_pos_folds (number of folds with at least one positive case), n_total_folds,
 #'   total_n_pos, metric, weightval, index, and all hyperparameter values
 #'   (trees, tree_depth, learn_rate, min_n, loss_reduction, mtry)
 #' @author Morgan Kain
 #' @export
 
-finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, direction, which_auc = "pr_auc"
+finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, direction
                                                 , tuning_grid_id, outpath) {
-  
+
   ## First, check if this tuning_grid_id already has a saved best parameter set
   if (file.exists(outpath)) {
     return(outpath)
@@ -488,7 +284,7 @@ finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, 
 
   ## Make the outpath if it doesn't exist yet
   create_data_directory(directory_path = strsplit(outpath, "/best_hyperparameters")[[1]][1])
-  
+
   stopifnot(metric    == "mix")
   ## For my current setup only max makes sense
   stopifnot(direction == "max")
@@ -497,36 +293,37 @@ finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, 
   ## Read every per-(outer x inner x index) result file into one long tibble
   all_results <- apply(inner_folds |> matrix(), 1, FUN = readRDS) |> bind_rows()
 
-  ## Compute the two-component score for each candidate hyperparameter set
+  ## S_pos: n_pos-weighted mean of -(logloss_pos), where logloss_pos is the per-fold mean
+  ## log-loss computed only on true 1s. Rewards predicting outbreak probability high where
+  ## outbreaks actually occur. The null model (predict prevalence ~0.005 everywhere) gets
+  ## S_pos ≈ -5.3, so it cannot hide at zero the way it did under the old exlogloss formula.
+  ## Zero-positive folds have logloss_pos = NA and contribute 0 to S_pos automatically.
+  ##
+  ## S_neg_penalty: n_all-weighted mean logloss_neg, the per-fold mean log-loss on true 0s.
+  ## Zero-positive folds contribute here, preserving their false-alarm signal even though
+  ## they contribute nothing to S_pos.
+  ##
+  ## final_score = S_pos - weightval * S_neg_penalty  (maximise)
+  ## Larger weightval suppresses false alarms more aggressively.
   scores <- all_results |>
     group_by(index) |>
     summarise(
-
-      ## S_disc: n_pos-weighted mean pr_auc, restricted to folds with positive cases.
-      ## pmax(..., 1L) guards against the degenerate case where an index was never
-      ## evaluated on any fold with a positive case, returning 0 rather than NaN/Inf.
-      S_disc = sum(get(which_auc) * n_pos, na.rm = TRUE) /
-               pmax(sum(n_pos[n_pos > 0], na.rm = TRUE), 1L)
-
-      ## S_calib: n_all-weighted mean excess log-loss across ALL folds.
-      ## Separate denominator from S_disc prevents n_all >> n_pos from collapsing scores.
-    , S_calib = sum(exlogloss * n_all, na.rm = TRUE) /
-                sum(n_all, na.rm = TRUE)
-
-      ## Diagnostic columns retained for inspection
+      S_pos = -sum(logloss_pos * n_pos, na.rm = TRUE) /
+               pmax(sum(n_pos[!is.na(logloss_pos)], na.rm = TRUE), 1L)
+    , S_neg_penalty = sum(logloss_neg * n_all, na.rm = TRUE) /
+                      sum(n_all, na.rm = TRUE)
     , n_pos_folds   = sum(n_pos > 0)
     , n_total_folds = n()
     , total_n_pos   = sum(n_pos)
     , .groups       = "drop"
-
     ) |>
     mutate(
-      final_score = S_disc - weightval * S_calib
+      final_score = S_pos - weightval * S_neg_penalty
     , metric      = metric
     , weightval   = weightval
     )
-  
-  # scores %>% arrange(final_score) %>% mutate(ii = seq(n()) %>% as.factor()) %>% {ggplot(., aes(ii, final_score)) + geom_point()}
+
+  # scores |> arrange(desc(final_score)) |> mutate(ii = seq(n()) |> as.factor()) |> {ggplot(_, aes(ii, final_score)) + geom_point()}
 
   ## Select the single index with the highest combined score
   best <- scores |>
@@ -544,98 +341,9 @@ finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, 
     mutate(
       tuning_grid_id = tuning_grid_id, .before = index
     )
-  
+
   write.csv(best, outpath)
-   
+
   outpath
-
-}
-
-
-#' Across all outer folds select the single best hyperparameter set for fitting the complete data
-#'
-#'
-#' @title finalize_hyperparameters
-
-#' @param outer_folds Tibble of output across all outer folds
-#' @param metric Metric used for selection
-#' @param weightval how to scale the weighting on the metric on 1s
-#' @param direction min or max
-#' @return Set of best hyperparameters
-#' @author Morgan Kain
-#' @export
-
-
-finalize_hyperparameters <- function(outer_folds, metric, weightval, direction) {
-
-  joined_files <- apply(outer_folds |> matrix(), 1, FUN = function(x) {
-    readRDS(x)
-  })
-
-  if (length(joined_files) > 1) {
-    joined_files <- joined_files |> bind_rows()
-  } else {
-    joined_files <- joined_files[[1]]
-  }
-
-  ## Remove inner-fold score columns so they are recomputed here on outer-fold
-  ## performance (S_disc and S_calib flow through from join_tuned_inner_folds
-  ## via hyper_set; final_score was already removed previously)
-  joined_files <- joined_files |> dplyr::select(-any_of(c("final_score", "S_disc", "S_calib")))
-
-  if (metric == "mix") {
-    ## Same two-component formula as join_tuned_inner_folds and
-    ## finalize_hyperparameters_from_inner: S_disc and S_calib normalised
-    ## separately to avoid scale mismatch from mixing n_pos and n_all in one denominator
-    metric_summary.s <- joined_files |>
-      group_by(index) |>
-      summarise(
-        S_disc  = sum(pr_auc * n_pos, na.rm = TRUE) /
-                  pmax(sum(n_pos[n_pos > 0], na.rm = TRUE), 1L)
-      , S_calib = sum(exlogloss * n_all, na.rm = TRUE) /
-                  sum(n_all, na.rm = TRUE)
-      , .groups = "drop"
-      ) |>
-      mutate(final_score = S_disc - weightval * S_calib)
-  } else if (metric == "logloss") {
-    metric_summary.s <- joined_files |>
-      dplyr::select(outer_fold_id, logloss_weighted, index) |>
-      unnest(cols = c(logloss_weighted)) |>
-      filter(weighting == weightval) |>
-      group_by(index) |>
-      summarise(
-        final_score = max(precision)
-      , .groups     = "drop"
-      )
-  } else {
-    stop("Choose mix or logloss for metric")
-  }
-
-  if (direction == "min") {
-    if (metric %in% c("mix", "logloss")) {
-      stop("Using either of these metrics and min does not make sense, use max")
-    }
-    metric_summary.s2 <- metric_summary.s |>
-      arrange(final_score) |>
-      dplyr::slice(1) |>
-      ungroup()
-  } else if (direction == "max") {
-    metric_summary.s2 <- metric_summary.s |>
-      arrange(desc(final_score)) |>
-      dplyr::slice(1)
-  } else {
-    stop("choose min or max for direction")
-  }
-
-  ## Explicit hyperparameter column selection avoids the multi-row join bug that
-  ## arises when has_outbreak differs across outer folds for the same index
-  metric_summary.s2 |>
-    left_join(
-      joined_files |>
-        dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
-        distinct()
-    , by = "index"
-    ) |>
-    mutate(metric = metric, weightval = weightval, .before = "index")
 
 }

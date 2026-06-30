@@ -89,8 +89,7 @@ fold_data <- function(
   fold_ends <- seq.Date(
       from = as.Date(other_parms$holdout_start)
     , to   = as.Date(end_date)
-    , by   = paste(step_size, "days")
-  )
+    , by   = paste(step_size, "days"))
 
   outer_folds <- map_df(seq_along(fold_ends), function(i) {
 

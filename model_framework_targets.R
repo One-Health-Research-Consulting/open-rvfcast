@@ -347,6 +347,9 @@ model_tuning_targets <- tar_plan(
     , tuning_grid$grid_id
     , ".csv") })
 
+  ## get the baseline occurance of outbreaks (in the full data)
+, tar_target(start_p, mean(splitted_data_fitting$train_data[[1]]$outbreak == 1))
+
   ## Fit across tuning_grid across all inner folds of all outer folds
    ## NOTE: for debugging swap outer_fold_prejoined -> outer_fold_prejoined_DEBUG
    ##       and inner_fold_ids_per_outer -> inner_fold_ids_per_outer_DEBUG
@@ -355,7 +358,7 @@ model_tuning_targets <- tar_plan(
     , inner_ids_all   = inner_fold_ids_per_outer
     , threshold       = positive_threshold
     , weightings      = weightings_on_ones
-    , start_p         = 0.005
+    , start_p         = start_p
     , id_cols         = id_cols
     , out_dir         = outer_folds_dir
     , tuning_grid_id  = tuning_grid$grid_id
@@ -367,16 +370,25 @@ model_tuning_targets <- tar_plan(
     , error           = "null"
     , format          = "file")
 
- ## Alternative (possibly better [?] and now the main [?]) strategy for selecting the
-   ## best set of hyperparameters by using all of (one per outer x inner x index combination)
-   ## instead of just the optimal set chosen per outer fold and then choosing from that
+ ## Strategy for selecting the best set of hyperparameters is to use all of
+ ## (one per outer x inner x index combination) the tuning sets
+  ## (rather than just the optimal set chosen per outer fold which was the og strategy)
 , tar_target(finalized_hyperparameters, finalize_hyperparameters_from_inner(
     inner_folds    = tuned_results_per_outer_fold
   , metric         = "mix"
-    ## The larger the weightval the more you penalize high predictions for true 0s
-  , weightval      = 0.1
+    ## Controls the sensitivity-specificity trade-off in hyperparameter selection. That is,
+     ## this parameter is a penalty weight on false-alarm log-loss (S_neg_penalty) relative
+     ## to positive log-loss (S_pos). Larger values = more aggressive false-alarm
+     ## suppression at the cost of sensitivity. If the value is near 0 the model puts nearly
+     ## all emphasis on getting high probabilities for 1s at the cost of higher probabilities
+     ## for true 0s. Larger values = the opposite. E.g., Large weightval, say above 10
+     ## strongly penalises false alarms. May select hyperparameter sets that are conservative,
+     ## predicting lower probabilities overall — at the cost of more missed outbreaks.
+     ## Range 1-5 seems most reasonable? Can examine with relatively little computation by
+     ## re-running finalize_hyperparameters_from_inner on already-computed fold results
+     ## and inspecting how predicted probabilities shift in fitted_model.
+  , weightval      = 3
   , direction      = "max"
-  , which_auc      = "pr_auc"
   , tuning_grid_id = tuning_grid$grid_id
   , outpath        = hyperparam_path))
 
@@ -403,7 +415,7 @@ model_fitting_targets <- tar_plan(
   , test_data       = test_data_fitting
   , threshold       = positive_threshold
   , weightings      = weightings_on_ones
-  , start_p         = 0.005
+  , start_p         = start_p
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
   , overwrite       = FALSE
