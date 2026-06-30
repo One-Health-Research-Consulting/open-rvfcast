@@ -278,9 +278,7 @@ finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, 
                                                 , tuning_grid_id, outpath) {
 
   ## First, check if this tuning_grid_id already has a saved best parameter set
-  if (file.exists(outpath)) {
-    return(outpath)
-  }
+  if (file.exists(outpath)) return(outpath)
 
   ## Make the outpath if it doesn't exist yet
   create_data_directory(directory_path = strsplit(outpath, "/best_hyperparameters")[[1]][1])
@@ -293,36 +291,49 @@ finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, 
   ## Read every per-(outer x inner x index) result file into one long tibble
   all_results <- apply(inner_folds |> matrix(), 1, FUN = readRDS) |> bind_rows()
 
-  ## S_pos: n_pos-weighted mean of -(logloss_pos), where logloss_pos is the per-fold mean
+  #### Notes about this scoring metric ---------------------------------------------
+  
+  ## *S_pos*: n_pos-weighted mean of -(logloss_pos), where logloss_pos is the per-fold mean
   ## log-loss computed only on true 1s. Rewards predicting outbreak probability high where
   ## outbreaks actually occur. The null model (predict prevalence ~0.005 everywhere) gets
-  ## S_pos ≈ -5.3, so it cannot hide at zero the way it did under the old exlogloss formula.
-  ## Zero-positive folds have logloss_pos = NA and contribute 0 to S_pos automatically.
-  ##
-  ## S_neg_penalty: n_all-weighted mean logloss_neg, the per-fold mean log-loss on true 0s.
-  ## Zero-positive folds contribute here, preserving their false-alarm signal even though
-  ## they contribute nothing to S_pos.
-  ##
+  ## S_pos ≈ -5.3, so it cannot "hide at zero"
+
+  ## Folds without any true 1s have logloss_pos = NA and contribute 0 to S_pos automatically.
+  
+  ## *S_neg_penalty*: n_all-weighted mean logloss_neg, the per-fold mean log-loss on true 0s.
+  ## Folds without any true 1s contribute here, preserving the ability for this strategy to
+  ## penalize high probabilities for true 0s even if they don't contribute to S_pos.
+  
   ## final_score = S_pos - weightval * S_neg_penalty  (maximise)
+  
   ## Larger weightval suppresses false alarms more aggressively.
+  
   scores <- all_results |>
     group_by(index) |>
     summarise(
+      ## score using the logloss_pos (see above) focused on estimated probabilities
+       ## for true 1s
       S_pos = -sum(logloss_pos * n_pos, na.rm = TRUE) /
                pmax(sum(n_pos[!is.na(logloss_pos)], na.rm = TRUE), 1L)
+      ## place where high estimated probabilities for true 0s get penalized 
     , S_neg_penalty = sum(logloss_neg * n_all, na.rm = TRUE) /
                       sum(n_all, na.rm = TRUE)
+      ## Summary stuff 
     , n_pos_folds   = sum(n_pos > 0)
     , n_total_folds = n()
     , total_n_pos   = sum(n_pos)
     , .groups       = "drop"
     ) |>
     mutate(
+      ## The final score is how well the model predicts true 1s 
+       ## minus how badly it over-predicts outbreak probability for true 0s 
+       ## multiplied by how much we want to weight this penalty
       final_score = S_pos - weightval * S_neg_penalty
     , metric      = metric
     , weightval   = weightval
     )
 
+  ## Quick visualization of score across all parameter combinations
   # scores |> arrange(desc(final_score)) |> mutate(ii = seq(n()) |> as.factor()) |> {ggplot(_, aes(ii, final_score)) + geom_point()}
 
   ## Select the single index with the highest combined score
