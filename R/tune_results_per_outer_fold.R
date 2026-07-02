@@ -260,11 +260,9 @@ prep_outer_ids <- function(folded_data, raw_data, inner_ids) {
 
 #' @param inner_folds Character vector of all file paths returned by the
 #'   tuned_results_per_outer_fold target (one path per outer x inner x index branch)
-#' @param metric Character; only "mix" is currently supported
 #' @param weightval Numeric >= 0; penalty weight on S_neg_penalty (false-alarm log-loss) relative
 #'   to S_pos (positive log-loss). Larger values suppress false alarms more aggressively at the
 #'   cost of potentially missing outbreaks. Values in the range 1-5 are reasonable for rare events.
-#' @param direction Character, max or min
 #' @param tuning_grid_id string for this tuning grid
 #' @param outpath where to save the best hyperparameter set
 #' @return Single-row tibble containing final_score, S_pos, S_neg_penalty,
@@ -274,8 +272,7 @@ prep_outer_ids <- function(folded_data, raw_data, inner_ids) {
 #' @author Morgan Kain
 #' @export
 
-finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, direction
-                                                , tuning_grid_id, outpath) {
+finalize_hyperparameters_from_inner <- function(inner_folds, weightval, tuning_grid_id, outpath) {
 
   ## First, check if this tuning_grid_id already has a saved best parameter set
   if (file.exists(outpath)) return(outpath)
@@ -283,14 +280,18 @@ finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, 
   ## Make the outpath if it doesn't exist yet
   create_data_directory(directory_path = strsplit(outpath, "/best_hyperparameters")[[1]][1])
 
-  stopifnot(metric    == "mix")
-  ## For my current setup only max makes sense
-  stopifnot(direction == "max")
   stopifnot(is.numeric(weightval), length(weightval) == 1, weightval >= 0)
 
   ## Read every per-(outer x inner x index) result file into one long tibble
-  all_results <- apply(inner_folds |> matrix(), 1, FUN = readRDS) |> bind_rows()
-
+  all_results <- purrr::map(inner_folds, .f = function(x) {
+    tload <- try(readRDS(x), silent = TRUE)
+    if (class(tload)[1] != "try-error") {
+      return(tload)
+    } else {
+      return(NULL)
+    }
+  }) |> bind_rows()
+  
   #### Notes about this scoring metric ---------------------------------------------
   
   ## *S_pos*: n_pos-weighted mean of -(logloss_pos), where logloss_pos is the per-fold mean
@@ -305,9 +306,6 @@ finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, 
   ## penalize high probabilities for true 0s even if they don't contribute to S_pos.
   
   ## final_score = S_pos - weightval * S_neg_penalty  (maximise)
-  
-  ## Larger weightval suppresses false alarms more aggressively.
-  
   scores <- all_results |>
     group_by(index) |>
     summarise(
@@ -328,13 +326,16 @@ finalize_hyperparameters_from_inner <- function(inner_folds, metric, weightval, 
       ## The final score is how well the model predicts true 1s 
        ## minus how badly it over-predicts outbreak probability for true 0s 
        ## multiplied by how much we want to weight this penalty
+       ## where a larger weightval suppresses false alarms more aggressively.
       final_score = S_pos - weightval * S_neg_penalty
-    , metric      = metric
     , weightval   = weightval
     )
 
   ## Quick visualization of score across all parameter combinations
-  score_plot <- ggplot(scores |> arrange(desc(final_score)) |> mutate(ii = seq(n()) |> as.factor()), aes(ii, final_score)) + geom_point()
+  score_plot <- ggplot(scores |> arrange(desc(final_score)) |> mutate(ii = seq(n()))
+                       , aes(ii, final_score)) + 
+    geom_point() +
+    xlab("Parameter Set") + ylab("Final Score")
 
   ## Select the single index with the highest combined score
   best <- scores |>

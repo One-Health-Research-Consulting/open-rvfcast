@@ -270,7 +270,9 @@ model_tuning_targets <- tar_plan(
   , loss_red_min   = -5
   , loss_red_max   = -0.3
   , mtry_min       = 8
-  , size           = 150))
+  , size           = 75))
+  
+, tar_target(hypergrid_seed, 44391827)
 
 , tar_target(tuning_grid, build_hyperparameter_grid(
     tune_pars            = tune_pars
@@ -278,7 +280,7 @@ model_tuning_targets <- tar_plan(
   , folded_data_training = folded_data_training
   , splitted_data        = splitted_data
   , overwrite            = FALSE
-  , seed                 = 78261782))
+  , seed                 = hypergrid_seed))
 
   ## Set up list of a id columns for grouping, summarizing, etc. that are usde in a few spots
 , tar_target(id_cols, c("shapeName", "Proportion_Country", "ADM2", "Proportion_ADM2", "date", "index"))
@@ -333,19 +335,13 @@ model_tuning_targets <- tar_plan(
 
   ## Subset of inner fold + tune-grid IDs for each outer fold, one branch per outer fold.
    ## Element-wise alignment with outer_fold_prejoined/_DEBUG via the same map pattern.
-, tar_target(inner_fold_ids_per_outer
-   , inner_fold_id_finalized |>
+, tar_target(inner_fold_ids_per_outer, inner_fold_id_finalized |>
      dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id)
    , pattern = map(folded_data_training))
 
   ## Build the path to where the best hyperparameter set will be saved, which is
   ## used to determine if tuning has to occur or not
-, tar_target(hyperparam_path, {
-    paste0(
-      "outputs/hyperparameters"
-    , "/best_hyperparameters_"
-    , tuning_grid$grid_id
-    , ".csv") })
+, tar_target(hyperparam_path, paste0("outputs/hyperparameters/best_hyperparameters_", tuning_grid$grid_id, ".csv"))
 
   ## get the baseline occurance of outbreaks (in the full data)
 , tar_target(start_p, mean(splitted_data_fitting$train_data[[1]]$outbreak == 1))
@@ -354,28 +350,78 @@ model_tuning_targets <- tar_plan(
    ## NOTE: for debugging swap outer_fold_prejoined -> outer_fold_prejoined_DEBUG
    ##       and inner_fold_ids_per_outer -> inner_fold_ids_per_outer_DEBUG
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
-      prejoined_data  = outer_fold_prejoined
-    , inner_ids_all   = inner_fold_ids_per_outer
-    , threshold       = positive_threshold
-    , weightings      = weightings_on_ones
-    , start_p         = start_p
-    , id_cols         = id_cols
-    , out_dir         = outer_folds_dir
-    , tuning_grid_id  = tuning_grid$grid_id
-    , hyperparam_path = hyperparam_path
-    , overwrite       = FALSE
-    , DEBUG           = FALSE
-    , checktime_path  = "outputs/timing")
-    , pattern         = map(outer_fold_prejoined, inner_fold_ids_per_outer)
-    , error           = "null"
-    , format          = "file")
+    prejoined_data  = outer_fold_prejoined
+  , inner_ids_all   = inner_fold_ids_per_outer
+  , threshold       = positive_threshold
+  , weightings      = weightings_on_ones
+  , start_p         = start_p
+  , id_cols         = id_cols
+  , out_dir         = outer_folds_dir
+  , tuning_grid_id  = tuning_grid$grid_id
+  , hyperparam_path = hyperparam_path
+  , overwrite       = FALSE
+  , DEBUG           = FALSE
+  , checktime_path  = "outputs/timing")
+  , pattern         = map(outer_fold_prejoined, inner_fold_ids_per_outer)
+  , error           = "null"
+  , format          = "file")
+
+  ## Build a refined local grid centred on the top-k global results
+, tar_target(local_tuning_grid, build_local_hyperparameter_grid(
+    inner_fold_paths     = tuned_results_per_outer_fold
+  , global_grid          = tuning_grid
+  , top_k                = 15
+  , size                 = 75
+  , weightval            = 3
+  , expansion            = 0.5
+  , grid_path            = "data/hypergrid"
+  , folded_data_training = folded_data_training
+  , splitted_data        = splitted_data
+  , seed                 = hypergrid_seed))
+
+, tar_target(local_hyperparam_path, paste0("outputs/hyperparameters/best_hyperparameters_", local_tuning_grid$grid_id, ".csv"))
+
+## (outer x inner x local-index) combinations, shuffled for load balancing.
+ ## Mirrors inner_fold_id_finalized but cross-joined with the local grid.
+, tar_target(local_inner_fold_id_finalized, {
+  base   <- prep_fold_ids(folded_data = folded_data_training, raw_data = splitted_data) |>
+    cross_join(local_tuning_grid$par_grid[[1]])
+  tfolds <- prep_outer_ids(
+    folded_data = folded_data_training
+  , raw_data    = splitted_data
+  , inner_ids   = base)
+  tfolds[sample(nrow(tfolds)), ]
+  })
+
+## Per-outer-fold slice of local grid IDs, element-wise aligned with outer_fold_prejoined
+, tar_target(local_inner_fold_ids_per_outer
+   , local_inner_fold_id_finalized |> dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id)
+   , pattern = map(folded_data_training))
+
+  ## Reuse the already-computed outer_fold_prejoined branches; only the per-fold
+   ## ID slice changes (pointing to local grid indices instead of global ones)
+, tar_target(local_tuned_results, tune_results_per_outer_fold(
+     prejoined_data  = outer_fold_prejoined
+   , inner_ids_all   = local_inner_fold_ids_per_outer
+   , threshold       = positive_threshold
+   , weightings      = weightings_on_ones
+   , start_p         = start_p
+   , id_cols         = id_cols
+   , out_dir         = outer_folds_dir
+   , tuning_grid_id  = local_tuning_grid$grid_id
+   , hyperparam_path = local_hyperparam_path
+   , overwrite       = FALSE
+   , DEBUG           = FALSE
+   , checktime_path  = "outputs/timing")
+   , pattern         = map(outer_fold_prejoined, local_inner_fold_ids_per_outer)
+   , error           = "null"
+   , format          = "file")
 
  ## Strategy for selecting the best set of hyperparameters is to use all of
  ## (one per outer x inner x index combination) the tuning sets
   ## (rather than just the optimal set chosen per outer fold which was the og strategy)
 , tar_target(finalized_hyperparameters, finalize_hyperparameters_from_inner(
-    inner_folds    = tuned_results_per_outer_fold
-  , metric         = "mix"
+    inner_folds    = c(tuned_results_per_outer_fold, local_tuned_results)
     ## Controls the sensitivity-specificity trade-off in hyperparameter selection. That is,
      ## this parameter is a penalty weight on false-alarm log-loss (S_neg_penalty) relative
      ## to positive log-loss (S_pos). Larger values = more aggressive false-alarm
@@ -388,9 +434,10 @@ model_tuning_targets <- tar_plan(
      ## re-running finalize_hyperparameters_from_inner on already-computed fold results
      ## and inspecting how predicted probabilities shift in fitted_model.
   , weightval      = 3
-  , direction      = "max"
-  , tuning_grid_id = tuning_grid$grid_id
-  , outpath        = hyperparam_path))
+  , tuning_grid_id = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")
+  , outpath        = paste0(
+    "outputs/hyperparameters/best_hyperparameters_combined_"
+   , tuning_grid$grid_id, "--", local_tuning_grid$grid_id, ".csv")))
 
 )
 

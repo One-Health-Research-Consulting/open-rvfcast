@@ -62,5 +62,138 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
     par_grid = par_grid |> list()
   , grid_id  = hyper_id
   )
-  
+
 }
+
+
+#' Build a local refinement hyperparameter grid centred on the top-k sets from global tuning
+#'
+#' Reads the saved per-(outer x inner x index) tuning result files produced by
+#' tune_results_per_outer_fold, scores them with the same S_pos / S_neg_penalty
+#' formula used in finalize_hyperparameters_from_inner, then builds a new
+#' space-filling grid confined to the neighbourhood of the top-k parameter sets.
+#' Indices in the new grid start above max(global_grid$par_grid[[1]]$index) so
+#' that local and global indices never collide when pooled in
+#' finalize_hyperparameters_from_inner.
+#'
+#' @title build_local_hyperparameter_grid
+#'
+#' @param inner_fold_paths Character vector of file paths from tuned_results_per_outer_fold
+#' @param global_grid Single-row tibble returned by build_hyperparameter_grid (par_grid + grid_id)
+#' @param top_k Number of top global parameter sets whose ranges define the local neighbourhood
+#' @param size Number of local grid points to generate (space-filling)
+#' @param weightval Numeric penalty weight on S_neg_penalty; must match the value used in selection
+#' @param expansion Fraction of the top-k range to extend on each side (e.g. 0.5 = ±50 %)
+#' @param grid_path Directory in which to save the local grid Rds
+#' @param folded_data_training Folded training data (needed to finalise mtry upper bound)
+#' @param splitted_data Split data object (needed to finalise mtry upper bound)
+#' @param seed Random seed for reproducibility
+#' @return Single-row tibble with columns par_grid (list) and grid_id (character, prefixed "local_")
+#' @author Morgan Kain
+#' @export
+
+build_local_hyperparameter_grid <- function(
+    inner_fold_paths
+  , global_grid
+  , top_k
+  , size
+  , weightval
+  , expansion
+  , grid_path
+  , folded_data_training
+  , splitted_data
+  , seed
+) {
+
+  create_data_directory(directory_path = grid_path)
+
+  ## Score every global parameter set with the same formula used in finalization
+  all_results <- purrr::map(inner_fold_paths, .f = function(x) {
+    tload <- try(readRDS(x), silent = TRUE)
+    if (class(tload)[1] != "try-error") {
+      return(tload)
+    } else {
+      return(NULL)
+    }
+    }) |> bind_rows()
+    
+  ## NOTE: See detailed notes about this scoring strategy in finalize_hyperparameters_from_inner
+  scores <- all_results |>
+    group_by(index) |>
+    summarise(
+      S_pos         = -sum(logloss_pos * n_pos, na.rm = TRUE) /
+                       pmax(sum(n_pos[!is.na(logloss_pos)], na.rm = TRUE), 1L)
+    , S_neg_penalty = sum(logloss_neg * n_all, na.rm = TRUE) / sum(n_all, na.rm = TRUE)
+    , .groups       = "drop"
+    ) |>
+    mutate(final_score = S_pos - weightval * S_neg_penalty)
+
+  ## Grab the top_k scores
+  top_indices <- scores |>
+    arrange(desc(final_score)) |>
+    dplyr::slice(seq_len(top_k)) |>
+    pull(index)
+
+  ## Retrieve the raw hyperparameter values for the top-k sets
+  top_params <- all_results |>
+    dplyr::filter(index %in% top_indices) |>
+    dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
+    distinct()
+
+  ## Compute local bounds for each hyperparameter.
+   ## learn_rate and loss_reduction are sampled on log10 scale by dials, so convert.
+  trees_range   <- expand_range(top_params$trees, lo_hard = 50, hi_hard = 3000, expansion = expansion, min_half_width = 50)
+  depth_range   <- expand_range(top_params$tree_depth, lo_hard = 2, hi_hard = 15, expansion = expansion, min_half_width = 1)
+  lr_range      <- expand_range(log10(top_params$learn_rate), lo_hard = -3, hi_hard = -0.3, expansion = expansion, min_half_width = 0.2)
+  minn_range    <- expand_range(top_params$min_n, lo_hard = 1, hi_hard = 50, expansion = expansion, min_half_width = 5)
+  lossred_range <- expand_range(log10(top_params$loss_reduction + .Machine$double.eps), lo_hard = -6, hi_hard = 0, expansion = expansion, min_half_width = 0.5)
+  ## Keep mtry anchored within reach of the top-k observed values
+  mtry_range_lo <- max(1L, min(top_params$mtry) - 3L)
+
+  set.seed(seed)
+  hyper_id  <- paste0("local_", stringi::stri_rand_strings(1, length = 15, pattern = "[A-Za-z0-9]"))
+  save_path <- paste0(grid_path, "/hypergrid_", hyper_id, ".Rds")
+
+  if (file.exists(save_path)) {
+    
+    par_grid <- readRDS(save_path)
+    
+  } else {
+
+    ## Index offset ensures no collision with global grid indices when results are pooled
+    idx_offset <- max(global_grid$par_grid[[1]]$index)
+
+    par_grid <- grid_space_filling(
+        trees(range          = as.integer(trees_range))
+      , tree_depth(range     = as.integer(depth_range))
+      , learn_rate(range     = lr_range)
+      , min_n(range          = as.integer(minn_range))
+      , loss_reduction(range = lossred_range)
+      , finalize(mtry(range  = c(mtry_range_lo, unknown())),
+                 folded_data_training$inner_folds[[10]] |>
+                   left_join(splitted_data$train_data[[1]], by = "index") |>
+                   filter(cluster != 1))
+      , size = size
+    ) |>
+      mutate(index = idx_offset + seq_len(n()), .before = 1)
+
+    saveRDS(par_grid, save_path)
+    
+  }
+
+  tibble(
+    par_grid = par_grid |> list()
+  , grid_id  = hyper_id
+  )
+
+}
+
+## Helper: extend the observed range by expansion on each side, clamped to hard limits.
+## min_half_width prevents collapse when all top-k sets share the same value.
+expand_range <- function(vals, lo_hard, hi_hard, expansion, min_half_width = 0) {
+  lo_k <- min(vals, na.rm = TRUE)
+  hi_k <- max(vals, na.rm = TRUE)
+  pad  <- max((hi_k - lo_k) * expansion, min_half_width)
+  c(max(lo_hard, lo_k - pad), min(hi_hard, hi_k + pad))
+}
+
