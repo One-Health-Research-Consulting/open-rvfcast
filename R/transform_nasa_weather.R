@@ -1,23 +1,23 @@
 #' Fetch and Transform NASA Weather Data
 #'
-#' This function downloads daily weather data from NASA POWER for a given month, 
-#' transforms it to match a continental raster template, and saves the processed 
+#' This function downloads daily weather data from NASA POWER for a given month,
+#' transforms it to match a continental raster template, and saves the processed
 #' data as a parquet file.
 #'
-#' @author [Your Name]
+#' @author Morgan Kain
 #'
-#' @param months_to_process Character. The year-month (YYYY-MM format) for which 
+#' @param months_to_process Character. The year-month (YYYY-MM format) for which
 #' to download and transform weather data.
-#' @param nasa_weather_variables Named character vector. Variables to download from 
-#' NASA POWER, with names being the column names in the output and values being the 
+#' @param nasa_weather_variables Named character vector. Variables to download from
+#' NASA POWER, with names being the column names in the output and values being the
 #' NASA POWER parameter codes. Default: c("relative_humidity" = "RH2M", "temperature" = "T2M", "precipitation" = "PRECTOTCORR").
-#' @param continent_raster_template SpatRaster. A wrapped raster template used for 
+#' @param continent_raster_template SpatRaster. A wrapped raster template used for
 #' cropping and resampling the NASA weather data to the desired spatial extent and resolution.
-#' @param local_folder Character. The directory where the transformed data will be saved. 
+#' @param local_folder Character. The directory where the transformed data will be saved.
 #' Default: "data/nasa_weather_transformed".
-#' @param basename_template Character. Template for the output filename. 
+#' @param basename_template Character. Template for the output filename.
 #' Default: glue::glue("nasa_weather_raw_{months_to_process}.parquet").
-#' @param endpoint Character. URL template for downloading NASA POWER NetCDF files. 
+#' @param endpoint Character. URL template for downloading NASA POWER NetCDF files.
 #' Default: "https://power-datastore.s3.amazonaws.com/v10/daily/{year}/{month}/power_10_daily_{yyyymmdd}_merra2_lst.nc".
 #' @param overwrite Logical. Whether to overwrite existing transformed data files. Default: FALSE.
 #' @param ... Additional parameters passed to internal functions.
@@ -38,19 +38,19 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
 
   # Check that nasa_weather_variables has names
   stopifnot(!is.null(names(nasa_weather_variables)))
-  
+
   # Check that months_to_process is only one value
   stopifnot(length(months_to_process) == 1)
-  
+
   # Create date for the first of the month
   start_date <- lubridate::ymd(paste0(months_to_process, "-01"))
-  
+
   # Get the last day of the month
   end_date <- lubridate::ceiling_date(start_date, "month") - lubridate::days(1)
   if (end_date > Sys.Date()) {
     end_date <- Sys.Date()
   }
-  
+
   # Extract the three variables you need
   year <- lubridate::year(start_date)
   month <- format(start_date, "%m")
@@ -60,12 +60,12 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
 
   # Establish filename
   transformed_file <- file.path(local_folder, glue::glue(basename_template))
-  
+
   # Create an error safe way to test if the parquet file can be read, if it exists
   error_safe_read_parquet <- purrr::possibly(arrow::open_dataset, NULL)
-  
+
   existing_data <- error_safe_read_parquet(transformed_file)
-  
+
   # Check if transformed file already exists and can be loaded. If so return file name and path
   if(!is.null(existing_data) & overwrite == FALSE) {
     message(glue::glue("{basename(transformed_file)} already exists, has rows, and overwrite is not TRUE, skipping"))
@@ -74,13 +74,13 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
 
   # Track if any downloads failed
   failed_downloads <- c()
-  
-  # This errors if any of the files in the month are wrong. 
+
+  # This errors if any of the files in the month are wrong.
   nasa_recorded_weather <- purrr::map_df(dates, .progress = TRUE, function(yyyymmdd) {
-    
+
     # Establish NetCDF filename. This uses glue to inject yyyymmdd.
     nc_file <- file.path(local_folder, glue::glue(endpoint) |> basename())
-    
+
     response <- httr2::request(glue::glue(endpoint)) |>
       httr2::req_error(is_error = \(resp) FALSE) |>  # Handle errors gracefully
       httr2::req_perform(path = nc_file)  # Automatically writes to file
@@ -104,25 +104,25 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
       # Transform and resample raster to template
       raw_raster <- terra::crop(raw_raster, continent_raster_template)
       transformed_raster <- transform_raster(raw_raster, continent_raster_template)
-      
+
       # Convert to XY table
       names(transformed_raster) <- name
       terra::as.data.frame(transformed_raster, xy = TRUE)
-    }) |> 
+    }) |>
       plyr::join_all(by = c("x", "y")) |>
       dplyr::mutate(date = lubridate::ymd(yyyymmdd))
 
       # Clean up file
       file.remove(nc_file)
-      
+
       results
-  }) 
-  
+  })
+
   if(!nrow(nasa_recorded_weather) > 0) {
-    message(glue::glue("No data found for {months_to_process}")) 
+    message(glue::glue("No data found for {months_to_process}"))
     return(NULL)
-  } 
-  
+  }
+
   nasa_recorded_weather <- nasa_recorded_weather |>
   dplyr::mutate(year = year,
          month = month,
@@ -142,7 +142,7 @@ fetch_and_transform_nasa_weather <- function(months_to_process,
   ## The partial parquet written above covers whatever dates did succeed; downstream
   ## targets fall back to ERA5T anomaly files for any date not present in this parquet.
   if(length(failed_downloads) > 0) message(glue::glue("Some NASA POWER netcdf files failed to download (expected for recent dates): {paste(failed_downloads, collapse = ', ')}"))
-  
+
   # If it can be loaded return file name and path of transformed parquet
   return(transformed_file)
 }
