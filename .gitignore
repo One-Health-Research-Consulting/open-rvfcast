@@ -29,3 +29,6 @@ notes/*
 **/*.SEN3
 
 www/.Renviron
+outputs/*
+scr_r/*
+
