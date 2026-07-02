@@ -14,6 +14,10 @@
 #' @param hyperparam_path path to where the best hyperparameter file will be / is saved
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
 #' @param DEBUG If TRUE reduce to a small dataset for code testing
+#' @param chunk_id Index of the (inner_fold x tune_grid) chunk this branch is responsible for.
+#'   Only needed to keep this branch's timing log distinct from other chunks of the same
+#'   outer fold running concurrently; not used to select data (inner_ids_all is already
+#'   pre-sliced to this chunk upstream).
 #' @param checktime_path path to save csv tracking computation time
 #' @return Character vector of file paths, one per (inner_fold_id, tune_grid_index) combination
 #' @author Morgan Kain
@@ -22,7 +26,7 @@
 tune_results_per_outer_fold <- function(prejoined_data, inner_ids_all, threshold
                                       , weightings, start_p, id_cols, out_dir
                                       , tuning_grid_id, hyperparam_path, overwrite, DEBUG
-                                      , checktime_path) {
+                                      , chunk_id, checktime_path) {
 
   ## First, check if this tuning_grid_id already has a saved best parameter set
   if (file.exists(hyperparam_path)) {
@@ -43,7 +47,10 @@ tune_results_per_outer_fold <- function(prejoined_data, inner_ids_all, threshold
 
 checktime_tibble <- tibble(user = numeric(0), sys = numeric(0), elapsed = numeric(0))
 
-checktime_path.full <- paste0(checktime_path, "/outer_fold_", outer_fold_id, ".csv")
+## chunk_id is folded into the filename because multiple chunks of the same outer fold now
+## run concurrently (see cross(outer_fold_prejoined, chunk_id) in model_framework_targets.R);
+## without it, concurrent branches would overwrite each other's timing log
+checktime_path.full <- paste0(checktime_path, "/outer_fold_", outer_fold_id, "_chunk_", chunk_id, ".csv")
 
   for (i in seq_len(nrow(inner_ids_all))) {
 
@@ -251,6 +258,32 @@ prep_outer_ids <- function(folded_data, raw_data, inner_ids) {
 
  # inner_ids |> left_join(., all_outer) |> filter(has_outbreak == 1) |> dplyr::select(-has_outbreak)
   inner_ids |> left_join(all_outer)
+}
+
+#' Split one outer fold's (inner_fold x tune_grid) rows into n_chunks contiguous pieces
+#' and return a single piece. Used to fan a single outer fold's tuning work out across
+#' multiple concurrent branches (see inner_fold_ids_per_outer_chunked in model_framework_targets.R).
+#'
+#' @title chunk_rows
+#' @param dat Tibble of rows to split (already filtered to one outer_fold_id)
+#' @param n_chunks Number of pieces to split dat into
+#' @param which Which piece (1-indexed) to return
+#' @return Subset of dat's rows belonging to piece `which`
+#' @author Morgan Kain
+#' @export
+
+chunk_rows <- function(dat, n_chunks, which) {
+
+  n_chunks <- max(1L, n_chunks)
+
+  if (nrow(dat) == 0) return(dat)
+
+  ## Round-robin assignment rather than cut() -- cut() errors when n_chunks == 1 and gives
+  ## uneven bins for small nrow(dat). Rows are already shuffled upstream
+  ## (inner_fold_id_finalized / local_inner_fold_id_finalized), so round-robin over shuffled
+  ## rows already balances load across chunks.
+  dat[(seq_len(nrow(dat)) - 1L) %% n_chunks + 1L == which, ]
+
 }
 
 

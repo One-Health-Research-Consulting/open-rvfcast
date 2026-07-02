@@ -271,7 +271,7 @@ model_tuning_targets <- tar_plan(
   , loss_red_max   = -0.3
   , mtry_min       = 8
   , size           = 75))
-  
+
 , tar_target(hypergrid_seed, 44391827)
 
 , tar_target(tuning_grid, build_hyperparameter_grid(
@@ -333,11 +333,23 @@ model_tuning_targets <- tar_plan(
         left_join(train_data, by = "index")))
   , pattern = map(folded_data_training))
 
-  ## Subset of inner fold + tune-grid IDs for each outer fold, one branch per outer fold.
-   ## Element-wise alignment with outer_fold_prejoined/_DEBUG via the same map pattern.
-, tar_target(inner_fold_ids_per_outer, inner_fold_id_finalized |>
-     dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id)
-   , pattern = map(folded_data_training))
+  ## Number of pieces to split each outer fold's (inner_fold x tune_grid).
+   ## Use more workers: total tuning branches = nrow(folded_data_training) * n_tune_chunks
+, tar_target(n_tune_chunks, max(1L, ceiling(as.integer(30) / nrow(folded_data_training))))
+
+  ## Chunk index branching dimension, crossed against outer_fold_prejoined below
+, tar_target(chunk_id, seq_len(n_tune_chunks))
+
+  ## DIAGNOSTIC ONLY -- nothing downstream depends on this target. It exists purely so the
+   ## (outer_fold_id x chunk_id) partition of inner_fold_id_finalized can be sanity-checked
+   ## cheaply. See how pattern = cross(outer_fold_prejoined, chunk_id) in tuned_results_per_outer_fold
+   ## below
+, tar_target(inner_fold_ids_per_outer_chunked
+  , inner_fold_id_finalized |>
+     dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id) |>
+     chunk_rows(n_chunks = n_tune_chunks, which = chunk_id) |>
+     dplyr::mutate(chunk_id = chunk_id, .after = "outer_fold_id")
+   , pattern = cross(folded_data_training, chunk_id))
 
   ## Build the path to where the best hyperparameter set will be saved, which is
   ## used to determine if tuning has to occur or not
@@ -346,12 +358,15 @@ model_tuning_targets <- tar_plan(
   ## get the baseline occurance of outbreaks (in the full data)
 , tar_target(start_p, mean(splitted_data_fitting$train_data[[1]]$outbreak == 1))
 
-  ## Fit across tuning_grid across all inner folds of all outer folds
-   ## NOTE: for debugging swap outer_fold_prejoined -> outer_fold_prejoined_DEBUG
-   ##       and inner_fold_ids_per_outer -> inner_fold_ids_per_outer_DEBUG
+  ## Fit across tuning_grid across all inner folds of all outer folds.
+   ## Branches cross outer_fold_prejoined with chunk_id so multiple chunks of the same
+   ## outer fold's (inner_fold x tune_grid) rows can run concurrently on separate workers,
+   ## each cheaply re-reading (not recomputing) that outer fold's pre-joined covariate data.
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
     prejoined_data  = outer_fold_prejoined
-  , inner_ids_all   = inner_fold_ids_per_outer
+  , inner_ids_all   = inner_fold_id_finalized |>
+                        dplyr::filter(outer_fold_id == outer_fold_prejoined$outer_fold_id) |>
+                        chunk_rows(n_chunks = n_tune_chunks, which = chunk_id)
   , threshold       = positive_threshold
   , weightings      = weightings_on_ones
   , start_p         = start_p
@@ -361,8 +376,9 @@ model_tuning_targets <- tar_plan(
   , hyperparam_path = hyperparam_path
   , overwrite       = FALSE
   , DEBUG           = FALSE
+  , chunk_id        = chunk_id
   , checktime_path  = "outputs/timing")
-  , pattern         = map(outer_fold_prejoined, inner_fold_ids_per_outer)
+  , pattern         = cross(outer_fold_prejoined, chunk_id)
   , error           = "null"
   , format          = "file")
 
@@ -393,16 +409,24 @@ model_tuning_targets <- tar_plan(
   tfolds[sample(nrow(tfolds)), ]
   })
 
-## Per-outer-fold slice of local grid IDs, element-wise aligned with outer_fold_prejoined
-, tar_target(local_inner_fold_ids_per_outer
-   , local_inner_fold_id_finalized |> dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id)
-   , pattern = map(folded_data_training))
+## DIAGNOSTIC ONLY, mirroring inner_fold_ids_per_outer_chunked above -- nothing downstream
+## depends on this; it's just a cheap way to sanity-check the local grid's partition.
+, tar_target(local_inner_fold_ids_per_outer_chunked
+   , local_inner_fold_id_finalized |>
+      dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id) |>
+      chunk_rows(n_chunks = n_tune_chunks, which = chunk_id) |>
+      dplyr::mutate(chunk_id = chunk_id, .after = "outer_fold_id")
+   , pattern = cross(folded_data_training, chunk_id))
 
   ## Reuse the already-computed outer_fold_prejoined branches; only the per-fold
-   ## ID slice changes (pointing to local grid indices instead of global ones)
+   ## ID slice changes (pointing to local grid indices instead of global ones).
+   ## See the matching comment on tuned_results_per_outer_fold above for why the filter/chunk
+   ## is done inline rather than via local_inner_fold_ids_per_outer_chunked.
 , tar_target(local_tuned_results, tune_results_per_outer_fold(
      prejoined_data  = outer_fold_prejoined
-   , inner_ids_all   = local_inner_fold_ids_per_outer
+   , inner_ids_all   = local_inner_fold_id_finalized |>
+                          dplyr::filter(outer_fold_id == outer_fold_prejoined$outer_fold_id) |>
+                          chunk_rows(n_chunks = n_tune_chunks, which = chunk_id)
    , threshold       = positive_threshold
    , weightings      = weightings_on_ones
    , start_p         = start_p
@@ -412,8 +436,9 @@ model_tuning_targets <- tar_plan(
    , hyperparam_path = local_hyperparam_path
    , overwrite       = FALSE
    , DEBUG           = FALSE
+   , chunk_id        = chunk_id
    , checktime_path  = "outputs/timing")
-   , pattern         = map(outer_fold_prejoined, local_inner_fold_ids_per_outer)
+   , pattern         = cross(outer_fold_prejoined, chunk_id)
    , error           = "null"
    , format          = "file")
 
