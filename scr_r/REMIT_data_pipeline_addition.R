@@ -266,3 +266,84 @@ REMIT_targets <- tar_plan(
   })
   
 )
+
+
+#' Create a Subset Raster Template Bounded by Location Points
+#'
+#' Builds a new raster template (wrapped SpatRaster) with the same resolution as
+#' continent_raster_template, cropped to the bounding box of the supplied locations
+#' plus a metric buffer applied in all directions. Cell centers in the returned
+#' raster are snapped to the nearest cell in continent_raster_template so that
+#' x/y coordinates will join cleanly to data derived from the full template.
+#'
+#' @param continent_raster_template Wrapped SpatRaster. Full-continent template used
+#'   as the source for resolution and CRS.
+#' @param locs Data frame. Must contain columns "Latitude" and "Longitude" in decimal degrees.
+#' @param buffer_km Numeric. Distance in km to expand the bounding box on each side. Default: 10.
+#'
+#' @return Wrapped SpatRaster whose cell centers are a strict subset of those in
+#'   continent_raster_template.
+#'
+#' @export
+create_location_raster_template <- function(continent_raster_template, locs, buffer_km = 10) {
+  
+  template <- terra::unwrap(continent_raster_template)
+  
+  ## Build sf points from location coordinates
+  pts <- sf::st_as_sf(locs, coords = c("Longitude", "Latitude"), crs = 4326)
+  
+  ## Project to Cylindrical Equal-Area for accurate metric buffering across Africa
+  cea      <- "+proj=cea +lon_0=0 +lat_ts=0 +datum=WGS84 +units=m +no_defs"
+  pts_proj <- sf::st_transform(pts, cea)
+  
+  ## Buffer all points by the requested distance and union to get combined footprint
+  buffered <- sf::st_union(sf::st_buffer(pts_proj, dist = buffer_km * 1000))
+  
+  ## Reproject the combined bounding box back to WGS84
+  bbox <- sf::st_bbox(sf::st_transform(buffered, 4326))
+  
+  buffer_ext <- terra::ext(
+    as.numeric(bbox["xmin"]), as.numeric(bbox["xmax"])
+    , as.numeric(bbox["ymin"]), as.numeric(bbox["ymax"])
+  )
+  
+  ## Find which cells of the continent template intersect the buffer extent
+  buffer_cells <- terra::cells(template, buffer_ext)
+  
+  rows <- terra::rowFromCell(template, buffer_cells)
+  cols <- terra::colFromCell(template, buffer_cells)
+  
+  r_range <- range(rows)
+  c_range <- range(cols)
+  
+  subset_template <- template[r_range[1]:r_range[2], c_range[1]:c_range[2], drop = FALSE]
+  
+  ## The row/col subset has the right cells but terra recomputes xmin/ymax through a
+  ## different arithmetic path than the full template, so cell centers can differ by
+  ## ~1e-14 degrees and break exact coordinate joins. Fix: find the nearest cell in the
+  ## full template for each cell in the subset, retrieve the exact x/y that the full
+  ## template produces for those cells, and rebuild the extent from those values.
+  subset_centers <- terra::xyFromCell(subset_template, seq_len(terra::ncell(subset_template)))
+  nearest_cells  <- terra::cellFromXY(template, subset_centers)
+  exact_centers  <- terra::xyFromCell(template, nearest_cells)
+  
+  xres <- terra::xres(template)
+  yres <- terra::yres(template)
+  
+  terra::ext(subset_template) <- terra::ext(
+    min(exact_centers[, "x"]) - xres / 2
+    , max(exact_centers[, "x"]) + xres / 2
+    , min(exact_centers[, "y"]) - yres / 2
+    , max(exact_centers[, "y"]) + yres / 2
+  )
+  
+  #values(subset_template) <- runif(ncell(subset_template))
+  #as.data.frame(subset_template, xy = TRUE)
+  #plot(subset_template)
+  #values(template) <- runif(ncell(template))
+  #as.data.frame(subset_template, xy = TRUE) |> left_join(as.data.frame(template, xy = TRUE) |> rename(base = lyr.1))
+  
+  terra::wrap(subset_template)
+  
+}
+
