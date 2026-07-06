@@ -30,6 +30,7 @@ set_ecmwf_api_parameter <- function(start_year = 2005,
                                     lead_months = seq(1, 6),
                                     ecmwf_forecasts_transformed_directory = NULL,
                                     basename_template = "ecmwf_seasonal_forecast_{month}_{year}.parquet",
+                                    dates_to_process = NULL,
                                     ...) {
 
 
@@ -77,9 +78,20 @@ set_ecmwf_api_parameter <- function(start_year = 2005,
   end_date <- if (lubridate::day(lubridate::today()) > ecmwf_publish_lag_days) {
     lubridate::floor_date(lubridate::today(), "month")
   } else {
-    lubridate::floor_date(lubridate::today(), "month") - lubridate::months(1)
+    lubridate::floor_date(lubridate::today() - 32L, "month")
   }
-  dates <- seq.Date(lubridate::ymd(start_year, truncated = 2L), end_date, by = "month")
+  seq_start <- lubridate::ymd(start_year, truncated = 2L)
+
+  # When dates_to_process is provided, start the sequence from one month before
+  # the earliest date rather than from start_year. create_forecasts_anomalies_sources
+  # only needs the most recent forecast file before each date, so months long
+  # before the earliest date in dates_to_process are never used.
+  if (!is.null(dates_to_process) && length(dates_to_process) > 0) {
+    earliest_needed <- lubridate::floor_date(min(as.Date(dates_to_process)) - 32L, "month")
+    seq_start       <- max(seq_start, earliest_needed)
+  }
+
+  dates <- seq.Date(seq_start, end_date, by = "month")
 
   seasonal_forecast_parameters <- tibble(year = year(dates), month = month(dates))
 
@@ -97,6 +109,20 @@ set_ecmwf_api_parameter <- function(start_year = 2005,
       select(-output_file)
   }
 
+  # targets cannot branch over a 0-row tibble.  When all needed month parquets already exist
+  # locally the filter above removes every row; return one NA sentinel row so that
+  # pattern = map() dispatches exactly once and transform_ecmwf_forecasts can short-circuit.
+  if (nrow(seasonal_forecast_parameters) == 0) {
+    return(tibble::tibble(
+      year            = NA_integer_
+    , month           = NA_integer_
+    , spatial_bounds  = list(NULL)
+    , variables       = list(NULL)
+    , product_types   = list(NULL)
+    , leadtime_months = list(NULL)
+    ))
+  }
+
   message(glue::glue("Preparing to fetch ecmwf {product_types}"))
 
   # 2m_temperature (monthly mean) is the average 2-meter air temperature over the calendar month.
@@ -104,8 +130,8 @@ set_ecmwf_api_parameter <- function(start_year = 2005,
   # total_precipitation is typically the total accumulation for the month (not an average). Check metadata to confirm, as some datasets might report mean daily precipitation rates.
 
   seasonal_forecast_parameters |>
-    mutate(spatial_bounds = list(spatial_bounds)) |> 
-    mutate(variables = list(variables)) |> 
-    mutate(product_types = list(product_types)) |> 
+    mutate(spatial_bounds = list(spatial_bounds)) |>
+    mutate(variables = list(variables)) |>
+    mutate(product_types = list(product_types)) |>
     mutate(leadtime_months = list(as.character(lead_months)))
 }

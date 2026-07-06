@@ -61,27 +61,26 @@ fetch_and_transform_era5t_weather <- function(
   last_day_of_month        <- lubridate::ceiling_date(start_date, "month") - lubridate::days(1)
 
   if (!is.null(existing_data) && !overwrite) {
-    if (last_day_of_month <= era5t_cutoff) {
-      # Full month is now available from ERA5T; only skip if the parquet already covers it
-      max_parquet_date <- existing_data |>
-        dplyr::summarise(max_date = max(date, na.rm = TRUE)) |>
-        dplyr::collect() |>
-        dplyr::pull(max_date) |>
-        as.Date()
-      if (max_parquet_date >= last_day_of_month) {
-        message(glue::glue("{basename(transformed_file)} is complete through {last_day_of_month}, skipping"))
-        return(transformed_file)
-      }
-      message(glue::glue(
-        "{basename(transformed_file)} covers only through {max_parquet_date} but full month is now ",
-        "available; reprocessing to fill in remaining days."
-      ))
-      # Fall through to re-download and reprocess
-    } else {
-      # Month not yet fully available from ERA5T; existing partial parquet is the best we can do
-      message(glue::glue("{basename(transformed_file)} already exists and month is not yet complete, skipping"))
+    # Determine the target ceiling: the full month end if ERA5T lag covers it,
+    # otherwise the ERA5T lag limit (end_date has already been clamped above).
+    target_end_date <- if (last_day_of_month <= era5t_cutoff) last_day_of_month else end_date
+
+    max_parquet_date <- existing_data |>
+      dplyr::summarise(max_date = max(date, na.rm = TRUE)) |>
+      dplyr::collect() |>
+      dplyr::pull(max_date) |>
+      as.Date()
+
+    if (max_parquet_date >= target_end_date) {
+      message(glue::glue("{basename(transformed_file)} is up to date through {target_end_date}, skipping"))
       return(transformed_file)
     }
+
+    message(glue::glue(
+      "{basename(transformed_file)} covers through {max_parquet_date} but ERA5T now provides ",
+      "data through {target_end_date}; reprocessing to extend coverage."
+    ))
+    # Fall through to re-download and reprocess
   }
 
   # Authenticate with CDS using the same credentials as the ECMWF seasonal forecasts

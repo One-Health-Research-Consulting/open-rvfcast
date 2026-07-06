@@ -30,6 +30,14 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
   # Check that ecmwf_forecasts_api_parameters is only one row
   stopifnot(nrow(ecmwf_forecasts_api_parameters) == 1)
 
+  # NA sentinel row means all needed parquets already exist locally; return the most
+  # recently modified one so the format = "file" target has a valid path to track.
+  if (is.na(ecmwf_forecasts_api_parameters$year)) {
+    existing <- sort(list.files(ecmwf_forecasts_transformed_directory,
+                                pattern = "\\.parquet$", full.names = TRUE))
+    return(if (length(existing) > 0) tail(existing, 1) else character(0))
+  }
+
   # Extract necessary details from the ecmwf paramters
   year <- ecmwf_forecasts_api_parameters$year
   month <- unlist(ecmwf_forecasts_api_parameters$month)

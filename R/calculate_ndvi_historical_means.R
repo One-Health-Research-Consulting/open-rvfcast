@@ -32,6 +32,7 @@ calculate_ndvi_historical_means <- function(sentinel_ndvi_transformed,
                                             overwrite = FALSE,
                                             modis_ndvi_transformed_directory = NULL,
                                             sentinel_ndvi_transformed_directory = NULL,
+                                            dates_to_process = NULL,
                                             ...) {
 
   # Set up safe way to read parquet files
@@ -44,8 +45,18 @@ calculate_ndvi_historical_means <- function(sentinel_ndvi_transformed,
   # signals that the dataset has not been opened yet.
   ndvi_data <- NULL
 
+  # When dates_to_process is provided restrict to only the DOYs that appear in those
+  # dates; this prevents opening the full NDVI dataset for DOYs that are irrelevant
+  # to the current pipeline run and avoids producing corrupted means from incomplete
+  # source data on a clean machine.
+  doys_to_process <- if (!is.null(dates_to_process) && length(dates_to_process) > 0) {
+    unique(lubridate::yday(as.Date(dates_to_process)))
+  } else {
+    1:366
+  }
+
   # Fast because we can avoid collecting until write_parquet
-  ndvi_historical_means <- map_vec(1:366, .progress = TRUE, function(i) {
+  ndvi_historical_means <- map_vec(doys_to_process, .progress = TRUE, function(i) {
 
     filename <- file.path(ndvi_historical_means_directory, glue::glue(basename_template))
 

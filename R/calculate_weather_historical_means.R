@@ -31,6 +31,8 @@ calculate_weather_historical_means <- function(nasa_weather_transformed,
                                                weather_historical_means_directory,
                                                basename_template = "weather_historical_mean_doy_{i}.parquet",
                                                overwrite = FALSE,
+                                               dates_to_process = NULL,
+                                               forecast_horizon = 150L,
                                                ...) {
 
   # Set up safe way to read parquet files
@@ -44,8 +46,23 @@ calculate_weather_historical_means <- function(nasa_weather_transformed,
   # immediate and loud rather than producing corrupted means.
   nasa_weather_data <- NULL
 
+  # When dates_to_process is provided restrict to the DOYs that appear in those dates
+  # PLUS all DOYs through the full forecast horizon. calculate_forecast_anomalies reads
+  # historical means for every DOY from dates_to_process through dates_to_process +
+  # forecast_horizon - 1 (one per lead interval day), so those DOY files must exist.
+  doys_to_process <- if (!is.null(dates_to_process) && length(dates_to_process) > 0) {
+    all_forecast_dates <- seq.Date(
+      min(as.Date(dates_to_process))
+    , max(as.Date(dates_to_process)) + as.integer(forecast_horizon) - 1L
+    , by = "day"
+    )
+    unique(lubridate::yday(all_forecast_dates))
+  } else {
+    1:366
+  }
+
   # Fast because we can avoid collecting until write_parquet
-  weather_historical_means <- map_vec(1:366, .progress = TRUE, function(i) {
+  weather_historical_means <- map_vec(doys_to_process, .progress = TRUE, function(i) {
 
     filename <- file.path(weather_historical_means_directory, glue::glue(basename_template))
 

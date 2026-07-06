@@ -33,6 +33,14 @@ transform_modis_ndvi <- function(modis_ndvi_token,
                                  basename_template = "transformed_modis_NDVI_{start_date}.gz.parquet",
                                  overwrite = FALSE,
                                  ...) {
+  # NA sentinel: local parquets already cover all needed dates; return the most recent
+  # local parquet so the format = "file" target has a valid path to track.
+  if (is.na(modis_ndvi_bundle_request$file_name[1])) {
+    existing <- sort(list.files(modis_ndvi_transformed_directory,
+                                pattern = "\\.parquet$", full.names = TRUE))
+    return(if (length(existing) > 0) tail(existing, 1) else character(0))
+  }
+
   # Figure out raw file name and path
   raw_file <- file.path(modis_ndvi_transformed_directory, basename(modis_ndvi_bundle_request$file_name[[1]]))
 

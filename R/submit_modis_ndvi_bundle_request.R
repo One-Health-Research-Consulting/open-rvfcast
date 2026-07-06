@@ -26,11 +26,21 @@
 #'                      overwrite=FALSE)
 #'
 #' @export
-submit_modis_ndvi_bundle_request <- function(modis_ndvi_token, 
-                                             modis_ndvi_task_id_continent, 
+submit_modis_ndvi_bundle_request <- function(modis_ndvi_token,
+                                             modis_ndvi_task_id_continent,
                                              retry_time = 5, # in seconds
                                              ...) {
-  
+
+  # NA sentinel: local parquets cover all needed dates; skip AppEEARS polling entirely.
+  if (is.na(modis_ndvi_task_id_continent$task_id)) {
+    return(tibble::tibble(
+      file_name  = NA_character_
+    , sha256     = NA_character_
+    , created    = as.POSIXct(NA_real_)
+    , start_date = as.Date(NA_character_)
+    ))
+  }
+
   # Extract current task id
   task_id <- modis_ndvi_task_id_continent$task_id
   

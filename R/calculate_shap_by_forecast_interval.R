@@ -5,20 +5,22 @@
 
 #' @param model_dat output of prep_for_shap_a (contains dat_for_shap list-column)
 #' @param final_hyper_set The choice of hyperparameters for final model fitting
+#' @param fitted_model paths to fitted model objects for the file paths
 #' @param fitdir path to saved extracted parsnip fit and recipe
 #' @param recdir path to saved recipe
 #' @return Tibble of mean absolute and mean signed SHAP values per feature per forecast_interval
 #' @author Morgan Kain
 #' @export
 
-calculate_shap_by_forecast_interval <- function(model_dat, final_hyper_set, fitdir, recdir) {
+calculate_shap_by_forecast_interval <- function(model_dat, final_hyper_set, fitted_model, fitdir, recdir) {
 
-  fit_path <- paste(fitdir, "/parsnip_fit_", model_dat$outer_fold_id
-                    , "_", final_hyper_set$index
-                    , ".Rds", sep = "")
-  rec_path <- paste(fitdir, "/recipe_", model_dat$outer_fold_id
-                    , "_", final_hyper_set$index
-                    , ".Rds", sep = "")
+  final_hyper_set <- read.csv(final_hyper_set)
+  
+  ## generate path to the fit for this model
+  fit_path <- fitted_model[grep("parsnip_fit", fitted_model)]
+  fit_path <- fit_path[grep(paste0("parsnip_fit_", model_dat$outer_fold_id, "_"), fit_path)]
+  rec_path <- fitted_model[grep("recipe", fitted_model)]
+  rec_path <- rec_path[grep(paste0("recipe_", model_dat$outer_fold_id, "_"), rec_path)]
 
   parsnip_fit   <- readRDS(fit_path)
   saved_recipe <- readRDS(rec_path)

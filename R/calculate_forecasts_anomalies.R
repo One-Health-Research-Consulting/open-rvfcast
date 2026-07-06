@@ -60,13 +60,22 @@ calculate_forecast_anomalies <- function(forecasts_anomalies_sources,
   existing_dataset <- error_safe_read_parquet(save_filename)
 
   if (!is.null(existing_dataset) && !overwrite) {
-    # Check if file has data - if zero rows, overwrite anyway
-    row_count <- existing_dataset |> count() |> collect() |> pull(n)
-    if (row_count > 0) {
-      message(glue::glue("{basename(save_filename)} already exists, has rows, and overwrite is not TRUE, skipping"))
+    # Require all expected forecast intervals to be present with more than one row each.
+    # A file with only 1 row per interval indicates a failed prior run (e.g. historical
+    # means were missing so only an NA sentinel row was written for each interval).
+    expected_intervals <- forecast_intervals[-1]
+    present_counts <- existing_dataset |>
+      dplyr::count(forecast_interval) |>
+      dplyr::collect()
+    complete <- all(expected_intervals %in% present_counts$forecast_interval) &&
+      all(present_counts$n[match(expected_intervals, present_counts$forecast_interval)] > 1)
+    if (complete) {
+      message(glue::glue("{basename(save_filename)} already exists with all forecast intervals, skipping"))
       return(save_filename)
     } else {
-      message(glue::glue("{basename(save_filename)} exists but has zero rows, overwriting"))
+      missing <- setdiff(expected_intervals, present_counts$forecast_interval)
+      thin   <- present_counts$forecast_interval[present_counts$n <= 1]
+      message(glue::glue("{basename(save_filename)} is incomplete (missing intervals: {paste(missing, collapse=',')}, thin intervals: {paste(thin, collapse=',')}), recomputing"))
     }
   } else if (!is.null(existing_dataset) && overwrite) {
     # File exists and overwrite is TRUE

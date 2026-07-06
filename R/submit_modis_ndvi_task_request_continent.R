@@ -31,6 +31,19 @@ submit_modis_ndvi_task_request_continent <- function(end_date,
                                                    bbox_coords,
                                                    modis_ndvi_transformed_directory,
                                                    overwrite = FALSE) {
+
+  # NA sentinel from get_modis_task_end_dates means local parquets already cover all
+  # needed dates; skip the AppEEARS API call and return a sentinel tibble.
+  if (is.na(end_date)) {
+    return(tibble::tibble(
+      task_id       = NA_character_
+    , status        = "skip"
+    , country_iso3c = "africa"
+    , year          = NA_integer_
+    , end_date      = as.Date(NA_character_)
+    ))
+  }
+
   task_name <- "africa"
   start_date <- floor_date(end_date, unit = "year")
   

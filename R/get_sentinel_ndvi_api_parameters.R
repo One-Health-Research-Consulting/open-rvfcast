@@ -23,6 +23,7 @@
 #' @export
 get_sentinel_ndvi_api_parameters <- function(sentinel_ndvi_transformed_directory = NULL,
                                               basename_template = "transformed_sentinel_NDVI_{start_date}_to_{end_date}.parquet",
+                                              dates_to_process  = NULL,
                                               ...) {
 
   # Query Africa S3A Near-Real-Time 10-day NDVI composites via OData API
@@ -61,6 +62,18 @@ get_sentinel_ndvi_api_parameters <- function(sentinel_ndvi_transformed_directory
     start_date = start_dates,
     end_date   = end_dates
   )
+
+  # When dates_to_process is provided, restrict to products whose time span
+  # covers at least one of those dates. This avoids submitting API requests for
+  # all historical products (hundreds since 2018) when only a few new dates
+  # need processing.
+  if (!is.null(dates_to_process) && length(dates_to_process) > 0) {
+    dates_dt <- as.Date(dates_to_process)
+    out <- out |>
+      dplyr::filter(purrr::map2_lgl(start_date, end_date, function(s, e) {
+        any(dates_dt >= s & dates_dt <= e)
+      }))
+  }
 
   # Filter to only products where the output parquet does not yet exist. Sentinel
   # products are historical observations that do not change once published, so
