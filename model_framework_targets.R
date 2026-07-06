@@ -386,10 +386,11 @@ model_tuning_targets <- tar_plan(
 , tar_target(local_tuning_grid, build_local_hyperparameter_grid(
     inner_fold_paths     = tuned_results_per_outer_fold
   , global_grid          = tuning_grid
-  , top_k                = 15
+  , tune_pars            = tune_pars
+  , top_k                = 8
   , size                 = 75
   , weightval            = 3
-  , expansion            = 0.5
+  , expansion            = 0.2
   , grid_path            = "data/hypergrid"
   , folded_data_training = folded_data_training
   , splitted_data        = splitted_data
@@ -520,6 +521,7 @@ model_evaluation_targets <- tar_plan(
 , tar_target(variable_importance, calculate_variable_importance(
     model_dat       = variable_importance_prep_a
   , final_hyper_set = finalized_hyperparameters
+  , fitted_model    = fitted_model
   , fitdir          = outer_folds_dir3
   , recdir          = outer_folds_dir3
   , num_vars        = 10)
@@ -539,6 +541,7 @@ model_evaluation_targets <- tar_plan(
 , tar_target(shap_by_forecast_interval, calculate_shap_by_forecast_interval(
     model_dat       = shap_prep_a
   , final_hyper_set = finalized_hyperparameters
+  , fitted_model    = fitted_model
   , fitdir          = outer_folds_dir3
   , recdir          = outer_folds_dir3)
   , pattern         = map(shap_prep_a)

@@ -3,7 +3,7 @@
 #'
 #' @title build_hyperparameter_grid
 
-#' @param tune_pars grid of parameter ranges 
+#' @param tune_pars grid of parameter ranges
 #' @param grid_path path to where to save parameter grid
 #' @param overwrite boolean to overwrite or generate a new hyperparameter grid
 #' @param folded_data_training
@@ -15,24 +15,24 @@
 
 build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training, splitted_data
                                       , overwrite, seed) {
-  
-  ## Make the grid path 
+
+  ## Make the grid path
   create_data_directory(directory_path = grid_path)
-  
+
   #### Hyperparameter search and tuning grid --------------------------------------
-  
+
   set.seed(seed)
   hyper_id  <- stringi::stri_rand_strings(1, length = 15, pattern = "[A-Za-z0-9]")
   grid_path <- paste(grid_path, "/hypergrid_", hyper_id, ".Rds", sep = "")
-  
+
   ## load previously saved if available for consistency
   ## Check if saved file exists and not overwrite
   if (file.exists(grid_path) && !overwrite) {
-    
+
     par_grid <- readRDS(grid_path)
-    
+
   } else {
-    
+
     par_grid <- with(tune_pars
          ## Number of alternative grid options available, but space_filling efficient
          ## NOTE: Could possibly do a bit better to save some computation time by
@@ -52,11 +52,11 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
            ## Total number of combinations of hyperparameters
            , size = size)) |>
       mutate(index = seq_len(n()), .before = 1)
-    
+
     saveRDS(par_grid, grid_path)
-    
+
   }
-  
+
   ## return
   tibble(
     par_grid = par_grid |> list()
@@ -80,6 +80,8 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
 #'
 #' @param inner_fold_paths Character vector of file paths from tuned_results_per_outer_fold
 #' @param global_grid Single-row tibble returned by build_hyperparameter_grid (par_grid + grid_id)
+#' @param tune_pars Data frame of global search bounds (same object passed to build_hyperparameter_grid);
+#'   used to cap the local grid so it never searches outside where the global grid already looked
 #' @param top_k Number of top global parameter sets whose ranges define the local neighbourhood
 #' @param size Number of local grid points to generate (space-filling)
 #' @param weightval Numeric penalty weight on S_neg_penalty; must match the value used in selection
@@ -95,6 +97,7 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
 build_local_hyperparameter_grid <- function(
     inner_fold_paths
   , global_grid
+  , tune_pars
   , top_k
   , size
   , weightval
@@ -116,7 +119,7 @@ build_local_hyperparameter_grid <- function(
       return(NULL)
     }
     }) |> bind_rows()
-    
+
   ## NOTE: See detailed notes about this scoring strategy in finalize_hyperparameters_from_inner
   scores <- all_results |>
     group_by(index) |>
@@ -140,24 +143,26 @@ build_local_hyperparameter_grid <- function(
     dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
     distinct()
 
-  ## Compute local bounds for each hyperparameter.
+  ## Compute local bounds for each hyperparameter, hard-capped at the ORIGINAL global
+   ## tune_pars bounds -- the local grid is a refinement and should never be allowed to
+   ## search outside where the global grid already looked.
    ## learn_rate and loss_reduction are sampled on log10 scale by dials, so convert.
-  trees_range   <- expand_range(top_params$trees, lo_hard = 50, hi_hard = 3000, expansion = expansion, min_half_width = 50)
-  depth_range   <- expand_range(top_params$tree_depth, lo_hard = 2, hi_hard = 15, expansion = expansion, min_half_width = 1)
-  lr_range      <- expand_range(log10(top_params$learn_rate), lo_hard = -3, hi_hard = -0.3, expansion = expansion, min_half_width = 0.2)
-  minn_range    <- expand_range(top_params$min_n, lo_hard = 1, hi_hard = 50, expansion = expansion, min_half_width = 5)
-  lossred_range <- expand_range(log10(top_params$loss_reduction + .Machine$double.eps), lo_hard = -6, hi_hard = 0, expansion = expansion, min_half_width = 0.5)
-  ## Keep mtry anchored within reach of the top-k observed values
-  mtry_range_lo <- max(1L, min(top_params$mtry) - 3L)
+  trees_range   <- expand_range(top_params$trees, lo_hard = tune_pars$tree_min, hi_hard = tune_pars$tree_max, expansion = expansion, min_half_width = 50)
+  depth_range   <- expand_range(top_params$tree_depth, lo_hard = tune_pars$tree_dep_min, hi_hard = tune_pars$tree_dep_max, expansion = expansion, min_half_width = 1)
+  lr_range      <- expand_range(log10(top_params$learn_rate), lo_hard = tune_pars$learn_rate_min, hi_hard = tune_pars$learn_rate_max, expansion = expansion, min_half_width = 0.2)
+  minn_range    <- expand_range(top_params$min_n, lo_hard = tune_pars$minn_min, hi_hard = tune_pars$minn_max, expansion = expansion, min_half_width = 5)
+  lossred_range <- expand_range(log10(top_params$loss_reduction + .Machine$double.eps), lo_hard = tune_pars$loss_red_min, hi_hard = tune_pars$loss_red_max, expansion = expansion, min_half_width = 0.5)
+  ## Keep mtry anchored within reach of the top-k observed values, but never below the global floor
+  mtry_range_lo <- max(tune_pars$mtry_min, min(top_params$mtry) - 3L)
 
   set.seed(seed)
   hyper_id  <- paste0("local_", stringi::stri_rand_strings(1, length = 15, pattern = "[A-Za-z0-9]"))
   save_path <- paste0(grid_path, "/hypergrid_", hyper_id, ".Rds")
 
   if (file.exists(save_path)) {
-    
+
     par_grid <- readRDS(save_path)
-    
+
   } else {
 
     ## Index offset ensures no collision with global grid indices when results are pooled
@@ -178,7 +183,7 @@ build_local_hyperparameter_grid <- function(
       mutate(index = idx_offset + seq_len(n()), .before = 1)
 
     saveRDS(par_grid, save_path)
-    
+
   }
 
   tibble(
@@ -196,4 +201,3 @@ expand_range <- function(vals, lo_hard, hi_hard, expansion, min_half_width = 0) 
   pad  <- max((hi_k - lo_k) * expansion, min_half_width)
   c(max(lo_hard, lo_k - pad), min(hi_hard, hi_k + pad))
 }
-
