@@ -59,6 +59,9 @@ using_hexes     <- TRUE
  ## adjust here than everywhere in the code
 district_id_col <- "shapeName"
 
+## include the background random effect intercept layer (sero unaccounted for by the cases) or not
+use_sero_kernel_intercept <- FALSE
+
 ## Targets for loading needed data ---------------------------------------------
 model_data_targets <- tar_plan(
 
@@ -71,7 +74,9 @@ model_data_targets <- tar_plan(
 
 , tar_target(region_data_path
              , paste("data/", region_name, "_joined_response_data/"
-             , region_name, "_joined_response_data_final_with_sero.parquet"
+             , region_name, "_joined_response_data_final_with_sero_int_"
+             , use_sero_kernel_intercept
+             , ".parquet"
              , sep = ""), format  = "file")
 
   ## Load and mask forecast data so that forecasts further out than the summarized
@@ -392,11 +397,14 @@ model_tuning_targets <- tar_plan(
   , weightval            = 3
   , expansion            = 0.2
   , grid_path            = "data/hypergrid"
+  , hyperparam_path      = hyperparam_path
   , folded_data_training = folded_data_training
   , splitted_data        = splitted_data
   , seed                 = hypergrid_seed))
 
-, tar_target(local_hyperparam_path, paste0("outputs/hyperparameters/best_hyperparameters_", local_tuning_grid$grid_id, ".csv"))
+, tar_target(local_hyperparam_path, paste0(
+  "outputs/hyperparameters/best_hyperparameters_combined_"
+  , tuning_grid$grid_id, "--", local_tuning_grid$grid_id, ".csv"))
 
 ## (outer x inner x local-index) combinations, shuffled for load balancing.
  ## Mirrors inner_fold_id_finalized but cross-joined with the local grid.
@@ -454,16 +462,14 @@ model_tuning_targets <- tar_plan(
      ## suppression at the cost of sensitivity. If the value is near 0 the model puts nearly
      ## all emphasis on getting high probabilities for 1s at the cost of higher probabilities
      ## for true 0s. Larger values = the opposite. E.g., Large weightval, say above 10
-     ## strongly penalises false alarms. May select hyperparameter sets that are conservative,
+     ## strongly penalizes false alarms. May select hyperparameter sets that are conservative,
      ## predicting lower probabilities overall — at the cost of more missed outbreaks.
      ## Range 1-5 seems most reasonable? Can examine with relatively little computation by
      ## re-running finalize_hyperparameters_from_inner on already-computed fold results
      ## and inspecting how predicted probabilities shift in fitted_model.
   , weightval      = 3
   , tuning_grid_id = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")
-  , outpath        = paste0(
-    "outputs/hyperparameters/best_hyperparameters_combined_"
-   , tuning_grid$grid_id, "--", local_tuning_grid$grid_id, ".csv")))
+  , outpath        = local_hyperparam_path))
 
 )
 
@@ -589,7 +595,7 @@ model_evaluation_targets <- tar_plan(
   , error                 = "null")
 
 , tar_target(examined_fits_AWS_upload, {
-   if (purpose == "training") {
+   if (purpose == "train") {
      AWS_put_files(
        transformed_file_list = examined_fits_within_pan
      , local_folder          = examined_fits_path

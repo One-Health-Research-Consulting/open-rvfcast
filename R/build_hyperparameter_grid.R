@@ -87,6 +87,8 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
 #' @param weightval Numeric penalty weight on S_neg_penalty; must match the value used in selection
 #' @param expansion Fraction of the top-k range to extend on each side (e.g. 0.5 = ±50 %)
 #' @param grid_path Directory in which to save the local grid Rds
+#' @param hyperparam_path path to save the best parameters from the global grid as a check to indicate that
+#'   that phase of the fitting was indeed completed
 #' @param folded_data_training Folded training data (needed to finalise mtry upper bound)
 #' @param splitted_data Split data object (needed to finalise mtry upper bound)
 #' @param seed Random seed for reproducibility
@@ -103,12 +105,28 @@ build_local_hyperparameter_grid <- function(
   , weightval
   , expansion
   , grid_path
+  , hyperparam_path
   , folded_data_training
   , splitted_data
   , seed
 ) {
 
   create_data_directory(directory_path = grid_path)
+  
+  set.seed(seed)
+  hyper_id  <- paste0("local_", stringi::stri_rand_strings(1, length = 15, pattern = "[A-Za-z0-9]"))
+  save_path <- paste0(grid_path, "/hypergrid_", hyper_id, ".Rds")
+  
+  if (file.exists(save_path)) {
+    
+    return(
+      tibble(
+        par_grid = readRDS(save_path) |> list()
+      , grid_id  = hyper_id
+      )
+    )
+    
+  } 
 
   ## Score every global parameter set with the same formula used in finalization
   all_results <- purrr::map(inner_fold_paths, .f = function(x) {
@@ -142,6 +160,9 @@ build_local_hyperparameter_grid <- function(
     dplyr::filter(index %in% top_indices) |>
     dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
     distinct()
+  
+  ## Save an intermediate file that indicates that this step has been run
+  write.csv(top_params, hyperparam_path)
 
   ## Compute local bounds for each hyperparameter, hard-capped at the ORIGINAL global
    ## tune_pars bounds -- the local grid is a refinement and should never be allowed to
@@ -154,10 +175,6 @@ build_local_hyperparameter_grid <- function(
   lossred_range <- expand_range(log10(top_params$loss_reduction + .Machine$double.eps), lo_hard = tune_pars$loss_red_min, hi_hard = tune_pars$loss_red_max, expansion = expansion, min_half_width = 0.5)
   ## Keep mtry anchored within reach of the top-k observed values, but never below the global floor
   mtry_range_lo <- max(tune_pars$mtry_min, min(top_params$mtry) - 3L)
-
-  set.seed(seed)
-  hyper_id  <- paste0("local_", stringi::stri_rand_strings(1, length = 15, pattern = "[A-Za-z0-9]"))
-  save_path <- paste0(grid_path, "/hypergrid_", hyper_id, ".Rds")
 
   if (file.exists(save_path)) {
 

@@ -11,6 +11,9 @@
 
 make_recipe <- function(train_data, id_cols) {
   recipe(outbreak ~ ., data = train_data) |>
+    ## Almost always corrected in the data pipeline, but every now and again a cell slips through with a
+     ## crazy scaled value, so cap here as a extra precaution (generally has no impact)
+    step_mutate(across(starts_with("anomaly_scaled_"), ~ pmin(pmax(.x, -6), 6))) |>
     update_role(all_of(id_cols), new_role = "ID") |>
     step_rm(all_of(id_cols)) |>
     step_zv(all_predictors()) |>

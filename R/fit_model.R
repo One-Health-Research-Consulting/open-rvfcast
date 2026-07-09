@@ -110,6 +110,11 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
   ## Attempt to clear up some ram
   rm(train_data, test_data)
   gc()
+  
+  outer_tbl_train  <- outer_tbl_train |> dplyr::select(-pred_sero)
+  outer_tbl_assess <- outer_tbl_assess |> dplyr::select(-pred_sero)
+  outer_tbl_train  <- outer_tbl_train |> dplyr::select(-Country)
+  outer_tbl_assess <- outer_tbl_assess |> dplyr::select(-Country)
 
   ## Set up and fit the final model for this outer fold
   rec       <- make_recipe(outer_tbl_train, id_cols = id_cols)

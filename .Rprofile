@@ -1,3 +1,4 @@
+source("renv/activate.R")
 # Derive the project root from R_PROFILE_USER when set (e.g. crew workers that
 # inherit it via Sys.setenv in packages.R), otherwise assume cwd is project root
 local({

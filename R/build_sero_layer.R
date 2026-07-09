@@ -128,21 +128,37 @@ prep_all_dates <- function(cov_dat) {
   all_dates <- read_parquet(cov_dat) |> dplyr::select(shapeName, date) |> distinct()
   all_dates
 }
-build_sero_for_outbreaks <- function(the_pairs, the_samps) {
+
+
+#' @param the_pairs links from all hex-date combos to all relevant outbreaks
+#' @param the_samps cleaned up samples
+#' @param use_intercept boolean for whether or not to use the background random
+#'    effect intercept layer (sero unaccounted for by the cases)
+#'    or just rely on the spatio-temporal component of the kernel without the intercept
+#' @return tibble of data
+#' @author Morgan Kain
+#' @export
+
+build_sero_for_outbreaks <- function(the_pairs, the_samps, use_intercept) {
 
   the_pairs <- the_pairs[[1]]
 
   all_dates_with_outbreaks <- lapply(the_pairs, FUN = function(x) {
 
+    ## select the background random effect draws for this hex's specific cell index, not all cells
+    the_bs <- the_samps[, , 4 + x$idx[1]] |> c()
+    if (!use_intercept) the_bs[] <- 0
+    
     predval <- get_pred(
       b0    = the_samps[, , 1] |> c()
-    , b     = the_samps[, , 5:dim(the_samps)[3]] |> c()
+    , b     = the_bs
     , alpha = the_samps[, , 2] |> c()
-    , rho_d = the_samps[, , 3] |> c() |> exp()
-    , rho_t = the_samps[, , 4] |> c() |> exp()
+    , rho_d = the_samps[, , 3] |> c()
+    , rho_t = the_samps[, , 4] |> c()
     , dists = x$distances
-    , times = x$time_diff
-    )
+    , times = x$time_diff)
+    
+    #print(x); print(predval)
 
     tibble(
       h3_id     = x$h3_id[1]
@@ -156,7 +172,7 @@ build_sero_for_outbreaks <- function(the_pairs, the_samps) {
   all_dates_with_outbreaks
 
 }
-finish_sero_layer <- function(sero_cases_dat, samps, with_outbreaks, all_dates, outpath, overwrite) {
+finish_sero_layer <- function(sero_cases_dat, samps, with_outbreaks, use_intercept, all_dates, outpath, overwrite) {
 
   if (file.exists(outpath) && !overwrite) {
     print("Layer already generated from fitted stan model, returning previously saved covariate layer")
@@ -173,6 +189,8 @@ finish_sero_layer <- function(sero_cases_dat, samps, with_outbreaks, all_dates, 
         dplyr::select(-hexgroup)) |>
     filter(is.na(pred_sero))
 
+  if (use_intercept) {
+    
   all_dates_without_outbreaks <- all_dates_without_outbreaks |>
     rowwise() |>
     mutate(pred_sero = mean(
@@ -182,6 +200,17 @@ finish_sero_layer <- function(sero_cases_dat, samps, with_outbreaks, all_dates, 
       )
     ) |>
     dplyr::select(-idx)
+  
+  } else {
+    
+    all_dates_without_outbreaks <- all_dates_without_outbreaks |>
+      rowwise() |>
+      mutate(pred_sero = mean(
+        samps[, , 1] |> c()
+      )) |>
+      dplyr::select(-idx)
+    
+  }
 
   all_dates.f <- rbind(
     with_outbreaks
@@ -212,4 +241,5 @@ get_pred <- function(b0, b, alpha, rho_d, rho_t, dists, times) {
   p_mean  <- mean(p_draws)
 
   p_mean
+  
 }

@@ -29,7 +29,7 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
   
   other_parms <- list(...)
   
-  if (purpose == "training") {
+  if (purpose == "train") {
 
   if (is.null(region_to_sum)) {
     outname <- paste(paste(outpath, "/", sep = "")
@@ -50,7 +50,8 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
   ## Combine predictions with the data
   dat_with_pred <- model_out$preds[[1]] |>
     mutate(index = model_out$assess_data[[1]], .before = 1) |>
-    left_join(test_data |> filter(index %in% model_out$assess_data[[1]]))
+    mutate(outbreak = as.numeric(as.character(outbreak))) |>
+    left_join(test_data |> dplyr::filter(index %in% model_out$assess_data[[1]]))
 
   ## Load the previously created / saved Africa map of sub-regions per Country
   if (!using_hexes) {
@@ -341,6 +342,7 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
    ## Combine predictions with the data
    dat_with_pred <- model_out$preds[[1]] |>
      mutate(index = model_out$assess_data[[1]], .before = 1) |>
+     mutate(outbreak = as.numeric(as.character(outbreak))) |>
      left_join(test_data |> filter(index %in% model_out$assess_data[[1]]))
    
    ## Load the previously created / saved Africa map of sub-regions per Country

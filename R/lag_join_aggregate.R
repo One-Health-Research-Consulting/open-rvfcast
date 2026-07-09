@@ -25,6 +25,11 @@ lag_join_aggregate <- function (
 
   ## 0) Logistics stuff
 
+  ## file_list is a placeholder (NA) when there was nothing new to process this cycle, added
+   ## purely so the calling target has a non-empty vector to dynamically branch over; bail out
+   ## here so this branch gets dropped via error = "null" instead of indexing into an empty list
+  if (length(processed_dates) == 0) stop("no new dates to process this cycle")
+
   ## Of all of the preprocessed_dates which is the one needed for this branch.
    ## NOTE: Rather messy way to do this, but was having so many targets issues and this is the
    ## method I could get working
@@ -384,8 +389,10 @@ combine_lja <- function(in_dir, out_dir, overwrite) {
 #' @export
 combine_lja_and_append_with_sero <- function(new_files, save_filename, sero_layer, out_dir, overwrite) {
 
-  ## Return existing output file unchanged when there is nothing new to add
-  if (length(new_files) == 0) return(save_filename)
+  ## Return existing output file unchanged when there is nothing new to add and no explicit
+   ## refresh was requested; overwrite = TRUE forces a rejoin of sero_layer onto the existing
+   ## data below even with zero new_files (e.g. to pick up a corrected sero layer)
+  if (length(new_files) == 0 && !overwrite) return(save_filename)
 
   ## Check if file already exists and can be read
   error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
@@ -395,13 +402,25 @@ combine_lja_and_append_with_sero <- function(new_files, save_filename, sero_laye
     return(save_filename)
   }
 
-  ## Read new cleaned files
-  new_data <- lapply(as.list(new_files), read_parquet) |> bind_rows()
+  ## Read new cleaned files, if any
+  new_data <- if (length(new_files) > 0) lapply(as.list(new_files), read_parquet) |> bind_rows() else NULL
 
-  ## Read existing base data; drop pred_sero in case existing_dat (save_filename) is itself a _with_sero file
+  ## Read existing base data; drop pred_sero since existing_dat (save_filename) is itself a _with_sero
+   ## file, so a stale pred_sero column would otherwise collide with the freshly joined one below
   safe_read <- possibly(arrow::read_parquet, NULL)
   base_data <- safe_read(save_filename)
-  all_data  <- if (!is.null(base_data)) bind_rows(base_data, new_data) else new_data
+  if (!is.null(base_data)) base_data <- base_data |> dplyr::select(-dplyr::any_of("pred_sero"))
+
+  all_data <- if (!is.null(base_data) && !is.null(new_data)) {
+    bind_rows(base_data, new_data)
+  } else if (!is.null(base_data)) {
+    base_data
+  } else {
+    new_data
+  }
+
+  ## Nothing existing and nothing new; no-op
+  if (is.null(all_data)) return(save_filename)
 
   ## Join sero layer predictions to the full combined dataset
   slay <- read_parquet(sero_layer) |> rename(shapeName = h3_id)

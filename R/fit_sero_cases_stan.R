@@ -17,7 +17,7 @@ fit_sero_cases_stan <- function(stan_dat, outpath, overwrite) {
   }
 
     stan_fit <- stan(
-      file     = "models/sero_kernel_icar_base.stan"
+      file    = "models/sero_kernel_icar_base.stan"
     , data    = stan_dat
     , chains  = 4
     , iter    = 20000
