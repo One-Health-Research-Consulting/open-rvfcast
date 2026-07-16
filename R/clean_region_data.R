@@ -4,11 +4,12 @@
 #' @title clean_region_data
 
 #' @param dat Complete region_data
+#' @param map_dat hex info 
 #' @return Tibble of cleaned region data
 #' @author Morgan Kain
 #' @export
 
-clean_region_data <- function(dat) {
+clean_region_data <- function(dat, map_dat) {
 
   ## Drop all columns that already have a scaled counterpart
   scaled_cols <- names(dat)[str_detect(names(dat), "_scaled_")]
@@ -26,7 +27,6 @@ clean_region_data <- function(dat) {
   , "Precipitation_of_Wettest_Month", "Precipitation_of_Driest_Month"
   , "Precipitation_Seasonality", "Precipitation_of_Wettest_Quarter"
   , "Precipitation_of_Driest_Quarter", "Precipitation_of_Warmest_Quarter", "Precipitation_of_Coldest_Quarter"
-  , "pred_sero"
   )
 
   dat <- dat |> mutate(across(all_of(vars_to_scale), ~ as.numeric(scale(.x)[, 1])))
@@ -34,6 +34,18 @@ clean_region_data <- function(dat) {
   ## dropping extremely rare land types that are causing model fitting to behave somewhat strangely
   dat <- dat |> dplyr::select(-c(built, snow, mangroves, moss))
 
+  ## Add in x, y and doy
+  lat_lon_centers <- st_centroid(map_dat) |>
+    st_coordinates() |> 
+    as.data.frame() %>%
+    rename(lat = Y, lon = X) |>
+    bind_cols(map_dat |> as.data.frame() |> dplyr::select(-geometry))
+  
+  dat <- dat |> 
+    left_join(lat_lon_centers) |>
+    relocate(lat, lon, .after = outbreak) |>
+    mutate(doy = yday(date), .after = date)
+  
   dat
 
 }

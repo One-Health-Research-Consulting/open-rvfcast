@@ -87,7 +87,7 @@ compute_metrics_vec <- function(truth, threshold, weightings, caseweights, prob1
       ## Measure of sensitivity (see https://yardstick.tidymodels.org/reference/recall.html)
     , recall    = tibble(
         threshold = threshold
-        , recall    = apply(class_hat, 2, FUN = function(x) recall_vec(truth, x |> factor(levels = c("1", "0")), event_level = event_level))
+      , recall    = apply(class_hat, 2, FUN = function(x) recall_vec(truth, x |> factor(levels = c("1", "0")), event_level = event_level))
     ) |> list()
       ## See https://yardstick.tidymodels.org/reference/precision.html
     , precision = tibble(

@@ -90,7 +90,10 @@ model_data_targets <- tar_plan(
 
   ## Reduce down to already scaled covariates and scale the other unbounded covariates so that
    ## covariates are roughly on the same scale
-, tar_target(region_data, clean_region_data(dat = region_data_raw))
+, tar_target(region_data, clean_region_data(
+    dat     = region_data_raw
+  , map_dat = region_hexes[[1]]
+  ))
 
   ## Other paths to intermediate products to save computation time.
    ## Most used only for using_hexes == FALSE

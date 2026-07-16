@@ -319,6 +319,7 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
       , plotted_calibration = plotted_calibration |> list()
       , prob_dens_plot = prob_dens_plot |> list()
       , map_split      = map_list |> list()
+      , all_preds      = dat.s |> list()
       )
 
   })
