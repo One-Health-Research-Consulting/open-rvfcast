@@ -4,6 +4,7 @@
 
 ## NOTES / ToDo ----------------------------------------------------------------
 
+
 ## Setup / Preamble ------------------------------------------------------------
 
 ## Re-record current dependencies for CAPSULE users
@@ -27,8 +28,24 @@ purpose <- Sys.getenv("PURPOSE")
 ## Targets options
 source("_targets_settings.R")
 
-## Some settings that change much about the pipeline ---------------------------
+
+## Some settings -----------------------------------------------------------------
+
+## If true uses H3 hexes, if false uses ADM2
 using_hexes <- TRUE
+
+## If true, rebuilds all dates regardless of whether or not they exist
+rebuild <- TRUE
+
+## reduce outbreaks by looking at resolution of nearby start dates?
+ ## NOTE: not supported yet, because no decision has been made on how to reduce
+ ## In fact, it may be the case that these are never reduced, instead "index"
+ ## cases will be determined and weighted
+reduce_outbreaks_by_end_date <- FALSE
+
+## include the background random effect intercept layer (sero unaccounted for by the cases) or not
+use_sero_kernel_intercept <- FALSE
+
 
 ## Targets for loading needed data ---------------------------------------------
 data_import_targets <- tar_plan(
@@ -105,11 +122,16 @@ data_import_targets <- tar_plan(
 
   ## To be extra carefiul, join the dates to make sure they are in the same order
 , tar_target(joined_dates, {
-    left_join(
+
+   all.d <- left_join(
       africa_data_dates |> rename(dates = all_dates)
     , region_data_dates |> rename(dates = all_dates) |> mutate(processed = 1)
     ) |>
     mutate(processed = ifelse(is.na(processed), 0, 1))
+
+   if (rebuild) all.d <- all.d |> mutate(processed = 0)
+
+   all.d
 
   })
 
@@ -162,8 +184,7 @@ data_import_targets <- tar_plan(
   ## predictor_data_processing_targets.R — so both rasters share an identical grid.
 , tar_target(wahis_raster_template, terra::rasterize(
     terra::vect(continent_polygon)
-  , terra::rast(ext(continent_polygon), resolution = 0.1
-    )) |>
+  , terra::rast(ext(continent_polygon), resolution = 0.1)) |>
     terra::wrap())
 
   ## One branch per new file only; format = "file" tracks content changes
@@ -186,7 +207,10 @@ data_import_targets <- tar_plan(
   , error                 = "null")
 
   ## Clean raw outbreak data into form needed for analysis (Step 1)
-, tar_target(rvf_outbreaks, clean_rvf_outbreaks(output_path = wahis_file_path))
+, tar_target(rvf_outbreaks, clean_rvf_outbreaks(
+    output_path = wahis_file_path
+  , map_dat     = region_map
+  , reduced     = reduce_outbreaks_by_end_date))
 
   ## Import RVF seroprevalence data
 , tar_target(rvf_seroprevalence, readRDS("data/cases_sero.Rds")$sero_data |> mutate(index = seq_len(n())))
@@ -205,9 +229,28 @@ data_import_targets <- tar_plan(
     , forecast_intervals    = c(1, 30, 60, 90, 120, 150)
     , dates_to_process      = joined_dates$dates
     , local_folder          = rvf_response_directory
+    , reduced               = reduce_outbreaks_by_end_date
     , overwrite             = FALSE)
     , format                = "file"
     , repository            = "local")
+
+  ## Build a neighbor observed-outbreak history term: per hex, per model date, case-weighted
+   ## (as a measure of nearby spread pressure) recent outbreak activity in the neighboring hexes
+   ## (focal hex excluded) over the same three near-lag windows (1-30, 31-60, 61-90). The aim here
+   ## is a `spread` term -- the kernel-smoothed sero layer also encodes neighbor outbreaks but
+   ## blends that spread signal with the (opposite-signed) immunity signal. The hope is that this
+   ## term helps to deconfound the short term introduction pressure
+, tar_target(neighbor_outbreak_history,
+    build_neighbor_outbreak_history(
+      wahis_outbreaks          = rvf_outbreaks
+    , region_map               = region_map
+    , path_to_region_neighbors = paste0("data/", region_name, "_region_neighbors.Rds")
+    , dates_to_process         = joined_dates$dates
+    , lags                     = c(30, 60, 90)
+    , case_weight              = TRUE
+    , overwrite                = FALSE)
+    , format                   = "file"
+    , repository               = "local")
 
   ## Pulls all African countries. Alternatively can just provide a single country
    ## directly to get_region_districts below
@@ -233,6 +276,15 @@ data_import_targets <- tar_plan(
     region_districts
   })
 
+  ## Build a template for the sero layer
+, tar_target(sero_template, {
+    template  <- read_parquet(minimal_date_needs[1])
+    cross_join(
+      region_map[[1]] |> as.data.frame() |> dplyr::select(shapeName)
+    , region_data_dates |> rename(date = all_dates)
+    )
+  })
+
   ## Prep the seroprevalence-cases dataset
 , tar_target(cases_sero, prep_cases_sero_dataset(
     sero_dat  = rvf_seroprevalence
@@ -247,28 +299,22 @@ modeling_targets <- tar_plan(
   ## Fit the spatio-temporal kernel model
   tar_target(sero_stan_model,
     fit_sero_cases_stan(
-      stan_dat  = cases_sero$stan_data
-    , outpath   = "data/sero_kernel_icar_base_model_samples.Rds"
-    , overwrite = FALSE)
-    , error     = "null"
-    , format    = "file")
+     stan_dat  = cases_sero$stan_data
+   , outpath   = "data/sero_kernel_icar_base_model_samples.Rds"
+   , overwrite = FALSE)
+   , error     = "null"
+   , format    = "file")
 
   ## Make predictions from the fitted stan model over a series of targets in order to facilitate parallelization
-   ## for this computationally expensive step
-   ## *NOTE: the target joined_region_data is built near the end of this targets script*
+  ## for this computationally expensive step
+  ## *NOTE: the target joined_region_data is built near the end of this targets script*
 , tar_target(prepped_pairs, prep_all_pairs(
     sero_cases_dat = cases_sero
-  , cov_dat        = joined_region_data
+  , cov_dat        = sero_template
   , map_dat        = region_map[[1]]))
 
   ## adjusted extracted samples from the fitted model
 , tar_target(prepped_samps, prep_samps(fitted_stan_model = sero_stan_model, time_adjustment = TRUE))
-
-  ## all linkages between forecasted dates and neighboring outbreaks
-, tar_target(prepped_all_dates, prep_all_dates(cov_dat = joined_region_data))
-
-  ## include the background random effect intercept layer (sero unaccounted for by the cases) or not
-, tar_target(use_sero_kernel_intercept, FALSE)
 
   ## estimated seroprevalence for prepped_all_dates
 , tar_target(built_sero_for_outbreaks, build_sero_for_outbreaks(
@@ -277,17 +323,27 @@ modeling_targets <- tar_plan(
   , use_intercept = use_sero_kernel_intercept)
   , pattern       = map(prepped_pairs))
 
+  ## Sero layer location
+, tar_target(sero_path, "data/sero_layer_int")
+
   ## Pull together the final layer
 , tar_target(finished_sero_layer, finish_sero_layer(
     sero_cases_dat = cases_sero
   , samps          = prepped_samps
   , with_outbreaks = built_sero_for_outbreaks
   , use_intercept  = use_sero_kernel_intercept
-  , all_dates      = prepped_all_dates
-  , outpath        = paste0("data/", "sero_layer_int_", use_sero_kernel_intercept, ".parquet")
+  , all_dates      = sero_template
+  , outpath        = paste0(sero_path, "_", use_sero_kernel_intercept, ".parquet")
   , overwrite      = FALSE)
   , error          = "null"
   , format         = "file")
+
+  ## Upload the layer to the S3 bucket
+, tar_target(sero_layer_AWS_upload, AWS_put_files(
+    transformed_file_list = finished_sero_layer
+  , local_folder          = sero_path
+  , overwrite             = parse_flag("OVERWRITE_SERO_LAYER"))
+  , error                 = "null")
 
 )
 
@@ -298,8 +354,8 @@ modeling_targets <- tar_plan(
  ## D) Summarizing covariates and cases to the Sub-Sub-Region of interest
 rvf_processing_targets <- tar_plan(
 
-## Determine the Country and ADM2 (or 1) region and H3 hex for all of the x, y coordinates
- tar_target(region_data_template, {
+  ## Determine the Country and ADM2 (or 1) region and H3 hex for all of the x, y coordinates
+  tar_target(region_data_template, {
     ## No new files to process; preserve the previously-built template in the targets store
     tar_cancel(length(minimal_date_needs) == 0)
     mask_and_cluster_build_template(
@@ -374,16 +430,18 @@ rvf_processing_targets <- tar_plan(
   ## Calculate lags, join cases, summarize and build master dataset. Save the output in individual
    ## parquet files by date
 , tar_target(cleaned_region_data, lag_join_aggregate(
-    file_list       = file_path_per_date
-  , processed_dates = prepped_dates
-  , cov_files       = region_data
-  , rvf_response    = rvf_response
-  , out_dir         = region_cleaned_data_directory
-  , all_dates       = joined_dates
-  , overwrite       = FALSE)
-  , pattern         = map(file_path_per_date)
-  , error           = "null"
-  , format          = "file")
+    file_list          = file_path_per_date
+  , processed_dates    = prepped_dates
+  , cov_files          = region_data
+  , rvf_response       = rvf_response
+  , sero_layer         = finished_sero_layer
+  , neighbor_outbreaks = neighbor_outbreak_history
+  , out_dir            = region_cleaned_data_directory
+  , all_dates          = joined_dates
+  , overwrite          = FALSE)
+  , pattern            = map(file_path_per_date)
+  , error              = "null"
+  , format             = "file")
 
   ## Upload to bucket
 , tar_target(cleaned_region_data_AWS_upload, AWS_put_files(
@@ -392,37 +450,21 @@ rvf_processing_targets <- tar_plan(
   , overwrite             = parse_flag("OVERWRITE_CLEANED_REGION_DATA"))
   , error                 = "null")
 
-  ## Build a single master file
-, tar_target(joined_region_data, combine_lja(
-    in_dir    = cleaned_region_data
-  , out_dir   = region_joined_data_directory
-  , overwrite = ifelse(all(is.na(dates_in_predictors)), FALSE, TRUE))
-  , error     = "null"
-  , format    = "file")
-
-  ## Upload to bucket
-, tar_target(final_region_data_AWS_upload, AWS_put_files(
-    transformed_file_list = joined_region_data
-  , local_folder          = region_joined_data_directory
-  , overwrite             = parse_flag("OVERWRITE_FINAL_REGION_DATA"))
-  , error                 = "null")
-
   ## Store the name of the existing model data file
 , tar_target(model_data_file_name, {
     paste0(
       region_joined_data_directory
     , "/pan_hex_joined_response_data_final_with_sero_int_"
     , use_sero_kernel_intercept
-    , ".parquet"
-    )
+    , ".parquet")
   })
 
   ## Append new data to existing joined parquet, join sero,
    ## write single _final_with_sero.parquet
-, tar_target(final_region_data, combine_lja_and_append_with_sero(
+, tar_target(final_region_data, combine_lja_and_append(
     new_files     = cleaned_region_data
   , save_filename = model_data_file_name
-  , sero_layer    = finished_sero_layer
+  , rebuild       = rebuild
   , out_dir       = region_joined_data_directory
   , overwrite     = ifelse(all(is.na(dates_in_predictors)), FALSE, TRUE))
   , error         = "null"

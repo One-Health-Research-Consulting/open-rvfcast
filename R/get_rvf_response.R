@@ -32,55 +32,85 @@ get_rvf_response <- function(wahis_outbreaks,
                              forecast_intervals,
                              dates_to_process,
                              local_folder = "data/rvf_response",
-                             save_filename = "rvf_response.parquet",
-                             overwrite    = FALSE) {
+                             save_filename = "rvf_response",
+                             reduced,
+                             overwrite = FALSE) {
 
-  save_filename            <- file.path(local_folder, save_filename)
+  save_filename <- paste0(local_folder, "/", save_filename, "_", reduced, ".parquet")
+  
   error_safe_read_parquet <- purrr::possibly(arrow::open_dataset, NULL)
   existing_dataset        <- error_safe_read_parquet(save_filename)
 
-  if (!is.null(existing_dataset) && !overwrite) {
-    save_filename
-  }
+  if (!is.null(existing_dataset) && !overwrite) return(save_filename)
 
-  # Unwrap packed template raster
+  if (!reduced) {
+  
+  ## Unwrap packed template raster
   wahis_raster_template <- terra::rast(wahis_raster_template)
 
-  # Convert outbreak locations to a terra vector
+  ## Convert outbreak locations to a terra vector
   pts <- terra::vect(cbind(wahis_outbreaks$longitude, wahis_outbreaks$latitude), crs = crs(wahis_raster_template))
 
   # Get cell indices for points
   cell_indices <- cellFromXY(wahis_raster_template, cbind(wahis_outbreaks$longitude, wahis_outbreaks$latitude))
 
-  # Convert cell indices to standardized lat-lon coordinates based on the template raster cell grid
-  # This will allow the outbreaks to be joined to the other data based on lat / long.
+  ## Convert cell indices to standardized lat-lon coordinates based on the template raster cell grid
+   ## This will allow the outbreaks to be joined to the other data based on lat / long.
   pt_coords <- xyFromCell(wahis_raster_template, cell_indices) |> as_tibble() |> setNames(c("x", "y"))
 
-  # Add cell x,y coords to outbreaks tibble.
+  ## Add cell x,y coords to outbreaks tibble.
   wahis_outbreaks_gridded <- wahis_outbreaks |> bind_cols(pt_coords)
+  
+  } else {
+    wahis_outbreaks_gridded <- wahis_outbreaks
+  }
 
-  # For every date in the range, sum cases across every interval
-  # This is an important issue. What exactly are we predicting? Probability
-  # of an outbreak _occurring_ within a forecast window? Or of an outbreak
-  # _starting_ within the forecast window? Going with starting. Much easier.
+  ## For every date in the range, sum cases across every interval
+  ## This is an important issue. What exactly are we predicting? Probability
+  ## of an outbreak _occurring_ within a forecast window? Or of an outbreak
+  ## _starting_ within the forecast window? Going with starting. Much easier.
   rvf_respone <- map_dfr(dates_to_process, function(model_date) {
 
     map2_dfr(head(forecast_intervals, -1), tail(forecast_intervals, -1), function(interval_start, interval_end) {
 
-      # Not inclusive exclusive handling of range
+      ## Not inclusive exclusive handling of range
       outbreaks <- wahis_outbreaks_gridded |>
-        filter(start_date >= lubridate::as_datetime(model_date) + days(interval_start), start_date < lubridate::as_datetime(model_date) + days(interval_end))
+        filter(
+          start_date >= lubridate::as_datetime(model_date) + days(interval_start)
+        , start_date < lubridate::as_datetime(model_date) + days(interval_end)
+        )
 
       if (nrow(outbreaks) > 0) {
+        
+        if (!reduced) {
+        
         outbreaks <- outbreaks |>
           group_by(x, y) |>
-          summarize(date = model_date,
-                    forecast_interval = interval_end,
-                    forecast_start = lubridate::as_datetime(model_date) + days(interval_start),
-                    forecast_end = lubridate::as_datetime(model_date) + days(interval_end),
-                    cases = sum(cases, na.rm = TRUE),
-                    .groups = "drop")
+          summarize(
+            date              = model_date
+          , forecast_interval = interval_end
+          , forecast_start    = lubridate::as_datetime(model_date) + days(interval_start)
+          , forecast_end      = lubridate::as_datetime(model_date) + days(interval_end)
+          , cases             = sum(cases, na.rm = TRUE)
+          , .groups           = "drop")
+        
+        } else {
+          
+        outbreaks <- outbreaks |>
+          group_by(h3_id) |>
+          summarize(
+            date              = model_date
+          , forecast_interval = interval_end
+          , forecast_start    = lubridate::as_datetime(model_date) + days(interval_start)
+          , forecast_end      = lubridate::as_datetime(model_date) + days(interval_end)
+          , cases             = sum(cases, na.rm = TRUE)
+          , .groups           = "drop")
+          
+          
+        }
+        
       }
+      
     })
 
   })
@@ -88,15 +118,20 @@ get_rvf_response <- function(wahis_outbreaks,
   arrow::write_parquet(rvf_respone, save_filename, compression = "gzip", compression_level = 5)
 
   save_filename
+  
 }
 
 
 ## And function to clean the raw version of the data, the output of which is
  ## used in the above function
-clean_rvf_outbreaks <- function(output_path) {
+clean_rvf_outbreaks <- function(output_path, map_dat, reduced) {
+  
+  ## Event       = Country
+  ## report_id   = Collection of outbreaks
+  ## outbreak_id = Individual outbreak --> can show up in many report_id
   
   wahis_outbreaks <- readRDS(output_path)
-  wahis_outbreaks <- wahis_outbreaks[[2]] |> left_join(wahis_outbreaks[[1]])
+  wahis_outbreaks <- wahis_outbreaks[[2]] |> left_join(wahis_outbreaks[[1]]) 
   
   wahis_outbreaks_processed <- preprocess_wahis_rvf_outbreaks(
     wahis_rvf_outbreaks_raw = wahis_outbreaks
@@ -130,7 +165,25 @@ clean_rvf_outbreaks <- function(output_path) {
     mutate(outbreak_id = seq_len(n())) |>
     arrange(start_date, end_date)
   
-  wahis_outbreaks_processed.s
+  if (reduced) {
+    
+  ## Join to the hexes to get a general "region" for outbreaks and then sort by 
+   ## end date to join "related" "outbreaks" into "Outbreaks"
+  wahis_outbreaks_processed.s |>
+    st_as_sf(coords = c("longitude", "latitude"), crs = st_crs(map_dat[[1]]), remove = FALSE) |>
+    st_join(map_dat[[1]], left = FALSE) |>
+    group_by(shapeName, end_date) |>
+    summarize(start_date = min(start_date), cases = sum(cases)) |>
+    rename(h3_id = shapeName) |>
+    as.data.frame() |>
+    dplyr::select(-geometry) |>
+    as_tibble()
+    
+  } else {
+    
+    wahis_outbreaks_processed.s
+    
+  }
   
 }
 

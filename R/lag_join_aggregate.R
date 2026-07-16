@@ -7,6 +7,8 @@
 #' @param processed_dates prepared dates for each parquet for building lagged variables
 #' @param cov_files list of covariate parquet files. Here the masked and clustered data
 #' @param rvf_response summarized case data
+#' @param sero_layer built seroprevalence for all hexes
+#' @param neighbor_outbreaks outbreak history in neighboring hexes
 #' @param out_dir Place to save output
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
 #' @return character vector path to parquet files
@@ -18,6 +20,8 @@ lag_join_aggregate <- function (
     , processed_dates
     , cov_files
     , rvf_response
+    , sero_layer
+    , neighbor_outbreaks
     , out_dir
     , all_dates
     , overwrite = FALSE
@@ -53,6 +57,11 @@ lag_join_aggregate <- function (
     message("file already exists and can be loaded, skipping processing")
     return(save_filename)
   }
+  
+  ## Load sero layer
+  seroprev <- read_parquet(sero_layer) |> 
+    rename(anomaly_not_sero = pred_sero) |>
+    dplyr::select(-c(historical_sd, historical_mean))
 
   ## Load cases
   cases <- read_parquet(rvf_response)
@@ -106,20 +115,29 @@ lag_join_aggregate <- function (
     , soil_drainage = as.factor(soil_drainage)
     )
   })
+  
+  ## Attach seroprevalence data
+  fdat <- fdat |> left_join(seroprev |> rename(shapeName = h3_id))
 
   ## First, find the variables that are static and forecasted -- these do not need to be lagged
 
   ## Covariates for lagging
-  lagging_names <- fdat |> dplyr::select(
+  near_lagging_names <- fdat |> dplyr::select(
     contains("anomaly"), -contains("forecast")
   ) |>
   names()
+  
+  far_lagging_names <- fdat |> dplyr::select(contains("sero")) |> names()
 
   ## Forecasted and Static covariates
-  fdat.f <- fdat |> dplyr::select(-all_of(lagging_names), -slope, -aspect)
+  fdat.f <- fdat |> dplyr::select(-all_of(near_lagging_names), -slope, -aspect)
 
-  ## process each lag
-  all_lags <- lapply(processed_dates |> rowwise() |> group_split(), FUN = function(this_set) {
+  ## split the needed dates by cov type
+  near_dates <- processed_dates |> filter(purpose == "all") |> rowwise() |> group_split()
+  far_dates  <- processed_dates |> filter(purpose == "sero") |> rowwise() |> group_split()
+  
+  ## process each short-term lag for anomaly data
+  all_lags_near <- lapply(near_dates, FUN = function(this_set) {
 
     lag_gap <- as.numeric(this_set$date - this_set$lag_floors)
 
@@ -130,8 +148,9 @@ lag_join_aggregate <- function (
     tdat <- arrow::open_dataset(needed_files) |>
       collect() |>
       ungroup() |>
-      dplyr::select(x, y, shapeName, Country, all_of(lagging_names))
-
+      left_join(seroprev |> rename(shapeName = h3_id)) |>
+      dplyr::select(x, y, shapeName, Country, all_of(near_lagging_names))
+  
     ## Extract out the average of the variables over the parquet files that are needed
     ## for the given lag
     tdat.s <- tdat |>
@@ -141,12 +160,46 @@ lag_join_aggregate <- function (
         ~ paste0(.x, paste("_", lag_gap, sep = "")),
         .cols = starts_with("anomaly")
       )
+    
+    tdat.s
 
   }) |>
     reduce(left_join, by = c("x", "y", "shapeName", "Country"))
 
+  ## process each long-term lag for anomaly data
+  sero_lags_far <- lapply(far_dates, FUN = function(this_set) {
+    
+    lag_gap <- as.numeric(this_set$date - this_set$lag_floors)
+    
+    file_nums    <- this_set$file_nums[[1]]
+    needed_dates <- all_dates[file_nums, ]$dates
+    needed_files <- purrr::map(needed_dates, .f = function(x) cov_files[grepl(x, cov_files)]) |> unlist()
+    
+    tdat <- arrow::open_dataset(needed_files) |>
+      collect() |>
+      ungroup() |>
+      left_join(seroprev |> rename(shapeName = h3_id)) |>
+      dplyr::select(x, y, shapeName, Country, all_of(far_lagging_names))
+    
+    ## Extract out the average of the variables over the parquet files that are needed
+    ## for the given lag
+    tdat.s <- tdat |>
+      group_by(x, y, shapeName, Country) |>
+      summarize(across(where(is.numeric), mean), .groups = "keep") |>
+      rename_with(
+        ~ paste0(.x, paste("_", lag_gap, sep = "")),
+        .cols = starts_with("anomaly")
+      )
+    
+    tdat.s
+    
+  }) |>
+    reduce(left_join, by = c("x", "y", "shapeName", "Country"))
+  
   ## Build the final covariate data frame
-  fdat.fc <- fdat.f |> left_join(all_lags, by = c("x", "y", "shapeName", "Country"))
+  fdat.fc <- fdat.f |> left_join(
+    left_join(all_lags_near, sero_lags_far, by = c("x", "y", "shapeName", "Country"))
+  , by = c("x", "y", "shapeName", "Country"))
 
   ## join cases
   cases.t <- cases |>
@@ -242,6 +295,23 @@ lag_join_aggregate <- function (
     left_join(dominant_ADM2) |>
     relocate(c(Country, Proportion_Country, ADM2, Proportion_ADM2), .after = shapeName)
 
+  ## Join the neighbor observed-outbreak history term (per hex, per model date). It is known at the
+  ## model date so it is constant across forecast intervals; filter to this branch's date, join by
+  ## hex, and fill hexes with no recent neighbor activity with 0
+  if (!is.null(neighbor_outbreaks)) {
+    
+    target_date <- as.Date(unique(processed_dates$date))
+
+    neigh_this <- read_parquet(neighbor_outbreaks) |>
+      mutate(date = as.Date(date)) |>
+      filter(date == target_date) |>
+      dplyr::select(-date)
+
+    fdat.final <- fdat.final |>
+      left_join(neigh_this, by = "shapeName") |>
+      mutate(across(starts_with("neigh_outbreak_wt_"), ~ replace(., is.na(.), 0)))
+  }
+
   arrow::write_parquet(fdat.final, save_filename, compression = "gzip", compression_level = 5)
 
   save_filename
@@ -275,8 +345,9 @@ prep_dates <- function(cov_files, dates_all) {
   for (i in seq_along(cov_files)) {
 
     files_to_avg <- data.frame(
-      lag_floors   = dates_for_predictions[i] - c(30, 60, 90)
-    , lag_ceilings = dates_for_predictions[i] - c(1, 31, 61)
+      lag_floors   = dates_for_predictions[i] - c(30, 60, 90, 360, 720)
+    , lag_ceilings = dates_for_predictions[i] - c(1, 31, 61, 91, 361)
+    , purpose      = c("all", "all", "all", "sero", "sero")
     ) |>
     rowwise() |>
       mutate(
@@ -313,81 +384,17 @@ prep_dates <- function(cov_files, dates_all) {
 }
 
 
-#' A follow up function to lag_join_aggregate to combine all of the aggregated parquet files
-#'
-#'
-#' @title combine_lja
-
-#' @param in_dir vector of paths to all of the summarized parquet files from lag_join_aggregate
-#' @param out_dir location to save the single final joined file
-#' @param overwrite Boolean to recalculate and save over a previously saved file or not
-#' @return character vector path to parquet file
-#' @author Morgan Kain
-#' @export
-
-combine_lja <- function(in_dir, out_dir, overwrite) {
-    ## 0) Logistics stuff
-
-    ## Set filename
-    save_filename <- paste(
-        out_dir
-      , "/"
-      , paste(out_dir |> strsplit("data/") |> unlist() |> tail(1), "final", sep = "_")
-      , ".parquet"
-      , sep = "")
-
-    ## Return existing file unchanged when no new data files are available
-    if (length(in_dir) == 0) {
-      return(save_filename)
-    }
-
-    ## Check if file already exists and can be read
-    error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
-
-    if (!is.null(error_safe_read_parquet(save_filename)) && !overwrite) {
-      message("No new data, returning saved file")
-      return(save_filename)
-    }
-
-    new_data <- lapply(in_dir |> as.list(), FUN = function(x) {
-        tf <- read_parquet(x)
-    }) |>
-        bind_rows()
-
-    ## Append new rows to existing data if present; if _final.parquet is missing (deleted after
-    ## append_with_sero ran last cycle), fall back to _final_with_sero.parquet stripping pred_sero
-    safe_read     <- possibly(arrow::read_parquet, NULL)
-    existing_data <- safe_read(save_filename)
-    if (is.null(existing_data)) {
-        with_sero_file <- gsub("final.parquet", "final_with_sero.parquet", save_filename)
-        existing_data <- safe_read(with_sero_file)
-
-        if (is.null(existing_data)) {
-         existing_data <- NULL
-        } else {
-         existing_data <- existing_data |> dplyr::select(-dplyr::any_of("pred_sero"))
-        }
-    }
-    all_out <- if (!is.null(existing_data)) bind_rows(existing_data, new_data) else new_data
-
-    arrow::write_parquet(all_out, save_filename, compression = "gzip", compression_level = 5)
-
-    save_filename
-}
-
-
-#' @title append_with_sero
-#' @description Appends new cleaned model data to an existing joined dataset, joins in the
-#'   seroprevalence layer, and writes a single _final_with_sero.parquet.
+#' @title combine_lja_and_append
+#' @description Appends new cleaned model data to an existing joined dataset and writes a single _final_with_sero.parquet.
 #' @param new_files character vector of paths to new cleaned parquet files (cleaned_region_data)
 #' @param save_filename path to the existing _final.parquet produced by combine_lja
-#' @param sero_layer path to the sero layer parquet (finished_sero_layer)
+#' @param rebuild whether or not all data files are being rebuilt
 #' @param out_dir directory to write the output file
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
 #' @return character path to the written _final_with_sero.parquet
 #' @author Morgan Kain
 #' @export
-combine_lja_and_append_with_sero <- function(new_files, save_filename, sero_layer, out_dir, overwrite) {
+combine_lja_and_append <- function(new_files, save_filename, rebuild, out_dir, overwrite) {
 
   ## Return existing output file unchanged when there is nothing new to add and no explicit
    ## refresh was requested; overwrite = TRUE forces a rejoin of sero_layer onto the existing
@@ -409,11 +416,10 @@ combine_lja_and_append_with_sero <- function(new_files, save_filename, sero_laye
    ## file, so a stale pred_sero column would otherwise collide with the freshly joined one below
   safe_read <- possibly(arrow::read_parquet, NULL)
   base_data <- safe_read(save_filename)
-  if (!is.null(base_data)) base_data <- base_data |> dplyr::select(-dplyr::any_of("pred_sero"))
 
-  all_data <- if (!is.null(base_data) && !is.null(new_data)) {
+  all_data <- if (!is.null(base_data) && !is.null(new_data) && !rebuild) {
     bind_rows(base_data, new_data)
-  } else if (!is.null(base_data)) {
+  } else if (!is.null(base_data) && !rebuild) {
     base_data
   } else {
     new_data
@@ -422,41 +428,9 @@ combine_lja_and_append_with_sero <- function(new_files, save_filename, sero_laye
   ## Nothing existing and nothing new; no-op
   if (is.null(all_data)) return(save_filename)
 
-  ## Join sero layer predictions to the full combined dataset
-  slay <- read_parquet(sero_layer) |> rename(shapeName = h3_id)
-  fdat <- left_join(all_data, slay)
-
-  arrow::write_parquet(fdat, save_filename, compression = "gzip", compression_level = 5)
-
-  ## Delete the intermediate files
-  # unlink(new_files)
+  arrow::write_parquet(all_data, save_filename, compression = "gzip", compression_level = 5)
 
   save_filename
 
 }
 
-
-join_in_sero_layer <- function(region_dat, sero_layer, overwrite) {
-
-  ## 0) Logistics stuff
-
-  ## Set filename
-  save_filename <- gsub("final.parquet", "final_with_sero.parquet", region_dat)
-
-  ## Check if file already exists and can be read
-  error_safe_read_parquet <- possibly(arrow::open_dataset, NULL)
-
-  if (!is.null(error_safe_read_parquet(save_filename)) && !overwrite) {
-    message("file already exists and can be loaded, skipping processing")
-    return(save_filename)
-  }
-
-  tdat <- read_parquet(region_dat)
-  slay <- read_parquet(sero_layer) |> rename(shapeName = h3_id)
-  fdat <- left_join(tdat, slay)
-
-  arrow::write_parquet(fdat, save_filename, compression = "gzip", compression_level = 5)
-
-  save_filename
-
-}

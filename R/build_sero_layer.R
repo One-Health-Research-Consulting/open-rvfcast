@@ -24,7 +24,7 @@ prep_all_pairs <- function(sero_cases_dat, cov_dat, map_dat) {
   map_data  <- sero_cases_dat$map_data[[1]]
 
   ## Load the covariate stack and strip out the unique combination of H3 and dates
-  all_dates <- read_parquet(cov_dat) |> dplyr::select(shapeName, date) |> distinct()
+  all_dates <- cov_dat |> dplyr::select(shapeName, date) |> distinct()
 
   ## join in geometry for calculating distances
   all_dates_sf <- all_dates |>
@@ -104,7 +104,7 @@ prep_all_pairs <- function(sero_cases_dat, cov_dat, map_dat) {
   split(all_dates.prepped, ceiling(seq_along(all_dates.prepped) / 2000))
 
 }
-prep_samps <- function(fitted_stan_model, time_adjustment) {
+prep_samps     <- function(fitted_stan_model, time_adjustment) {
 
   ## First do a bit of work to extract the stan model coefficients
   param_samps  <- readRDS(fitted_stan_model)
@@ -172,7 +172,7 @@ build_sero_for_outbreaks <- function(the_pairs, the_samps, use_intercept) {
   all_dates_with_outbreaks
 
 }
-finish_sero_layer <- function(sero_cases_dat, samps, with_outbreaks, use_intercept, all_dates, outpath, overwrite) {
+finish_sero_layer        <- function(sero_cases_dat, samps, with_outbreaks, use_intercept, all_dates, outpath, overwrite) {
 
   if (file.exists(outpath) && !overwrite) {
     print("Layer already generated from fitted stan model, returning previously saved covariate layer")
@@ -219,6 +219,20 @@ finish_sero_layer <- function(sero_cases_dat, samps, with_outbreaks, use_interce
     distinct() |>
     ungroup() |>
     mutate(pred_sero = ifelse(is.na(pred_sero), mean(samps[, , 1] |> c()), pred_sero))
+  
+  ## convert to anomaly and scaled anomaly
+  all_dates.f <- all_dates.f |>
+    group_by(h3_id) |>
+    mutate(
+      historical_mean = mean(pred_sero)
+    , historical_sd   = sd(pred_sero)
+    , historical_sd   = ifelse(historical_sd < 0.1, 0.1, historical_sd)
+    ) |>
+    ungroup() |>
+    mutate(
+      anomaly_sero        = pred_sero - historical_mean
+    , anomaly_scaled_sero = anomaly_sero / historical_sd
+    )
 
   arrow::write_parquet(
     all_dates.f
