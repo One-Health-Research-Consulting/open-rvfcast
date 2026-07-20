@@ -17,14 +17,35 @@
 #' @author Morgan Kain
 #' @export
 
-prep_all_pairs <- function(sero_cases_dat, cov_dat, map_dat) {
+prep_all_pairs <- function(sero_cases_dat, cov_dat, map_dat, outpath, overwrite) {
 
+  ## first attempt to load the file if it already exists and overwrite = FALSE
+  error_safe_readRDS <- possibly(readRDS, NULL)
+  
+  all_dates.prepped.old <- error_safe_readRDS(paste0(outpath, "/prepped_pairs.Rds"))
+  
+  if (!is.null(all_dates.prepped.old)) {
+    
+    ## get the list of dates in the prepped pairs file
+    last_date <- lapply(all_dates.prepped.old, FUN = function(x) {
+      x[[1]]$date %>% unique() %>% as.character()
+    }) %>% unlist() %>% as_date() %>% max()
+    
+    ## Check if there are new dates in the old file
+    needed_date <- unique(cov_dat$date)[which(unique(cov_dat$date) > last_date)]
+    
+  }
+  
   ## grab the stan data to get the correct indices for the H3 hex names
   stan_data <- sero_cases_dat$stan_data[[1]]
   map_data  <- sero_cases_dat$map_data[[1]]
 
   ## Load the covariate stack and strip out the unique combination of H3 and dates
   all_dates <- cov_dat |> dplyr::select(shapeName, date) |> distinct()
+  
+  if (!overwrite) {
+    all_dates <-  all_dates |> filter(date %in% needed_date)
+  }
 
   ## join in geometry for calculating distances
   all_dates_sf <- all_dates |>
@@ -100,8 +121,17 @@ prep_all_pairs <- function(sero_cases_dat, cov_dat, map_dat) {
     mutate(time_diff = as.numeric(date - date_cases) / 365) |>
     filter(time_diff <= 8, time_diff > 0) |>
     split_tibble(c("h3_id", "date"))
-
-  split(all_dates.prepped, ceiling(seq_along(all_dates.prepped) / 2000))
+  
+  all_dates.prepped <- split(all_dates.prepped, ceiling(seq_along(all_dates.prepped) / 2000))
+  
+  if (!is.null(all_dates.prepped.old) && !overwrite) {
+    all_dates.prepped.old <- c(all_dates.prepped.old, all_dates.prepped)
+    saveRDS(all_dates.prepped.old, paste0(outpath, "/prepped_pairs.Rds"))
+    return(all_dates.prepped.old)
+  } else {
+    saveRDS(all_dates.prepped, paste0(outpath, "/prepped_pairs.Rds"))
+    return(all_dates.prepped)
+  }
 
 }
 prep_samps     <- function(fitted_stan_model, time_adjustment) {
@@ -174,7 +204,17 @@ build_sero_for_outbreaks <- function(the_pairs, the_samps, use_intercept) {
 }
 finish_sero_layer        <- function(sero_cases_dat, samps, with_outbreaks, use_intercept, all_dates, outpath, overwrite) {
 
-  if (file.exists(outpath) && !overwrite) {
+  ## Check if there has been new data generated
+  error_safe_read_parquet <- possibly(read_parquet, NULL)
+  all_dates.prepped.old   <- error_safe_read_parquet(outpath)
+  
+  if (!is.null(all_dates.prepped.old)) {
+    new_dates <- unique(with_outbreaks$date)[which(unique(with_outbreaks$date) %notin% unique(all_dates.prepped.old$date))]
+  } else {
+    new_dates <- NULL
+  }
+  
+  if (file.exists(outpath) && !overwrite && is.null(new_dates)) {
     print("Layer already generated from fitted stan model, returning previously saved covariate layer")
     return(outpath)
   }

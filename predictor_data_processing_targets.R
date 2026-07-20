@@ -338,6 +338,11 @@ dynamic_targets <- tar_plan(
     }) |>
     na.omit()
 
+    ## Process only the dates_to_process_all dates that have not yet been written.
+    ## Using membership rather than max-date comparison avoids skipping unprocessed
+    ## historical dates when a more recent forecast anchor parquet already exists.
+    narrow_dates <- dates_to_process_all[!as.character(dates_to_process_all) %in% processed_dates]
+    
     narrow_dates
 
   })

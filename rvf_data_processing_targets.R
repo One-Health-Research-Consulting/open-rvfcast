@@ -278,7 +278,7 @@ data_import_targets <- tar_plan(
     template  <- read_parquet(minimal_date_needs[1])
     cross_join(
       region_map[[1]] |> as.data.frame() |> dplyr::select(shapeName)
-    , region_data_dates |> rename(date = all_dates)
+    , africa_data_dates |> dplyr::select(all_dates) |> rename(date = all_dates)
     )
   })
 
@@ -302,13 +302,18 @@ modeling_targets <- tar_plan(
    , error     = "null"
    , format    = "file")
 
+  ## path to where to save some intermediate files for building the sero layer
+, tar_target(sero_helper_path, "data/sero_layer_prep")
+  
   ## Make predictions from the fitted stan model over a series of targets in order to facilitate parallelization
   ## for this computationally expensive step
   ## *NOTE: the target joined_region_data is built near the end of this targets script*
 , tar_target(prepped_pairs, prep_all_pairs(
     sero_cases_dat = cases_sero
   , cov_dat        = sero_template
-  , map_dat        = region_map[[1]]))
+  , map_dat        = region_map[[1]]
+  , outpath        = sero_helper_path
+  , overwrite      = FALSE))
 
   ## adjusted extracted samples from the fitted model
 , tar_target(prepped_samps, prep_samps(fitted_stan_model = sero_stan_model, time_adjustment = TRUE))
@@ -321,7 +326,7 @@ modeling_targets <- tar_plan(
   , pattern       = map(prepped_pairs))
 
   ## Sero layer location
-, tar_target(sero_path, "data/sero_layer_int")
+, tar_target(sero_path, "data/sero_layer_prep/sero_layer_int")
 
   ## Pull together the final layer
 , tar_target(finished_sero_layer, finish_sero_layer(
