@@ -96,18 +96,21 @@ scalability when working with large, distributed data sources.
 
 #### Accessing the Complete Dataset
 
-The first of the modules generates approximately 500 300mb files (meant
-to be stored in `data/africa_full_predictor_data`). These data can be
-accessed from the cloud (see .env for credentials). The second of the
-modules generates a single 800mb file; this file is also accessible from
-the cloud (BUT ATM email Noam Ross or Morgan Kain); this file should be
-stored in `data/pan_hex_joined_response_data` for the third module
-(modeling). **Important**: The `africa_full_predictor_data` dataset only
-contains dates for which data was successfully retrieved from **all**
-predictor sources. If any predictor is missing for a given date, that
-date will not be included in the final dataset. This ensures data
-completeness - if a file is present in the `africa_full_predictor_data`
-folder, it is guaranteed to contain all predictors for that date.
+If run in full, the first of the modules generates approximately 500
+300mb files (meant to be stored in `data/africa_full_predictor_data`).
+These data can be accessed from the cloud (see .env for credentials).
+However, for the purposes of monthly forecasting, the combined data file
+needed for modeling can be appended with data from recent dates without
+downloading this full stack. The second of the modules generates a
+single ~900mb file; this file is also accessible from the cloud (BUT ATM
+email Noam Ross or Morgan Kain); this file should be stored in
+`data/pan_hex_joined_response_data` for the third module (modeling).
+**Important**: The `africa_full_predictor_data` dataset only contains
+dates for which data was successfully retrieved from **all** predictor
+sources. If any predictor is missing for a given date, that date will
+not be included in the final dataset. This ensures data completeness -
+if a file is present in the `africa_full_predictor_data` folder, it is
+guaranteed to contain all predictors for that date.
 
 For more details on how the pipeline handles data dependencies and
 incremental updates, see
@@ -160,11 +163,12 @@ bucket and it isn’t found, it defaults to re-downloading the data from
 source. In most cases for model development work, the data has already
 been downloaded, cleaned, and packaged and this module can be skipped.
 
-For deployment and auto-updating of data for new forecasts (running the
-full pipeline from start to finish), a decision will need to be made for
-how often new data is downloaded (different sources are updated at
-different frequencies) vs relying on already downloaded data to make new
-forecasts.
+The pipeline is designed so that for auto-updating of data for just new
+dates monthly for new forecasts, only files that are needed to update
+the data are downloaded (which makes forecasting not very time
+intensive). However, if the goal is to not just download recent data
+(i.e., to rebuild the full stack, all data can be downloaded – see
+targets dates_to_process_all and dates_to_process).
 
 Many of the computational steps in the first module can be time
 consuming and either depend on or produce large files. In order to speed

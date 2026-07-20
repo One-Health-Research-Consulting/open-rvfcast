@@ -31,6 +31,8 @@ suppressPackageStartupMessages({
   library(dials)
   library(here)
   library(lubridate)
+  ## Needed by clean_region_data() for hex-centroid lat/lon (st_centroid / st_coordinates)
+  library(sf)
 })
 conflicts_prefer(dplyr::filter, dplyr::select, .quiet = TRUE)
 
@@ -57,11 +59,24 @@ The pipeline is orchestrated with the `targets` R package, with computationally 
 Predictions are made at the resolution of H3 hexagonal grid cells (resolution 3; ~12,400 km² per cell), covering the African continent. H3 hexagons tile space without the irregularity of administrative boundaries, providing a consistent spatial support across countries and ecological gradients. Each hexagon carries a unique H3 identifier stored as `shapeName`.
 
 ```{r load-data}
+## File naming encodes use_sero_kernel_intercept (see model_framework_targets.R); the
+## production pipeline currently runs with this set to FALSE, so default to that file but
+## fall back to whichever with_sero variant is newest if the default isn't present locally
+use_sero_kernel_intercept <- FALSE
 dat_path <- here::here("data/pan_hex_joined_response_data",
-                       "pan_hex_joined_response_data_final_with_sero.parquet")
+                       paste0("pan_hex_joined_response_data_final_with_sero_int_",
+                              use_sero_kernel_intercept, ".parquet"))
+if (!file.exists(dat_path)) {
+  candidates <- list.files(here::here("data/pan_hex_joined_response_data"),
+                           pattern = "_final_with_sero.*\\.parquet$", full.names = TRUE)
+  dat_path  <- candidates[order(file.info(candidates)$mtime, decreasing = TRUE)][1]
+}
 dat_raw  <- arrow::read_parquet(dat_path) |>
   ungroup() |>
   mutate(index = row_number(), .before = 1)
+
+## H3 hex sf object; used below by clean_region_data() to derive hex centroids (lat/lon)
+region_hexes <- readRDS(here::here("data/region_hexes_small.Rds"))
 
 tibble::tibble(
   ` ` = c("Unique H3 hexagons", "Date range", "Total rows (hex × date × interval)")
@@ -104,13 +119,13 @@ dat_raw |>
   )
 ```
 
-The extremely low event prevalence (~0.1–1% depending on interval and period) is the primary modeling challenge. This imbalance is addressed via **observation-level importance weights** (Section 7) rather than resampling, which preserves the full dataset.
+The extremely low event prevalence (well under 0.1% across the full pan-African hex dataset, though this varies by interval and by the time period considered) is the primary modeling challenge. This imbalance is addressed at the gradient level inside the XGBoost engine itself (`scale_pos_weight` and `max_delta_step`; Section 7) rather than via resampling or observation-level case weights, which preserves the full dataset and avoids the training instabilities described in Section 7.
 
 ---
 
 ## 4. Covariate Stack
 
-Covariates fall into six conceptually distinct groups. Static layers do not change over time; dynamic layers vary by date.
+Covariates fall into nine conceptually distinct groups (Sections 4.1–4.9). Static layers do not change over time; dynamic layers vary by date.
 
 ### 4.1 Host abundance (static)
 
@@ -159,10 +174,10 @@ bind_rows(
 
 ### 4.4 Soil properties (static)
 
-Two categorical soil descriptors from the HWSD/FAO soil database:
+Two categorical soil descriptors from the HWSD/FAO soil database. Unknown values in either variable are imputed by nearest-neighbour (`lag_join_aggregate()`) before aggregating to the hex scale. Both are converted to integer codes via `as.numeric(as.factor(...))` upstream of the recipe (in the `region_data_raw` target), so **neither is one-hot encoded** — both enter XGBoost as plain numeric predictors:
 
-- **`soil_texture`**: broad texture class (e.g., loamy, sandy, clayey). Nominal factor; one-hot encoded by the recipe.
-- **`soil_drainage`**: drainage class encoded as an ordinal integer (1–7). Unknown values are imputed by nearest-neighbour before aggregating to the hex scale.
+- **`soil_drainage`**: drainage class, mapped to a genuinely ordinal integer (1–7, worst-to-best drainage) before the numeric conversion, so the integer code preserves a meaningful order.
+- **`soil_texture`**: broad texture class (e.g., loamy, sandy, clayey). The integer code is assigned by alphabetical order of the texture label, so it is **not** ordinal in any soil-science sense. This is a modeling simplification — a tree-based learner can still split on this code freely, but the numeric distance between codes carries no meaning for texture (unlike `soil_drainage`).
 
 ```{r covs-soil}
 tibble(
@@ -175,7 +190,11 @@ tibble(
 
 ### 4.5 Dynamic weather anomalies (time-varying, lagged)
 
-Anomalies are computed as deviations from the long-run monthly mean. Three lagged windows — the mean anomaly over days 1–30, 31–60, and 61–90 prior to the origin date — are created for temperature, precipitation, relative humidity (ERA5-Land reanalysis), and NDVI (MODIS Terra MOD13A3, 1 km monthly composites). The pipeline retains both raw-scale and pre-scaled versions in the parquet; `clean_region_data()` drops the raw-scale columns, retaining only the `anomaly_scaled_*` versions.
+Anomalies are computed as deviations from the long-run monthly mean (by day-of-year). Three lagged windows — the mean anomaly over days 1–30, 31–60, and 61–90 prior to the origin date — are created for temperature, precipitation, relative humidity, and NDVI. The pipeline retains both raw-scale and pre-scaled versions in the parquet; `clean_region_data()` drops the raw-scale columns, retaining only the `anomaly_scaled_*` versions.
+
+**Weather source (temperature / precipitation / relative humidity):** The pipeline sources recorded temperature, precipitation, and relative humidity from **ERA5T**, the near-real-time extension of ECMWF's ERA5 reanalysis, which is available with only a ~5-day lag (`fetch_and_transform_era5t_weather()`).
+
+**NDVI:** monthly NDVI composites now draw on two sources — MODIS Terra (MOD13A3, 1 km monthly composites) as the primary long-record source, supplemented with Sentinel-derived NDVI for recent months not yet available from MODIS — combined in `create_ndvi_transformed_sources()` before the anomaly calculation.
 
 ```{r covs-weather-lags}
 weather_lag_cols <- names(dat_raw)[
@@ -191,27 +210,40 @@ tibble(
 
 ### 4.6 Climate forecasts (time-varying, forward-looking)
 
-ECMWF medium-range forecast anomalies for temperature, precipitation, and relative humidity valid at the origin date. Only the pre-scaled versions are retained after preprocessing.
+ECMWF seasonal forecast anomalies (monthly-mean lead times of 1–6 months from the forecast base date) for temperature, precipitation, and relative humidity valid at the origin date. Only the pre-scaled versions are retained after preprocessing.
 
 ```{r covs-forecasts}
 forecast_cols <- names(dat_raw)[grepl("^anomaly_forecast_scaled_", names(dat_raw))]
-tibble(Variable = forecast_cols, Source = "ECMWF medium-range forecast")
+tibble(Variable = forecast_cols, Source = "ECMWF seasonal forecast")
 ```
 
 ### 4.7 Host immune status — seroprevalence (time-varying)
 
-A spatiotemporal kernel model (Stan; ICAR spatial structure) fitted to recorded RVF outbreaks and independent livestock seroprevalence surveys generates a continuous estimate of the fraction of the local livestock population with prior RVF exposure at each H3 hex and date. Higher seroprevalence implies greater herd immunity and thus lower expected outbreak risk. The posterior mean prediction (`pred_sero`) is mean-centered and scaled before modeling.
+A spatiotemporal kernel model (Stan; ICAR spatial structure) fitted to recorded RVF outbreaks and independent livestock seroprevalence surveys generates a continuous estimate of the fraction of the local livestock population with prior RVF exposure at each H3 hex and date. Higher seroprevalence implies greater herd immunity and thus lower expected outbreak risk. A full description of this model is available in documentation/openRVFcast_Walkthrough.docx (see section "Immunity Decay Layer" at the end of the document.)
 
 The kernel contributions from past outbreaks decay jointly over space and time:
 
 $$K(d, t) = \exp\!\left(-\frac{d}{\rho_d}\right) \cdot \exp\!\left(-\frac{t}{\rho_t}\right)$$
 
-where $d$ is the spatial distance in km between a focal hex and a past outbreak location, and $t$ is the time elapsed since the outbreak in years. For hexes with no proximate outbreaks (within 1,000 km and 8 years), the seroprevalence estimate defaults to the posterior mean baseline from the ICAR random effects.
+where $d$ is the spatial distance in km between a focal hex and a past outbreak location, and $t$ is the time elapsed since the outbreak in years. For hexes with no proximate outbreaks (within 1,000 km and 8 years), the seroprevalence estimate defaults to the posterior mean baseline from the ICAR random effects. 
 
-### 4.8 Complete predictor summary
+Lagged seroprevalence values are calculated in two ways. First, three "near term" lags are built (using the same 1–30, 31–60, and 61–90 day lags as for the weather anomaly data); these lags represent the near term immunity status of the population within the hex. Second, two "long term" lags are built to quantify immunity for the year and two years prior (91-360 days and 361-720 days). This gives five lagged seroprevalence predictors per row: `anomaly_not_sero_30`, `_60`, `_90`, `_360`, and `_720`.
+
+### 4.8 Nearby outbreak history (time-varying)
+
+A hex's own outbreak history is already captured indirectly (via the seroprevalence kernel, which is itself built from past outbreak locations), but `build_neighbor_outbreak_history()` adds a direct, short-horizon measure of **observed outbreak activity in spatially adjacent hexes**. For every focal hex and model date, and for each of the same three near-term windows used elsewhere (1–30, 31–60, 61–90 days prior), the covariate sums a per-outbreak weight over every outbreak reported in a *neighboring* hex (sharing an edge, or within a small tolerance for micro-gaps in the hex adjacency) during that window. A hex is never counted as its own neighbor, so this is purely a measure of pressure from elsewhere.
+
+By default (`case_weight = TRUE`) each neighboring outbreak is weighted by $\log_{10}(\text{cases} + 1)$ rather than counted as 1, so a handful of large outbreaks exerts more spread pressure than the same number of single-case reports; outbreaks with unknown case counts (~1% of records) are imputed with the median log-scale weight. This produces three predictors — `neigh_outbreak_wt_30`, `neigh_outbreak_wt_60`, `neigh_outbreak_wt_90` — intended to let the model learn short-range spatial contagion/spillover risk that is faster-moving than the multi-year seroprevalence kernel can capture; hexes with no recent neighbor activity are filled with 0 rather than `NA`.
+
+### 4.9 Non-biological spatial and temporal covariates
+
+Finally, day of the year (`doy`), latitude, and longitude (hex centroids, added by `clean_region_data()`) and country are used as covariates. 
+
+### 4.10 Complete predictor summary
 
 ```{r cov-summary}
-dat_clean <- clean_region_data(dat_raw)
+map_dat   <- region_hexes[[1]]
+dat_clean <- clean_region_data(dat_raw, map_dat)
 id_cols   <- c("shapeName", "Proportion_Country", "ADM2", "Proportion_ADM2", "date", "index")
 
 predictor_cols <- setdiff(names(dat_clean),
@@ -226,9 +258,10 @@ tibble(column = predictor_cols) |>
   , grepl("^anomaly_scaled_(temperature|precipitation|relative_humidity|ndvi)_",
           column)                                                                 ~ "Weather anomaly (lagged)"
   , grepl("^anomaly_forecast_scaled_", column)                                    ~ "Climate forecast"
-  , column == "pred_sero"                                                          ~ "Seroprevalence"
-  , column == "forecast_interval"                                                  ~ "Forecast interval"
-  , TRUE                                                                           ~ "Other"
+  , grepl("^anomaly_not_sero_", column)                                           ~ "Seroprevalence (lagged)"
+  , grepl("^neigh_outbreak_wt_", column)                                          ~ "Nearby outbreak history"
+  , column %in% c("doy", "lat", "lon")                                            ~ "Spatial / temporal"
+  , TRUE                                                                          ~ "Other"
   )) |>
   count(Category, name = "N predictors") |>
   arrange(desc(`N predictors`))
@@ -238,19 +271,26 @@ tibble(column = predictor_cols) |>
 
 ## 5. Data Preprocessing
 
-### 5.1 Scaling
+### 5.1 Scaling, geometry, and column pruning
 
-`clean_region_data()` mean-centers and scales (divides by the standard deviation computed on the full, all-Africa dataset) all bioclimatic variables, livestock densities, and the seroprevalence estimate. Some covariates were already pre-scaled earlier in the pipeline (the `anomaly_scaled_*` columns).
+`clean_region_data(dat, map_dat)` does several things in sequence:
+
+1. **De-duplicates scaled/raw pairs.** Wherever a `_scaled_` counterpart of a column exists, the raw-scale version is dropped (the `anomaly_scaled_*` weather, NDVI, and forecast columns were already pre-scaled earlier in the pipeline).
+2. **Scales the remaining unbounded covariates.** Livestock densities (`glw_*`), elevation, and all 19 BioClim variables are mean-centered and scaled (divided by the standard deviation), computed on the full, all-Africa dataset passed in.
+3. **Drops near-zero-variance land-cover classes** (`built`, `snow`, `mangroves`, `moss`; Section 4.3).
+4. **Adds spatial/temporal covariates**: hex centroid latitude/longitude (via `sf::st_centroid()` on `map_dat`, the H3 hex sf object) and day-of-year (`doy`, from `date`).
+
+Note that `soil_texture` / `soil_drainage` and `neigh_outbreak_wt_*` are untouched here — they arrive already in their final numeric form (Sections 4.4, 4.8).
 
 ```{r show-clean-region-data}
 #| echo: true
 #| eval: false
-dat_clean <- clean_region_data(dat = region_data_raw)
+dat_clean <- clean_region_data(dat = region_data_raw, map_dat = region_hexes[[1]])
 ```
 
 ### 5.2 Train / test split
 
-Data are split at a fixed temporal boundary, respecting the time ordering of observations. Dates ≤ 2020-12-19 form the training set used during nested cross-validation; later dates form the held-out test set evaluated only after the model is fully tuned.
+Data are split at a fixed temporal boundary, respecting the time ordering of observations. As of July, 2026 dates ≤ 2020-12-19 form the training set are used during nested cross-validation; later dates form the held-out test set evaluated only after the model is fully tuned. As the dataset grows, the 2020-12-19 date can be pushed closer in time to expand the training data set.
 
 ```{r train-test-split}
 end_date   <- as.Date("2020-12-19")
@@ -307,17 +347,42 @@ Outer fold i (temporal expanding window)
 Total number of model fits during tuning:
 $$N_{\text{fits}} = N_{\text{outer}} \times N_{\text{inner}} \times N_{\text{grid}} = N_{\text{outer}} \times 20 \times 150$$
 
-Each fit is dispatched as an independent `mirai` worker task. Results are cached to disk; if a file already exists and `overwrite = FALSE`, the worker returns the cached path immediately, enabling incremental re-runs.
+$N_\text{grid} = 150$ is now reached in two phases of 75 candidates each — a global search followed by a local refinement search around the most promising region of parameter space (Section 9.1) — rather than a single flat 150-point grid, but the total fit count is unchanged.
+
+Each fit is dispatched as an independent `mirai` worker task. Results are cached to disk; if a file already exists and `overwrite = FALSE`, the worker returns the cached path immediately, enabling incremental re-runs. Inner-fold covariate data is now pre-joined once per outer fold and each outer fold's tuning workload is split into concurrent chunks across workers, which changes the parallelization granularity but not the statistical design described above.
 
 ---
 
 ## 7. Class Imbalance Handling
 
-Rather than oversampling or post-hoc threshold adjustment, the model receives **observation-level importance weights** that upweight outbreak observations relative to non-outbreak observations. Weights are computed **per forecast interval** within each training fold, so the effective class balance is 1:1 within each interval:
+An earlier version of the pipeline addressed class imbalance with **observation-level importance weights** passed through the tidymodels workflow (`hardhat::importance_weights()` + `add_case_weights()`). This has been removed and replaced with XGBoost's native, engine-level class-imbalance parameters — `scale_pos_weight` and `max_delta_step` — for the reasons detailed below. A full derivation is kept alongside the code in `docs/xgboost_class_imbalance_explanation.md`; this section summarizes the key points.
 
-$$w_i = \begin{cases} \dfrac{n_{\text{neg},k}}{n_{\text{pos},k}} & \text{if } y_i = 1 \text{ in interval } k \\ 1 & \text{if } y_i = 0 \end{cases}$$
+### 7.1 Why case weights were removed
 
-Computing weights per interval (rather than globally) prevents shorter-horizon intervals — which tend to have slightly higher prevalence — from implicitly receiving less attention in the joint fit. The actual imbalance ratios from the training data:
+XGBoost is a second-order booster: each leaf's optimal output is $w_\ell^{*} = -\sum_{i \in \ell} g_i / (\sum_{i \in \ell} h_i + \lambda)$, where $g_i$ and $h_i$ are the first- and second-order gradients of the loss for observation $i$. For `binary:logistic`, $g_i = p_i - y_i$ and $h_i = p_i(1-p_i)$. Two features of this problem combine to make naive case weighting dangerous:
+
+- **`base_score` is set to the empirical prevalence** ($p \approx 0.005$–$0.07$ depending on interval/period; Section 8.2), so that predicted probabilities are calibrated to the true marginal outbreak rate rather than an artificially balanced 50/50 rate. At this starting point, every observation has a tiny Hessian ($h_i = p(1-p) \approx p$).
+- **Case weights multiply both $g_i$ and $h_i$** by the same factor $w_i$. For a true positive with weight $w \approx n_\text{neg}/n_\text{pos}$ (often several hundred for this data), the optimal leaf value $-w \cdot g_i / (w \cdot h_i) = -g_i/h_i$ is *unchanged* by the weight in principle — but because $h_i$ is so small at initialization, this ratio is already explosively large (on the order of $1/p$), and the case weight simultaneously inflates the *effective* Hessian mass in a leaf (`min_child_weight` is a threshold on $\sum h_i$), letting a handful of positives satisfy `min_n` on their own. In combination, a single early tree can push predicted probabilities for true positives to ≈1 and leave true negatives pinned near 0 (a degenerate, saturated fit), while `min_n` stops providing any real regularization for positive-containing leaves.
+
+### 7.2 `scale_pos_weight` + `max_delta_step`
+
+`scale_pos_weight` (`calc_spw()`, computed fresh per training fold as $n_\text{neg}/n_\text{pos}$, returning 1 if there are no positives) has the same mathematical effect on gradients as a uniform case weight on all positives, but is applied internally by the engine rather than as a typed column in the training tibble — avoiding `predict()`-time type conflicts between fitting and assessment data that motivated dropping `add_case_weights()` in the first place.
+
+`max_delta_step = 1` caps the output of every leaf in every tree to $[-1, +1]$ *before* it is scaled by the learning rate, directly bounding the margin any single tree can move any single observation by (`learn_rate` × 1). This is XGBoost's own documented recommendation for severe class imbalance, and is what actually prevents the saturation problem described above — `scale_pos_weight` alone does not.
+
+```{r spw-code}
+#| echo: true
+#| eval: false
+calc_spw <- function(df, outcome = "outbreak") {
+  y     <- as.character(df[[outcome]])
+  n_pos <- sum(y == "1", na.rm = TRUE)
+  n_neg <- sum(y == "0", na.rm = TRUE)
+  if (n_pos == 0) return(1)
+  n_neg / n_pos
+}
+```
+
+The actual imbalance ratios (`scale_pos_weight`, computed per forecast interval for illustration) in the training data:
 
 ```{r class-weights-demo}
 train_data |>
@@ -327,19 +392,23 @@ train_data |>
   summarize(
     `N (0)` = sum(outbreak == "0")
   , `N (1)` = sum(outbreak == "1")
-  , `Weight on 1s (n_neg / n_pos)` = round(sum(outbreak == "0") / sum(outbreak == "1"), 1)
+  , `scale_pos_weight (n_neg / n_pos)` = round(sum(outbreak == "0") / sum(outbreak == "1"), 1)
   , .groups = "drop"
   ) |>
   rename(`Forecast interval` = forecast_interval)
 ```
 
-Weights are passed into the tidymodels workflow via `hardhat::importance_weights()`, which signals to the XGBoost engine to incorporate them in the per-observation gradient computation.
+Note that in the actual pipeline `scale_pos_weight` is computed globally per training fold (`calc_spw()` on the pooled, all-interval training tibble; `forecast_interval` is a predictor, not a separate model), not per interval as shown above — the per-interval breakdown here is purely descriptive.
+
+### 7.3 Consequence for `min_n`
+
+Because `min_child_weight` (`min_n`) thresholds the *sum of Hessians* rather than a raw sample count, and $h_i \approx p \approx 0.005$ per observation at `base_score = 0.005`, a given `min_n` corresponds to roughly $\text{min\_n} / p$ effective samples per leaf — far more restrictive than the face-value sample count once suggested by a wide range like 5–100. The tuning range for `min_n` was narrowed accordingly to 1–10 (Section 9.1) to target a more sensible ~200–2,000 effective samples per leaf.
 
 ---
 
 ## 8. Tidymodels Workflow
 
-The model is assembled as a `tidymodels` *workflow* combining a preprocessing recipe, an XGBoost model specification, and the case-weight column.
+The model is assembled as a `tidymodels` *workflow* combining a preprocessing recipe and an XGBoost model specification. There is no longer a case-weight column in the workflow (Section 7) — class imbalance is handled entirely inside the model specification via `scale_pos_weight` / `max_delta_step`.
 
 ### 8.1 Preprocessing recipe
 
@@ -347,26 +416,21 @@ The model is assembled as a `tidymodels` *workflow* combining a preprocessing re
 
 | Step | Function | Description |
 |---|---|---|
-| 1 | `update_role(..., new_role = "ID")` | Marks ID columns so they pass through baking but are not used as predictors |
-| 2 | `step_rm(all_of(id_cols))` | Physically removes ID columns from the baked matrix |
-| 3 | `step_zv(all_predictors())` | Removes zero-variance predictors (only `moss` is flagged in practice) |
-| 4 | `step_dummy(..., one_hot = TRUE)` | One-hot encodes nominal predictors (`Country`, `forecast_interval`) |
+| 1 | `step_mutate(across(starts_with("anomaly_scaled_"), ...))` | Caps scaled weather/NDVI anomalies to $[-6, 6]$ as a safety net against occasional extreme values slipping through upstream data cleaning |
+| 2 | `update_role(..., new_role = "ID")` | Marks ID columns so they pass through baking but are not used as predictors |
+| 3 | `step_rm(all_of(id_cols))` | Physically removes ID columns from the baked matrix |
+| 4 | `step_zv(all_predictors())` | Removes zero-variance predictors |
+| 5 | `step_dummy(..., one_hot = TRUE)` | One-hot encodes nominal predictors — in practice just `Country` and `forecast_interval`, since `soil_texture` / `soil_drainage` are now numeric-coded upstream (Section 4.4) |
 
 ```{r recipe-setup}
-## Prepare training data with correct types and weights
+## Prepare training data with correct types. No case-weight column is built here --
+## class imbalance is handled entirely inside the model spec (scale_pos_weight, Section 7)
 train_sample <- train_data |>
   dplyr::select(-cases) |>
   mutate(
     outbreak          = as.factor(outbreak)
   , forecast_interval = as.factor(forecast_interval)
-  ) |>
-  group_by(forecast_interval) |>
-  mutate(
-    weights = length(which(outbreak == "0")) / length(which(outbreak == "1"))
-  , weights = ifelse(outbreak == "0", 1, weights)
-  , weights = hardhat::importance_weights(weights)
-  ) |>
-  ungroup()
+  )
 ```
 
 ```{r recipe-make}
@@ -381,21 +445,23 @@ After prepping and baking the recipe, the number of predictor columns entering t
 rec_prepped  <- prep(rec, training = train_sample)
 baked_sample <- bake(rec_prepped, new_data = NULL)
 
-predictor_names_baked <- setdiff(names(baked_sample), c("outbreak", "weights"))
+predictor_names_baked <- setdiff(names(baked_sample), "outbreak")
 cat("Total predictors entering XGBoost:", length(predictor_names_baked), "\n\n")
 
 ## Organise by group for readability
 tibble(predictor = sort(predictor_names_baked)) |>
   mutate(group = case_when(
-    grepl("^glw_",              predictor) ~ "Host abundance"
-  , grepl("^anomaly_forecast_", predictor) ~ "Climate forecast"
-  , grepl("^anomaly_scaled_",   predictor) ~ "Weather anomaly (lagged)"
-  , grepl("^forecast_interval", predictor) ~ "Forecast interval (one-hot)"
-  , grepl("^Country_",          predictor) ~ "Country (one-hot)"
-  , predictor == "pred_sero"               ~ "Seroprevalence"
-  , predictor %in% lc_retained            ~ "Land cover"
+    grepl("^glw_",                predictor) ~ "Host abundance"
+  , grepl("^anomaly_forecast_",   predictor) ~ "Climate forecast"
+  , grepl("^anomaly_scaled_",     predictor) ~ "Weather anomaly (lagged)"
+  , grepl("^anomaly_not_sero_",   predictor) ~ "Seroprevalence (lagged)"
+  , grepl("^neigh_outbreak_wt_",  predictor) ~ "Nearby outbreak history"
+  , grepl("^forecast_interval",   predictor) ~ "Forecast interval (one-hot)"
+  , grepl("^Country_",            predictor) ~ "Country (one-hot)"
+  , predictor %in% lc_retained               ~ "Land cover"
   , predictor %in% c("soil_drainage", "soil_texture") ~ "Soil"
-  , TRUE                                   ~ "Bioclimatic / elevation"
+  , predictor %in% c("doy", "lat", "lon")    ~ "Spatial / temporal"
+  , TRUE                                     ~ "Bioclimatic / elevation"
   )) |>
   count(group, name = "N predictors") |>
   arrange(desc(`N predictors`))
@@ -405,18 +471,34 @@ The `forecast_interval` one-hot encoding produces five binary columns — one pe
 
 ### 8.2 XGBoost model specification
 
-`make_model()` wraps `parsnip::boost_tree()` in classification mode using the XGBoost engine with a binary logistic objective:
+`make_model()` wraps `parsnip::boost_tree()` in classification mode using the XGBoost engine with a binary logistic objective. It now also takes `spw` (`scale_pos_weight`; Section 7) alongside the tuned hyperparameters and the `base_score` initialization:
 
 ```{r hyper-load}
-## Load finalized hyperparameters from a saved outer-fold fit
-hyper <- readRDS(
-  here::here("outputs/pan_hex_final_model_fits_ws/model_fit_1_15.Rds")
-)$hyperparams[[1]]
+## Load the hyperparameters behind the most recently written final-fit output, wherever the
+## pipeline currently stands, rather than a fixed file name (naming includes the tuning grid
+## id, which changes across tuning runs)
+final_fits_dir <- here::here("outputs/pan_hex_final_model_fits_ws")
+fit_files      <- list.files(final_fits_dir, pattern = "^model_fit_.*\\.Rds$", full.names = TRUE)
+
+if (length(fit_files) > 0) {
+  latest_fit <- fit_files[order(file.info(fit_files)$mtime, decreasing = TRUE)][1]
+  hyper      <- readRDS(latest_fit)$hyperparams[[1]]
+} else {
+  ## Fall back to the finalized hyperparameter CSV directly if no final fit has been
+  ## written yet (finalize_hyperparameters_from_inner, Section 9.3)
+  hyper_files <- list.files(here::here("outputs/hyperparameters"),
+                            pattern = "^best_hyperparameters.*\\.csv$", full.names = TRUE)
+  hyper <- read.csv(hyper_files[order(file.info(hyper_files)$mtime, decreasing = TRUE)][1])
+}
 ```
 
 ```{r model-spec-build}
 #| echo: true
-mod <- make_model(params = hyper, start_p = 0.005)
+## start_p mirrors the `start_p` target in model_framework_targets.R: the empirical
+## outbreak prevalence across the full training data, used to initialize base_score
+start_p <- mean(train_data$outbreak == 1)
+spw     <- calc_spw(train_sample)
+mod     <- make_model(params = hyper, start_p = start_p, spw = spw)
 mod
 ```
 
@@ -425,11 +507,13 @@ Key fixed engine-level arguments beyond the tuned hyperparameters:
 | Argument | Value | Rationale |
 |---|---|---|
 | `objective` | `"binary:logistic"` | Output calibrated probabilities for a binary event |
-| `base_score` | `0.005` | Initialises the intercept near the marginal outbreak prevalence, anchoring boosting near a calibrated baseline rather than 0.5 |
+| `base_score` | `start_p` = empirical outbreak prevalence in the full training data | Initialises the intercept near the marginal outbreak prevalence, anchoring boosting near a calibrated baseline rather than 0.5 (Section 8.2 of `docs/xgboost_class_imbalance_explanation.md`) |
+| `scale_pos_weight` | `calc_spw(train_data)` = $n_\text{neg}/n_\text{pos}$ | Class-imbalance correction at the gradient level (Section 7) |
+| `max_delta_step` | `1` | Caps per-tree leaf output to prevent margin saturation given `scale_pos_weight` and small initial Hessians (Section 7) |
 | `nthread` | `1` | One thread per worker; parallelism is handled by the `mirai` pool |
 | `verbosity` | `0` | Silent during the large-scale pipeline |
 
-The six tunable hyperparameters, their search ranges, and the finalized values:
+The six tunable hyperparameters, their current search ranges (Section 9.1), and the values behind the fit loaded above:
 
 ```{r hyper-table}
 tibble(
@@ -437,13 +521,13 @@ tibble(
                       "Min node size", "Loss reduction (γ)", "Column fraction (mtry)")
 , `boost_tree name` = c("trees", "tree_depth", "learn_rate", "min_n",
                         "loss_reduction", "mtry")
-, Range           = c("100–1,500", "4–10", "0.01–0.50", "5–100", "0–0.5", "finalised")
-, `Finalized value` = c(
+, Range           = c("100–1,500", "4–9", "0.01–0.30 (log10 scale)", "1–10", "1e-5–0.50 (log10 scale)", "8–finalised")
+, `Loaded value` = c(
     as.character(hyper$trees)
   , as.character(hyper$tree_depth)
-  , round(hyper$learn_rate, 3)
+  , round(hyper$learn_rate, 4)
   , as.character(hyper$min_n)
-  , round(hyper$loss_reduction, 3)
+  , round(hyper$loss_reduction, 4)
   , as.character(hyper$mtry)
   )
 )
@@ -451,14 +535,13 @@ tibble(
 
 ### 8.3 Workflow assembly
 
-The recipe, model specification, and case-weight column are combined into a single `workflow` object, which is passed directly to `fit()`:
+The recipe and model specification are combined into a single `workflow` object, which is passed directly to `fit()`:
 
 ```{r workflow-assembly}
 #| echo: true
 wf <- workflow() |>
   add_recipe(rec) |>
-  add_model(mod)  |>
-  add_case_weights(weights)
+  add_model(mod)
 
 wf
 ```
@@ -467,16 +550,24 @@ wf
 
 ## 9. Hyperparameter Search
 
-### 9.1 Search strategy
+### 9.1 Search strategy: global grid, then local refinement
 
-Hyperparameters are explored using a **space-filling design** (Latin hypercube, via `dials::grid_space_filling()`). Space-filling designs place candidates more uniformly across the joint parameter space than random search, reducing wasted evaluations on clustered, redundant regions. A grid of $N = 150$ candidates is generated once and evaluated across every inner fold of every outer fold.
+Hyperparameters are explored using a **space-filling design** (via `dials::grid_space_filling()`), which places candidates more uniformly across the joint parameter space than random search, reducing wasted evaluations on clustered, redundant regions. The search is now a **two-phase, adaptive** design rather than a single flat grid:
+
+1. **Global grid** (`build_hyperparameter_grid()`): a space-filling grid of $N = 75$ candidates spanning the full search bounds below, evaluated across every inner fold of every outer fold (`tuned_results_per_outer_fold`).
+2. **Local refinement grid** (`build_local_hyperparameter_grid()`): the global results are scored with the same formula used for final selection (Section 9.2), the top `top_k = 8` global candidates are identified, and a second space-filling grid of $N = 75$ points is drawn from the neighbourhood of those top-k sets — each parameter's range is the observed top-k range expanded by 20% on each side (`expansion = 0.2`), hard-capped at the *original* global search bounds so the refinement never explores outside where the global grid already looked. This second grid is evaluated the same way as the first (`local_tuned_results`).
+
+Final selection (Section 9.3) pools **both** grids' results together, so the effective search is 150 evaluated candidates concentrated more heavily around the promising region of parameter space than a single flat 150-point grid would be.
 
 ```{r tuning-setup}
+## Mirrors tune_pars in model_framework_targets.R. learn_rate and loss_reduction bounds
+## are specified on the log10 scale, matching dials::learn_rate()/loss_reduction() defaults
 tune_pars <- list(
-  tree_min = 100, tree_max = 1500, tree_dep_min = 4, tree_dep_max = 10
-, learn_rate_min = 0.01, learn_rate_max = 0.5
-, minn_min = 5, minn_max = 100, loss_red_min = 0, loss_red_max = 0.5
-, size = 150
+  tree_min = 100, tree_max = 1500, tree_dep_min = 4, tree_dep_max = 9
+, learn_rate_min = -2, learn_rate_max = -0.52
+, minn_min = 1, minn_max = 10, loss_red_min = -5, loss_red_max = -0.3
+, mtry_min = 8
+, size = 75
 )
 set.seed(42)
 train_small <- train_sample |> dplyr::slice_sample(n = 10000)
@@ -484,104 +575,73 @@ train_small <- train_sample |> dplyr::slice_sample(n = 10000)
 
 ```{r tuning-grid-call}
 #| echo: true
-tuning_grid <- with(tune_pars,
+## Global grid (phase 1)
+global_grid <- with(tune_pars,
   grid_space_filling(
     trees(range          = c(tree_min, tree_max))
   , tree_depth(range     = c(tree_dep_min, tree_dep_max))
-  , learn_rate(range     = c(learn_rate_min, learn_rate_max), trans = NULL)
+  , learn_rate(range     = c(learn_rate_min, learn_rate_max))
   , min_n(range          = c(minn_min, minn_max))
   , loss_reduction(range = c(loss_red_min, loss_red_max))
-  , finalize(mtry(), train_small)
-  , size = tune_pars$size
+  , finalize(mtry(range = c(mtry_min, unknown())), train_small)
+  , size = size
   )
 ) |> mutate(index = row_number(), .before = 1)
 ```
 
 ```{r tuning-grid-summary}
-cat("Grid:", nrow(tuning_grid), "candidate sets ×",
-    ncol(tuning_grid) - 1, "hyperparameters\n\n")
-as.data.frame(summary(tuning_grid[, -1])) |>
+cat("Global grid:", nrow(global_grid), "candidate sets ×",
+    ncol(global_grid) - 1, "hyperparameters\n",
+    "(a further", tune_pars$size, "local-refinement candidates are drawn in phase 2,",
+    "for", nrow(global_grid) + tune_pars$size, "evaluated sets in total)\n\n")
+as.data.frame(summary(global_grid[, -1])) |>
   dplyr::select(Var2, Freq) |>
   rename(Parameter = Var2, Summary = Freq)
 ```
 
-### 9.2 Selection metric at the inner fold level
+### 9.2 Selection metric: class-conditional log-loss
 
-For each outer fold, the best hyperparameter set is chosen by aggregating a composite **"mix" score** across all inner spatial folds. The score balances two objectives:
+Each (outer fold × inner fold × hyperparameter index) fit is scored per forecast horizon (`compute_metrics_vec()`) using a **class-conditional log-loss**, which replaced an earlier PR-AUC-plus-excess-log-loss "mix" score after that formula was found to have a critical flaw: a null model that predicts the marginal prevalence for every observation achieves an *excess* log-loss of exactly zero (by definition) and a small-but-nonzero PR-AUC, so it could score at or near the maximum achievable value and was never reliably beaten by a model that actually discriminates. A full derivation and worked numerical comparison of the two formulas is in `docs/tuning_pipeline_description.Rmd`; the essential change is below.
 
-- **PR-AUC** (area under the precision–recall curve): a threshold-free metric suited to heavily imbalanced data; strongly sensitive to the quality of predicted probabilities for the rare positive class.
-- **Excess log-loss**: the difference between the model's log-loss and the entropy of the marginal class distribution (i.e., the log-loss of a model that predicts only the base rate). This penalises overconfident wrong predictions in folds that contain no outbreaks at all.
+**Per fold-horizon quantities** (`compute_metrics_vec()`), computed separately on the true positives and true negatives of the assessment set:
 
-For a given hyperparameter index and outer fold, the score across inner folds is:
+$$\text{logloss\_pos} = \frac{1}{n_+} \sum_{i:\,y_i=1} -\log(\hat p_i + \epsilon) \qquad \text{logloss\_neg} = \frac{1}{n_-} \sum_{i:\,y_i=0} -\log(1 - \hat p_i + \epsilon)$$
 
-$$\text{score} = \frac{\sum_k w_k \cdot s_k}{\sum_k w_k}$$
+with $\epsilon = 10^{-15}$ to avoid $-\infty$, and `logloss_pos` undefined (`NA`) when a fold-horizon has no true positives ($n_+ = 0$).
 
-where, for each inner fold $k$:
+**Pooled score components** (`finalize_hyperparameters_from_inner()`), aggregated across every (outer × inner × horizon) row sharing a hyperparameter index $k$:
 
-$$s_k = \begin{cases}
-\text{PR-AUC}_k \times n_{\text{pos},k} & \text{if } n_{\text{pos},k} > 0 \\[4pt]
--\lambda \times \text{ExcessLogLoss}_k \times n_{\text{all},k} & \text{if } n_{\text{pos},k} = 0
-\end{cases}$$
+$$S_\text{pos} = -\frac{\sum_k \text{logloss\_pos}_k \cdot n_{+,k}}{\sum_{k:\,n_{+,k}>0} n_{+,k}} \qquad\qquad S_\text{neg\_penalty} = \frac{\sum_k \text{logloss\_neg}_k \cdot n_{\text{all},k}}{\sum_k n_{\text{all},k}}$$
 
-$$w_k = \begin{cases}
-n_{\text{pos},k} & \text{if } n_{\text{pos},k} > 0 \\
-n_{\text{all},k} & \text{otherwise}
-\end{cases}$$
+$$\boxed{\text{final\_score} = S_\text{pos} - \texttt{weightval} \times S_\text{neg\_penalty}} \qquad \text{(maximise)}$$
 
-and $\lambda = 10^{-5}$ is a scaling constant controlling how much outbreak-free inner folds constrain the search. Weighting by $n_{\text{pos},k}$ ensures inner folds with more outbreak events exert proportionally greater influence. The hyperparameter set with the **maximum** score is selected for each outer fold.
-
-The R implementation from `join_tuned_inner_folds()`:
+$S_\text{pos}$ rewards assigning high probability to true outbreaks (the null model scores $S_\text{pos} \approx -\log(p) \approx -5$ to $-7$ at this data's prevalence, not 0, so it can no longer "hide" at the top of the ranking); $S_\text{neg\_penalty}$ penalises high probabilities on true non-outbreaks and is well-defined even for fold-horizons with zero positives, so those folds still contribute useful false-alarm information without diluting $S_\text{pos}$. The maximum possible score is 0 (a perfect classifier).
 
 ```{r mix-metric-code}
 #| echo: true
 #| eval: false
-metric_summary.s <- metric_summary |>
-  mutate(
-    weight  = if_else(n_pos > 0, n_pos, n_all)
-  , contrib = case_when(
-      n_pos > 0  ~ pr_auc * n_pos
-    , n_pos == 0 ~ -weightval * exlogloss * n_all
-    )
-  ) |>
-  group_by(outer_fold_id, index) |>
+scores <- all_results |>
+  group_by(index) |>
   summarise(
-    final_score = sum(contrib, na.rm = TRUE) / sum(weight, na.rm = TRUE)
-  , .groups     = "drop"
-  )
+    S_pos         = -sum(logloss_pos * n_pos, na.rm = TRUE) /
+                     pmax(sum(n_pos[!is.na(logloss_pos)], na.rm = TRUE), 1L)
+  , S_neg_penalty = sum(logloss_neg * n_all, na.rm = TRUE) / sum(n_all, na.rm = TRUE)
+  , .groups       = "drop"
+  ) |>
+  mutate(final_score = S_pos - weightval * S_neg_penalty)
 ```
 
-### 9.3 Selection across outer folds
+### 9.3 Selection across folds and grids
 
-Having identified the best inner-fold hyperparameter set for each outer fold, the same "mix" criterion is applied across outer folds to select a **single final hyperparameter set** used for all final model fits.
+Rather than selecting a winning hyperparameter set per outer fold and then aggregating (which would add a second-stage decision rule and leave each per-fold estimate with very high variance, given how few positives any single outer × inner combination contains), all (outer fold × inner fold × horizon) results from **both** the global and local-refinement grids are pooled globally before scoring. The single hyperparameter index with the highest combined `final_score` is selected and used for every final model fit (Section 10).
+
+A `weightval` (the $\lambda$ penalty weight on $S_\text{neg\_penalty}$) of approximately **500** (set in `model_framework_targets.R`) is the operating weight as of July, 2026 (though it remains unclear exactly what the value of `weightval` should be). A large `weightval` is needed because $S_\text{pos}$ and $S_\text{neg\_penalty}$ live on very different scales: at this data's prevalence, a competitive model's $S_\text{pos}$ moves over a range of a few units (roughly $-1$ to $-6$), while $S_\text{neg\_penalty}$ — the mean log-loss on true negatives, which are the overwhelming majority of the data and are usually assigned probabilities close to the true baseline — typically sits close to 0 (often $10^{-2}$ or smaller). A `weightval` on the order of hundreds is needed for the false-alarm term to meaningfully compete with the positive-prediction term in that regime (smaller values in the 1–5 range effectively let the search ignore false-alarm rates almost entirely). `finalize_hyperparameters_from_inner()` only re-reads already-computed result files, so different `weightval` choices can be re-evaluated at negligible computational cost by deleting the saved hyperparameter CSV and rerunning the finalization step.
 
 ---
 
 ## 10. Final Model Fitting
 
-After hyperparameter selection, the model is fit on an expanding sequence of test-period temporal windows (mirroring the outer-fold CV structure but applied to the held-out post-2020-12-19 data). For each test window, the model is trained on **all available data up to the test-window start** — both the full cross-validation training set and any preceding test windows — using the finalized hyperparameters.
-
-```{r final-hyper}
-tibble(
-  Parameter       = c("Index", "Trees", "Tree depth", "Learn rate",
-                      "Min node size", "Loss reduction", "mtry")
-, `Finalized value` = c(
-    hyper$index
-  , hyper$trees
-  , hyper$tree_depth
-  , round(hyper$learn_rate, 4)
-  , hyper$min_n
-  , round(hyper$loss_reduction, 4)
-  , hyper$mtry
-  )
-)
-```
-
-The full recipe fit on the final training data reports the following structure:
-
-```{r final-recipe-summary}
-rec_fit <- readRDS(here::here("outputs/pan_hex_final_model_fits_ws/recipe_1_15.Rds"))
-print(rec_fit)
-```
+After hyperparameter selection, the model is fit on an expanding sequence of test-period temporal windows (mirroring the outer-fold CV structure but applied to the held-out post-2020-12-19 data; see documentation/openRVFcast_Walkthrough.docx for a visual description of this model fitting). For each test window, the model is trained on **all available data up to the test-window start** using the finalized hyperparameters.
 
 ---
 
@@ -595,7 +655,7 @@ XGBoost's native gain-based importance scores (via `xgboost::xgb.importance()`) 
 
 ### 11.2 SHAP values stratified by forecast interval
 
-SHapley Additive exPlanations (SHAP) are computed using XGBoost's built-in TreeSHAP algorithm (`predict(..., predcontrib = TRUE)`). Computing SHAP values for all ~4.7 million rows per model fit would take ~15 hours; instead, a **stratified random sample** of one observation per (hex × calendar month × forecast interval) combination is drawn (~100,000 rows, ~15 min computation).
+SHapley Additive exPlanations (SHAP) are computed using XGBoost's built-in TreeSHAP algorithm (`predict(..., predcontrib = TRUE)`). Computing SHAP values for every row of a given model fit's assessment data (several million rows, growing as more dates are added to the pipeline) would take on the order of hours; instead, a **stratified random sample** of one observation per (hex × calendar month × forecast interval) combination is drawn (~100,000 rows, ~15 min computation).
 
 SHAP values are summarised as mean |SHAP| and mean signed SHAP per feature per forecast interval, then aggregated across outer folds. The resulting heatmap is the primary interpretability output: it reveals how the relative importance of each predictor group shifts with forecast lead time. For example, recent weather anomalies (fast-moving) tend to be more influential at short horizons, while bioclimatic suitability and seroprevalence (slow-moving) become relatively more important at longer horizons.
 

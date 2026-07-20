@@ -2362,11 +2362,13 @@ window.Quarto = {
   <li><a href="#dynamic-weather-anomalies-time-varying-lagged" id="toc-dynamic-weather-anomalies-time-varying-lagged" class="nav-link" data-scroll-target="#dynamic-weather-anomalies-time-varying-lagged">4.5 Dynamic weather anomalies (time-varying, lagged)</a></li>
   <li><a href="#climate-forecasts-time-varying-forward-looking" id="toc-climate-forecasts-time-varying-forward-looking" class="nav-link" data-scroll-target="#climate-forecasts-time-varying-forward-looking">4.6 Climate forecasts (time-varying, forward-looking)</a></li>
   <li><a href="#host-immune-status-seroprevalence-time-varying" id="toc-host-immune-status-seroprevalence-time-varying" class="nav-link" data-scroll-target="#host-immune-status-seroprevalence-time-varying">4.7 Host immune status — seroprevalence (time-varying)</a></li>
-  <li><a href="#complete-predictor-summary" id="toc-complete-predictor-summary" class="nav-link" data-scroll-target="#complete-predictor-summary">4.8 Complete predictor summary</a></li>
+  <li><a href="#nearby-outbreak-history-time-varying" id="toc-nearby-outbreak-history-time-varying" class="nav-link" data-scroll-target="#nearby-outbreak-history-time-varying">4.8 Nearby outbreak history (time-varying)</a></li>
+  <li><a href="#non-biological-spatial-and-temporal-covariates" id="toc-non-biological-spatial-and-temporal-covariates" class="nav-link" data-scroll-target="#non-biological-spatial-and-temporal-covariates">4.9 Non-biological spatial and temporal covariates</a></li>
+  <li><a href="#complete-predictor-summary" id="toc-complete-predictor-summary" class="nav-link" data-scroll-target="#complete-predictor-summary">4.10 Complete predictor summary</a></li>
   </ul></li>
   <li><a href="#data-preprocessing" id="toc-data-preprocessing" class="nav-link" data-scroll-target="#data-preprocessing">5. Data Preprocessing</a>
   <ul class="collapse">
-  <li><a href="#scaling" id="toc-scaling" class="nav-link" data-scroll-target="#scaling">5.1 Scaling</a></li>
+  <li><a href="#scaling-geometry-and-column-pruning" id="toc-scaling-geometry-and-column-pruning" class="nav-link" data-scroll-target="#scaling-geometry-and-column-pruning">5.1 Scaling, geometry, and column pruning</a></li>
   <li><a href="#train-test-split" id="toc-train-test-split" class="nav-link" data-scroll-target="#train-test-split">5.2 Train / test split</a></li>
   </ul></li>
   <li><a href="#cross-validation-design" id="toc-cross-validation-design" class="nav-link" data-scroll-target="#cross-validation-design">6. Cross-Validation Design</a>
@@ -2375,7 +2377,12 @@ window.Quarto = {
   <li><a href="#inner-spatial-folds-leave-one-cluster-out" id="toc-inner-spatial-folds-leave-one-cluster-out" class="nav-link" data-scroll-target="#inner-spatial-folds-leave-one-cluster-out">6.2 Inner spatial folds (leave-one-cluster-out)</a></li>
   <li><a href="#nesting-schematic" id="toc-nesting-schematic" class="nav-link" data-scroll-target="#nesting-schematic">6.3 Nesting schematic</a></li>
   </ul></li>
-  <li><a href="#class-imbalance-handling" id="toc-class-imbalance-handling" class="nav-link" data-scroll-target="#class-imbalance-handling">7. Class Imbalance Handling</a></li>
+  <li><a href="#class-imbalance-handling" id="toc-class-imbalance-handling" class="nav-link" data-scroll-target="#class-imbalance-handling">7. Class Imbalance Handling</a>
+  <ul class="collapse">
+  <li><a href="#why-case-weights-were-removed" id="toc-why-case-weights-were-removed" class="nav-link" data-scroll-target="#why-case-weights-were-removed">7.1 Why case weights were removed</a></li>
+  <li><a href="#scale_pos_weight-max_delta_step" id="toc-scale_pos_weight-max_delta_step" class="nav-link" data-scroll-target="#scale_pos_weight-max_delta_step">7.2 <code>scale_pos_weight</code> + <code>max_delta_step</code></a></li>
+  <li><a href="#consequence-for-min_n" id="toc-consequence-for-min_n" class="nav-link" data-scroll-target="#consequence-for-min_n">7.3 Consequence for <code>min_n</code></a></li>
+  </ul></li>
   <li><a href="#tidymodels-workflow" id="toc-tidymodels-workflow" class="nav-link" data-scroll-target="#tidymodels-workflow">8. Tidymodels Workflow</a>
   <ul class="collapse">
   <li><a href="#preprocessing-recipe" id="toc-preprocessing-recipe" class="nav-link" data-scroll-target="#preprocessing-recipe">8.1 Preprocessing recipe</a></li>
@@ -2384,9 +2391,9 @@ window.Quarto = {
   </ul></li>
   <li><a href="#hyperparameter-search" id="toc-hyperparameter-search" class="nav-link" data-scroll-target="#hyperparameter-search">9. Hyperparameter Search</a>
   <ul class="collapse">
-  <li><a href="#search-strategy" id="toc-search-strategy" class="nav-link" data-scroll-target="#search-strategy">9.1 Search strategy</a></li>
-  <li><a href="#selection-metric-at-the-inner-fold-level" id="toc-selection-metric-at-the-inner-fold-level" class="nav-link" data-scroll-target="#selection-metric-at-the-inner-fold-level">9.2 Selection metric at the inner fold level</a></li>
-  <li><a href="#selection-across-outer-folds" id="toc-selection-across-outer-folds" class="nav-link" data-scroll-target="#selection-across-outer-folds">9.3 Selection across outer folds</a></li>
+  <li><a href="#search-strategy-global-grid-then-local-refinement" id="toc-search-strategy-global-grid-then-local-refinement" class="nav-link" data-scroll-target="#search-strategy-global-grid-then-local-refinement">9.1 Search strategy: global grid, then local refinement</a></li>
+  <li><a href="#selection-metric-class-conditional-log-loss" id="toc-selection-metric-class-conditional-log-loss" class="nav-link" data-scroll-target="#selection-metric-class-conditional-log-loss">9.2 Selection metric: class-conditional log-loss</a></li>
+  <li><a href="#selection-across-folds-and-grids" id="toc-selection-across-folds-and-grids" class="nav-link" data-scroll-target="#selection-across-folds-and-grids">9.3 Selection across folds and grids</a></li>
   </ul></li>
   <li><a href="#final-model-fitting" id="toc-final-model-fitting" class="nav-link" data-scroll-target="#final-model-fitting">10. Final Model Fitting</a></li>
   <li><a href="#post-fit-analysis" id="toc-post-fit-analysis" class="nav-link" data-scroll-target="#post-fit-analysis">11. Post-Fit Analysis</a>
@@ -2451,11 +2458,11 @@ window.Quarto = {
 </tr>
 <tr class="even">
 <td style="text-align: left;">Date range</td>
-<td style="text-align: left;">2005-04-07 to 2025-07-08</td>
+<td style="text-align: left;">2006-04-11 to 2026-06-17</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Total rows (hex × date × interval)</td>
-<td style="text-align: left;">6,033,885</td>
+<td style="text-align: left;">6,021,535</td>
 </tr>
 </tbody>
 </table>
@@ -2524,45 +2531,45 @@ window.Quarto = {
 <tbody>
 <tr class="odd">
 <td style="text-align: right;">30</td>
-<td style="text-align: right;">1206777</td>
-<td style="text-align: right;">192</td>
-<td style="text-align: left;">0.016%</td>
+<td style="text-align: right;">1204307</td>
+<td style="text-align: right;">782</td>
+<td style="text-align: left;">0.065%</td>
 </tr>
 <tr class="even">
 <td style="text-align: right;">60</td>
-<td style="text-align: right;">1206777</td>
-<td style="text-align: right;">207</td>
-<td style="text-align: left;">0.017%</td>
+<td style="text-align: right;">1204307</td>
+<td style="text-align: right;">778</td>
+<td style="text-align: left;">0.065%</td>
 </tr>
 <tr class="odd">
 <td style="text-align: right;">90</td>
-<td style="text-align: right;">1206777</td>
-<td style="text-align: right;">192</td>
-<td style="text-align: left;">0.016%</td>
+<td style="text-align: right;">1204307</td>
+<td style="text-align: right;">765</td>
+<td style="text-align: left;">0.064%</td>
 </tr>
 <tr class="even">
 <td style="text-align: right;">120</td>
-<td style="text-align: right;">1206777</td>
-<td style="text-align: right;">179</td>
-<td style="text-align: left;">0.015%</td>
+<td style="text-align: right;">1204307</td>
+<td style="text-align: right;">753</td>
+<td style="text-align: left;">0.063%</td>
 </tr>
 <tr class="odd">
 <td style="text-align: right;">150</td>
-<td style="text-align: right;">1206777</td>
-<td style="text-align: right;">211</td>
-<td style="text-align: left;">0.017%</td>
+<td style="text-align: right;">1204307</td>
+<td style="text-align: right;">821</td>
+<td style="text-align: left;">0.068%</td>
 </tr>
 </tbody>
 </table>
 </div>
 </div>
 </div>
-<p>The extremely low event prevalence (~0.1–1% depending on interval and period) is the primary modeling challenge. This imbalance is addressed via <strong>observation-level importance weights</strong> (Section 7) rather than resampling, which preserves the full dataset.</p>
+<p>The extremely low event prevalence (well under 0.1% across the full pan-African hex dataset, though this varies by interval and by the time period considered) is the primary modeling challenge. This imbalance is addressed at the gradient level inside the XGBoost engine itself (<code>scale_pos_weight</code> and <code>max_delta_step</code>; Section 7) rather than via resampling or observation-level case weights, which preserves the full dataset and avoids the training instabilities described in Section 7.</p>
 <hr>
 </section>
 <section id="covariate-stack" class="level2">
 <h2 class="anchored" data-anchor-id="covariate-stack">4. Covariate Stack</h2>
-<p>Covariates fall into six conceptually distinct groups. Static layers do not change over time; dynamic layers vary by date.</p>
+<p>Covariates fall into nine conceptually distinct groups (Sections 4.1–4.9). Static layers do not change over time; dynamic layers vary by date.</p>
 <section id="host-abundance-static" class="level3">
 <h3 class="anchored" data-anchor-id="host-abundance-static">4.1 Host abundance (static)</h3>
 <p>Livestock density for the three primary RVF-competent host species, from the Gridded Livestock of the World (GLW 3.0) database. Mean-centered and scaled before modeling.</p>
@@ -2765,10 +2772,10 @@ window.Quarto = {
 </section>
 <section id="soil-properties-static" class="level3">
 <h3 class="anchored" data-anchor-id="soil-properties-static">4.4 Soil properties (static)</h3>
-<p>Two categorical soil descriptors from the HWSD/FAO soil database:</p>
+<p>Two categorical soil descriptors from the HWSD/FAO soil database. Unknown values in either variable are imputed by nearest-neighbour (<code>lag_join_aggregate()</code>) before aggregating to the hex scale. Both are converted to integer codes via <code>as.numeric(as.factor(...))</code> upstream of the recipe (in the <code>region_data_raw</code> target), so <strong>neither is one-hot encoded</strong> — both enter XGBoost as plain numeric predictors:</p>
 <ul>
-<li><strong><code>soil_texture</code></strong>: broad texture class (e.g., loamy, sandy, clayey). Nominal factor; one-hot encoded by the recipe.</li>
-<li><strong><code>soil_drainage</code></strong>: drainage class encoded as an ordinal integer (1–7). Unknown values are imputed by nearest-neighbour before aggregating to the hex scale.</li>
+<li><strong><code>soil_drainage</code></strong>: drainage class, mapped to a genuinely ordinal integer (1–7, worst-to-best drainage) before the numeric conversion, so the integer code preserves a meaningful order.</li>
+<li><strong><code>soil_texture</code></strong>: broad texture class (e.g., loamy, sandy, clayey). The integer code is assigned by alphabetical order of the texture label, so it is <strong>not</strong> ordinal in any soil-science sense. This is a modeling simplification — a tree-based learner can still split on this code freely, but the numeric distance between codes carries no meaning for texture (unlike <code>soil_drainage</code>).</li>
 </ul>
 <div class="cell">
 <div class="cell-output-display">
@@ -2825,7 +2832,9 @@ window.Quarto = {
 </section>
 <section id="dynamic-weather-anomalies-time-varying-lagged" class="level3">
 <h3 class="anchored" data-anchor-id="dynamic-weather-anomalies-time-varying-lagged">4.5 Dynamic weather anomalies (time-varying, lagged)</h3>
-<p>Anomalies are computed as deviations from the long-run monthly mean. Three lagged windows — the mean anomaly over days 1–30, 31–60, and 61–90 prior to the origin date — are created for temperature, precipitation, relative humidity (ERA5-Land reanalysis), and NDVI (MODIS Terra MOD13A3, 1 km monthly composites). The pipeline retains both raw-scale and pre-scaled versions in the parquet; <code>clean_region_data()</code> drops the raw-scale columns, retaining only the <code>anomaly_scaled_*</code> versions.</p>
+<p>Anomalies are computed as deviations from the long-run monthly mean (by day-of-year). Three lagged windows — the mean anomaly over days 1–30, 31–60, and 61–90 prior to the origin date — are created for temperature, precipitation, relative humidity, and NDVI. The pipeline retains both raw-scale and pre-scaled versions in the parquet; <code>clean_region_data()</code> drops the raw-scale columns, retaining only the <code>anomaly_scaled_*</code> versions.</p>
+<p><strong>Weather source (temperature / precipitation / relative humidity):</strong> The pipeline sources recorded temperature, precipitation, and relative humidity from <strong>ERA5T</strong>, the near-real-time extension of ECMWF’s ERA5 reanalysis, which is available with only a ~5-day lag (<code>fetch_and_transform_era5t_weather()</code>).</p>
+<p><strong>NDVI:</strong> monthly NDVI composites now draw on two sources — MODIS Terra (MOD13A3, 1 km monthly composites) as the primary long-record source, supplemented with Sentinel-derived NDVI for recent months not yet available from MODIS — combined in <code>create_ndvi_transformed_sources()</code> before the anomaly calculation.</p>
 <div class="cell">
 <div class="cell-output-display">
 <div class="kable-table">
@@ -2906,15 +2915,11 @@ window.Quarto = {
 </section>
 <section id="climate-forecasts-time-varying-forward-looking" class="level3">
 <h3 class="anchored" data-anchor-id="climate-forecasts-time-varying-forward-looking">4.6 Climate forecasts (time-varying, forward-looking)</h3>
-<p>ECMWF medium-range forecast anomalies for temperature, precipitation, and relative humidity valid at the origin date. Only the pre-scaled versions are retained after preprocessing.</p>
+<p>ECMWF seasonal forecast anomalies (monthly-mean lead times of 1–6 months from the forecast base date) for temperature, precipitation, and relative humidity valid at the origin date. Only the pre-scaled versions are retained after preprocessing.</p>
 <div class="cell">
 <div class="cell-output-display">
 <div class="kable-table">
 <table class="caption-top table table-sm table-striped small">
-<colgroup>
-<col style="width: 60%">
-<col style="width: 40%">
-</colgroup>
 <thead>
 <tr class="header">
 <th style="text-align: left;">Variable</th>
@@ -2924,15 +2929,15 @@ window.Quarto = {
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">anomaly_forecast_scaled_temperature</td>
-<td style="text-align: left;">ECMWF medium-range forecast</td>
+<td style="text-align: left;">ECMWF seasonal forecast</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">anomaly_forecast_scaled_precipitation</td>
-<td style="text-align: left;">ECMWF medium-range forecast</td>
+<td style="text-align: left;">ECMWF seasonal forecast</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">anomaly_forecast_scaled_relative_humidity</td>
-<td style="text-align: left;">ECMWF medium-range forecast</td>
+<td style="text-align: left;">ECMWF seasonal forecast</td>
 </tr>
 </tbody>
 </table>
@@ -2942,13 +2947,23 @@ window.Quarto = {
 </section>
 <section id="host-immune-status-seroprevalence-time-varying" class="level3">
 <h3 class="anchored" data-anchor-id="host-immune-status-seroprevalence-time-varying">4.7 Host immune status — seroprevalence (time-varying)</h3>
-<p>A spatiotemporal kernel model (Stan; ICAR spatial structure) fitted to recorded RVF outbreaks and independent livestock seroprevalence surveys generates a continuous estimate of the fraction of the local livestock population with prior RVF exposure at each H3 hex and date. Higher seroprevalence implies greater herd immunity and thus lower expected outbreak risk. The posterior mean prediction (<code>pred_sero</code>) is mean-centered and scaled before modeling.</p>
+<p>A spatiotemporal kernel model (Stan; ICAR spatial structure) fitted to recorded RVF outbreaks and independent livestock seroprevalence surveys generates a continuous estimate of the fraction of the local livestock population with prior RVF exposure at each H3 hex and date. Higher seroprevalence implies greater herd immunity and thus lower expected outbreak risk. A full description of this model is available in documentation/openRVFcast_Walkthrough.docx (see section “Immunity Decay Layer” at the end of the document.)</p>
 <p>The kernel contributions from past outbreaks decay jointly over space and time:</p>
 <p><span class="math display">\[K(d, t) = \exp\!\left(-\frac{d}{\rho_d}\right) \cdot \exp\!\left(-\frac{t}{\rho_t}\right)\]</span></p>
 <p>where <span class="math inline">\(d\)</span> is the spatial distance in km between a focal hex and a past outbreak location, and <span class="math inline">\(t\)</span> is the time elapsed since the outbreak in years. For hexes with no proximate outbreaks (within 1,000 km and 8 years), the seroprevalence estimate defaults to the posterior mean baseline from the ICAR random effects.</p>
+<p>Lagged seroprevalence values are calculated in two ways. First, three “near term” lags are built (using the same 1–30, 31–60, and 61–90 day lags as for the weather anomaly data); these lags represent the near term immunity status of the population within the hex. Second, two “long term” lags are built to quantify immunity for the year and two years prior (91-360 days and 361-720 days). This gives five lagged seroprevalence predictors per row: <code>anomaly_not_sero_30</code>, <code>_60</code>, <code>_90</code>, <code>_360</code>, and <code>_720</code>.</p>
+</section>
+<section id="nearby-outbreak-history-time-varying" class="level3">
+<h3 class="anchored" data-anchor-id="nearby-outbreak-history-time-varying">4.8 Nearby outbreak history (time-varying)</h3>
+<p>A hex’s own outbreak history is already captured indirectly (via the seroprevalence kernel, which is itself built from past outbreak locations), but <code>build_neighbor_outbreak_history()</code> adds a direct, short-horizon measure of <strong>observed outbreak activity in spatially adjacent hexes</strong>. For every focal hex and model date, and for each of the same three near-term windows used elsewhere (1–30, 31–60, 61–90 days prior), the covariate sums a per-outbreak weight over every outbreak reported in a <em>neighboring</em> hex (sharing an edge, or within a small tolerance for micro-gaps in the hex adjacency) during that window. A hex is never counted as its own neighbor, so this is purely a measure of pressure from elsewhere.</p>
+<p>By default (<code>case_weight = TRUE</code>) each neighboring outbreak is weighted by <span class="math inline">\(\log_{10}(\text{cases} + 1)\)</span> rather than counted as 1, so a handful of large outbreaks exerts more spread pressure than the same number of single-case reports; outbreaks with unknown case counts (~1% of records) are imputed with the median log-scale weight. This produces three predictors — <code>neigh_outbreak_wt_30</code>, <code>neigh_outbreak_wt_60</code>, <code>neigh_outbreak_wt_90</code> — intended to let the model learn short-range spatial contagion/spillover risk that is faster-moving than the multi-year seroprevalence kernel can capture; hexes with no recent neighbor activity are filled with 0 rather than <code>NA</code>.</p>
+</section>
+<section id="non-biological-spatial-and-temporal-covariates" class="level3">
+<h3 class="anchored" data-anchor-id="non-biological-spatial-and-temporal-covariates">4.9 Non-biological spatial and temporal covariates</h3>
+<p>Finally, day of the year (<code>doy</code>), latitude, and longitude (hex centroids, added by <code>clean_region_data()</code>) and country are used as covariates.</p>
 </section>
 <section id="complete-predictor-summary" class="level3">
-<h3 class="anchored" data-anchor-id="complete-predictor-summary">4.8 Complete predictor summary</h3>
+<h3 class="anchored" data-anchor-id="complete-predictor-summary">4.10 Complete predictor summary</h3>
 <div class="cell">
 <div class="cell-output-display">
 <div class="kable-table">
@@ -2973,23 +2988,31 @@ window.Quarto = {
 <td style="text-align: right;">7</td>
 </tr>
 <tr class="even">
+<td style="text-align: left;">Seroprevalence (lagged)</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr class="odd">
 <td style="text-align: left;">Climate forecast</td>
 <td style="text-align: right;">3</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td style="text-align: left;">Host abundance</td>
 <td style="text-align: right;">3</td>
 </tr>
+<tr class="odd">
+<td style="text-align: left;">Nearby outbreak history</td>
+<td style="text-align: right;">3</td>
+</tr>
 <tr class="even">
+<td style="text-align: left;">Spatial / temporal</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="odd">
 <td style="text-align: left;">Soil</td>
 <td style="text-align: right;">2</td>
 </tr>
-<tr class="odd">
-<td style="text-align: left;">Forecast interval</td>
-<td style="text-align: right;">1</td>
-</tr>
 <tr class="even">
-<td style="text-align: left;">Seroprevalence</td>
+<td style="text-align: left;">Other</td>
 <td style="text-align: right;">1</td>
 </tr>
 </tbody>
@@ -3002,16 +3025,23 @@ window.Quarto = {
 </section>
 <section id="data-preprocessing" class="level2">
 <h2 class="anchored" data-anchor-id="data-preprocessing">5. Data Preprocessing</h2>
-<section id="scaling" class="level3">
-<h3 class="anchored" data-anchor-id="scaling">5.1 Scaling</h3>
-<p><code>clean_region_data()</code> mean-centers and scales (divides by the standard deviation computed on the full, all-Africa dataset) all bioclimatic variables, livestock densities, and the seroprevalence estimate. Some covariates were already pre-scaled earlier in the pipeline (the <code>anomaly_scaled_*</code> columns).</p>
+<section id="scaling-geometry-and-column-pruning" class="level3">
+<h3 class="anchored" data-anchor-id="scaling-geometry-and-column-pruning">5.1 Scaling, geometry, and column pruning</h3>
+<p><code>clean_region_data(dat, map_dat)</code> does several things in sequence:</p>
+<ol type="1">
+<li><strong>De-duplicates scaled/raw pairs.</strong> Wherever a <code>_scaled_</code> counterpart of a column exists, the raw-scale version is dropped (the <code>anomaly_scaled_*</code> weather, NDVI, and forecast columns were already pre-scaled earlier in the pipeline).</li>
+<li><strong>Scales the remaining unbounded covariates.</strong> Livestock densities (<code>glw_*</code>), elevation, and all 19 BioClim variables are mean-centered and scaled (divided by the standard deviation), computed on the full, all-Africa dataset passed in.</li>
+<li><strong>Drops near-zero-variance land-cover classes</strong> (<code>built</code>, <code>snow</code>, <code>mangroves</code>, <code>moss</code>; Section 4.3).</li>
+<li><strong>Adds spatial/temporal covariates</strong>: hex centroid latitude/longitude (via <code>sf::st_centroid()</code> on <code>map_dat</code>, the H3 hex sf object) and day-of-year (<code>doy</code>, from <code>date</code>).</li>
+</ol>
+<p>Note that <code>soil_texture</code> / <code>soil_drainage</code> and <code>neigh_outbreak_wt_*</code> are untouched here — they arrive already in their final numeric form (Sections 4.4, 4.8).</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>dat_clean <span class="ot">&lt;-</span> <span class="fu">clean_region_data</span>(<span class="at">dat =</span> region_data_raw)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>dat_clean <span class="ot">&lt;-</span> <span class="fu">clean_region_data</span>(<span class="at">dat =</span> region_data_raw, <span class="at">map_dat =</span> region_hexes[[<span class="dv">1</span>]])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="train-test-split" class="level3">
 <h3 class="anchored" data-anchor-id="train-test-split">5.2 Train / test split</h3>
-<p>Data are split at a fixed temporal boundary, respecting the time ordering of observations. Dates ≤ 2020-12-19 form the training set used during nested cross-validation; later dates form the held-out test set evaluated only after the model is fully tuned.</p>
+<p>Data are split at a fixed temporal boundary, respecting the time ordering of observations. As of July, 2026 dates ≤ 2020-12-19 form the training set are used during nested cross-validation; later dates form the held-out test set evaluated only after the model is fully tuned. As the dataset grows, the 2020-12-19 date can be pushed closer in time to expand the training data set.</p>
 <div class="cell">
 <div class="cell-output-display">
 <div class="kable-table">
@@ -3027,15 +3057,15 @@ window.Quarto = {
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">Training</td>
-<td style="text-align: left;">2005-04-07</td>
+<td style="text-align: left;">2006-04-11</td>
 <td style="text-align: left;">2020-12-19</td>
-<td style="text-align: left;">4,683,415</td>
+<td style="text-align: left;">4,386,060</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Test</td>
 <td style="text-align: left;">2021-01-17</td>
-<td style="text-align: left;">2025-07-08</td>
-<td style="text-align: left;">1,350,470</td>
+<td style="text-align: left;">2026-06-17</td>
+<td style="text-align: left;">1,635,475</td>
 </tr>
 </tbody>
 </table>
@@ -3103,15 +3133,36 @@ window.Quarto = {
 │     Inner fold 20: train on clusters 1–19, assess on cluster 20
 └── Assessment: dates T_i + 1  …  T_i + 150</code></pre>
 <p>Total number of model fits during tuning: <span class="math display">\[N_{\text{fits}} = N_{\text{outer}} \times N_{\text{inner}} \times N_{\text{grid}} = N_{\text{outer}} \times 20 \times 150\]</span></p>
-<p>Each fit is dispatched as an independent <code>mirai</code> worker task. Results are cached to disk; if a file already exists and <code>overwrite = FALSE</code>, the worker returns the cached path immediately, enabling incremental re-runs.</p>
+<p><span class="math inline">\(N_\text{grid} = 150\)</span> is now reached in two phases of 75 candidates each — a global search followed by a local refinement search around the most promising region of parameter space (Section 9.1) — rather than a single flat 150-point grid, but the total fit count is unchanged.</p>
+<p>Each fit is dispatched as an independent <code>mirai</code> worker task. Results are cached to disk; if a file already exists and <code>overwrite = FALSE</code>, the worker returns the cached path immediately, enabling incremental re-runs. Inner-fold covariate data is now pre-joined once per outer fold and each outer fold’s tuning workload is split into concurrent chunks across workers, which changes the parallelization granularity but not the statistical design described above.</p>
 <hr>
 </section>
 </section>
 <section id="class-imbalance-handling" class="level2">
 <h2 class="anchored" data-anchor-id="class-imbalance-handling">7. Class Imbalance Handling</h2>
-<p>Rather than oversampling or post-hoc threshold adjustment, the model receives <strong>observation-level importance weights</strong> that upweight outbreak observations relative to non-outbreak observations. Weights are computed <strong>per forecast interval</strong> within each training fold, so the effective class balance is 1:1 within each interval:</p>
-<p><span class="math display">\[w_i = \begin{cases} \dfrac{n_{\text{neg},k}}{n_{\text{pos},k}} &amp; \text{if } y_i = 1 \text{ in interval } k \\ 1 &amp; \text{if } y_i = 0 \end{cases}\]</span></p>
-<p>Computing weights per interval (rather than globally) prevents shorter-horizon intervals — which tend to have slightly higher prevalence — from implicitly receiving less attention in the joint fit. The actual imbalance ratios from the training data:</p>
+<p>An earlier version of the pipeline addressed class imbalance with <strong>observation-level importance weights</strong> passed through the tidymodels workflow (<code>hardhat::importance_weights()</code> + <code>add_case_weights()</code>). This has been removed and replaced with XGBoost’s native, engine-level class-imbalance parameters — <code>scale_pos_weight</code> and <code>max_delta_step</code> — for the reasons detailed below. A full derivation is kept alongside the code in <code>docs/xgboost_class_imbalance_explanation.md</code>; this section summarizes the key points.</p>
+<section id="why-case-weights-were-removed" class="level3">
+<h3 class="anchored" data-anchor-id="why-case-weights-were-removed">7.1 Why case weights were removed</h3>
+<p>XGBoost is a second-order booster: each leaf’s optimal output is <span class="math inline">\(w_\ell^{*} = -\sum_{i \in \ell} g_i / (\sum_{i \in \ell} h_i + \lambda)\)</span>, where <span class="math inline">\(g_i\)</span> and <span class="math inline">\(h_i\)</span> are the first- and second-order gradients of the loss for observation <span class="math inline">\(i\)</span>. For <code>binary:logistic</code>, <span class="math inline">\(g_i = p_i - y_i\)</span> and <span class="math inline">\(h_i = p_i(1-p_i)\)</span>. Two features of this problem combine to make naive case weighting dangerous:</p>
+<ul>
+<li><strong><code>base_score</code> is set to the empirical prevalence</strong> (<span class="math inline">\(p \approx 0.005\)</span>–<span class="math inline">\(0.07\)</span> depending on interval/period; Section 8.2), so that predicted probabilities are calibrated to the true marginal outbreak rate rather than an artificially balanced 50/50 rate. At this starting point, every observation has a tiny Hessian (<span class="math inline">\(h_i = p(1-p) \approx p\)</span>).</li>
+<li><strong>Case weights multiply both <span class="math inline">\(g_i\)</span> and <span class="math inline">\(h_i\)</span></strong> by the same factor <span class="math inline">\(w_i\)</span>. For a true positive with weight <span class="math inline">\(w \approx n_\text{neg}/n_\text{pos}\)</span> (often several hundred for this data), the optimal leaf value <span class="math inline">\(-w \cdot g_i / (w \cdot h_i) = -g_i/h_i\)</span> is <em>unchanged</em> by the weight in principle — but because <span class="math inline">\(h_i\)</span> is so small at initialization, this ratio is already explosively large (on the order of <span class="math inline">\(1/p\)</span>), and the case weight simultaneously inflates the <em>effective</em> Hessian mass in a leaf (<code>min_child_weight</code> is a threshold on <span class="math inline">\(\sum h_i\)</span>), letting a handful of positives satisfy <code>min_n</code> on their own. In combination, a single early tree can push predicted probabilities for true positives to ≈1 and leave true negatives pinned near 0 (a degenerate, saturated fit), while <code>min_n</code> stops providing any real regularization for positive-containing leaves.</li>
+</ul>
+</section>
+<section id="scale_pos_weight-max_delta_step" class="level3">
+<h3 class="anchored" data-anchor-id="scale_pos_weight-max_delta_step">7.2 <code>scale_pos_weight</code> + <code>max_delta_step</code></h3>
+<p><code>scale_pos_weight</code> (<code>calc_spw()</code>, computed fresh per training fold as <span class="math inline">\(n_\text{neg}/n_\text{pos}\)</span>, returning 1 if there are no positives) has the same mathematical effect on gradients as a uniform case weight on all positives, but is applied internally by the engine rather than as a typed column in the training tibble — avoiding <code>predict()</code>-time type conflicts between fitting and assessment data that motivated dropping <code>add_case_weights()</code> in the first place.</p>
+<p><code>max_delta_step = 1</code> caps the output of every leaf in every tree to <span class="math inline">\([-1, +1]\)</span> <em>before</em> it is scaled by the learning rate, directly bounding the margin any single tree can move any single observation by (<code>learn_rate</code> × 1). This is XGBoost’s own documented recommendation for severe class imbalance, and is what actually prevents the saturation problem described above — <code>scale_pos_weight</code> alone does not.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>calc_spw <span class="ot">&lt;-</span> <span class="cf">function</span>(df, <span class="at">outcome =</span> <span class="st">&quot;outbreak&quot;</span>) {</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  y     <span class="ot">&lt;-</span> <span class="fu">as.character</span>(df[[outcome]])</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  n_pos <span class="ot">&lt;-</span> <span class="fu">sum</span>(y <span class="sc">==</span> <span class="st">&quot;1&quot;</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  n_neg <span class="ot">&lt;-</span> <span class="fu">sum</span>(y <span class="sc">==</span> <span class="st">&quot;0&quot;</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (n_pos <span class="sc">==</span> <span class="dv">0</span>) <span class="fu">return</span>(<span class="dv">1</span>)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  n_neg <span class="sc">/</span> n_pos</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>The actual imbalance ratios (<code>scale_pos_weight</code>, computed per forecast interval for illustration) in the training data:</p>
 <div class="cell">
 <div class="cell-output-display">
 <div class="kable-table">
@@ -3121,51 +3172,56 @@ window.Quarto = {
 <th style="text-align: left;">Forecast interval</th>
 <th style="text-align: right;">N (0)</th>
 <th style="text-align: right;">N (1)</th>
-<th style="text-align: right;">Weight on 1s (n_neg / n_pos)</th>
+<th style="text-align: right;">scale_pos_weight (n_neg / n_pos)</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">30</td>
-<td style="text-align: right;">936511</td>
-<td style="text-align: right;">172</td>
-<td style="text-align: right;">5444.8</td>
+<td style="text-align: right;">876615</td>
+<td style="text-align: right;">597</td>
+<td style="text-align: right;">1468.4</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">60</td>
-<td style="text-align: right;">936490</td>
-<td style="text-align: right;">193</td>
-<td style="text-align: right;">4852.3</td>
+<td style="text-align: right;">876607</td>
+<td style="text-align: right;">605</td>
+<td style="text-align: right;">1448.9</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">90</td>
-<td style="text-align: right;">936504</td>
-<td style="text-align: right;">179</td>
-<td style="text-align: right;">5231.9</td>
+<td style="text-align: right;">876620</td>
+<td style="text-align: right;">592</td>
+<td style="text-align: right;">1480.8</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">120</td>
-<td style="text-align: right;">936513</td>
-<td style="text-align: right;">170</td>
-<td style="text-align: right;">5508.9</td>
+<td style="text-align: right;">876625</td>
+<td style="text-align: right;">587</td>
+<td style="text-align: right;">1493.4</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">150</td>
-<td style="text-align: right;">936480</td>
-<td style="text-align: right;">203</td>
-<td style="text-align: right;">4613.2</td>
+<td style="text-align: right;">876542</td>
+<td style="text-align: right;">670</td>
+<td style="text-align: right;">1308.3</td>
 </tr>
 </tbody>
 </table>
 </div>
 </div>
 </div>
-<p>Weights are passed into the tidymodels workflow via <code>hardhat::importance_weights()</code>, which signals to the XGBoost engine to incorporate them in the per-observation gradient computation.</p>
+<p>Note that in the actual pipeline <code>scale_pos_weight</code> is computed globally per training fold (<code>calc_spw()</code> on the pooled, all-interval training tibble; <code>forecast_interval</code> is a predictor, not a separate model), not per interval as shown above — the per-interval breakdown here is purely descriptive.</p>
+</section>
+<section id="consequence-for-min_n" class="level3">
+<h3 class="anchored" data-anchor-id="consequence-for-min_n">7.3 Consequence for <code>min_n</code></h3>
+<p>Because <code>min_child_weight</code> (<code>min_n</code>) thresholds the <em>sum of Hessians</em> rather than a raw sample count, and <span class="math inline">\(h_i \approx p \approx 0.005\)</span> per observation at <code>base_score = 0.005</code>, a given <code>min_n</code> corresponds to roughly <span class="math inline">\(\text{min\_n} / p\)</span> effective samples per leaf — far more restrictive than the face-value sample count once suggested by a wide range like 5–100. The tuning range for <code>min_n</code> was narrowed accordingly to 1–10 (Section 9.1) to target a more sensible ~200–2,000 effective samples per leaf.</p>
 <hr>
+</section>
 </section>
 <section id="tidymodels-workflow" class="level2">
 <h2 class="anchored" data-anchor-id="tidymodels-workflow">8. Tidymodels Workflow</h2>
-<p>The model is assembled as a <code>tidymodels</code> <em>workflow</em> combining a preprocessing recipe, an XGBoost model specification, and the case-weight column.</p>
+<p>The model is assembled as a <code>tidymodels</code> <em>workflow</em> combining a preprocessing recipe and an XGBoost model specification. There is no longer a case-weight column in the workflow (Section 7) — class imbalance is handled entirely inside the model specification via <code>scale_pos_weight</code> / <code>max_delta_step</code>.</p>
 <section id="preprocessing-recipe" class="level3">
 <h3 class="anchored" data-anchor-id="preprocessing-recipe">8.1 Preprocessing recipe</h3>
 <p><code>make_recipe()</code> defines the recipe. Steps are applied in order during both training (via <code>prep()</code> + <code>bake()</code>) and prediction:</p>
@@ -3185,34 +3241,39 @@ window.Quarto = {
 <tbody>
 <tr class="odd">
 <td>1</td>
-<td><code>update_role(..., new_role = &quot;ID&quot;)</code></td>
-<td>Marks ID columns so they pass through baking but are not used as predictors</td>
+<td><code>step_mutate(across(starts_with(&quot;anomaly_scaled_&quot;), ...))</code></td>
+<td>Caps scaled weather/NDVI anomalies to <span class="math inline">\([-6, 6]\)</span> as a safety net against occasional extreme values slipping through upstream data cleaning</td>
 </tr>
 <tr class="even">
 <td>2</td>
-<td><code>step_rm(all_of(id_cols))</code></td>
-<td>Physically removes ID columns from the baked matrix</td>
+<td><code>update_role(..., new_role = &quot;ID&quot;)</code></td>
+<td>Marks ID columns so they pass through baking but are not used as predictors</td>
 </tr>
 <tr class="odd">
 <td>3</td>
-<td><code>step_zv(all_predictors())</code></td>
-<td>Removes zero-variance predictors (only <code>moss</code> is flagged in practice)</td>
+<td><code>step_rm(all_of(id_cols))</code></td>
+<td>Physically removes ID columns from the baked matrix</td>
 </tr>
 <tr class="even">
 <td>4</td>
+<td><code>step_zv(all_predictors())</code></td>
+<td>Removes zero-variance predictors</td>
+</tr>
+<tr class="odd">
+<td>5</td>
 <td><code>step_dummy(..., one_hot = TRUE)</code></td>
-<td>One-hot encodes nominal predictors (<code>Country</code>, <code>forecast_interval</code>)</td>
+<td>One-hot encodes nominal predictors — in practice just <code>Country</code> and <code>forecast_interval</code>, since <code>soil_texture</code> / <code>soil_drainage</code> are now numeric-coded upstream (Section 4.4)</td>
 </tr>
 </tbody>
 </table>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>rec <span class="ot">&lt;-</span> <span class="fu">make_recipe</span>(train_sample, <span class="at">id_cols =</span> id_cols)</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>rec</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>rec <span class="ot">&lt;-</span> <span class="fu">make_recipe</span>(train_sample, <span class="at">id_cols =</span> id_cols)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>rec</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>After prepping and baking the recipe, the number of predictor columns entering the model:</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
-<pre><code>Total predictors entering XGBoost: 116 </code></pre>
+<pre><code>Total predictors entering XGBoost: 126 </code></pre>
 </div>
 <div class="cell-output-display">
 <div class="kable-table">
@@ -3245,16 +3306,24 @@ window.Quarto = {
 <td style="text-align: right;">5</td>
 </tr>
 <tr class="even">
+<td style="text-align: left;">Seroprevalence (lagged)</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr class="odd">
 <td style="text-align: left;">Climate forecast</td>
 <td style="text-align: right;">3</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td style="text-align: left;">Host abundance</td>
 <td style="text-align: right;">3</td>
 </tr>
+<tr class="odd">
+<td style="text-align: left;">Nearby outbreak history</td>
+<td style="text-align: right;">3</td>
+</tr>
 <tr class="even">
-<td style="text-align: left;">Seroprevalence</td>
-<td style="text-align: right;">1</td>
+<td style="text-align: left;">Spatial / temporal</td>
+<td style="text-align: right;">3</td>
 </tr>
 </tbody>
 </table>
@@ -3265,10 +3334,14 @@ window.Quarto = {
 </section>
 <section id="xgboost-model-specification" class="level3">
 <h3 class="anchored" data-anchor-id="xgboost-model-specification">8.2 XGBoost model specification</h3>
-<p><code>make_model()</code> wraps <code>parsnip::boost_tree()</code> in classification mode using the XGBoost engine with a binary logistic objective:</p>
+<p><code>make_model()</code> wraps <code>parsnip::boost_tree()</code> in classification mode using the XGBoost engine with a binary logistic objective. It now also takes <code>spw</code> (<code>scale_pos_weight</code>; Section 7) alongside the tuned hyperparameters and the <code>base_score</code> initialization:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>mod <span class="ot">&lt;-</span> <span class="fu">make_model</span>(<span class="at">params =</span> hyper, <span class="at">start_p =</span> <span class="fl">0.005</span>)</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>mod</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="do">## start_p mirrors the `start_p` target in model_framework_targets.R: the empirical</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="do">## outbreak prevalence across the full training data, used to initialize base_score</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>start_p <span class="ot">&lt;-</span> <span class="fu">mean</span>(train_data<span class="sc">$</span>outbreak <span class="sc">==</span> <span class="dv">1</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>spw     <span class="ot">&lt;-</span> <span class="fu">calc_spw</span>(train_sample)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>mod     <span class="ot">&lt;-</span> <span class="fu">make_model</span>(<span class="at">params =</span> hyper, <span class="at">start_p =</span> start_p, <span class="at">spw =</span> spw)</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>mod</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Boosted Tree Model Specification (classification)
 
@@ -3283,6 +3356,8 @@ Main Arguments:
 Engine-Specific Arguments:
   objective = binary:logistic
   base_score = start_p
+  scale_pos_weight = spw
+  max_delta_step = 1
   nthread = 1
   verbosity = 0
 
@@ -3311,8 +3386,18 @@ Computational engine: xgboost </code></pre>
 </tr>
 <tr class="even">
 <td><code>base_score</code></td>
-<td><code>0.005</code></td>
-<td>Initialises the intercept near the marginal outbreak prevalence, anchoring boosting near a calibrated baseline rather than 0.5</td>
+<td><code>start_p</code> = empirical outbreak prevalence in the full training data</td>
+<td>Initialises the intercept near the marginal outbreak prevalence, anchoring boosting near a calibrated baseline rather than 0.5 (Section 8.2 of <code>docs/xgboost_class_imbalance_explanation.md</code>)</td>
+</tr>
+<tr class="odd">
+<td><code>scale_pos_weight</code></td>
+<td><code>calc_spw(train_data)</code> = <span class="math inline">\(n_\text{neg}/n_\text{pos}\)</span></td>
+<td>Class-imbalance correction at the gradient level (Section 7)</td>
+</tr>
+<tr class="even">
+<td><code>max_delta_step</code></td>
+<td><code>1</code></td>
+<td>Caps per-tree leaf output to prevent margin saturation given <code>scale_pos_weight</code> and small initial Hessians (Section 7)</td>
 </tr>
 <tr class="odd">
 <td><code>nthread</code></td>
@@ -3326,17 +3411,23 @@ Computational engine: xgboost </code></pre>
 </tr>
 </tbody>
 </table>
-<p>The six tunable hyperparameters, their search ranges, and the finalized values:</p>
+<p>The six tunable hyperparameters, their current search ranges (Section 9.1), and the values behind the fit loaded above:</p>
 <div class="cell">
 <div class="cell-output-display">
 <div class="kable-table">
 <table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 21%">
+<col style="width: 31%">
+<col style="width: 17%">
+</colgroup>
 <thead>
 <tr class="header">
 <th style="text-align: left;">Parameter</th>
 <th style="text-align: left;">boost_tree name</th>
 <th style="text-align: left;">Range</th>
-<th style="text-align: left;">Finalized value</th>
+<th style="text-align: left;">Loaded value</th>
 </tr>
 </thead>
 <tbody>
@@ -3344,37 +3435,37 @@ Computational engine: xgboost </code></pre>
 <td style="text-align: left;">Number of trees</td>
 <td style="text-align: left;">trees</td>
 <td style="text-align: left;">100–1,500</td>
-<td style="text-align: left;">231</td>
+<td style="text-align: left;">1247</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Max tree depth</td>
 <td style="text-align: left;">tree_depth</td>
-<td style="text-align: left;">4–10</td>
-<td style="text-align: left;">10</td>
+<td style="text-align: left;">4–9</td>
+<td style="text-align: left;">8</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Learning rate</td>
 <td style="text-align: left;">learn_rate</td>
-<td style="text-align: left;">0.01–0.50</td>
-<td style="text-align: left;">0.474</td>
+<td style="text-align: left;">0.01–0.30 (log10 scale)</td>
+<td style="text-align: left;">0.0118</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Min node size</td>
 <td style="text-align: left;">min_n</td>
-<td style="text-align: left;">5–100</td>
-<td style="text-align: left;">51</td>
+<td style="text-align: left;">1–10</td>
+<td style="text-align: left;">14</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Loss reduction (γ)</td>
 <td style="text-align: left;">loss_reduction</td>
-<td style="text-align: left;">0–0.5</td>
-<td style="text-align: left;">2.083</td>
+<td style="text-align: left;">1e-5–0.50 (log10 scale)</td>
+<td style="text-align: left;">0.1863</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Column fraction (mtry)</td>
 <td style="text-align: left;">mtry</td>
-<td style="text-align: left;">finalised</td>
-<td style="text-align: left;">22</td>
+<td style="text-align: left;">8–finalised</td>
+<td style="text-align: left;">32</td>
 </tr>
 </tbody>
 </table>
@@ -3384,28 +3475,25 @@ Computational engine: xgboost </code></pre>
 </section>
 <section id="workflow-assembly" class="level3">
 <h3 class="anchored" data-anchor-id="workflow-assembly">8.3 Workflow assembly</h3>
-<p>The recipe, model specification, and case-weight column are combined into a single <code>workflow</code> object, which is passed directly to <code>fit()</code>:</p>
+<p>The recipe and model specification are combined into a single <code>workflow</code> object, which is passed directly to <code>fit()</code>:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>wf <span class="ot">&lt;-</span> <span class="fu">workflow</span>() <span class="sc">|&gt;</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_recipe</span>(rec) <span class="sc">|&gt;</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_model</span>(mod)  <span class="sc">|&gt;</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_case_weights</span>(weights)</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>wf</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>wf <span class="ot">&lt;-</span> <span class="fu">workflow</span>() <span class="sc">|&gt;</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_recipe</span>(rec) <span class="sc">|&gt;</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_model</span>(mod)</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>wf</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>══ Workflow ════════════════════════════════════════════════════════════════════
 Preprocessor: Recipe
 Model: boost_tree()
 
 ── Preprocessor ────────────────────────────────────────────────────────────────
-3 Recipe Steps
+4 Recipe Steps
 
+• step_mutate()
 • step_rm()
 • step_zv()
 • step_dummy()
-
-── Case Weights ────────────────────────────────────────────────────────────────
-weights
 
 ── Model ───────────────────────────────────────────────────────────────────────
 Boosted Tree Model Specification (classification)
@@ -3421,6 +3509,8 @@ Main Arguments:
 Engine-Specific Arguments:
   objective = binary:logistic
   base_score = start_p
+  scale_pos_weight = spw
+  max_delta_step = 1
   nthread = 1
   verbosity = 0
 
@@ -3432,25 +3522,32 @@ Computational engine: xgboost </code></pre>
 </section>
 <section id="hyperparameter-search" class="level2">
 <h2 class="anchored" data-anchor-id="hyperparameter-search">9. Hyperparameter Search</h2>
-<section id="search-strategy" class="level3">
-<h3 class="anchored" data-anchor-id="search-strategy">9.1 Search strategy</h3>
-<p>Hyperparameters are explored using a <strong>space-filling design</strong> (Latin hypercube, via <code>dials::grid_space_filling()</code>). Space-filling designs place candidates more uniformly across the joint parameter space than random search, reducing wasted evaluations on clustered, redundant regions. A grid of <span class="math inline">\(N = 150\)</span> candidates is generated once and evaluated across every inner fold of every outer fold.</p>
+<section id="search-strategy-global-grid-then-local-refinement" class="level3">
+<h3 class="anchored" data-anchor-id="search-strategy-global-grid-then-local-refinement">9.1 Search strategy: global grid, then local refinement</h3>
+<p>Hyperparameters are explored using a <strong>space-filling design</strong> (via <code>dials::grid_space_filling()</code>), which places candidates more uniformly across the joint parameter space than random search, reducing wasted evaluations on clustered, redundant regions. The search is now a <strong>two-phase, adaptive</strong> design rather than a single flat grid:</p>
+<ol type="1">
+<li><strong>Global grid</strong> (<code>build_hyperparameter_grid()</code>): a space-filling grid of <span class="math inline">\(N = 75\)</span> candidates spanning the full search bounds below, evaluated across every inner fold of every outer fold (<code>tuned_results_per_outer_fold</code>).</li>
+<li><strong>Local refinement grid</strong> (<code>build_local_hyperparameter_grid()</code>): the global results are scored with the same formula used for final selection (Section 9.2), the top <code>top_k = 8</code> global candidates are identified, and a second space-filling grid of <span class="math inline">\(N = 75\)</span> points is drawn from the neighbourhood of those top-k sets — each parameter’s range is the observed top-k range expanded by 20% on each side (<code>expansion = 0.2</code>), hard-capped at the <em>original</em> global search bounds so the refinement never explores outside where the global grid already looked. This second grid is evaluated the same way as the first (<code>local_tuned_results</code>).</li>
+</ol>
+<p>Final selection (Section 9.3) pools <strong>both</strong> grids’ results together, so the effective search is 150 evaluated candidates concentrated more heavily around the promising region of parameter space than a single flat 150-point grid would be.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>tuning_grid <span class="ot">&lt;-</span> <span class="fu">with</span>(tune_pars,</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">grid_space_filling</span>(</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">trees</span>(<span class="at">range          =</span> <span class="fu">c</span>(tree_min, tree_max))</span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  , <span class="fu">tree_depth</span>(<span class="at">range     =</span> <span class="fu">c</span>(tree_dep_min, tree_dep_max))</span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  , <span class="fu">learn_rate</span>(<span class="at">range     =</span> <span class="fu">c</span>(learn_rate_min, learn_rate_max), <span class="at">trans =</span> <span class="cn">NULL</span>)</span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  , <span class="fu">min_n</span>(<span class="at">range          =</span> <span class="fu">c</span>(minn_min, minn_max))</span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  , <span class="fu">loss_reduction</span>(<span class="at">range =</span> <span class="fu">c</span>(loss_red_min, loss_red_max))</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  , <span class="fu">finalize</span>(<span class="fu">mtry</span>(), train_small)</span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>  , <span class="at">size =</span> tune_pars<span class="sc">$</span>size</span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">index =</span> <span class="fu">row_number</span>(), <span class="at">.before =</span> <span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="do">## Global grid (phase 1)</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>global_grid <span class="ot">&lt;-</span> <span class="fu">with</span>(tune_pars,</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">grid_space_filling</span>(</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">trees</span>(<span class="at">range          =</span> <span class="fu">c</span>(tree_min, tree_max))</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  , <span class="fu">tree_depth</span>(<span class="at">range     =</span> <span class="fu">c</span>(tree_dep_min, tree_dep_max))</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  , <span class="fu">learn_rate</span>(<span class="at">range     =</span> <span class="fu">c</span>(learn_rate_min, learn_rate_max))</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  , <span class="fu">min_n</span>(<span class="at">range          =</span> <span class="fu">c</span>(minn_min, minn_max))</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  , <span class="fu">loss_reduction</span>(<span class="at">range =</span> <span class="fu">c</span>(loss_red_min, loss_red_max))</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>  , <span class="fu">finalize</span>(<span class="fu">mtry</span>(<span class="at">range =</span> <span class="fu">c</span>(mtry_min, <span class="fu">unknown</span>())), train_small)</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>  , <span class="at">size =</span> size</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">index =</span> <span class="fu">row_number</span>(), <span class="at">.before =</span> <span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
-<pre><code>Grid: 150 candidate sets × 6 hyperparameters</code></pre>
+<pre><code>Global grid: 75 candidate sets × 6 hyperparameters
+ (a further 75 local-refinement candidates are drawn in phase 2, for 150 evaluated sets in total)</code></pre>
 </div>
 <div class="cell-output-display">
 <div class="kable-table">
@@ -3472,7 +3569,7 @@ Computational engine: xgboost </code></pre>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">trees</td>
-<td style="text-align: left;">Median : 799.5</td>
+<td style="text-align: left;">Median : 800.0</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">trees</td>
@@ -3488,123 +3585,123 @@ Computational engine: xgboost </code></pre>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">tree_depth</td>
-<td style="text-align: left;">Min. : 4.00</td>
+<td style="text-align: left;">Min. :4.00</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">tree_depth</td>
-<td style="text-align: left;">1st Qu.: 5.00</td>
+<td style="text-align: left;">1st Qu.:5.00</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">tree_depth</td>
-<td style="text-align: left;">Median : 7.00</td>
+<td style="text-align: left;">Median :6.00</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">tree_depth</td>
-<td style="text-align: left;">Mean : 6.96</td>
+<td style="text-align: left;">Mean :6.44</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">tree_depth</td>
-<td style="text-align: left;">3rd Qu.: 9.00</td>
+<td style="text-align: left;">3rd Qu.:8.00</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">tree_depth</td>
-<td style="text-align: left;">Max. :10.00</td>
+<td style="text-align: left;">Max. :9.00</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">learn_rate</td>
-<td style="text-align: left;">Min. :0.0100</td>
+<td style="text-align: left;">Min. :0.01000</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">learn_rate</td>
-<td style="text-align: left;">1st Qu.:0.1325</td>
+<td style="text-align: left;">1st Qu.:0.02345</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">learn_rate</td>
-<td style="text-align: left;">Median :0.2550</td>
+<td style="text-align: left;">Median :0.05495</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">learn_rate</td>
-<td style="text-align: left;">Mean :0.2550</td>
+<td style="text-align: left;">Mean :0.08664</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">learn_rate</td>
-<td style="text-align: left;">3rd Qu.:0.3775</td>
+<td style="text-align: left;">3rd Qu.:0.12886</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">learn_rate</td>
-<td style="text-align: left;">Max. :0.5000</td>
+<td style="text-align: left;">Max. :0.30200</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">min_n</td>
-<td style="text-align: left;">Min. : 5.00</td>
+<td style="text-align: left;">Min. : 1.000</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">min_n</td>
-<td style="text-align: left;">1st Qu.: 23.25</td>
+<td style="text-align: left;">1st Qu.: 3.000</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">min_n</td>
-<td style="text-align: left;">Median : 42.00</td>
+<td style="text-align: left;">Median : 5.000</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">min_n</td>
-<td style="text-align: left;">Mean : 44.94</td>
+<td style="text-align: left;">Mean : 5.333</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">min_n</td>
-<td style="text-align: left;">3rd Qu.: 62.75</td>
+<td style="text-align: left;">3rd Qu.: 8.000</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">min_n</td>
-<td style="text-align: left;">Max. :100.00</td>
+<td style="text-align: left;">Max. :10.000</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">loss_reduction</td>
-<td style="text-align: left;">Min. :1.000</td>
+<td style="text-align: left;">Min. :0.000010</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">loss_reduction</td>
-<td style="text-align: left;">1st Qu.:1.334</td>
+<td style="text-align: left;">1st Qu.:0.000150</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">loss_reduction</td>
-<td style="text-align: left;">Median :1.778</td>
+<td style="text-align: left;">Median :0.002239</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">loss_reduction</td>
-<td style="text-align: left;">Mean :1.879</td>
+<td style="text-align: left;">Mean :0.049116</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">loss_reduction</td>
-<td style="text-align: left;">3rd Qu.:2.371</td>
+<td style="text-align: left;">3rd Qu.:0.033586</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">loss_reduction</td>
-<td style="text-align: left;">Max. :3.162</td>
+<td style="text-align: left;">Max. :0.501187</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">mtry</td>
-<td style="text-align: left;">Min. : 1.00</td>
+<td style="text-align: left;">Min. : 8.0</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">mtry</td>
-<td style="text-align: left;">1st Qu.:13.00</td>
+<td style="text-align: left;">1st Qu.:17.0</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">mtry</td>
-<td style="text-align: left;">Median :25.50</td>
+<td style="text-align: left;">Median :30.0</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">mtry</td>
-<td style="text-align: left;">Mean :26.78</td>
+<td style="text-align: left;">Mean :33.0</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">mtry</td>
-<td style="text-align: left;">3rd Qu.:39.75</td>
+<td style="text-align: left;">3rd Qu.:48.5</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">mtry</td>
-<td style="text-align: left;">Max. :58.00</td>
+<td style="text-align: left;">Max. :67.0</td>
 </tr>
 </tbody>
 </table>
@@ -3612,96 +3709,38 @@ Computational engine: xgboost </code></pre>
 </div>
 </div>
 </section>
-<section id="selection-metric-at-the-inner-fold-level" class="level3">
-<h3 class="anchored" data-anchor-id="selection-metric-at-the-inner-fold-level">9.2 Selection metric at the inner fold level</h3>
-<p>For each outer fold, the best hyperparameter set is chosen by aggregating a composite <strong>“mix” score</strong> across all inner spatial folds. The score balances two objectives:</p>
-<ul>
-<li><strong>PR-AUC</strong> (area under the precision–recall curve): a threshold-free metric suited to heavily imbalanced data; strongly sensitive to the quality of predicted probabilities for the rare positive class.</li>
-<li><strong>Excess log-loss</strong>: the difference between the model’s log-loss and the entropy of the marginal class distribution (i.e., the log-loss of a model that predicts only the base rate). This penalises overconfident wrong predictions in folds that contain no outbreaks at all.</li>
-</ul>
-<p>For a given hyperparameter index and outer fold, the score across inner folds is:</p>
-<p><span class="math display">\[\text{score} = \frac{\sum_k w_k \cdot s_k}{\sum_k w_k}\]</span></p>
-<p>where, for each inner fold <span class="math inline">\(k\)</span>:</p>
-<p><span class="math display">\[s_k = \begin{cases}
-\text{PR-AUC}_k \times n_{\text{pos},k} &amp; \text{if } n_{\text{pos},k} &gt; 0 \\[4pt]
--\lambda \times \text{ExcessLogLoss}_k \times n_{\text{all},k} &amp; \text{if } n_{\text{pos},k} = 0
-\end{cases}\]</span></p>
-<p><span class="math display">\[w_k = \begin{cases}
-n_{\text{pos},k} &amp; \text{if } n_{\text{pos},k} &gt; 0 \\
-n_{\text{all},k} &amp; \text{otherwise}
-\end{cases}\]</span></p>
-<p>and <span class="math inline">\(\lambda = 10^{-5}\)</span> is a scaling constant controlling how much outbreak-free inner folds constrain the search. Weighting by <span class="math inline">\(n_{\text{pos},k}\)</span> ensures inner folds with more outbreak events exert proportionally greater influence. The hyperparameter set with the <strong>maximum</strong> score is selected for each outer fold.</p>
-<p>The R implementation from <code>join_tuned_inner_folds()</code>:</p>
+<section id="selection-metric-class-conditional-log-loss" class="level3">
+<h3 class="anchored" data-anchor-id="selection-metric-class-conditional-log-loss">9.2 Selection metric: class-conditional log-loss</h3>
+<p>Each (outer fold × inner fold × hyperparameter index) fit is scored per forecast horizon (<code>compute_metrics_vec()</code>) using a <strong>class-conditional log-loss</strong>, which replaced an earlier PR-AUC-plus-excess-log-loss “mix” score after that formula was found to have a critical flaw: a null model that predicts the marginal prevalence for every observation achieves an <em>excess</em> log-loss of exactly zero (by definition) and a small-but-nonzero PR-AUC, so it could score at or near the maximum achievable value and was never reliably beaten by a model that actually discriminates. A full derivation and worked numerical comparison of the two formulas is in <code>docs/tuning_pipeline_description.Rmd</code>; the essential change is below.</p>
+<p><strong>Per fold-horizon quantities</strong> (<code>compute_metrics_vec()</code>), computed separately on the true positives and true negatives of the assessment set:</p>
+<p><span class="math display">\[\text{logloss\_pos} = \frac{1}{n_+} \sum_{i:\,y_i=1} -\log(\hat p_i + \epsilon) \qquad \text{logloss\_neg} = \frac{1}{n_-} \sum_{i:\,y_i=0} -\log(1 - \hat p_i + \epsilon)\]</span></p>
+<p>with <span class="math inline">\(\epsilon = 10^{-15}\)</span> to avoid <span class="math inline">\(-\infty\)</span>, and <code>logloss_pos</code> undefined (<code>NA</code>) when a fold-horizon has no true positives (<span class="math inline">\(n_+ = 0\)</span>).</p>
+<p><strong>Pooled score components</strong> (<code>finalize_hyperparameters_from_inner()</code>), aggregated across every (outer × inner × horizon) row sharing a hyperparameter index <span class="math inline">\(k\)</span>:</p>
+<p><span class="math display">\[S_\text{pos} = -\frac{\sum_k \text{logloss\_pos}_k \cdot n_{+,k}}{\sum_{k:\,n_{+,k}&gt;0} n_{+,k}} \qquad\qquad S_\text{neg\_penalty} = \frac{\sum_k \text{logloss\_neg}_k \cdot n_{\text{all},k}}{\sum_k n_{\text{all},k}}\]</span></p>
+<p><span class="math display">\[\boxed{\text{final\_score} = S_\text{pos} - \texttt{weightval} \times S_\text{neg\_penalty}} \qquad \text{(maximise)}\]</span></p>
+<p><span class="math inline">\(S_\text{pos}\)</span> rewards assigning high probability to true outbreaks (the null model scores <span class="math inline">\(S_\text{pos} \approx -\log(p) \approx -5\)</span> to <span class="math inline">\(-7\)</span> at this data’s prevalence, not 0, so it can no longer “hide” at the top of the ranking); <span class="math inline">\(S_\text{neg\_penalty}\)</span> penalises high probabilities on true non-outbreaks and is well-defined even for fold-horizons with zero positives, so those folds still contribute useful false-alarm information without diluting <span class="math inline">\(S_\text{pos}\)</span>. The maximum possible score is 0 (a perfect classifier).</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>metric_summary.s <span class="ot">&lt;-</span> metric_summary <span class="sc">|&gt;</span></span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">weight  =</span> <span class="fu">if_else</span>(n_pos <span class="sc">&gt;</span> <span class="dv">0</span>, n_pos, n_all)</span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  , <span class="at">contrib =</span> <span class="fu">case_when</span>(</span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>      n_pos <span class="sc">&gt;</span> <span class="dv">0</span>  <span class="sc">~</span> pr_auc <span class="sc">*</span> n_pos</span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    , n_pos <span class="sc">==</span> <span class="dv">0</span> <span class="sc">~</span> <span class="sc">-</span>weightval <span class="sc">*</span> exlogloss <span class="sc">*</span> n_all</span>
-<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(outer_fold_id, index) <span class="sc">|&gt;</span></span>
-<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
-<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">final_score =</span> <span class="fu">sum</span>(contrib, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="sc">/</span> <span class="fu">sum</span>(weight, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>  , <span class="at">.groups     =</span> <span class="st">&quot;drop&quot;</span></span>
-<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>scores <span class="ot">&lt;-</span> all_results <span class="sc">|&gt;</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(index) <span class="sc">|&gt;</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">S_pos         =</span> <span class="sc">-</span><span class="fu">sum</span>(logloss_pos <span class="sc">*</span> n_pos, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="sc">/</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>                     <span class="fu">pmax</span>(<span class="fu">sum</span>(n_pos[<span class="sc">!</span><span class="fu">is.na</span>(logloss_pos)], <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="dv">1</span>L)</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  , <span class="at">S_neg_penalty =</span> <span class="fu">sum</span>(logloss_neg <span class="sc">*</span> n_all, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="sc">/</span> <span class="fu">sum</span>(n_all, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  , <span class="at">.groups       =</span> <span class="st">&quot;drop&quot;</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">final_score =</span> S_pos <span class="sc">-</span> weightval <span class="sc">*</span> S_neg_penalty)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
-<section id="selection-across-outer-folds" class="level3">
-<h3 class="anchored" data-anchor-id="selection-across-outer-folds">9.3 Selection across outer folds</h3>
-<p>Having identified the best inner-fold hyperparameter set for each outer fold, the same “mix” criterion is applied across outer folds to select a <strong>single final hyperparameter set</strong> used for all final model fits.</p>
+<section id="selection-across-folds-and-grids" class="level3">
+<h3 class="anchored" data-anchor-id="selection-across-folds-and-grids">9.3 Selection across folds and grids</h3>
+<p>Rather than selecting a winning hyperparameter set per outer fold and then aggregating (which would add a second-stage decision rule and leave each per-fold estimate with very high variance, given how few positives any single outer × inner combination contains), all (outer fold × inner fold × horizon) results from <strong>both</strong> the global and local-refinement grids are pooled globally before scoring. The single hyperparameter index with the highest combined <code>final_score</code> is selected and used for every final model fit (Section 10).</p>
+<p>A <code>weightval</code> (the <span class="math inline">\(\lambda\)</span> penalty weight on <span class="math inline">\(S_\text{neg\_penalty}\)</span>) of approximately <strong>500</strong> (set in <code>model_framework_targets.R</code>) is the operating weight as of July, 2026 (though it remains unclear exactly what the value of <code>weightval</code> should be). A large <code>weightval</code> is needed because <span class="math inline">\(S_\text{pos}\)</span> and <span class="math inline">\(S_\text{neg\_penalty}\)</span> live on very different scales: at this data’s prevalence, a competitive model’s <span class="math inline">\(S_\text{pos}\)</span> moves over a range of a few units (roughly <span class="math inline">\(-1\)</span> to <span class="math inline">\(-6\)</span>), while <span class="math inline">\(S_\text{neg\_penalty}\)</span> — the mean log-loss on true negatives, which are the overwhelming majority of the data and are usually assigned probabilities close to the true baseline — typically sits close to 0 (often <span class="math inline">\(10^{-2}\)</span> or smaller). A <code>weightval</code> on the order of hundreds is needed for the false-alarm term to meaningfully compete with the positive-prediction term in that regime (smaller values in the 1–5 range effectively let the search ignore false-alarm rates almost entirely). <code>finalize_hyperparameters_from_inner()</code> only re-reads already-computed result files, so different <code>weightval</code> choices can be re-evaluated at negligible computational cost by deleting the saved hyperparameter CSV and rerunning the finalization step.</p>
 <hr>
 </section>
 </section>
 <section id="final-model-fitting" class="level2">
 <h2 class="anchored" data-anchor-id="final-model-fitting">10. Final Model Fitting</h2>
-<p>After hyperparameter selection, the model is fit on an expanding sequence of test-period temporal windows (mirroring the outer-fold CV structure but applied to the held-out post-2020-12-19 data). For each test window, the model is trained on <strong>all available data up to the test-window start</strong> — both the full cross-validation training set and any preceding test windows — using the finalized hyperparameters.</p>
-<div class="cell">
-<div class="cell-output-display">
-<div class="kable-table">
-<table class="caption-top table table-sm table-striped small">
-<thead>
-<tr class="header">
-<th style="text-align: left;">Parameter</th>
-<th style="text-align: right;">Finalized value</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">Index</td>
-<td style="text-align: right;">15.0000</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">Trees</td>
-<td style="text-align: right;">231.0000</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">Tree depth</td>
-<td style="text-align: right;">10.0000</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">Learn rate</td>
-<td style="text-align: right;">0.4737</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">Min node size</td>
-<td style="text-align: right;">51.0000</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">Loss reduction</td>
-<td style="text-align: right;">2.0835</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">mtry</td>
-<td style="text-align: right;">22.0000</td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-</div>
-<p>The full recipe fit on the final training data reports the following structure:</p>
+<p>After hyperparameter selection, the model is fit on an expanding sequence of test-period temporal windows (mirroring the outer-fold CV structure but applied to the held-out post-2020-12-19 data; see documentation/openRVFcast_Walkthrough.docx for a visual description of this model fitting). For each test window, the model is trained on <strong>all available data up to the test-window start</strong> using the finalized hyperparameters.</p>
 <hr>
 </section>
 <section id="post-fit-analysis" class="level2">
@@ -3713,7 +3752,7 @@ n_{\text{all},k} &amp; \text{otherwise}
 </section>
 <section id="shap-values-stratified-by-forecast-interval" class="level3">
 <h3 class="anchored" data-anchor-id="shap-values-stratified-by-forecast-interval">11.2 SHAP values stratified by forecast interval</h3>
-<p>SHapley Additive exPlanations (SHAP) are computed using XGBoost’s built-in TreeSHAP algorithm (<code>predict(..., predcontrib = TRUE)</code>). Computing SHAP values for all ~4.7 million rows per model fit would take ~15 hours; instead, a <strong>stratified random sample</strong> of one observation per (hex × calendar month × forecast interval) combination is drawn (~100,000 rows, ~15 min computation).</p>
+<p>SHapley Additive exPlanations (SHAP) are computed using XGBoost’s built-in TreeSHAP algorithm (<code>predict(..., predcontrib = TRUE)</code>). Computing SHAP values for every row of a given model fit’s assessment data (several million rows, growing as more dates are added to the pipeline) would take on the order of hours; instead, a <strong>stratified random sample</strong> of one observation per (hex × calendar month × forecast interval) combination is drawn (~100,000 rows, ~15 min computation).</p>
 <p>SHAP values are summarised as mean |SHAP| and mean signed SHAP per feature per forecast interval, then aggregated across outer folds. The resulting heatmap is the primary interpretability output: it reveals how the relative importance of each predictor group shifts with forecast lead time. For example, recent weather anomalies (fast-moving) tend to be more influential at short horizons, while bioclimatic suitability and seroprevalence (slow-moving) become relatively more important at longer horizons.</p>
 <hr>
 </section>
