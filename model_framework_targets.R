@@ -397,7 +397,7 @@ model_tuning_targets <- tar_plan(
   , tune_pars            = tune_pars
   , top_k                = 8
   , size                 = 75
-  , weightval            = 3
+  , weightval            = 500
   , expansion            = 0.2
   , grid_path            = "data/hypergrid"
   , hyperparam_path      = hyperparam_path
@@ -470,7 +470,7 @@ model_tuning_targets <- tar_plan(
      ## Range 1-5 seems most reasonable? Can examine with relatively little computation by
      ## re-running finalize_hyperparameters_from_inner on already-computed fold results
      ## and inspecting how predicted probabilities shift in fitted_model.
-  , weightval      = 3
+  , weightval      = 500
   , tuning_grid_id = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")
   , outpath        = local_hyperparam_path))
 

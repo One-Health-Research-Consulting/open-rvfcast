@@ -115,7 +115,7 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
   #outer_tbl_assess <- outer_tbl_assess |> dplyr::select(-pred_sero)
   #outer_tbl_train  <- outer_tbl_train |> dplyr::select(-Country)
   #outer_tbl_assess <- outer_tbl_assess |> dplyr::select(-Country)
-
+  
   ## Set up and fit the final model for this outer fold
   rec       <- make_recipe(outer_tbl_train, id_cols = id_cols)
   mod       <- make_model(params = final_hyper_set, start_p = start_p, spw = spw)

@@ -17,9 +17,6 @@ for (f in list.files(here::here("R"), full.names = TRUE)) source(f)
 
 aws_bucket <- Sys.getenv("AWS_BUCKET_ID")
 
-## Get the "purpose" of the current run (full model 'train' or 'forecast')
-purpose <- Sys.getenv("PURPOSE")
-
 ## Targets options
 source("_targets_settings.R")
 
@@ -341,35 +338,6 @@ dynamic_targets <- tar_plan(
     }) |>
     na.omit()
 
-    ## Process only the dates_to_process_all dates that have not yet been written.
-    ## Using membership rather than max-date comparison avoids skipping unprocessed
-    ## historical dates when a more recent forecast anchor parquet already exists.
-    narrow_dates <- dates_to_process_all[!as.character(dates_to_process_all) %in% processed_dates]
-
-    ## If the purpose is forecasting (which will be set to occur on the first of each month),
-     ## this chunk of code finds the most recent date that will have the needed data given
-     ## the lags in acquiring those data source (about a week total), which will mean that
-     ## forecasts made on the first of a month will be about a week stale -- but this is 
-     ## basically as good as we can do
-    if (purpose == "forecast") {
-
-      ## Forecast anchor = last day of the previous complete month.
-      ## ERA5T for the previous month is always fully available by the time the
-      ## pipeline runs (end-of-month is well past the 5-day ERA5T lag).
-      ## Anchoring to floor_date - 1 prevents current-month ERA5T download failures.
-      era5t_anchor <- lubridate::floor_date(Sys.Date(), "month") - 1L
-
-      ## Exclude current-month dates: ERA5T is not yet available for the current month.
-      ## NASA downloads whatever is available for each month; fetch_and_transform_nasa_weather
-      ## handles 404s gracefully, and africa_full_predictor_data_sources_temporal falls
-      ## back to ERA5T anomaly files for any date without a NASA anomaly file.
-      narrow_dates <- narrow_dates[narrow_dates <= era5t_anchor]
-
-      ## Anchor is always appended so the pipeline always has a fresh forecast date.
-      ## unique() removes the duplicate when era5t_anchor is already in narrow_dates.
-      narrow_dates <- unique(c(narrow_dates, era5t_anchor))
-    }
-
     narrow_dates
 
   })
@@ -683,11 +651,11 @@ dynamic_targets <- tar_plan(
   ## Most often a 30 day forecast, in example, will overlap multiple base date
   ## forecast ranges.
 , tar_target(ecmwf_forecasts_transformed, transform_ecmwf_forecasts(
-    ecmwf_forecasts_api_parameters
-  , ecmwf_forecasts_transformed_directory
-  , continent_raster_template
-  , basename_template = "ecmwf_seasonal_forecast_{month}_{year}.parquet"
-  , overwrite         = parse_flag("OVERWRITE_ECMWF_FORECASTS")
+    ecmwf_forecasts_api_parameters        = ecmwf_forecasts_api_parameters
+  , ecmwf_forecasts_transformed_directory = ecmwf_forecasts_transformed_directory
+  , continent_raster_template             = continent_raster_template
+  , basename_template                     = "ecmwf_seasonal_forecast_{month}_{year}.parquet"
+  , overwrite                             = parse_flag("OVERWRITE_ECMWF_FORECASTS")
   , get_ecmwf_forecasts_AWS)
   , pattern           = map(ecmwf_forecasts_api_parameters)
   , error             = "null"

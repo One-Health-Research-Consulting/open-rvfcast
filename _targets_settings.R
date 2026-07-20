@@ -20,11 +20,23 @@ if (Sys.getenv("NPROC", unset = "1") != "1") {
       name = "local"
     , reset_globals = FALSE
     , workers = as.integer(Sys.getenv("NPROC", unset = "1"))
-    , seconds_timeout  = 120
+      # Timeouts raised well above worker startup + sync-check time so a slow-but-alive
+      # worker (fresh R + full tidymodels/xgboost load every task under memory pressure)
+      # is not mis-classified as a crash.
+    , seconds_timeout  = 600
     , seconds_interval = 5
-    , seconds_launch = 120
-    , retry_tasks = TRUE
-    , tasks_max = 1
+    , seconds_launch   = 600
+      # Tolerate transient worker deaths (e.g. an occasional OOM kill when heavy tuning
+      # branches coincide) by retrying the branch many times before aborting tar_make,
+      # instead of the default of 5.
+    , crashes_max = 30L
+      # Run gc() on the worker after each task to shed peak memory between branches.
+    , garbage_collection = TRUE
+      # One task per worker keeps memory from accumulating across branches.
+    , tasks_max = 1L
+      # Persist per-worker stdout/stderr so the actual cause of any crash (OOM kill vs.
+      # segfault) is captured rather than lost.
+    , options_local = crew::crew_options_local(log_directory = "logs/crew")
     )
   )
 }

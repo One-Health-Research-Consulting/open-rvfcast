@@ -85,7 +85,7 @@ transform_ecmwf_forecasts <- function(ecmwf_forecasts_api_parameters,
         product_type = product_type,
         variable = variable,
         year = year,
-        month = month, # The current month
+        month = sprintf("%02d", month), # CDS requires a zero-padded two-digit month string (e.g. "07")
         leadtime_month = unlist(ecmwf_forecasts_api_parameters$leadtime_months), # What will the weather be X months from the current month?
         area = round(unlist(ecmwf_forecasts_api_parameters$spatial_bounds), 1),
         format = "grib",

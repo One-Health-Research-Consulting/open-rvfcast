@@ -22,9 +22,6 @@ for (f in list.files(here::here("R"), full.names = TRUE)) source(f)
 
 aws_bucket <- Sys.getenv("AWS_BUCKET_ID")
 
-## Get the "purpose" of the current run (full model 'train' or 'forecast')
-purpose <- Sys.getenv("PURPOSE")
-
 ## Targets options
 source("_targets_settings.R")
 
@@ -35,7 +32,7 @@ source("_targets_settings.R")
 using_hexes <- TRUE
 
 ## If true, rebuilds all dates regardless of whether or not they exist
-rebuild <- TRUE
+rebuild <- FALSE
 
 ## reduce outbreaks by looking at resolution of nearby start dates?
  ## NOTE: not supported yet, because no decision has been made on how to reduce

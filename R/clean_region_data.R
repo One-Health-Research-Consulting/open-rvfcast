@@ -14,7 +14,10 @@ clean_region_data <- function(dat, map_dat) {
   ## Drop all columns that already have a scaled counterpart
   scaled_cols <- names(dat)[str_detect(names(dat), "_scaled_")]
   base_cols   <- str_replace(scaled_cols, "_scaled_", "_")
-  dat         <- dat |> select(-any_of(base_cols))
+  dat         <- dat |> dplyr::select(-any_of(base_cols))
+  
+  ## Drop the sero colums we are not using
+  dat <- dat |> dplyr::select(-contains("anomaly_scaled_sero"))
 
   ## Not ideal as this will need to be manually adjusted, but ok for now. Scale
    ## all of these
