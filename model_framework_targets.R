@@ -62,6 +62,14 @@ district_id_col <- "shapeName"
 ## include the background random effect intercept layer (sero unaccounted for by the cases) or not
 use_sero_kernel_intercept <- FALSE
 
+## Which hyperparameter-selection strategy feeds the final model fit, variable importance, and
+ ## SHAP targets: the original pooled-log-loss score (finalized_hyperparameters) or the
+ ## hex-relative score (finalized_hyperparameters_hexrelative, see R/hex_relative_scoring.R),
+ ## which scores predictions against each hex's own baseline instead of pooling across all
+ ## hexes together. Both tuning branches always run (so their outputs stay comparable) --
+ ## this flag only chooses which one is used downstream. Flip this one value to switch.
+use_hexrelative_scoring <- TRUE
+
 ## Targets for loading needed data ---------------------------------------------
 model_data_targets <- tar_plan(
 
@@ -474,6 +482,170 @@ model_tuning_targets <- tar_plan(
   , tuning_grid_id = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")
   , outpath        = local_hyperparam_path))
 
+## Hex-relative tuning branch (R/hex_relative_scoring.R) ------------------------
+ ## Mirrors the global -> local -> finalize structure above exactly, but scores predictions
+ ## relative to each hex's own baseline instead of pooling across all hexes. Every grid_path,
+ ## out_dir, and hyperparam_path below is distinct from the originals so the two branches
+ ## never read or overwrite each other's cache -- the only things reused are upstream,
+ ## scoring-agnostic targets (folded_data_training, splitted_data, tune_pars, id_cols,
+ ## outer_fold_prejoined, chunk_id, etc.), which are just shared input data, not shared cache.
+
+  ## Column identifying the spatial hex for the within-hex baseline (matches district_id_col)
+, tar_target(hex_id_col_for_scoring, district_id_col)
+
+  ## Distinct seed so this grid is an independent draw, not a copy of tuning_grid
+, tar_target(hypergrid_seed_hexrelative, 71982634)
+
+, tar_target(tuning_grid_hexrelative, build_hyperparameter_grid(
+    tune_pars            = tune_pars
+  , grid_path            = "data/hypergrid_hexrelative"
+  , folded_data_training = folded_data_training
+  , splitted_data        = splitted_data
+  , overwrite            = FALSE
+  , seed                 = hypergrid_seed_hexrelative))
+
+, tar_target(inner_fold_id_hexrelative, prep_fold_ids(
+    folded_data = folded_data_training
+  , raw_data    = splitted_data) |>
+  cross_join(tuning_grid_hexrelative$par_grid[[1]]) |>
+  group_by(outer_fold_id) |>
+  filter(inner_fold_id %in% unique(inner_fold_id)) |>
+  ungroup())
+
+, tar_target(inner_fold_id_finalized_hexrelative, {
+   tfolds <- prep_outer_ids(
+      folded_data = folded_data_training
+    , raw_data    = splitted_data
+    , inner_ids   = inner_fold_id_hexrelative)
+  tfolds[sample(nrow(tfolds)), ]})
+
+, tar_target(outer_folds_dir_hexrelative, create_data_directory(
+    directory_path = paste("outputs/", region_name, "_model_tuning_inner_hexrel_ws", sep = "")))
+
+  ## DIAGNOSTIC ONLY, mirroring inner_fold_ids_per_outer_chunked -- nothing downstream depends on this
+, tar_target(inner_fold_ids_per_outer_chunked_hexrelative
+  , inner_fold_id_finalized_hexrelative |>
+     dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id) |>
+     chunk_rows(n_chunks = n_tune_chunks, which = chunk_id) |>
+     dplyr::mutate(chunk_id = chunk_id, .after = "outer_fold_id")
+   , pattern = cross(folded_data_training, chunk_id))
+
+, tar_target(hyperparam_path_hexrelative, paste0(
+  "outputs/hyperparameters/best_hyperparameters_hexrel_", tuning_grid_hexrelative$grid_id, ".csv"))
+
+, tar_target(tuned_results_per_outer_fold_hexrelative, tune_results_per_outer_fold_hexrelative(
+    prejoined_data  = outer_fold_prejoined
+  , inner_ids_all   = inner_fold_id_finalized_hexrelative |>
+                        dplyr::filter(outer_fold_id == outer_fold_prejoined$outer_fold_id) |>
+                        chunk_rows(n_chunks = n_tune_chunks, which = chunk_id)
+  , threshold       = positive_threshold
+  , weightings      = weightings_on_ones
+  , start_p         = start_p
+  , id_cols         = id_cols
+  , out_dir         = outer_folds_dir_hexrelative
+  , tuning_grid_id  = tuning_grid_hexrelative$grid_id
+  , hyperparam_path = hyperparam_path_hexrelative
+  , overwrite       = FALSE
+  , DEBUG           = FALSE
+  , chunk_id        = chunk_id
+  , checktime_path  = "outputs/timing"
+  , hex_id_col      = hex_id_col_for_scoring)
+  , pattern         = cross(outer_fold_prejoined, chunk_id)
+  , error           = "null"
+  , format          = "file")
+
+  ## Penalty weight on S_neg_penalty (raw/global, non-hex), used for the final_score component that
+   ## gets folded into final_score_combined via gamma 
+, tar_target(weightval_raw_for_scoring, 500)
+
+  ## Penalty weight on S_neg_penalty_hex. Within hex weight for hexes that have
+   ## never experienced an outbreak (~92% of hexes have never had an event) 
+, tar_target(weightval_hex_for_scoring, 10)
+
+  ## Weight on the raw (non-hex) final_score when blending it into final_score_combined =
+   ## final_score_hex + gamma * final_score (see score_hexrelative_results in
+   ## R/hex_relative_scoring.R). This exists so a hyperparameter set that gets the within-hex
+   ## timing right but is systematically miscalibrated overall (too high/low everywhere in a
+   ## given hex) can still be penalized. gamma = 0 reduces to pure hex-relative selection (i.e., 
+   ## if overall mean is bad but seasonality is captured it is highly rewarded).
+   ## final_score and final_score_hex live on very different natural scales so need a much
+   ## smaller value here 
+, tar_target(gamma_for_combined_score, 0.01)
+
+  ## Build a refined local grid centred on the top-k global results, ranked by final_score_combined
+, tar_target(local_tuning_grid_hexrelative, build_local_hyperparameter_grid_hexrelative(
+    inner_fold_paths     = tuned_results_per_outer_fold_hexrelative
+  , global_grid          = tuning_grid_hexrelative
+  , tune_pars            = tune_pars
+  , top_k                = 8
+  , size                 = 75
+  , weightval_raw        = weightval_raw_for_scoring
+  , weightval_hex        = weightval_hex_for_scoring
+  , gamma                = gamma_for_combined_score
+  , expansion            = 0.2
+  , grid_path            = "data/hypergrid_hexrelative"
+  , folded_data_training = folded_data_training
+  , splitted_data        = splitted_data
+  , seed                 = hypergrid_seed_hexrelative))
+
+, tar_target(local_hyperparam_path_hexrelative, paste0(
+  "outputs/hyperparameters/best_hyperparameters_hexrel_combined_"
+  , tuning_grid_hexrelative$grid_id, "--", local_tuning_grid_hexrelative$grid_id, ".csv"))
+
+, tar_target(local_inner_fold_id_finalized_hexrelative, {
+  base   <- prep_fold_ids(folded_data = folded_data_training, raw_data = splitted_data) |>
+    cross_join(local_tuning_grid_hexrelative$par_grid[[1]])
+  tfolds <- prep_outer_ids(
+    folded_data = folded_data_training
+  , raw_data    = splitted_data
+  , inner_ids   = base)
+  tfolds[sample(nrow(tfolds)), ]
+  })
+
+  ## DIAGNOSTIC ONLY, mirroring local_inner_fold_ids_per_outer_chunked -- nothing downstream depends on this
+, tar_target(local_inner_fold_ids_per_outer_chunked_hexrelative
+   , local_inner_fold_id_finalized_hexrelative |>
+      dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id) |>
+      chunk_rows(n_chunks = n_tune_chunks, which = chunk_id) |>
+      dplyr::mutate(chunk_id = chunk_id, .after = "outer_fold_id")
+   , pattern = cross(folded_data_training, chunk_id))
+
+, tar_target(local_tuned_results_hexrelative, tune_results_per_outer_fold_hexrelative(
+     prejoined_data  = outer_fold_prejoined
+   , inner_ids_all   = local_inner_fold_id_finalized_hexrelative |>
+                          dplyr::filter(outer_fold_id == outer_fold_prejoined$outer_fold_id) |>
+                          chunk_rows(n_chunks = n_tune_chunks, which = chunk_id)
+   , threshold       = positive_threshold
+   , weightings      = weightings_on_ones
+   , start_p         = start_p
+   , id_cols         = id_cols
+   , out_dir         = outer_folds_dir_hexrelative
+   , tuning_grid_id  = local_tuning_grid_hexrelative$grid_id
+   , hyperparam_path = local_hyperparam_path_hexrelative
+   , overwrite       = FALSE
+   , DEBUG           = FALSE
+   , chunk_id        = chunk_id
+   , checktime_path  = "outputs/timing"
+   , hex_id_col      = hex_id_col_for_scoring)
+   , pattern         = cross(outer_fold_prejoined, chunk_id)
+   , error           = "null"
+   , format          = "file")
+
+  ## weightval_raw/weightval_hex/gamma are NOT passed here separately -- they are read directly
+   ## off local_tuning_grid_hexrelative inside finalize_hyperparameters_from_inner_hexrelative, so
+   ## this stage can never silently drift out of sync with whatever scoring parameters actually
+   ## built that grid (see the note on build_local_hyperparameter_grid_hexrelative)
+, tar_target(finalized_hyperparameters_hexrelative, finalize_hyperparameters_from_inner_hexrelative(
+    inner_folds       = c(tuned_results_per_outer_fold_hexrelative, local_tuned_results_hexrelative)
+  , local_tuning_grid = local_tuning_grid_hexrelative
+  , tuning_grid_id    = paste(tuning_grid_hexrelative$grid_id, local_tuning_grid_hexrelative$grid_id, sep = "--")
+  , outpath           = local_hyperparam_path_hexrelative))
+
+  ## Single point of control for which strategy's hyperparameters actually get used below --
+  ## see use_hexrelative_scoring at the top of this file
+, tar_target(final_hyper_set_selected
+  , if (use_hexrelative_scoring) finalized_hyperparameters_hexrelative else finalized_hyperparameters)
+
 )
 
 ## Fitting of model on holdout data --------------------------------------------
@@ -491,7 +663,7 @@ model_fitting_targets <- tar_plan(
   ## Use the finalized hyperparameters to fit the model for all of the chunks of time that
    ## make up the testing phase
 , tar_target(fitted_model, fit_model(
-    final_hyper_set = finalized_hyperparameters
+    final_hyper_set = final_hyper_set_selected
   , full_data       = folded_data_for_fitting
   , train_data      = train_data_fitting
   , test_data       = test_data_fitting
@@ -529,7 +701,7 @@ model_evaluation_targets <- tar_plan(
    ## given variable_importance_prep_a
 , tar_target(variable_importance, calculate_variable_importance(
     model_dat       = variable_importance_prep_a
-  , final_hyper_set = finalized_hyperparameters
+  , final_hyper_set = final_hyper_set_selected
   , fitted_model    = fitted_model
   , fitdir          = outer_folds_dir3
   , recdir          = outer_folds_dir3
@@ -549,7 +721,7 @@ model_evaluation_targets <- tar_plan(
   ## Compute per-row SHAP values and summarize as mean |SHAP| per feature per forecast_interval
 , tar_target(shap_by_forecast_interval, calculate_shap_by_forecast_interval(
     model_dat       = shap_prep_a
-  , final_hyper_set = finalized_hyperparameters
+  , final_hyper_set = final_hyper_set_selected
   , fitted_model    = fitted_model
   , fitdir          = outer_folds_dir3
   , recdir          = outer_folds_dir3)
