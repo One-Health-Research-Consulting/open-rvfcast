@@ -15,52 +15,50 @@
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
 #' @param DEBUG If TRUE reduce to a small dataset for code testing
 #' @param chunk_id Index of the (inner_fold x tune_grid) chunk this branch is responsible for.
-#'   Only needed to keep this branch's timing log distinct from other chunks of the same
-#'   outer fold running concurrently; not used to select data (inner_ids_all is already
-#'   pre-sliced to this chunk upstream).
 #' @param checktime_path path to save csv tracking computation time
+#' @param hex_id_col Column identifying the spatial hex
 #' @return Character vector of file paths, one per (inner_fold_id, tune_grid_index) combination
 #' @author Morgan Kain
 #' @export
 
-tune_results_per_outer_fold <- function(prejoined_data, inner_ids_all, threshold
-                                      , weightings, start_p, id_cols, out_dir
-                                      , tuning_grid_id, hyperparam_path, overwrite, DEBUG
-                                      , chunk_id, checktime_path) {
-
+tune_results_per_outer_fold <- function(
+    prejoined_data, inner_ids_all, threshold
+  , weightings, start_p, id_cols, out_dir
+  , tuning_grid_id, hyperparam_path, overwrite, DEBUG
+  , chunk_id, checktime_path, hex_id_col = "shapeName"
+) {
+  
   ## First, check if this tuning_grid_id already has a saved best parameter set
-  if (file.exists(hyperparam_path)) {
-    return(hyperparam_path)
-  }
-
+  if (file.exists(hyperparam_path)) return(hyperparam_path)
+  
   ## Extract the outer fold ID and the pre-joined covariate data for this branch.
   ## joined_data already contains inner fold indices left-joined with train_data covariates,
   ## so no join is needed inside the loop -- only cluster-based filtering per iteration.
   outer_fold_id <- prejoined_data$outer_fold_id
   joined_data   <- prejoined_data$data[[1]]
-
+  
   error_safe_read_file <- possibly(readRDS, NULL)
-
+  
   ## Iterate over every (inner_fold_id, tune_grid_index) combination for this outer fold.
   ## Each fit is saved to its own file so partial progress survives a restart or error.
-  save_filenames <- character(nrow(inner_ids_all))
-
-checktime_tibble <- tibble(user = numeric(0), sys = numeric(0), elapsed = numeric(0))
-
-## chunk_id is folded into the filename because multiple chunks of the same outer fold now
-## run concurrently (see cross(outer_fold_prejoined, chunk_id) in model_framework_targets.R);
-## without it, concurrent branches would overwrite each other's timing log
-checktime_path.full <- paste0(checktime_path, "/outer_fold_", outer_fold_id, "_chunk_", chunk_id, ".csv")
-
+  save_filenames       <- character(nrow(inner_ids_all))
+  
+  checktime_tibble    <- tibble(user = numeric(0), sys = numeric(0), elapsed = numeric(0))
+  
+  ## chunk_id is folded into the filename because multiple chunks of the same outer fold now
+  ## run concurrently (see cross(outer_fold_prejoined, chunk_id) in model_framework_targets.R);
+  ## without it, concurrent branches would overwrite each other's timing log
+  checktime_path.full <- paste0(checktime_path, "/outer_fold_", outer_fold_id, "_chunk_", chunk_id, "_hexrel.csv")
+  
   for (i in seq_len(nrow(inner_ids_all))) {
-
+    
     inner_ids   <- inner_ids_all[i, ]
     inner_id    <- inner_ids$inner_fold_id
     tuning_grid <- inner_ids |> dplyr::select(-contains("fold_id"))
-
-    ## Set filename (identical naming convention to the previous single-branch design)
+    
+    ## Create a new file saving convention so it doesn't conflict with the other option
     save_filename <- paste(
-        out_dir
+      out_dir
       , "/"
       , "inner_tuning_"
       , "outer_fold_"
@@ -74,121 +72,123 @@ checktime_path.full <- paste0(checktime_path, "/outer_fold_", outer_fold_id, "_c
       , ".Rds"
       , sep = ""
     )
-
+    
     if (!is.null(error_safe_read_file(save_filename)) && !overwrite) {
       message("file already exists and can be loaded, skipping processing")
       save_filenames[i] <- save_filename
       next
     }
-
+    
     checktime <- system.time({
-
-    ## Inner training data: exclude one spatial cluster
-    inner_tbl_train <- joined_data |>
-      dplyr::filter(cluster != inner_id) |>
-      relocate(cluster, .after = "date") |>
-      dplyr::select(-c(cluster, cases)) |>
-      mutate(outbreak = as.factor(outbreak)) |>
-      mutate(forecast_interval = as.factor(forecast_interval))
-
-    ## Class imbalance handled via scale_pos_weight in engine, not case weights
-    spw <- calc_spw(inner_tbl_train)
-
-    ## Inner assessment data: extract the held-out spatial cluster
-    ## weights stored as plain numeric (not hardhat_importance_weights) so that
-    ## predict() on a workflow without add_case_weights() does not raise a type error
-    inner_tbl_assess <- joined_data |>
-      dplyr::filter(cluster == inner_id) |>
-      relocate(cluster, .after = "date") |>
-      dplyr::select(-c(cluster, cases)) |>
-      mutate(outbreak = as.factor(outbreak)) |>
-      mutate(forecast_interval = as.factor(forecast_interval)) |>
-      mutate(
-        weights = length(which(outbreak == "0")) / max(length(which(outbreak == "1")), 1)
-      , weights = ifelse(outbreak == "0", 1, weights)
-      , .after = "index"
-      )
-
-    if (DEBUG) {
-      inner_tbl_train <- inner_tbl_train[1:10000, ]
-    }
-
-    ## Create scaffold recipe + model + workflow and fit model
-    rec <- make_recipe(inner_tbl_train, id_cols = id_cols)
-    mod <- make_model(params = tuning_grid, start_p = start_p, spw = spw)
-    wf  <- workflow() |> add_model(mod) |> add_recipe(rec)
-
-    print("At model fitting")
-    fit <- fit(wf, data = inner_tbl_train)
-    print("Finished with model fitting")
-
-    ## Free training objects before predictions to reduce peak memory within the loop
-    rm(inner_tbl_train, rec, mod, wf)
-    gc()
-
-    ## Predictions: prob only
-    prob1     <- predict(fit, inner_tbl_assess, type = "prob")$.pred_1
-    truth     <- factor(inner_tbl_assess[["outbreak"]], levels = c("1", "0"))
-    class_hat <- apply(
-      threshold |> matrix()
-    , 1
-    , FUN = function(x) factor(ifelse(prob1 >= x, "1", "0"), levels = c("1", "0"))
-    )
-    all_intervals     <- inner_tbl_assess$forecast_interval
-    forecast_interval <- all_intervals |> unique() |> as.character() |> as.numeric() |> sort()
-
-    ## Free fitted model before metrics computation
-    rm(fit)
-    gc()
-
-    ## Compute metrics
-    metrics <- purrr:::map(forecast_interval, .f = function(this_int) {
-
-      truth.t     <- truth[which(all_intervals == this_int)]
-      prob1.t     <- prob1[which(all_intervals == this_int)]
-      class_hat.t <- class_hat[which(all_intervals == this_int), ]
-
-      compute_metrics_vec(
-        truth       = truth.t
-      , threshold   = threshold
-      , weightings  = weightings
-      , caseweights = inner_tbl_assess |> filter(forecast_interval == this_int) |> pull(weights)
-      , prob1       = prob1.t
-      , class_hat   = class_hat.t
-      , event_level = "first"
-      ) |>
+      
+      ## Inner training data: exclude one spatial cluster
+      inner_tbl_train <- joined_data |>
+        dplyr::filter(cluster != inner_id) |>
+        relocate(cluster, .after = "date") |>
+        dplyr::select(-c(cluster, cases)) |>
+        mutate(outbreak = as.factor(outbreak)) |>
+        mutate(forecast_interval = as.factor(forecast_interval))
+      
+      ## Class imbalance handled via scale_pos_weight in engine, not case weights
+      spw <- calc_spw(inner_tbl_train)
+      
+      ## Inner assessment data: extract the held-out spatial cluster
+      ## weights stored as plain numeric (not hardhat_importance_weights) so that
+      ## predict() on a workflow without add_case_weights() does not raise a type error
+      inner_tbl_assess <- joined_data |>
+        dplyr::filter(cluster == inner_id) |>
+        relocate(cluster, .after = "date") |>
+        dplyr::select(-c(cluster, cases)) |>
+        mutate(outbreak = as.factor(outbreak)) |>
+        mutate(forecast_interval = as.factor(forecast_interval)) |>
         mutate(
-          outer_fold_id = outer_fold_id
-        , inner_fold_id = inner_id
-        , interval      = this_int
-        , .before       = 1
+          weights = length(which(outbreak == "0")) / max(length(which(outbreak == "1")), 1)
+          , weights = ifelse(outbreak == "0", 1, weights)
+          , .after = "index"
+        )
+      
+      if (DEBUG) inner_tbl_train <- inner_tbl_train[1:10000, ]
+      
+      ## Create scaffold recipe + model + workflow and fit model
+      rec <- make_recipe(inner_tbl_train, id_cols = id_cols)
+      mod <- make_model(params = tuning_grid, start_p = start_p, spw = spw)
+      wf  <- workflow() |> add_model(mod) |> add_recipe(rec)
+      
+      fit <- fit(wf, data = inner_tbl_train)
+      
+      ## Free training objects before predictions to reduce peak memory within the loop
+      rm(inner_tbl_train, rec, mod, wf)
+      gc()
+      
+      ## Predictions: prob only, plus the hex id needed to compute each hex's own baseline
+      prob1     <- predict(fit, inner_tbl_assess, type = "prob")$.pred_1
+      truth     <- factor(inner_tbl_assess[["outbreak"]], levels = c("1", "0"))
+      hex_id    <- inner_tbl_assess[[hex_id_col]]
+      class_hat <- apply(
+        threshold |> matrix()
+        , 1
+        , FUN = function(x) factor(ifelse(prob1 >= x, "1", "0"), levels = c("1", "0"))
+      )
+      all_intervals     <- inner_tbl_assess$forecast_interval
+      forecast_interval <- all_intervals |> unique() |> as.character() |> as.numeric() |> sort()
+      
+      ## Free fitted model before metrics computation
+      rm(fit)
+      gc()
+      
+      ## Compute metrics -- hex baseline is computed WITHIN each forecast_interval (rather than
+      ## pooling across all five horizons) since predicted probability at a 0-30 day horizon and
+      ## a 121-150 day horizon are not expected to share the same typical level for a given hex
+      metrics <- purrr:::map(forecast_interval, .f = function(this_int) {
+        
+        this_rows   <- which(all_intervals == this_int)
+        truth.t     <- truth[this_rows]
+        prob1.t     <- prob1[this_rows]
+        hex_id.t    <- hex_id[this_rows]
+        class_hat.t <- class_hat[this_rows, ]
+        
+        compute_metrics_vec(
+          truth       = truth.t
+          , threshold   = threshold
+          , weightings  = weightings
+          , caseweights = inner_tbl_assess |> filter(forecast_interval == this_int) |> pull(weights)
+          , prob1       = prob1.t
+          , hex_id      = hex_id.t
+          , class_hat   = class_hat.t
+          , event_level = "first"
         ) |>
-        bind_cols(tuning_grid)
-
-    }) |>
-    bind_rows()
-
-    saveRDS(metrics, save_filename)
-
-    ## Free assessment data and metrics before the next iteration
-    rm(inner_tbl_assess, metrics)
-    gc()
-
-    save_filenames[i] <- save_filename
-
-  })
-
+          mutate(
+            outer_fold_id = outer_fold_id
+            , inner_fold_id = inner_id
+            , interval      = this_int
+            , .before       = 1
+          ) |>
+          bind_cols(tuning_grid)
+        
+      }) |>
+        bind_rows()
+      
+      saveRDS(metrics, save_filename)
+      
+      ## Free assessment data and metrics before the next iteration
+      rm(inner_tbl_assess, metrics)
+      gc()
+      
+      save_filenames[i] <- save_filename
+      
+    })
+    
     checktime_tibble <- bind_rows(
       checktime_tibble
-    , tibble(user = checktime[1], sys = checktime[2], elapsed = checktime[3])
+      , tibble(user = checktime[1], sys = checktime[2], elapsed = checktime[3])
     )
-
+    
     write.csv(checktime_tibble, checktime_path.full)
-
+    
   }
-
+  
   save_filenames
-
+  
 }
 
 #' Finalize inner folds for all outer folds
@@ -293,28 +293,32 @@ chunk_rows <- function(dat, n_chunks, which) {
 
 #' @param inner_folds Character vector of all file paths returned by the
 #'   tuned_results_per_outer_fold target (one path per outer x inner x index branch)
-#' @param weightval Numeric >= 0; penalty weight on S_neg_penalty (false-alarm log-loss) relative
-#'   to S_pos (positive log-loss). Larger values suppress false alarms more aggressively at the
-#'   cost of potentially missing outbreaks. Values in the range 1-5 are reasonable for rare events.
+#' @param local_tuning_grid Single-row tibble returned by build_local_hyperparameter_grid;
+#'   must carry weightval_raw, weightval_hex, gamma columns
 #' @param tuning_grid_id string for this tuning grid
 #' @param outpath where to save the best hyperparameter set
-#' @return Single-row tibble containing final_score, S_pos, S_neg_penalty,
-#'   n_pos_folds (number of folds with at least one positive case), n_total_folds,
-#'   total_n_pos, metric, weightval, index, and all hyperparameter values
-#'   (trees, tree_depth, learn_rate, min_n, loss_reduction, mtry)
+#' @return Single-row tibble containing final_score_combined, final_score_hex, S_pos_hex,
+#'   S_neg_penalty_hex, within_hex_auc, the raw (non-hex) final_score/S_pos/S_neg_penalty,
+#'   hex_only_would_have_picked_index, raw_only_would_have_picked_index, and all hyperparameter values
 #' @author Morgan Kain
 #' @export
 
-finalize_hyperparameters_from_inner <- function(inner_folds, weightval, tuning_grid_id, outpath) {
-
+finalize_hyperparameters_from_inner <- function(inner_folds, local_tuning_grid, tuning_grid_id, outpath) {
+  
   ## First, check if this tuning_grid_id already has a saved best parameter set
   if (file.exists(outpath)) return(outpath)
-
+  
   ## Make the outpath if it doesn't exist yet
   create_data_directory(directory_path = strsplit(outpath, "/best_hyperparameters")[[1]][1])
-
-  stopifnot(is.numeric(weightval), length(weightval) == 1, weightval >= 0)
-
+  
+  weightval_raw <- local_tuning_grid$weightval_raw
+  weightval_hex <- local_tuning_grid$weightval_hex
+  gamma         <- local_tuning_grid$gamma
+  
+  stopifnot(is.numeric(weightval_raw), length(weightval_raw) == 1, weightval_raw >= 0)
+  stopifnot(is.numeric(weightval_hex), length(weightval_hex) == 1, weightval_hex >= 0)
+  stopifnot(is.numeric(gamma), length(gamma) == 1, gamma >= 0)
+  
   ## Read every per-(outer x inner x index) result file into one long tibble
   all_results <- purrr::map(inner_folds, .f = function(x) {
     tload <- try(readRDS(x), silent = TRUE)
@@ -325,70 +329,35 @@ finalize_hyperparameters_from_inner <- function(inner_folds, weightval, tuning_g
     }
   }) |> bind_rows()
   
-  #### Notes about this scoring metric ---------------------------------------------
+  ## Do the scoring. Detaailed info on the scoring inside this function
+  scores <- score_hexrelative_results(all_results, weightval_raw, weightval_hex, gamma)
   
-  ## *S_pos*: n_pos-weighted mean of -(logloss_pos), where logloss_pos is the per-fold mean
-  ## log-loss computed only on true 1s. Rewards predicting outbreak probability high where
-  ## outbreaks actually occur. The null model (predict prevalence ~0.005 everywhere) gets
-  ## S_pos ≈ -5.3, so it cannot "hide at zero"
-
-  ## Folds without any true 1s have logloss_pos = NA and contribute 0 to S_pos automatically.
-  
-  ## *S_neg_penalty*: n_all-weighted mean logloss_neg, the per-fold mean log-loss on true 0s.
-  ## Folds without any true 1s contribute here, preserving the ability for this strategy to
-  ## penalize high probabilities for true 0s even if they don't contribute to S_pos.
-  
-  ## final_score = S_pos - weightval * S_neg_penalty  (maximise)
-  scores <- all_results |>
-    group_by(index) |>
-    summarise(
-      ## score using the logloss_pos (see above) focused on estimated probabilities
-       ## for true 1s
-      S_pos = -sum(logloss_pos * n_pos, na.rm = TRUE) /
-               pmax(sum(n_pos[!is.na(logloss_pos)], na.rm = TRUE), 1L)
-      ## place where high estimated probabilities for true 0s get penalized 
-    , S_neg_penalty = sum(logloss_neg * n_all, na.rm = TRUE) /
-                      sum(n_all, na.rm = TRUE)
-      ## Summary stuff 
-    , n_pos_folds   = sum(n_pos > 0)
-    , n_total_folds = n()
-    , total_n_pos   = sum(n_pos)
-    , .groups       = "drop"
-    ) |>
-    mutate(
-      ## The final score is how well the model predicts true 1s 
-       ## minus how badly it over-predicts outbreak probability for true 0s 
-       ## multiplied by how much we want to weight this penalty
-       ## where a larger weightval suppresses false alarms more aggressively.
-      final_score = S_pos - weightval * S_neg_penalty
-    , weightval   = weightval
-    )
-
-  ## Quick visualization of score across all parameter combinations
-  score_plot <- ggplot(scores |> arrange(desc(final_score)) |> mutate(ii = seq(n()))
-                       , aes(ii, final_score)) + 
-    geom_point() +
-    xlab("Parameter Set") + ylab("Final Score")
-
-  ## Select the single index with the highest combined score
+  ## Find the single best
   best <- scores |>
-    arrange(desc(final_score)) |>
+    arrange(desc(final_score_combined)) |>
     dplyr::slice(1)
-
-  ## Recover the hyperparameter values for the winning index.
-  ## trees / tree_depth / learn_rate / min_n / loss_reduction / mtry are constant
-  ## across all rows sharing an index, so distinct() always yields exactly one row.
+  
+  ## What a pure hex-relative selection (gamma = 0) and a pure raw selection would each have
+  ## picked from this same pool of fits -- kept alongside so all three strategies are directly
+  ## comparable from one tuning run
+  hex_only_best_index <- scores |> arrange(desc(final_score_hex)) |> dplyr::slice(1) |> pull(index)
+  raw_only_best_index <- scores |> arrange(desc(final_score))     |> dplyr::slice(1) |> pull(index)
+  
+  ## Cleanup/add details for export
   best <- best |>
     left_join(
       all_results |>
         dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
         distinct(), by = "index") |>
     mutate(
-      tuning_grid_id = tuning_grid_id, .before = index
+      tuning_grid_id                    = tuning_grid_id
+      , hex_only_would_have_picked_index  = hex_only_best_index
+      , raw_only_would_have_picked_index  = raw_only_best_index
+      , .before = index
     )
-
+  
   write.csv(best, outpath)
-
+  
   outpath
-
+  
 }

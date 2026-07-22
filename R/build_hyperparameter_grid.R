@@ -78,57 +78,43 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
 #'
 #' @title build_local_hyperparameter_grid
 #'
-#' @param inner_fold_paths Character vector of file paths from tuned_results_per_outer_fold
+#' @param inner_fold_paths Character vector of file paths from tune_results_per_outer_fold_hexrelative
 #' @param global_grid Single-row tibble returned by build_hyperparameter_grid (par_grid + grid_id)
 #' @param tune_pars Data frame of global search bounds (same object passed to build_hyperparameter_grid);
 #'   used to cap the local grid so it never searches outside where the global grid already looked
 #' @param top_k Number of top global parameter sets whose ranges define the local neighbourhood
 #' @param size Number of local grid points to generate (space-filling)
-#' @param weightval Numeric penalty weight on S_neg_penalty; must match the value used in selection
-#' @param expansion Fraction of the top-k range to extend on each side (e.g. 0.5 = ±50 %)
+#' @param weightval_raw Numeric penalty weight on S_neg_penalty (raw, non-hex); see score_hexrelative_results
+#' @param weightval_hex Numeric penalty weight on S_neg_penalty_hex; see score_hexrelative_results
+#' @param gamma Numeric weight on the raw (non-hex) final_score in the blend; see score_hexrelative_results
+#' @param expansion Fraction of the top-k range to extend on each side (e.g. 0.5 = +/-50%)
 #' @param grid_path Directory in which to save the local grid Rds
-#' @param hyperparam_path path to save the best parameters from the global grid as a check to indicate that
-#'   that phase of the fitting was indeed completed
 #' @param folded_data_training Folded training data (needed to finalise mtry upper bound)
 #' @param splitted_data Split data object (needed to finalise mtry upper bound)
 #' @param seed Random seed for reproducibility
-#' @return Single-row tibble with columns par_grid (list) and grid_id (character, prefixed "local_")
+#' @return Single-row tibble with columns par_grid (list), grid_id (character, prefixed "localhex_"),
+#'   weightval_raw, weightval_hex, gamma
 #' @author Morgan Kain
 #' @export
 
 build_local_hyperparameter_grid <- function(
     inner_fold_paths
-  , global_grid
-  , tune_pars
-  , top_k
-  , size
-  , weightval
-  , expansion
-  , grid_path
-  , hyperparam_path
-  , folded_data_training
-  , splitted_data
-  , seed
+    , global_grid
+    , tune_pars
+    , top_k
+    , size
+    , weightval_raw
+    , weightval_hex
+    , gamma
+    , expansion
+    , grid_path
+    , folded_data_training
+    , splitted_data
+    , seed
 ) {
-
+  
   create_data_directory(directory_path = grid_path)
   
-  set.seed(seed)
-  hyper_id  <- paste0("local_", stringi::stri_rand_strings(1, length = 15, pattern = "[A-Za-z0-9]"))
-  save_path <- paste0(grid_path, "/hypergrid_", hyper_id, ".Rds")
-  
-  if (file.exists(save_path)) {
-    
-    return(
-      tibble(
-        par_grid = readRDS(save_path) |> list()
-      , grid_id  = hyper_id
-      )
-    )
-    
-  } 
-
-  ## Score every global parameter set with the same formula used in finalization
   all_results <- purrr::map(inner_fold_paths, .f = function(x) {
     tload <- try(readRDS(x), silent = TRUE)
     if (class(tload)[1] != "try-error") {
@@ -136,38 +122,27 @@ build_local_hyperparameter_grid <- function(
     } else {
       return(NULL)
     }
-    }) |> bind_rows()
-
-  ## NOTE: See detailed notes about this scoring strategy in finalize_hyperparameters_from_inner
-  scores <- all_results |>
-    group_by(index) |>
-    summarise(
-      S_pos         = -sum(logloss_pos * n_pos, na.rm = TRUE) /
-                       pmax(sum(n_pos[!is.na(logloss_pos)], na.rm = TRUE), 1L)
-    , S_neg_penalty = sum(logloss_neg * n_all, na.rm = TRUE) / sum(n_all, na.rm = TRUE)
-    , .groups       = "drop"
-    ) |>
-    mutate(final_score = S_pos - weightval * S_neg_penalty)
-
-  ## Grab the top_k scores
+  }) |> bind_rows()
+  
+  ## Do the scoring. Detaailed info on the scoring inside this function
+  scores <- score_hexrelative_results(all_results, weightval_raw, weightval_hex, gamma)
+  
+  ## Extract out the top few indices
   top_indices <- scores |>
-    arrange(desc(final_score)) |>
+    arrange(desc(final_score_combined)) |>
     dplyr::slice(seq_len(top_k)) |>
     pull(index)
-
-  ## Retrieve the raw hyperparameter values for the top-k sets
+  
+  ## Extract out the top few parameter sets
   top_params <- all_results |>
     dplyr::filter(index %in% top_indices) |>
     dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
     distinct()
   
-  ## Save an intermediate file that indicates that this step has been run
-  write.csv(top_params, hyperparam_path)
-
   ## Compute local bounds for each hyperparameter, hard-capped at the ORIGINAL global
-   ## tune_pars bounds -- the local grid is a refinement and should never be allowed to
-   ## search outside where the global grid already looked.
-   ## learn_rate and loss_reduction are sampled on log10 scale by dials, so convert.
+  ## tune_pars bounds -- the local grid is a refinement and should never be allowed to
+  ## search outside where the global grid already looked.
+  ## learn_rate and loss_reduction are sampled on log10 scale by dials, so convert.
   trees_range   <- expand_range(top_params$trees, lo_hard = tune_pars$tree_min, hi_hard = tune_pars$tree_max, expansion = expansion, min_half_width = 50)
   depth_range   <- expand_range(top_params$tree_depth, lo_hard = tune_pars$tree_dep_min, hi_hard = tune_pars$tree_dep_max, expansion = expansion, min_half_width = 1)
   lr_range      <- expand_range(log10(top_params$learn_rate), lo_hard = tune_pars$learn_rate_min, hi_hard = tune_pars$learn_rate_max, expansion = expansion, min_half_width = 0.2)
@@ -175,18 +150,25 @@ build_local_hyperparameter_grid <- function(
   lossred_range <- expand_range(log10(top_params$loss_reduction + .Machine$double.eps), lo_hard = tune_pars$loss_red_min, hi_hard = tune_pars$loss_red_max, expansion = expansion, min_half_width = 0.5)
   ## Keep mtry anchored within reach of the top-k observed values, but never below the global floor
   mtry_range_lo <- max(tune_pars$mtry_min, min(top_params$mtry) - 3L)
-
+  
+  ## Hash every parameter that determines this grid's content into its id, so a change in any of
+  ## them produces a new file (forcing a rebuild) instead of silently reusing a stale one -- see
+  ## the note above the function.
+  param_sig <- digest::digest(list(weightval_raw, weightval_hex, gamma, top_k, expansion, size, seed))
+  hyper_id  <- paste0("localhex_", param_sig)
+  save_path <- paste0(grid_path, "/hypergrid_", hyper_id, ".Rds")
+  
   if (file.exists(save_path)) {
-
+    
     par_grid <- readRDS(save_path)
-
+    
   } else {
-
-    ## Index offset ensures no collision with global grid indices when results are pooled
+    
     idx_offset <- max(global_grid$par_grid[[1]]$index)
-
+    
+    set.seed(seed)
     par_grid <- grid_space_filling(
-        trees(range          = as.integer(trees_range))
+      trees(range          = as.integer(trees_range))
       , tree_depth(range     = as.integer(depth_range))
       , learn_rate(range     = lr_range)
       , min_n(range          = as.integer(minn_range))
@@ -198,16 +180,19 @@ build_local_hyperparameter_grid <- function(
       , size = size
     ) |>
       mutate(index = idx_offset + seq_len(n()), .before = 1)
-
+    
     saveRDS(par_grid, save_path)
-
+    
   }
-
+  
   tibble(
-    par_grid = par_grid |> list()
-  , grid_id  = hyper_id
+    par_grid      = par_grid |> list()
+    , grid_id       = hyper_id
+    , weightval_raw = weightval_raw
+    , weightval_hex = weightval_hex
+    , gamma         = gamma
   )
-
+  
 }
 
 ## Helper: extend the observed range by expansion on each side, clamped to hard limits.
