@@ -32,7 +32,7 @@ source("_targets_settings.R")
 using_hexes <- TRUE
 
 ## If true, rebuilds all dates regardless of whether or not they exist
-rebuild <- FALSE
+rebuild <- TRUE
 
 ## reduce outbreaks by looking at resolution of nearby start dates?
  ## NOTE: not supported yet, because no decision has been made on how to reduce
@@ -373,7 +373,7 @@ rvf_processing_targets <- tar_plan(
 ## Use the template to categorize all x, y, coordinates for all of the data (by date)
  ## Mask to the Sub-Region of interest (drop nothing if pan-African is desired) and
  ## with Sub-Sub Regions identified
- ## Build smaller more manageable .parquet files composed of the same dates but
+ ## Build smaller more manageable .parquet files composed of the same dates
 , tar_target(region_data_minimal_date, mask_and_cluster_from_template(
     template  = region_data_template
     ## First processing step for the new date[s]
@@ -418,16 +418,31 @@ rvf_processing_targets <- tar_plan(
     }
   })
 
-  ## process the remaining files needed for cleaning region data given lagged variables
-, tar_target(region_data, mask_and_cluster_from_template(
+
+  ## Of the files needed for lags, those NOT already processed above via minimal_date_needs
+   ## On a full rebuild, minimal_date_needs already spans every date, so this is empty --
+   ## collapse to the same NA_character_ sentinel used elsewhere 
+, tar_target(remaining_files, {
+    rem <- all_needed_full_africa_files[all_needed_full_africa_files %notin% minimal_date_needs]
+    if (length(rem) == 0) NA_character_ else rem
+  })
+
+  ## Process only the lag-only files region_data_minimal_date did not already cover; 
+   ## when remaining_files is the NA sentinel, read_parquet(NA) errors and the 
+   ## branch is dropped via error = "null"
+, tar_target(region_data_remaining, mask_and_cluster_from_template(
     template  = region_data_template
-    ## First processing step for the new date[s]
-  , cov_files = all_needed_full_africa_files
+  , cov_files = remaining_files
   , out_dir   = region_data_directory
   , overwrite = FALSE)
-  , pattern   = map(all_needed_full_africa_files)
+  , pattern   = map(remaining_files)
   , error     = "null"
   , format    = "file")
+
+  ## Full set of processed files needed downstream for lag calculations: the union of this
+   ## cycle's newly processed dates and any additional older lag-only files. 
+   ## On a full rebuild region_data_remaining is empty and region_data reduces to region_data_minimal_date
+, tar_target(region_data, unique(c(region_data_minimal_date, region_data_remaining)), format = "file")
 
   ## Calculate lags, join cases, summarize and build master dataset. Save the output in individual
    ## parquet files by date

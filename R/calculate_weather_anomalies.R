@@ -88,7 +88,8 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
       dplyr::mutate(x = round(x, 7), y = round(y, 7))
 
     doy_to_process <- as.numeric(lubridate::yday(date))
-    # Open dataset to historical weather data
+    
+    ## Open dataset to historical weather data
     historical_means <- arrow::open_dataset(weather_historical_means) |>
       dplyr::filter(doy == doy_to_process) |>
       dplyr::collect() |>
@@ -112,7 +113,7 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
     weather_transformed_dataset <- weather_transformed_dataset |>
       dplyr::mutate(
         anomaly_precipitation = precipitation - precipitation_historical,
-        anomaly_scaled_precipitation = anomaly_precipitation / precipitation_sd
+        anomaly_scaled_precipitation = dplyr::if_else(precipitation_sd == 0, 0, anomaly_precipitation / precipitation_sd)
       )
 
     # Calculate relative_humidity anomalies

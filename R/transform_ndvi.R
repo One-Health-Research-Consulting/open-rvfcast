@@ -81,22 +81,39 @@ transform_ndvi <- function(ndvi_transformed_sources,
 
   message(paste("Processing", nrow(ndvi_transformed_data), "rows"))
 
-  # Scale raw data appropriately.
+  ## It appears that sentinel NDVI after about Feb 2025 comes already scaled??
+   ## Dividing an already-scaled value by 200 again silently corrupts it,
+   ## so detect which format this month's Sentinel data is in before deciding whether to rescale.
+  sentinel_vals <- ndvi_transformed_data$ndvi[ndvi_transformed_data$source != "modis"]
+  sentinel_already_scaled <- length(sentinel_vals) > 0 && max(abs(sentinel_vals), na.rm = TRUE) <= 1.5
+
+  ## Same issue observed for MODIS -- some months arrive already scaled to the standard
+   ## -1 to 1 range rather than needing the /10000 correction, so check this source too.
+  modis_vals <- ndvi_transformed_data$ndvi[ndvi_transformed_data$source == "modis"]
+  modis_already_scaled <- length(modis_vals) > 0 && max(abs(modis_vals), na.rm = TRUE) <= 1.5
+
+  ## Scale raw data appropriately.
   ndvi_transformed_data <- ndvi_transformed_data |>
     mutate(
       ndvi = case_when(
-        source == "modis" ~ ndvi / 10000, # MODIS
-        TRUE ~ ndvi / 200  # Sentinel
+        modis_already_scaled & source == "modis" ~ ndvi, ## MODIS, already scaled upstream
+        source == "modis" ~ ndvi / 10000,                ## MODIS, raw digital-number scale
+        sentinel_already_scaled ~ ndvi,                  ## Sentinel, already scaled upstream
+        TRUE ~ ndvi / 200                                ## Sentinel, raw digital-number scale
       )
     )
 
   ndvi_transformed_data <- ndvi_transformed_data |>
     select(-source) |>
+    # Round coordinates before grouping: MODIS and Sentinel source rasters occasionally
+    # disagree on a pixel's x/y by a sub-1e-7 floating point epsilon, which otherwise
+    # makes group_by() treat them as two separate pixels and silently skip the blend below
+    mutate(x = round(x, 7), y = round(y, 7)) |>
     group_by(x, y, date, doy, month, year) |>
     summarize(ndvi = mean(ndvi), .groups = "drop")
 
   arrow::write_parquet(ndvi_transformed_data, save_filename, compression = "gzip", compression_level = 5)
 
   return(save_filename)
-  
+
 }

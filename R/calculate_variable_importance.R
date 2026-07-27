@@ -26,7 +26,7 @@ calculate_variable_importance   <- function(model_dat, final_hyper_set, fitted_m
   rec_path <- rec_path[grep(paste0("recipe_", model_dat$outer_fold_id, "_"), rec_path)]
 
   ## Load fit from RDS
-  parsnip_fit   <- readRDS(fit_path)
+  parsnip_fit  <- readRDS(fit_path)
   saved_recipe <- readRDS(rec_path)
 
   ## Variable Importance

@@ -87,6 +87,15 @@ mask_and_cluster_build_template <- function(
   }) |>
   bind_rows()
 
+  ## Country boundary layers are digitized independently per-country and often overlap slightly
+   ## at shared borders (and, e.g., Western Sahara vs Morocco, overlap substantially where two
+   ## layers both claim the same disputed territory). st_join above therefore sometimes matches a
+   ## single point to more than one country/ADM2, which would otherwise duplicate that point
+   ## downstream every time the template is joined back onto covariate data. Keep a single,
+   ## deterministic match per point: countries_sf/hex_sf are processed in a fixed order, so the
+   ## first match for a given index is reproducible across runs.
+  df_sorted <- df_sorted |> distinct(index, .keep_all = TRUE)
+
   ## ** Then for hex ------------------------------------------------
   hex_sf <- lapply(hex_sf, FUN = function(x) {
     sf::st_make_valid(x) |> st_collection_extract("POLYGON")
@@ -134,6 +143,11 @@ mask_and_cluster_build_template <- function(
 
   }) |>
   bind_rows()
+
+  ## H3 hexes tile edge-to-edge with no gaps or overlaps, but the default st_join match
+   ## (st_intersects) can still match a point lying exactly on a shared hex edge to both
+   ## neighboring hexes; keep a single deterministic match per point as above
+  df_sorted2 <- df_sorted2 |> distinct(index, .keep_all = TRUE)
 
   df_sorted2 <- df_sorted2 |> dplyr::select(index, shapeName)
 

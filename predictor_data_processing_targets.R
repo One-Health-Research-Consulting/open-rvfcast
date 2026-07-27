@@ -343,7 +343,10 @@ dynamic_targets <- tar_plan(
     ## historical dates when a more recent forecast anchor parquet already exists.
     narrow_dates <- dates_to_process_all[!as.character(dates_to_process_all) %in% processed_dates]
     
-    narrow_dates
+    # narrow_dates
+    
+    ## Temporary to explore the issues with NDVI data
+    dates_to_process_all[-length(dates_to_process_all)]
 
   })
 
@@ -833,23 +836,21 @@ derived_data_targets <- tar_plan(
   , cue        = tar_cue("always"))
 
 , tar_target(ndvi_historical_means, calculate_ndvi_historical_means(
-    sentinel_ndvi_transformed
-  , modis_ndvi_transformed
+    ndvi_transformed
   , ndvi_historical_means_directory
-  , basename_template                   = "ndvi_historical_mean_doy_{i}.parquet"
-  , overwrite                           = parse_flag("OVERWRITE_HISTORICAL_MEANS")
-  , modis_ndvi_transformed_directory    = modis_ndvi_transformed_directory
-  , sentinel_ndvi_transformed_directory = sentinel_ndvi_transformed_directory
-  , dates_to_process                    = dates_to_process
+  , basename_template           = "ndvi_historical_mean_doy_{i}.parquet"
+  , overwrite                   = parse_flag("OVERWRITE_HISTORICAL_MEANS")
+  , ndvi_transformed_directory  = ndvi_transformed_directory
+  , dates_to_process            = dates_to_process
   , ndvi_historical_means_AWS)
-  , format                              = "file"
-  , repository                          = "local"
-  , cue                                 = tar_cue_age(
-      name                              = ndvi_historical_means
+  , format                      = "file"
+  , repository                  = "local"
+  , cue                         = tar_cue_age(
+      name                      = ndvi_historical_means
       ## *THUS ToDo* -- adjust so that the full needed stack of files is built when
        ## PURPOSE=train which will happen about every 12 months or so (or less
        ## frequently than that TBH)
-    , age                               = as.difftime(180, units = "days")))
+    , age                       = as.difftime(180, units = "days")))
 
   ## Next step put ndvi_historical_means files on AWS.
 , tar_target(ndvi_historical_means_AWS_upload, AWS_put_files(
