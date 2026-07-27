@@ -325,6 +325,8 @@ model_tuning_targets <- tar_plan(
 
 , tar_target(outer_folds_dir, create_data_directory(
     directory_path = paste("outputs/", region_name, "_model_tuning_inner_ws", sep = "")))
+, tar_target(outer_folds_dir3, create_data_directory(
+  directory_path = paste("outputs/", region_name, "_final_model_fits_ws", sep = "")))
 
   ## DIAGNOSTIC ONLY -- nothing downstream depends on this target. It exists purely so the
    ## (outer_fold_id x chunk_id) partition of inner_fold_id_finalized can be sanity-checked
@@ -338,6 +340,9 @@ model_tuning_targets <- tar_plan(
    , pattern = cross(folded_data_training, chunk_id))
 
 , tar_target(hyperparam_path, paste0("outputs/hyperparameters/best_hyperparameters", tuning_grid$grid_id, ".csv"))
+
+## get the baseline occurance of outbreaks (in the full data)
+, tar_target(start_p, mean(splitted_data_fitting$train_data[[1]]$outbreak == 1))
 
 , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
     prejoined_data  = outer_fold_prejoined
@@ -408,6 +413,25 @@ model_tuning_targets <- tar_plan(
   , inner_ids   = base)
   tfolds[sample(nrow(tfolds)), ]
   })
+
+  ## Pre-join inner fold indices with training covariates, one branch per outer fold.
+   ## Workers for tuned_results_per_outer_fold load this small per-fold slice rather than
+   ## the full train_data, and the join is computed once per fold instead of once per
+   ## (inner_fold x tune_grid) branch.
+, tar_target(outer_fold_prejoined
+             , tibble(
+               outer_fold_id = folded_data_training$outer_fold_id
+               , data          = list(
+                 folded_data_training$inner_folds[[1]] |>
+                   left_join(train_data, by = "index")))
+             , pattern = map(folded_data_training))
+
+  ## Number of pieces to split each outer fold's (inner_fold x tune_grid).
+   ## Use more workers: total tuning branches = nrow(folded_data_training) * n_tune_chunks
+, tar_target(n_tune_chunks, max(1L, ceiling(as.integer(30) / nrow(folded_data_training))))
+
+  ## Chunk index branching dimension, crossed against outer_fold_prejoined below
+, tar_target(chunk_id, seq_len(n_tune_chunks))
 
   ## DIAGNOSTIC ONLY, mirroring inner_fold_ids_per_outer_chunked above -- nothing downstream
    ## depends on this; it's just a cheap way to sanity-check the local grid's partition.
@@ -508,7 +532,7 @@ model_evaluation_targets <- tar_plan(
    ## given variable_importance_prep_a
 , tar_target(variable_importance, calculate_variable_importance(
     model_dat       = variable_importance_prep_a
-  , final_hyper_set = final_hyper_set_selected
+  , final_hyper_set = finalized_hyperparameters
   , fitted_model    = fitted_model
   , fitdir          = outer_folds_dir3
   , recdir          = outer_folds_dir3
@@ -528,7 +552,7 @@ model_evaluation_targets <- tar_plan(
   ## Compute per-row SHAP values and summarize as mean |SHAP| per feature per forecast_interval
 , tar_target(shap_by_forecast_interval, calculate_shap_by_forecast_interval(
     model_dat       = shap_prep_a
-  , final_hyper_set = final_hyper_set_selected
+  , final_hyper_set = finalized_hyperparameters
   , fitted_model    = fitted_model
   , fitdir          = outer_folds_dir3
   , recdir          = outer_folds_dir3)

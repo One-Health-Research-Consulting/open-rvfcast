@@ -147,7 +147,7 @@ tune_results_per_outer_fold <- function(
         hex_id.t    <- hex_id[this_rows]
         class_hat.t <- class_hat[this_rows, ]
         
-        compute_metrics_vec(
+        compute_metrics_vec_hexrelative(
           truth       = truth.t
           , threshold   = threshold
           , weightings  = weightings
