@@ -108,11 +108,12 @@ build_local_hyperparameter_grid <- function(
     , gamma
     , expansion
     , grid_path
+    , hyperparam_path
     , folded_data_training
     , splitted_data
     , seed
 ) {
-  
+
   create_data_directory(directory_path = grid_path)
   
   all_results <- purrr::map(inner_fold_paths, .f = function(x) {
@@ -124,7 +125,7 @@ build_local_hyperparameter_grid <- function(
     }
   }) |> bind_rows()
   
-  ## Do the scoring. Detaailed info on the scoring inside this function
+  ## Do the scoring. Detailed info on the scoring inside this function
   scores <- score_hexrelative_results(all_results, weightval_raw, weightval_hex, gamma)
   
   ## Extract out the top few indices
@@ -185,12 +186,16 @@ build_local_hyperparameter_grid <- function(
     
   }
   
+  ## Save the intermediate best set as a tracking method to indicate the global
+  ## tuning is finished
+  write.csv(top_params, hyperparam_path)
+  
   tibble(
     par_grid      = par_grid |> list()
-    , grid_id       = hyper_id
-    , weightval_raw = weightval_raw
-    , weightval_hex = weightval_hex
-    , gamma         = gamma
+  , grid_id       = hyper_id
+  , weightval_raw = weightval_raw
+  , weightval_hex = weightval_hex
+  , gamma         = gamma
   )
   
 }

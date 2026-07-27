@@ -263,25 +263,14 @@ cross_validation_targets <- tar_plan(
 )
 
 ## Targets for conducting model tuning -----------------------------------------
-model_tuning_targets <- tar_plan(
 
-  ## Model tuning parameters
-  tar_target(tune_pars, data.frame(
-    tree_min       = 100
-  , tree_max       = 1500
-  , tree_dep_min   = 4
-  , tree_dep_max   = 9
-  , learn_rate_min = -2
-  , learn_rate_max = -0.52
-  , minn_min       = 1
-  , minn_max       = 10
-  , loss_red_min   = -5
-  , loss_red_max   = -0.3
-  , mtry_min       = 8
-  , size           = 75))
+## Needed regardless of PURPOSE -- these are also referenced downstream by
+ ## model_fitting_targets and model_evaluation_targets, so they stay outside the
+ ## PURPOSE-conditional block below
+model_tuning_targets_common <- tar_plan(
 
   ## Set up list of a id columns for grouping, summarizing, etc. that are usde in a few spots
-, tar_target(id_cols, c("shapeName", "Proportion_Country", "ADM2", "Proportion_ADM2", "date", "index"))
+  tar_target(id_cols, c("shapeName", "Proportion_Country", "ADM2", "Proportion_ADM2", "date", "index"))
 
   ## probability value for which an outbreak is considered "likely"
 , tar_target(positive_threshold, seq(0.05, 0.95, by = 0.05))
@@ -289,195 +278,239 @@ model_tuning_targets <- tar_plan(
   ## How much to weight ones (detected outbreaks) relative to zeros (no outbreaks)
 , tar_target(weightings_on_ones, c(1, 10, 100, 1000))
 
-  ## Distinct seed so this grid is an independent draw, not a copy of tuning_grid
-, tar_target(hypergrid_seed, 71982634)
+  ## get the baseline occurance of outbreaks (in the full data)
+, tar_target(start_p, mean(splitted_data_fitting$train_data[[1]]$outbreak == 1))
 
-  ## Build the "global" (first step) hyperparameter tuning grid
-, tar_target(tuning_grid, build_hyperparameter_grid(
-    tune_pars            = tune_pars
-  , grid_path            = "data/hypergrid"
-  , folded_data_training = folded_data_training
-  , splitted_data        = splitted_data
-  , overwrite            = FALSE
-  , seed                 = hypergrid_seed))
-
-  ## Final prep steps for parallel processing for tuning across all inner folds are to
-   ## 1) Evaluate which of all of the inner folds across all outer folds actually have
-   ## ones (outbreaks) in the assessment set
-, tar_target(inner_fold_id, prep_fold_ids(
-    folded_data = folded_data_training
-  , raw_data    = splitted_data) |>
-  cross_join(tuning_grid$par_grid[[1]]) |>
-  group_by(outer_fold_id) |>
-  filter(inner_fold_id %in% unique(inner_fold_id)) |>
-  ungroup())
-
-  ## 2) AND which of the outer_fold_ids for ALL of the train_data have at least a single
-   ## one in the assess_data. There is no point in wasting computation on inner folds if
-   ## the best inner fold hyperparameter set cant be evaluated on the whole training_set
-   ## for this outer_fold because there is no outbreak in the assess_data
-, tar_target(inner_fold_id_finalized, {
-   tfolds <- prep_outer_ids(
-      folded_data = folded_data_training
-    , raw_data    = splitted_data
-    , inner_ids   = inner_fold_id)
-  tfolds[sample(nrow(tfolds)), ]})
-
-, tar_target(outer_folds_dir, create_data_directory(
-    directory_path = paste("outputs/", region_name, "_model_tuning_inner_ws", sep = "")))
 , tar_target(outer_folds_dir3, create_data_directory(
   directory_path = paste("outputs/", region_name, "_final_model_fits_ws", sep = "")))
 
-  ## DIAGNOSTIC ONLY -- nothing downstream depends on this target. It exists purely so the
-   ## (outer_fold_id x chunk_id) partition of inner_fold_id_finalized can be sanity-checked
-   ## cheaply. See how pattern = cross(outer_fold_prejoined, chunk_id) in tuned_results_per_outer_fold
-   ## below
-, tar_target(inner_fold_ids_per_outer_chunked
-  , inner_fold_id_finalized |>
-     dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id) |>
-     chunk_rows(n_chunks = n_tune_chunks, which = chunk_id) |>
-     dplyr::mutate(chunk_id = chunk_id, .after = "outer_fold_id")
-   , pattern = cross(folded_data_training, chunk_id))
+)
 
-, tar_target(hyperparam_path, paste0("outputs/hyperparameters/best_hyperparameters", tuning_grid$grid_id, ".csv"))
+## PURPOSE == "train" runs the full two-stage tuning pipeline (global grid search across all
+ ## outer/inner folds, then a refined local grid centred on the top global results) and ends by
+ ## writing out finalized_hyperparameters. PURPOSE == "forecast" needs none of that -- the branch
+ ## below is plain R evaluated once while the plan is being built, so when PURPOSE == "forecast"
+ ## none of tuning_grid / tuned_results_per_outer_fold / local_tuning_grid / local_tuned_results
+ ## are ever added to the targets graph at all (not merely skipped at run time). Only the target
+ ## name finalized_hyperparameters is shared across both branches, since that's the only piece
+ ## model_fitting_targets depends on
+if (purpose == "train") {
 
-## get the baseline occurance of outbreaks (in the full data)
-, tar_target(start_p, mean(splitted_data_fitting$train_data[[1]]$outbreak == 1))
+  model_tuning_targets_purpose <- tar_plan(
 
-, tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
-    prejoined_data  = outer_fold_prejoined
-  , inner_ids_all   = inner_fold_id_finalized |>
-                        dplyr::filter(outer_fold_id == outer_fold_prejoined$outer_fold_id) |>
-                        chunk_rows(n_chunks = n_tune_chunks, which = chunk_id)
-  , threshold       = positive_threshold
-  , weightings      = weightings_on_ones
-  , start_p         = start_p
-  , id_cols         = id_cols
-  , out_dir         = outer_folds_dir
-  , tuning_grid_id  = tuning_grid$grid_id
-  , hyperparam_path = hyperparam_path
-  , overwrite       = FALSE
-  , DEBUG           = FALSE
-  , chunk_id        = chunk_id
-  , checktime_path  = "outputs/timing"
-  , hex_id_col      = district_id_col)
-  , pattern         = cross(outer_fold_prejoined, chunk_id)
-  , error           = "null"
-  , format          = "file")
+    ## Model tuning parameters
+    tar_target(tune_pars, data.frame(
+      tree_min       = 100
+    , tree_max       = 1500
+    , tree_dep_min   = 4
+    , tree_dep_max   = 9
+    , learn_rate_min = -2
+    , learn_rate_max = -0.52
+    , minn_min       = 1
+    , minn_max       = 10
+    , loss_red_min   = -5
+    , loss_red_max   = -0.3
+    , mtry_min       = 8
+    , size           = 75))
 
-  ## Penalty weight on S_neg_penalty (raw/global, non-hex), used for the final_score component that
-   ## gets folded into final_score_combined via gamma
-, tar_target(weightval_raw_for_scoring, 500)
+    ## Distinct seed so this grid is an independent draw, not a copy of tuning_grid
+  , tar_target(hypergrid_seed, 71982634)
 
-  ## Penalty weight on S_neg_penalty_hex. Within hex weight for hexes that have
-   ## never experienced an outbreak (~92% of hexes have never had an event)
-, tar_target(weightval_hex_for_scoring, 10)
+    ## Build the "global" (first step) hyperparameter tuning grid
+  , tar_target(tuning_grid, build_hyperparameter_grid(
+      tune_pars            = tune_pars
+    , grid_path            = "data/hypergrid"
+    , folded_data_training = folded_data_training
+    , splitted_data        = splitted_data
+    , overwrite            = FALSE
+    , seed                 = hypergrid_seed))
 
-  ## Weight on the raw (non-hex) final_score when blending it into final_score_combined =
-   ## final_score_hex + gamma * final_score. This exists so a hyperparameter set that 
-   ## gets the within-hex timing right but is systematically miscalibrated overall 
-   ## (too high/low everywhere in a given hex) can still be penalized. 
-   ## larger gamma puts more weight on the entire raw final_score. That is, a larger gamma pulls
-   ## the blended score towards “global” calibration: both better absolute positive-day 
-   ## confidence and better absolute false-alarm control together
-, tar_target(gamma_for_combined_score, 0.01)
+    ## Final prep steps for parallel processing for tuning across all inner folds are to
+     ## 1) Evaluate which of all of the inner folds across all outer folds actually have
+     ## ones (outbreaks) in the assessment set
+  , tar_target(inner_fold_id, prep_fold_ids(
+      folded_data = folded_data_training
+    , raw_data    = splitted_data) |>
+    cross_join(tuning_grid$par_grid[[1]]) |>
+    group_by(outer_fold_id) |>
+    filter(inner_fold_id %in% unique(inner_fold_id)) |>
+    ungroup())
 
-  ## Build a refined local grid centred on the top-k global results, ranked by final_score_combined
-, tar_target(local_tuning_grid, build_local_hyperparameter_grid(
-    inner_fold_paths     = tuned_results_per_outer_fold
-  , global_grid          = tuning_grid
-  , tune_pars            = tune_pars
-  , top_k                = 8
-  , size                 = 75
-  , weightval_raw        = weightval_raw_for_scoring
-  , weightval_hex        = weightval_hex_for_scoring
-  , gamma                = gamma_for_combined_score
-  , expansion            = 0.2
-  , grid_path            = "data/hypergrid"
-  , folded_data_training = folded_data_training
-  , splitted_data        = splitted_data
-  , seed                 = hypergrid_seed))
+    ## 2) AND which of the outer_fold_ids for ALL of the train_data have at least a single
+     ## one in the assess_data. There is no point in wasting computation on inner folds if
+     ## the best inner fold hyperparameter set cant be evaluated on the whole training_set
+     ## for this outer_fold because there is no outbreak in the assess_data
+  , tar_target(inner_fold_id_finalized, {
+     tfolds <- prep_outer_ids(
+        folded_data = folded_data_training
+      , raw_data    = splitted_data
+      , inner_ids   = inner_fold_id)
+    tfolds[sample(nrow(tfolds)), ]})
 
-, tar_target(local_hyperparam_path, paste0(
-  "outputs/hyperparameters/best_hyperparameters_combined_"
-  , tuning_grid$grid_id, "--", local_tuning_grid$grid_id, ".csv"))
+  , tar_target(outer_folds_dir, create_data_directory(
+      directory_path = paste("outputs/", region_name, "_model_tuning_inner_ws", sep = "")))
 
-  ## (outer x inner x local-index) combinations, shuffled for load balancing.
-   ## Mirrors inner_fold_id_finalized but cross-joined with the local grid.
-, tar_target(local_inner_fold_id_finalized, {
-  base   <- prep_fold_ids(folded_data = folded_data_training, raw_data = splitted_data) |>
-    cross_join(local_tuning_grid$par_grid[[1]])
-  tfolds <- prep_outer_ids(
-    folded_data = folded_data_training
-  , raw_data    = splitted_data
-  , inner_ids   = base)
-  tfolds[sample(nrow(tfolds)), ]
-  })
+    ## DIAGNOSTIC ONLY -- nothing downstream depends on this target. It exists purely so the
+     ## (outer_fold_id x chunk_id) partition of inner_fold_id_finalized can be sanity-checked
+     ## cheaply. See how pattern = cross(outer_fold_prejoined, chunk_id) in tuned_results_per_outer_fold
+     ## below
+  , tar_target(inner_fold_ids_per_outer_chunked
+    , inner_fold_id_finalized |>
+       dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id) |>
+       chunk_rows(n_chunks = n_tune_chunks, which = chunk_id) |>
+       dplyr::mutate(chunk_id = chunk_id, .after = "outer_fold_id")
+     , pattern = cross(folded_data_training, chunk_id))
 
-  ## Pre-join inner fold indices with training covariates, one branch per outer fold.
-   ## Workers for tuned_results_per_outer_fold load this small per-fold slice rather than
-   ## the full train_data, and the join is computed once per fold instead of once per
-   ## (inner_fold x tune_grid) branch.
-, tar_target(outer_fold_prejoined
-             , tibble(
-               outer_fold_id = folded_data_training$outer_fold_id
-               , data          = list(
-                 folded_data_training$inner_folds[[1]] |>
-                   left_join(train_data, by = "index")))
-             , pattern = map(folded_data_training))
+  , tar_target(hyperparam_path, paste0("outputs/hyperparameters/best_hyperparameters", tuning_grid$grid_id, ".csv"))
 
-  ## Number of pieces to split each outer fold's (inner_fold x tune_grid).
-   ## Use more workers: total tuning branches = nrow(folded_data_training) * n_tune_chunks
-, tar_target(n_tune_chunks, max(1L, ceiling(as.integer(30) / nrow(folded_data_training))))
-
-  ## Chunk index branching dimension, crossed against outer_fold_prejoined below
-, tar_target(chunk_id, seq_len(n_tune_chunks))
-
-  ## DIAGNOSTIC ONLY, mirroring inner_fold_ids_per_outer_chunked above -- nothing downstream
-   ## depends on this; it's just a cheap way to sanity-check the local grid's partition.
-, tar_target(local_inner_fold_ids_per_outer_chunked
-   , local_inner_fold_id_finalized |>
-      dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id) |>
-      chunk_rows(n_chunks = n_tune_chunks, which = chunk_id) |>
-      dplyr::mutate(chunk_id = chunk_id, .after = "outer_fold_id")
-   , pattern = cross(folded_data_training, chunk_id))
-
-  ## Reuse the already-computed outer_fold_prejoined branches; only the per-fold
-   ## ID slice changes (pointing to local grid indices instead of global ones).
-   ## See the matching comment on tuned_results_per_outer_fold above for why the filter/chunk
-   ## is done inline rather than via local_inner_fold_ids_per_outer_chunked.
-, tar_target(local_tuned_results, tune_results_per_outer_fold(
-     prejoined_data  = outer_fold_prejoined
-   , inner_ids_all   = local_inner_fold_id_finalized |>
+  , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
+      prejoined_data  = outer_fold_prejoined
+    , inner_ids_all   = inner_fold_id_finalized |>
                           dplyr::filter(outer_fold_id == outer_fold_prejoined$outer_fold_id) |>
                           chunk_rows(n_chunks = n_tune_chunks, which = chunk_id)
-   , threshold       = positive_threshold
-   , weightings      = weightings_on_ones
-   , start_p         = start_p
-   , id_cols         = id_cols
-   , out_dir         = outer_folds_dir
-   , tuning_grid_id  = local_tuning_grid$grid_id
-   , hyperparam_path = local_hyperparam_path
-   , overwrite       = FALSE
-   , DEBUG           = FALSE
-   , chunk_id        = chunk_id
-   , checktime_path  = "outputs/timing"
-   , hex_id_col      = district_id_col)
-   , pattern         = cross(outer_fold_prejoined, chunk_id)
-   , error           = "null"
-   , format          = "file")
+    , threshold       = positive_threshold
+    , weightings      = weightings_on_ones
+    , start_p         = start_p
+    , id_cols         = id_cols
+    , out_dir         = outer_folds_dir
+    , tuning_grid_id  = tuning_grid$grid_id
+    , overwrite       = FALSE
+    , DEBUG           = FALSE
+    , chunk_id        = chunk_id
+    , checktime_path  = "outputs/timing"
+    , hex_id_col      = district_id_col)
+    , pattern         = cross(outer_fold_prejoined, chunk_id)
+    , error           = "null"
+    , format          = "file")
 
-  ## weightval_raw/weightval_hex/gamma are NOT passed here separately -- they are read directly
-   ## off local_tuning_grid inside finalize_hyperparameters_from_inner, so
-   ## this stage can never silently drift out of sync with whatever scoring parameters actually
-   ## built that grid (see the note on build_local_hyperparameter_grid)
-, tar_target(finalized_hyperparameters, finalize_hyperparameters_from_inner(
-    inner_folds       = c(tuned_results_per_outer_fold, local_tuned_results)
-  , local_tuning_grid = local_tuning_grid
-  , tuning_grid_id    = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")
-  , outpath           = local_hyperparam_path))
+    ## Penalty weight on S_neg_penalty (raw/global, non-hex), used for the final_score component that
+     ## gets folded into final_score_combined via gamma
+  , tar_target(weightval_raw_for_scoring, 500)
 
-)
+    ## Penalty weight on S_neg_penalty_hex. Within hex weight for hexes that have
+     ## never experienced an outbreak (~92% of hexes have never had an event)
+  , tar_target(weightval_hex_for_scoring, 10)
+
+    ## Weight on the raw (non-hex) final_score when blending it into final_score_combined =
+     ## final_score_hex + gamma * final_score. This exists so a hyperparameter set that
+     ## gets the within-hex timing right but is systematically miscalibrated overall
+     ## (too high/low everywhere in a given hex) can still be penalized.
+     ## larger gamma puts more weight on the entire raw final_score. That is, a larger gamma pulls
+     ## the blended score towards “global” calibration: both better absolute positive-day
+     ## confidence and better absolute false-alarm control together
+  , tar_target(gamma_for_combined_score, 0.05)
+
+    ## Build a refined local grid centred on the top-k global results, ranked by final_score_combined
+  , tar_target(local_tuning_grid, build_local_hyperparameter_grid(
+      inner_fold_paths     = tuned_results_per_outer_fold
+    , global_grid          = tuning_grid
+    , tune_pars            = tune_pars
+    , top_k                = 8
+    , size                 = 75
+    , weightval_raw        = weightval_raw_for_scoring
+    , weightval_hex        = weightval_hex_for_scoring
+    , gamma                = gamma_for_combined_score
+    , expansion            = 0.2
+    , grid_path            = "data/hypergrid"
+    , hyperparam_path      = hyperparam_path
+    , folded_data_training = folded_data_training
+    , splitted_data        = splitted_data
+    , seed                 = hypergrid_seed))
+
+  , tar_target(local_hyperparam_path, paste0(
+    "outputs/hyperparameters/best_hyperparameters_combined_"
+    , tuning_grid$grid_id, "--", local_tuning_grid$grid_id, ".csv"))
+
+    ## (outer x inner x local-index) combinations, shuffled for load balancing.
+     ## Mirrors inner_fold_id_finalized but cross-joined with the local grid.
+  , tar_target(local_inner_fold_id_finalized, {
+    base   <- prep_fold_ids(folded_data = folded_data_training, raw_data = splitted_data) |>
+      cross_join(local_tuning_grid$par_grid[[1]])
+    tfolds <- prep_outer_ids(
+      folded_data = folded_data_training
+    , raw_data    = splitted_data
+    , inner_ids   = base)
+    tfolds[sample(nrow(tfolds)), ]
+    })
+
+    ## Pre-join inner fold indices with training covariates, one branch per outer fold.
+     ## Workers for tuned_results_per_outer_fold load this small per-fold slice rather than
+     ## the full train_data, and the join is computed once per fold instead of once per
+     ## (inner_fold x tune_grid) branch.
+  , tar_target(outer_fold_prejoined
+               , tibble(
+                 outer_fold_id = folded_data_training$outer_fold_id
+                 , data          = list(
+                   folded_data_training$inner_folds[[1]] |>
+                     left_join(train_data, by = "index")))
+               , pattern = map(folded_data_training))
+
+    ## Number of pieces to split each outer fold's (inner_fold x tune_grid).
+     ## Use more workers: total tuning branches = nrow(folded_data_training) * n_tune_chunks
+  , tar_target(n_tune_chunks, max(1L, ceiling(as.integer(30) / nrow(folded_data_training))))
+
+    ## Chunk index branching dimension, crossed against outer_fold_prejoined below
+  , tar_target(chunk_id, seq_len(n_tune_chunks))
+
+    ## DIAGNOSTIC ONLY, mirroring inner_fold_ids_per_outer_chunked above -- nothing downstream
+     ## depends on this; it's just a cheap way to sanity-check the local grid's partition.
+  , tar_target(local_inner_fold_ids_per_outer_chunked
+     , local_inner_fold_id_finalized |>
+        dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id) |>
+        chunk_rows(n_chunks = n_tune_chunks, which = chunk_id) |>
+        dplyr::mutate(chunk_id = chunk_id, .after = "outer_fold_id")
+     , pattern = cross(folded_data_training, chunk_id))
+
+    ## Reuse the already-computed outer_fold_prejoined branches; only the per-fold
+     ## ID slice changes (pointing to local grid indices instead of global ones).
+     ## See the matching comment on tuned_results_per_outer_fold above for why the filter/chunk
+     ## is done inline rather than via local_inner_fold_ids_per_outer_chunked.
+  , tar_target(local_tuned_results, tune_results_per_outer_fold(
+       prejoined_data  = outer_fold_prejoined
+     , inner_ids_all   = local_inner_fold_id_finalized |>
+                            dplyr::filter(outer_fold_id == outer_fold_prejoined$outer_fold_id) |>
+                            chunk_rows(n_chunks = n_tune_chunks, which = chunk_id)
+     , threshold       = positive_threshold
+     , weightings      = weightings_on_ones
+     , start_p         = start_p
+     , id_cols         = id_cols
+     , out_dir         = outer_folds_dir
+     , tuning_grid_id  = local_tuning_grid$grid_id
+     , overwrite       = FALSE
+     , DEBUG           = FALSE
+     , chunk_id        = chunk_id
+     , checktime_path  = "outputs/timing"
+     , hex_id_col      = district_id_col)
+     , pattern         = cross(outer_fold_prejoined, chunk_id)
+     , error           = "null"
+     , format          = "file")
+
+    ## weightval_raw/weightval_hex/gamma are NOT passed here separately -- they are read directly
+     ## off local_tuning_grid inside finalize_hyperparameters_from_inner, so
+     ## this stage can never silently drift out of sync with whatever scoring parameters actually
+     ## built that grid (see the note on build_local_hyperparameter_grid)
+  , tar_target(finalized_hyperparameters, finalize_hyperparameters_from_inner(
+      inner_folds       = c(tuned_results_per_outer_fold, local_tuned_results)
+    , local_tuning_grid = local_tuning_grid
+    , tuning_grid_id    = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")
+    , outpath           = local_hyperparam_path))
+
+  )
+
+} else {
+
+  ## PURPOSE == "forecast": skip tuning entirely and point finalized_hyperparameters at
+   ## whatever hyperparameter set was most recently finalized by a PURPOSE = train run
+  model_tuning_targets_purpose <- tar_plan(
+
+    tar_target(finalized_hyperparameters, get_latest_finalized_hyperparameters(
+      hyperparam_dir = "outputs/hyperparameters"))
+
+  )
+
+}
+
+model_tuning_targets <- c(model_tuning_targets_common, model_tuning_targets_purpose)
 
 ## Fitting of model on holdout data --------------------------------------------
 model_fitting_targets <- tar_plan(

@@ -11,7 +11,6 @@
 #' @param id_cols Columns that define a unique data point
 #' @param out_dir Where to save output
 #' @param tuning_grid_id id of the current tuning grid to track tuning better
-#' @param hyperparam_path path to where the best hyperparameter file will be / is saved
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
 #' @param DEBUG If TRUE reduce to a small dataset for code testing
 #' @param chunk_id Index of the (inner_fold x tune_grid) chunk this branch is responsible for.
@@ -24,13 +23,10 @@
 tune_results_per_outer_fold <- function(
     prejoined_data, inner_ids_all, threshold
   , weightings, start_p, id_cols, out_dir
-  , tuning_grid_id, hyperparam_path, overwrite, DEBUG
+  , tuning_grid_id, overwrite, DEBUG
   , chunk_id, checktime_path, hex_id_col = "shapeName"
 ) {
-  
-  ## First, check if this tuning_grid_id already has a saved best parameter set
-  if (file.exists(hyperparam_path)) return(hyperparam_path)
-  
+
   ## Extract the outer fold ID and the pre-joined covariate data for this branch.
   ## joined_data already contains inner fold indices left-joined with train_data covariates,
   ## so no join is needed inside the loop -- only cluster-based filtering per iteration.
@@ -357,7 +353,45 @@ finalize_hyperparameters_from_inner <- function(inner_folds, local_tuning_grid, 
     )
   
   write.csv(best, outpath)
-  
+
   outpath
-  
+
+}
+
+#' Locate the finalized hyperparameter set from the most recent PURPOSE = train run
+#'
+#' Used when PURPOSE = forecast so that finalized_hyperparameters can be populated without
+#' rebuilding (or even defining) any of the tuning targets (tuning_grid, tuned_results_per_outer_fold,
+#' local_tuning_grid, local_tuned_results, etc.) -- those targets only exist in the targets
+#' graph when PURPOSE = train (see model_framework_targets.R), so forecasting just needs to
+#' find whatever finalized hyperparameter file that train run already wrote out.
+#'
+#' @title get_latest_finalized_hyperparameters
+#'
+#' @param hyperparam_dir Directory finalize_hyperparameters_from_inner saves
+#'   best_hyperparameters_combined_*.csv files into
+#' @return Path to the most recently modified finalized hyperparameter csv
+#' @author Morgan Kain
+#' @export
+
+get_latest_finalized_hyperparameters <- function(hyperparam_dir) {
+
+  ## Only match the final (global + local) combined output, not the intermediate top-k
+   ## checkpoint csv that build_local_hyperparameter_grid writes out mid-tuning
+  candidates <- list.files(
+    hyperparam_dir
+  , pattern    = "^best_hyperparameters_combined_.*\\.csv$"
+  , full.names = TRUE
+  )
+
+  if (length(candidates) == 0) {
+    stop(
+      "PURPOSE = forecast needs a hyperparameter set finalized by a prior PURPOSE = train run, "
+    , "but none were found in '", hyperparam_dir, "'. Run PURPOSE = train at least once first."
+    )
+  }
+
+  ## Most recently modified file == most recently completed training run
+  candidates[which.max(file.mtime(candidates))]
+
 }
