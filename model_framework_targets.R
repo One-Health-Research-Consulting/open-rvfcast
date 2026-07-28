@@ -65,12 +65,9 @@ use_sero_kernel_intercept <- FALSE
 ## Targets for loading needed data ---------------------------------------------
 model_data_targets <- tar_plan(
 
-  ## Get date from which we are forecasting if we are forecasting
-  tar_target(forecast_date, rollbackward(as_date(floor_date(Sys.Date(), "month") - 2)))
-
   ## Eventually will want to download the data from the S3 bucket, but for now load from local
    ## Sub Region (e.g., Country) and Sub-Sub Regions (e.g., adm2 -- i.e., district or county) of interest
-, tar_target(region_name, ifelse(using_hexes, "pan_hex", "pan"))
+  tar_target(region_name, ifelse(using_hexes, "pan_hex", "pan"))
 
 , tar_target(region_data_path
              , paste("data/", region_name, "_joined_response_data/"
@@ -92,8 +89,10 @@ model_data_targets <- tar_plan(
    ## covariates are roughly on the same scale
 , tar_target(region_data, clean_region_data(
     dat     = region_data_raw
-  , map_dat = region_hexes[[1]]
-  ))
+  , map_dat = region_hexes[[1]]))
+
+  ## Get date from which we are forecasting if we are forecasting
+, tar_target(forecast_date, max(region_data$date))
 
   ## Other paths to intermediate products to save computation time.
    ## Most used only for using_hexes == FALSE
@@ -536,7 +535,7 @@ model_fitting_targets <- tar_plan(
   , start_p         = start_p
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
-  , overwrite       = FALSE
+  , overwrite       = TRUE
   , DEBUG           = FALSE)
   , pattern         = map(folded_data_for_fitting)
   , error           = "null"
@@ -619,7 +618,7 @@ model_evaluation_targets <- tar_plan(
   , outpath_for_for  = forecasts_path
   , outpath_for_app  = app_file_path
   , purpose          = purpose
-  , overwrite        = FALSE
+  , overwrite        = TRUE
     ## Make predictions for a given country
   , country_code     = "ZAF")
   , pattern          = map(model_out_for_eval)

@@ -343,10 +343,9 @@ dynamic_targets <- tar_plan(
     ## historical dates when a more recent forecast anchor parquet already exists.
     narrow_dates <- dates_to_process_all[!as.character(dates_to_process_all) %in% processed_dates]
     
-    # narrow_dates
-    
-    ## Temporary to explore the issues with NDVI data
-    dates_to_process_all[-length(dates_to_process_all)]
+    ## Somewhat crude fix to avoid too recent of a date given lags with era5t
+     ## weather that can cause some issues
+    narrow_dates <= Sys.Date() - 7
 
   })
 
@@ -598,7 +597,7 @@ dynamic_targets <- tar_plan(
 
   ## Fetch ERA5T daily weather from CDS and transform to continental parquets.
   ## Branches over months_to_process_era5t
-   ## For forecasting, don't need many months
+  ## For forecasting, don't need many months
 , tar_target(era5t_weather_transformed, fetch_and_transform_era5t_weather(
     months_to_process         = months_to_process
   , continent_raster_template = continent_raster_template
@@ -703,37 +702,47 @@ derived_data_targets <- tar_plan(
   , error      = "null"
   , cue        = tar_cue("always"))
 
+  ## Full rebuild of the historical means archive is controlled by the user via the
+  ## REBUILD_HISTORICAL_MEANS .env flag rather than a fixed age-based cue (the pipeline
+  ## doesn't explicitly track how much new data has accumulated). When TRUE, pull down
+  ## every ERA5T file present on S3 -- not just the ones needed for dates_to_process --
+  ## so the full local archive is available before means are recomputed below.
+, tar_target(era5t_weather_transformed_full_AWS, AWS_get_folder(
+    local_folder     = era5t_weather_transformed_directory
+  , skip_fetch       = !parse_flag("REBUILD_HISTORICAL_MEANS")
+  , sync_with_remote = TRUE)
+  , error            = "null"
+  , cue              = tar_cue("always"))
+
 , tar_target(weather_historical_means, calculate_weather_historical_means(
     era5t_weather_transformed_directory
   , weather_historical_means_directory
-  , basename_template  = "weather_historical_mean_doy_{i}.parquet"
-  , overwrite          = parse_flag("OVERWRITE_HISTORICAL_MEANS")
-  , dates_to_process   = dates_to_process
-  , forecast_horizon   = max(forecast_intervals)
-  , weather_historical_means_AWS)
-  , format             = "file"
-  , repository         = "local"
-  , cue                = tar_cue_age(
-     name              = weather_historical_means
-     ## Recalculate every 6 months. NOTE: with the update, this won't really
-     ## work right because when the pipeline is run for a new date the full stack
-     ## of requisite files wont be present.
-     ## *THUS ToDo* -- adjust so that the full needed stack of files is built when
-      ## PURPOSE=train which will happen about every 12 months or so (or less
-      ## frequently than that TBH)
-   , age               = as.difftime(180, units = "days")))
+  , basename_template = "weather_historical_mean_doy_{i}.parquet"
+  , overwrite         = parse_flag(c("OVERWRITE_HISTORICAL_MEANS", "REBUILD_HISTORICAL_MEANS"))
+    ## Rebuilding: pass dates_to_process = NULL so every DOY (1:366) is recomputed
+    ## from the full downloaded archive instead of only the DOYs touched by the
+    ## current incremental run.
+  , dates_to_process  = if (parse_flag("REBUILD_HISTORICAL_MEANS")) NULL else dates_to_process
+  , forecast_horizon  = max(forecast_intervals)
+  , weather_historical_means_AWS
+  , era5t_weather_transformed_full_AWS)
+  , format            = "file"
+  , repository        = "local"
+    ## Always re-check this target when REBUILD_HISTORICAL_MEANS is TRUE so flipping
+    ## the flag reliably triggers a rebuild; otherwise fall back to normal targets caching.
+  , cue               = parse_flag("REBUILD_HISTORICAL_MEANS", cue = "always"))
 
   ## Next step put weather_historical_means files on AWS.
 , tar_target(weather_historical_means_AWS_upload, AWS_put_files(
     transformed_file_list = weather_historical_means
   , local_folder          = weather_historical_means_directory
-  , overwrite             = parse_flag("OVERWRITE_HISTORICAL_MEANS"))
+  , overwrite             = parse_flag(c("OVERWRITE_HISTORICAL_MEANS", "REBUILD_HISTORICAL_MEANS")))
   , error                 = "null")
 
 , tar_target(weather_anomalies_directory, create_data_directory(directory_path = "data/weather_anomalies"))
 
-  # Check if weather_anomalies parquet files already exists on AWS and can be loaded
-  # The only important one is the directory. The others are there to enforce dependencies.
+  ## Check if weather_anomalies parquet files already exists on AWS and can be loaded
+  ## The only important one is the directory. The others are there to enforce dependencies.
 , tar_target(weather_anomalies_AWS, AWS_get_needed_files(
     s3_folder  = weather_anomalies_directory
   , dates      = dates_to_process
@@ -770,7 +779,7 @@ derived_data_targets <- tar_plan(
 , tar_target(forecasts_anomalies_directory, create_data_directory(directory_path = "data/forecast_anomalies"))
 
   ## Check if forecasts_anomalies parquet files already exists on AWS and can be loaded
-  ## The only important one is the directory. The others are there to enforce dependencies.
+   ## The only important one is the directory. The others are there to enforce dependencies.
 , tar_target(forecasts_anomalies_AWS, AWS_get_needed_files(
     s3_folder  = forecasts_anomalies_directory
   , dates      = dates_to_process
@@ -835,28 +844,39 @@ derived_data_targets <- tar_plan(
   , error      = "null"
   , cue        = tar_cue("always"))
 
+  ## As with weather_historical_means, a full rebuild is user-controlled via the
+  ## REBUILD_HISTORICAL_MEANS .env flag: when TRUE, pull down every NDVI file present
+  ## on S3 -- not just the ones needed for dates_to_process -- before means are recomputed.
+, tar_target(ndvi_transformed_full_AWS, AWS_get_folder(
+    local_folder     = ndvi_transformed_directory
+  , skip_fetch       = !parse_flag("REBUILD_HISTORICAL_MEANS")
+  , sync_with_remote = TRUE)
+  , error            = "null"
+  , cue              = tar_cue("always"))
+
 , tar_target(ndvi_historical_means, calculate_ndvi_historical_means(
     ndvi_transformed
   , ndvi_historical_means_directory
   , basename_template           = "ndvi_historical_mean_doy_{i}.parquet"
-  , overwrite                   = parse_flag("OVERWRITE_HISTORICAL_MEANS")
+  , overwrite                   = parse_flag(c("OVERWRITE_HISTORICAL_MEANS", "REBUILD_HISTORICAL_MEANS"))
   , ndvi_transformed_directory  = ndvi_transformed_directory
-  , dates_to_process            = dates_to_process
-  , ndvi_historical_means_AWS)
+    ## Rebuilding: pass dates_to_process = NULL so every DOY (1:366) is recomputed
+     ## from the full downloaded archive instead of only the DOYs touched by the
+     ## current incremental run.
+  , dates_to_process            = if (parse_flag("REBUILD_HISTORICAL_MEANS")) NULL else dates_to_process
+  , ndvi_historical_means_AWS
+  , ndvi_transformed_full_AWS)
   , format                      = "file"
   , repository                  = "local"
-  , cue                         = tar_cue_age(
-      name                      = ndvi_historical_means
-      ## *THUS ToDo* -- adjust so that the full needed stack of files is built when
-       ## PURPOSE=train which will happen about every 12 months or so (or less
-       ## frequently than that TBH)
-    , age                       = as.difftime(180, units = "days")))
+    ## Always re-check this target when REBUILD_HISTORICAL_MEANS is TRUE so flipping
+     ## the flag reliably triggers a rebuild; otherwise fall back to normal targets caching.
+  , cue                         = parse_flag("REBUILD_HISTORICAL_MEANS", cue = "always"))
 
   ## Next step put ndvi_historical_means files on AWS.
 , tar_target(ndvi_historical_means_AWS_upload, AWS_put_files(
     transformed_file_list = ndvi_historical_means
   , local_folder          = ndvi_historical_means_directory
-  , overwrite             = parse_flag("OVERWRITE_HISTORICAL_MEANS"))
+  , overwrite             = parse_flag(c("OVERWRITE_HISTORICAL_MEANS", "REBUILD_HISTORICAL_MEANS")))
   , error                 = "null")
 
 , tar_target(ndvi_anomalies_directory, create_data_directory(directory_path = "data/ndvi_anomalies"))
