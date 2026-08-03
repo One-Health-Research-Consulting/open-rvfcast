@@ -6,7 +6,9 @@
 #' @param file_list names of the parquets saved separately (only fix I could get working for whatever reason)
 #' @param processed_dates prepared dates for each parquet for building lagged variables
 #' @param cov_files list of covariate parquet files. Here the masked and clustered data
-#' @param rvf_response summarized case data
+#' @param rvf_response summarized case data. When built from country-index-flagged outbreaks
+#'   (see get_rvf_response), also carries country_index_outbreak, aggregated up to the hex
+#'   level here alongside cases
 #' @param sero_layer built seroprevalence for all hexes
 #' @param neighbor_outbreaks outbreak history in neighboring hexes
 #' @param out_dir Place to save output
@@ -225,7 +227,12 @@ lag_join_aggregate <- function (
     cases.t <- cases.t |>
       mutate(x = snapped_xy[, 1], y = snapped_xy[, 2]) |>
       group_by(x, y, date, forecast_interval) |>
-      summarize(cases = sum(cases, na.rm = TRUE), .groups = "drop")
+      summarize(
+        cases = sum(cases, na.rm = TRUE)
+        ## Same snapped (x, y) grouping as cases, so any country-index case keeps landing
+         ## on the identical cell as the case it came from
+      , country_index_outbreak = max(country_index_outbreak, na.rm = TRUE)
+      , .groups = "drop")
   }
 
   fdat.fcc <- fdat.fc |>
@@ -233,7 +240,8 @@ lag_join_aggregate <- function (
     mutate(x = round(x, 4), y = round(y, 4)) |>
     left_join(cases.t, by = c("x", "y", "date", "forecast_interval")) |>
     relocate(cases, .after = shapeName) |>
-    mutate(cases = ifelse(is.na(cases), 0, cases))
+    mutate(cases = ifelse(is.na(cases), 0, cases)) |>
+    mutate(country_index_outbreak = ifelse(is.na(country_index_outbreak), 0, country_index_outbreak))
 
   ## check join issue
   cases_a <- cases.t$cases |> sum()
@@ -252,7 +260,11 @@ lag_join_aggregate <- function (
     group_by(shapeName, date, forecast_interval) |>
     summarize(
       cases = sum(cases, na.rm = TRUE)
-    , across(where(is.numeric) & !all_of("cases"), ~ mean(.x, na.rm = TRUE))
+      ## Excluded from the generic numeric mean below and aggregated by max instead --
+       ## it's a 0/1 flag, not a magnitude, so any grid cell in this hex/window flagged
+       ## as a country-index case should keep the hex flagged, not get averaged away
+    , country_index_outbreak = max(country_index_outbreak, na.rm = TRUE)
+    , across(where(is.numeric) & !all_of(c("cases", "country_index_outbreak")), ~ mean(.x, na.rm = TRUE))
     , across(where(is.factor), ~ stat_mode(.x, na.rm = TRUE))
     , .groups = "keep") |>
     mutate(outbreak = ifelse(cases > 0, 1, 0), .after = cases) |>

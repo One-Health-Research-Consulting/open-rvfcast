@@ -87,13 +87,15 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
 #' @param weightval_raw Numeric penalty weight on S_neg_penalty (raw, non-hex); see score_hexrelative_results
 #' @param weightval_hex Numeric penalty weight on S_neg_penalty_hex; see score_hexrelative_results
 #' @param gamma Numeric weight on the raw (non-hex) final_score in the blend; see score_hexrelative_results
+#' @param delta Numeric weight on final_score_index (country-level index-case performance) in the
+#'   blend; see score_hexrelative_results. 0 reduces to the pre-existing hex + gamma*raw blend
 #' @param expansion Fraction of the top-k range to extend on each side (e.g. 0.5 = +/-50%)
 #' @param grid_path Directory in which to save the local grid Rds
 #' @param folded_data_training Folded training data (needed to finalise mtry upper bound)
 #' @param splitted_data Split data object (needed to finalise mtry upper bound)
 #' @param seed Random seed for reproducibility
 #' @return Single-row tibble with columns par_grid (list), grid_id (character, prefixed "localhex_"),
-#'   weightval_raw, weightval_hex, gamma
+#'   weightval_raw, weightval_hex, gamma, delta
 #' @author Morgan Kain
 #' @export
 
@@ -106,6 +108,7 @@ build_local_hyperparameter_grid <- function(
     , weightval_raw
     , weightval_hex
     , gamma
+    , delta
     , expansion
     , grid_path
     , hyperparam_path
@@ -115,7 +118,7 @@ build_local_hyperparameter_grid <- function(
 ) {
 
   create_data_directory(directory_path = grid_path)
-  
+
   all_results <- purrr::map(inner_fold_paths, .f = function(x) {
     tload <- try(readRDS(x), silent = TRUE)
     if (class(tload)[1] != "try-error") {
@@ -124,9 +127,9 @@ build_local_hyperparameter_grid <- function(
       return(NULL)
     }
   }) |> bind_rows()
-  
+
   ## Do the scoring. Detailed info on the scoring inside this function
-  scores <- score_hexrelative_results(all_results, weightval_raw, weightval_hex, gamma)
+  scores <- score_hexrelative_results(all_results, weightval_raw, weightval_hex, gamma, delta)
   
   ## Extract out the top few indices
   top_indices <- scores |>
@@ -155,7 +158,7 @@ build_local_hyperparameter_grid <- function(
   ## Hash every parameter that determines this grid's content into its id, so a change in any of
   ## them produces a new file (forcing a rebuild) instead of silently reusing a stale one -- see
   ## the note above the function.
-  param_sig <- digest::digest(list(weightval_raw, weightval_hex, gamma, top_k, expansion, size, seed))
+  param_sig <- digest::digest(list(weightval_raw, weightval_hex, gamma, delta, top_k, expansion, size, seed))
   hyper_id  <- paste0("localhex_", param_sig)
   save_path <- paste0(grid_path, "/hypergrid_", hyper_id, ".Rds")
   
@@ -196,8 +199,9 @@ build_local_hyperparameter_grid <- function(
   , weightval_raw = weightval_raw
   , weightval_hex = weightval_hex
   , gamma         = gamma
+  , delta         = delta
   )
-  
+
 }
 
 ## Helper: extend the observed range by expansion on each side, clamped to hard limits.

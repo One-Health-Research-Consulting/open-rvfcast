@@ -14,11 +14,17 @@
 #' @param out_dir Where to save output
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
 #' @param DEBUG If TRUE reduce to a small dataset for code testing
+#' @param index_boost Multiplier applied on top of the class-imbalance weight for
+#'   country-level index cases (see identify_index_outbreaks/get_rvf_response), i.e. an
+#'   index case counts as (1 + index_boost) times an ordinary positive case in reporting
+#'   metrics. Default 1 (double weight). Training itself is unaffected either way -- class
+#'   imbalance there is handled via scale_pos_weight at the engine level, not per-row
+#'   weights, to avoid corrupting min_child_weight semantics
 #' @return Tibble of model fit output
 #' @author Morgan Kain
 #' @export
 
-fit_model <- function(final_hyper_set, full_data, train_data, test_data, threshold, weightings, start_p, id_cols, out_dir, overwrite, DEBUG) {
+fit_model <- function(final_hyper_set, full_data, train_data, test_data, threshold, weightings, start_p, id_cols, out_dir, overwrite, DEBUG, index_boost = 1) {
 
   ## load the csv of the finalized hyperparameter set
   final_hyper_set <- read.csv(final_hyper_set)
@@ -76,14 +82,17 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
   ## Extract the needed data
   ## 1) full amount of training data (all the stuff from the hyperparameter tuning step)
   ## 2) some portion of the data from the left-out period depending on what forecast window is being predicted
+  ## country_index_outbreak is dropped from training data here (never a predictor -- by
+   ## construction it's 1 only where outbreak is also 1, so leaving it in would be leakage),
+   ## the same treatment already given to cases
   outer_tbl_train <- rbind(
     train_data |>
       dplyr::filter(index %in% full_data$train_data[[1]]) |>
-      dplyr::select(-c(cases)) |>
+      dplyr::select(-c(cases, country_index_outbreak)) |>
       mutate(outbreak = factor(outbreak, levels = c(1, 0)))
   , test_data |>
       dplyr::filter(index %in% full_data$train_data[[1]]) |>
-      dplyr::select(-c(cases)) |>
+      dplyr::select(-c(cases, country_index_outbreak)) |>
       mutate(outbreak = factor(outbreak, levels = c(1, 0)))
   ) |>
     mutate(forecast_interval = as.factor(forecast_interval))
@@ -92,6 +101,9 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
    ## case weights in the workflow, which corrupts min_child_weight semantics
   spw <- calc_spw(outer_tbl_train)
 
+  ## country_index_outbreak is kept here (unlike outer_tbl_train above) -- it's a native
+   ## column on test_data (see get_rvf_response/lag_join_aggregate), used below to weight
+   ## reporting metrics toward the cases a real warning system most needs to catch
   outer_tbl_assess  <- test_data |>
     dplyr::filter(index %in% full_data$assess_data[[1]]) |>
     dplyr::select(-c(cases)) |>
@@ -100,6 +112,9 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
     mutate(
       weights = length(which(outbreak == "0")) / max(length(which(outbreak == "1")), 1)
     , weights = ifelse(outbreak == "0", 1, weights)
+      ## Extra emphasis for country-level index cases on top of the class-imbalance
+       ## weight above; training itself is untouched by this (see index_boost doc)
+    , weights = weights * (1 + index_boost * country_index_outbreak)
     , .after = "index"
     )
 
@@ -153,6 +168,7 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
     , prob1       = prob1
     , class_hat   = class_hat
     , event_level = "first"
+    , index_flag  = outer_tbl_assess |> pull(country_index_outbreak)
   ) |>
   mutate(
     outer_fold = full_data$outer_fold_id

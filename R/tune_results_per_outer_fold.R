@@ -32,9 +32,9 @@ tune_results_per_outer_fold <- function(
   ## so no join is needed inside the loop -- only cluster-based filtering per iteration.
   outer_fold_id <- prejoined_data$outer_fold_id
   joined_data   <- prejoined_data$data[[1]]
-  
+
   error_safe_read_file <- possibly(readRDS, NULL)
-  
+
   ## Iterate over every (inner_fold_id, tune_grid_index) combination for this outer fold.
   ## Each fit is saved to its own file so partial progress survives a restart or error.
   save_filenames       <- character(nrow(inner_ids_all))
@@ -77,18 +77,24 @@ tune_results_per_outer_fold <- function(
     
     checktime <- system.time({
       
-      ## Inner training data: exclude one spatial cluster
+      ## Inner training data: exclude one spatial cluster. country_index_outbreak is
+       ## dropped here -- never a training predictor (by construction it's 1 only where
+       ## outbreak is also 1, so leaving it in would be leakage), same treatment as cases
       inner_tbl_train <- joined_data |>
         dplyr::filter(cluster != inner_id) |>
         relocate(cluster, .after = "date") |>
-        dplyr::select(-c(cluster, cases)) |>
+        dplyr::select(-c(cluster, cases, country_index_outbreak)) |>
         mutate(outbreak = as.factor(outbreak)) |>
         mutate(forecast_interval = as.factor(forecast_interval))
-      
+
       ## Class imbalance handled via scale_pos_weight in engine, not case weights
       spw <- calc_spw(inner_tbl_train)
-      
-      ## Inner assessment data: extract the held-out spatial cluster
+
+      ## Inner assessment data: extract the held-out spatial cluster. country_index_outbreak
+       ## is kept here (unlike inner_tbl_train above) -- a native column on joined_data (see
+       ## get_rvf_response/lag_join_aggregate), used below as index_flag for
+       ## compute_metrics_vec_hexrelative so hyperparameter selection can weight
+       ## country-level index-case performance via score_hexrelative_results' delta
       ## weights stored as plain numeric (not hardhat_importance_weights) so that
       ## predict() on a workflow without add_case_weights() does not raise a type error
       inner_tbl_assess <- joined_data |>
@@ -152,6 +158,7 @@ tune_results_per_outer_fold <- function(
           , hex_id      = hex_id.t
           , class_hat   = class_hat.t
           , event_level = "first"
+          , index_flag  = inner_tbl_assess |> filter(forecast_interval == this_int) |> pull(country_index_outbreak)
         ) |>
           mutate(
             outer_fold_id = outer_fold_id
@@ -290,7 +297,7 @@ chunk_rows <- function(dat, n_chunks, which) {
 #' @param inner_folds Character vector of all file paths returned by the
 #'   tuned_results_per_outer_fold target (one path per outer x inner x index branch)
 #' @param local_tuning_grid Single-row tibble returned by build_local_hyperparameter_grid;
-#'   must carry weightval_raw, weightval_hex, gamma columns
+#'   must carry weightval_raw, weightval_hex, gamma, delta columns
 #' @param tuning_grid_id string for this tuning grid
 #' @param outpath where to save the best hyperparameter set
 #' @return Single-row tibble containing final_score_combined, final_score_hex, S_pos_hex,
@@ -310,11 +317,13 @@ finalize_hyperparameters_from_inner <- function(inner_folds, local_tuning_grid, 
   weightval_raw <- local_tuning_grid$weightval_raw
   weightval_hex <- local_tuning_grid$weightval_hex
   gamma         <- local_tuning_grid$gamma
-  
+  delta         <- local_tuning_grid$delta
+
   stopifnot(is.numeric(weightval_raw), length(weightval_raw) == 1, weightval_raw >= 0)
   stopifnot(is.numeric(weightval_hex), length(weightval_hex) == 1, weightval_hex >= 0)
   stopifnot(is.numeric(gamma), length(gamma) == 1, gamma >= 0)
-  
+  stopifnot(is.numeric(delta), length(delta) == 1, delta >= 0)
+
   ## Read every per-(outer x inner x index) result file into one long tibble
   all_results <- purrr::map(inner_folds, .f = function(x) {
     tload <- try(readRDS(x), silent = TRUE)
@@ -324,9 +333,9 @@ finalize_hyperparameters_from_inner <- function(inner_folds, local_tuning_grid, 
       return(NULL)
     }
   }) |> bind_rows()
-  
+
   ## Do the scoring. Detaailed info on the scoring inside this function
-  scores <- score_hexrelative_results(all_results, weightval_raw, weightval_hex, gamma)
+  scores <- score_hexrelative_results(all_results, weightval_raw, weightval_hex, gamma, delta)
   
   ## Find the single best
   best <- scores |>

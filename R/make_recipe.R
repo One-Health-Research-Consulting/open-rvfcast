@@ -60,19 +60,32 @@ make_model <- function(params, start_p, spw) {
 ##### Some helpers ----------------------------------------------------------------
 
 ## Memory-efficient metrics calculation
-compute_metrics_vec <- function(truth, threshold, weightings, caseweights, prob1, class_hat, event_level = "first") {
+compute_metrics_vec <- function(
+    truth
+  , threshold
+  , weightings
+  , caseweights
+  , prob1
+  , class_hat
+  , event_level = "first"
+  , index_flag = NULL) {
 
   n_pos <- length(which(truth == "1"))
   n_all <- length(truth)
+  
   ## Constant predictions produce a degenerate two-point PR curve whose trapezoidal
-  ## AUC equals (1 + prevalence) / 2 regardless of calibration -- appearing near 0.501
-  ## for rare events and scoring far above the true no-skill baseline of prevalence.
-  ## ROC-AUC handles ties correctly (returns 0.5) so needs no special casing.
+   ## AUC equals (1 + prevalence) / 2 regardless of calibration -- appearing near 0.501
+   ## for rare events and scoring far above the true no-skill baseline of prevalence.
+   ## ROC-AUC handles ties correctly (returns 0.5) so needs no special casing.
   no_discrimination <- diff(range(prob1)) < .Machine$double.eps
 
   ttib <- tibble(
       n_pos     = n_pos
     , n_all     = n_all
+      ## Count of country-level index-case rows in this call, needed to correctly weight
+       ## logloss_index when it's pooled (by n_pos_index) across many such calls in
+       ## score_hexrelative_results, exactly as n_pos already does for logloss_pos
+    , n_pos_index = if (is.null(index_flag)) NA_integer_ else sum(index_flag == 1, na.rm = TRUE)
       ## Ranking metrics
       ## Calculate Area Under the Precision-Recall Curve (good for cases where getting
        ## positives correct is important, but still quite sensitive to huge class imbalance).
@@ -119,6 +132,21 @@ compute_metrics_vec <- function(truth, threshold, weightings, caseweights, prob1
         tweights <- ifelse(tweights > 1, x, 1)
         yardstick::mn_log_loss_vec(truth, prob1, case_weights = tweights)})
       ) |> list()
+      ## Performance restricted to country-level index cases specifically (see
+       ## get_rvf_response/lag_join_aggregate) -- the cases a real warning system most needs to
+       ## catch, as opposed to later, already-known-about cases in the same chain/country
+    , logloss_index = if (is.null(index_flag) || sum(index_flag == 1, na.rm = TRUE) == 0) NA_real_ else
+                       mean(-log(pmax(prob1[index_flag == 1], 1e-15)))
+    , recall_index   = if (is.null(index_flag) || sum(index_flag == 1, na.rm = TRUE) == 0) NA_real_ else
+                       tibble(
+                         threshold = threshold
+                       , recall    = apply(class_hat[index_flag == 1, , drop = FALSE], 2, FUN = function(x) {
+                           recall_vec(
+                             truth[index_flag == 1] |> factor(levels = c("1", "0"))
+                           , x |> factor(levels = c("1", "0"))
+                           , event_level = event_level)
+                         })
+                       ) |> list()
   )
 
   ttib

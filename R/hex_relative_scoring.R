@@ -16,13 +16,16 @@
 #' @param hex_id Vector identifying which spatial hex each row belongs to
 #' @param class_hat Matrix of thresholded class predictions passed through to compute_metrics_vec
 #' @param event_level Passed through to compute_metrics_vec
+#' @param index_flag Optional 0/1 vector (same row order/length as truth); current default 
+#'   being to use country-level index cases. Passed to compute_metrics_vecto weight hyperparameter
+#'   selection toward those cases (see get_rvf_response/lag_join_aggregate in rvf_data_processing_targets.R)
 #' @return Tibble: all compute_metrics_vec columns plus n_hex, logloss_pos_hex, logloss_neg_hex,
 #'   n_neg_eventful, within_hex_auc, within_hex_auc_n_pairs
 #' @author Morgan Kain
 #' @export
 
 compute_metrics_vec_hexrelative <- function(truth, threshold, weightings, caseweights, prob1, hex_id
-                                            , class_hat, event_level = "first") {
+                                            , class_hat, event_level = "first", index_flag = NULL) {
 
   ## Compute the "global" calibration score component
   base_metrics <- compute_metrics_vec(
@@ -32,7 +35,8 @@ compute_metrics_vec_hexrelative <- function(truth, threshold, weightings, casewe
   , caseweights = caseweights
   , prob1       = prob1
   , class_hat   = class_hat
-  , event_level = event_level)
+  , event_level = event_level
+  , index_flag  = index_flag)
 
   ## Score Information ------------------------------------------------------------
   
@@ -232,14 +236,22 @@ within_hex_auc_vec <- function(truth, prob1, hex_id) {
 #' @param weightval_hex Numeric penalty weight on S_neg_penalty_hex relative to S_pos_hex
 #' @param gamma Numeric weight on the raw (non-hex) final_score when blending it into
 #'   final_score_combined; gamma = 0 reduces to pure hex-relative selection
+#' @param delta Numeric weight on final_score_index (country-level index-case
+#'   performance, see get_rvf_response/lag_join_aggregate) when blending it into
+#'   final_score_combined; delta = 0 reduces to the pre-existing hex + gamma*raw blend.
+#'   Since an index case is already one of the positives counted in S_pos/S_pos_hex,
+#'   delta > 0 makes index-case performance count *again*, on top of that, so it has
+#'   more influence on which hyperparameters get picked than an equally-well/badly
+#'   predicted non-index positive
 #' @return Tibble with one row per tuning-grid index: S_pos, S_neg_penalty, final_score (raw),
-#'   S_pos_hex, S_neg_penalty_hex, final_score_hex, final_score_combined, within_hex_auc,
-#'   n_pos_folds, n_total_folds, total_n_pos, weightval_raw, weightval_hex, gamma
+#'   S_pos_hex, S_neg_penalty_hex, final_score_hex, S_pos_index, final_score_index,
+#'   final_score_combined, within_hex_auc, n_pos_folds, n_total_folds, total_n_pos,
+#'   total_n_pos_index, weightval_raw, weightval_hex, gamma, delta
 #' @author Morgan Kain
 #' @export
 
-score_hexrelative_results <- function(all_results, weightval_raw, weightval_hex, gamma) {
-  
+score_hexrelative_results <- function(all_results, weightval_raw, weightval_hex, gamma, delta = 0) {
+
   ## ** NOTE: See commenting in compute_metrics_vec_hexrelative for more details
 
   ## Much reused from the final_score calculation without the within-hex component
@@ -256,20 +268,29 @@ score_hexrelative_results <- function(all_results, weightval_raw, weightval_hex,
        ## rows in hexes that have an event this call, so it must be weighted by that same count
     , S_neg_penalty_hex = sum(logloss_neg_hex * n_neg_eventful, na.rm = TRUE) /
                             pmax(sum(n_neg_eventful[!is.na(logloss_neg_hex)], na.rm = TRUE), 1L)
+      ## Same pooling logic as S_pos, restricted to country-level index-case rows (see
+       ## compute_metrics_vec); NA (contributes nothing) when a fold/interval/index has none
+    , S_pos_index       = -sum(logloss_index * n_pos_index, na.rm = TRUE) /
+                            pmax(sum(n_pos_index[!is.na(logloss_index)], na.rm = TRUE), 1L)
     , within_hex_auc    = sum(within_hex_auc * within_hex_auc_n_pairs, na.rm = TRUE) /
                             pmax(sum(within_hex_auc_n_pairs[!is.na(within_hex_auc)], na.rm = TRUE), 1L)
     , n_pos_folds       = sum(n_pos > 0)
     , n_total_folds     = n()
     , total_n_pos       = sum(n_pos)
+    , total_n_pos_index = sum(n_pos_index, na.rm = TRUE)
     , .groups           = "drop"
     ) |>
     mutate(
       final_score          = S_pos - weightval_raw * S_neg_penalty
     , final_score_hex      = S_pos_hex - weightval_hex * S_neg_penalty_hex
-    , final_score_combined = final_score_hex + gamma * final_score
+      ## No separate negative-penalty term here: an index case is only ever a positive
+       ## row, so there is no natural "false index alarm" to penalize symmetrically
+    , final_score_index    = S_pos_index
+    , final_score_combined = final_score_hex + gamma * final_score + delta * final_score_index
     , weightval_raw        = weightval_raw
     , weightval_hex        = weightval_hex
     , gamma                = gamma
+    , delta                = delta
     )
 
 }

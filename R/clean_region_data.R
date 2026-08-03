@@ -18,6 +18,11 @@ clean_region_data <- function(dat, map_dat) {
   
   ## Drop the sero colums we are not using
   dat <- dat |> dplyr::select(-contains("anomaly_scaled_sero"))
+  
+  ## Drop other covariates that are a problem for reporting lags
+  dat <- dat |> dplyr::select(-contains("neigh_outbreak"), -c(
+    "anomaly_not_sero_30", "anomaly_not_sero_60", "anomaly_not_sero_90"
+  ))
 
   ## Not ideal as this will need to be manually adjusted, but ok for now. Scale
    ## all of these

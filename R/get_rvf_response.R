@@ -6,7 +6,10 @@
 #'
 #' @author Nathan C. Layman, Morgan Kain
 #'
-#' @param wahis_outbreaks Outbreak data to be processed.
+#' @param wahis_outbreaks Outbreak data to be processed. Include \code{country_index_case}
+#'   (see \code{identify_index_outbreaks}) to also aggregate \code{country_index_outbreak}
+#'   alongside \code{cases} -- computed from the same raster-cell grouping so it lands on
+#'   the exact same (x, y)/hex as \code{cases} rather than via an independent spatial join
 #' @param wahis_raster_template Template to be used for raster operations.
 #' @param forecast_intervals Intervals for which forecasts are to be made.
 #' @param dates_to_process Dates for which predictions are to be made.
@@ -83,7 +86,7 @@ get_rvf_response <- function(wahis_outbreaks,
       if (nrow(outbreaks) > 0) {
         
         if (!reduced) {
-        
+
         outbreaks <- outbreaks |>
           group_by(x, y) |>
           summarize(
@@ -92,10 +95,14 @@ get_rvf_response <- function(wahis_outbreaks,
           , forecast_start    = lubridate::as_datetime(model_date) + days(interval_start)
           , forecast_end      = lubridate::as_datetime(model_date) + days(interval_end)
           , cases             = sum(cases, na.rm = TRUE)
+            ## Same grouping as cases above, so this lands on the identical (x, y) cell --
+             ## computing it independently elsewhere risks a different spatial join disagreeing
+             ## with cases/outbreak at hex boundaries
+          , country_index_outbreak = max(country_index_case, na.rm = TRUE)
           , .groups           = "drop")
-        
+
         } else {
-          
+
         outbreaks <- outbreaks |>
           group_by(h3_id) |>
           summarize(
@@ -104,9 +111,10 @@ get_rvf_response <- function(wahis_outbreaks,
           , forecast_start    = lubridate::as_datetime(model_date) + days(interval_start)
           , forecast_end      = lubridate::as_datetime(model_date) + days(interval_end)
           , cases             = sum(cases, na.rm = TRUE)
+          , country_index_outbreak = max(country_index_case, na.rm = TRUE)
           , .groups           = "drop")
-          
-          
+
+
         }
         
       }
@@ -131,7 +139,9 @@ clean_rvf_outbreaks <- function(output_path, map_dat, reduced) {
   ## outbreak_id = Individual outbreak --> can show up in many report_id
   
   wahis_outbreaks <- readRDS(output_path)
-  wahis_outbreaks <- wahis_outbreaks[[2]] |> left_join(wahis_outbreaks[[1]]) 
+  wahis_outbreaks <- wahis_outbreaks[[2]] |> left_join(
+    wahis_outbreaks[[1]] |> dplyr::select(-c(country_iso3c, country_area_id))
+  ) 
   
   wahis_outbreaks_processed <- preprocess_wahis_rvf_outbreaks(
     wahis_rvf_outbreaks_raw = wahis_outbreaks

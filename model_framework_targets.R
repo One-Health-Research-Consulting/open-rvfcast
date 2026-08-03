@@ -277,6 +277,11 @@ model_tuning_targets_common <- tar_plan(
   ## How much to weight ones (detected outbreaks) relative to zeros (no outbreaks)
 , tar_target(weightings_on_ones, c(1, 10, 100, 1000))
 
+  ## Extra weight given to country-level index cases (see get_rvf_response/lag_join_aggregate)
+   ## on top of the class-imbalance weight when reporting fitted_model's assessment metrics;
+   ## 1 means an index case counts double an ordinary positive case
+, tar_target(country_index_boost, 1)
+
   ## get the baseline occurance of outbreaks (in the full data)
 , tar_target(start_p, mean(splitted_data_fitting$train_data[[1]]$outbreak == 1))
 
@@ -399,7 +404,14 @@ if (purpose == "train") {
      ## confidence and better absolute false-alarm control together
   , tar_target(gamma_for_combined_score, 0.05)
 
-    ## Build a refined local grid centred on the top-k global results, ranked by final_score_combined
+    ## Weight on final_score_index (country-level index-case performance, see
+     ## get_rvf_response/lag_join_aggregate) when blending it into final_score_combined = final_score_hex +
+     ## gamma * final_score + delta * final_score_index. An index case is already counted once as
+     ## an ordinary positive in final_score_hex/final_score; delta > 0 makes it count again, so
+     ## hyperparameter selection rewards catching those cases
+  , tar_target(delta_for_index_score, 1)
+  
+    ## Build a refined local grid centered on the top-k global results, ranked by final_score_combined
   , tar_target(local_tuning_grid, build_local_hyperparameter_grid(
       inner_fold_paths     = tuned_results_per_outer_fold
     , global_grid          = tuning_grid
@@ -409,6 +421,7 @@ if (purpose == "train") {
     , weightval_raw        = weightval_raw_for_scoring
     , weightval_hex        = weightval_hex_for_scoring
     , gamma                = gamma_for_combined_score
+    , delta                = delta_for_index_score
     , expansion            = 0.2
     , grid_path            = "data/hypergrid"
     , hyperparam_path      = hyperparam_path
@@ -484,7 +497,7 @@ if (purpose == "train") {
      , error           = "null"
      , format          = "file")
 
-    ## weightval_raw/weightval_hex/gamma are NOT passed here separately -- they are read directly
+    ## weightval_raw/weightval_hex/gamma/delta are NOT passed here separately -- they are read directly
      ## off local_tuning_grid inside finalize_hyperparameters_from_inner, so
      ## this stage can never silently drift out of sync with whatever scoring parameters actually
      ## built that grid (see the note on build_local_hyperparameter_grid)
@@ -536,7 +549,8 @@ model_fitting_targets <- tar_plan(
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
   , overwrite       = TRUE
-  , DEBUG           = FALSE)
+  , DEBUG           = FALSE
+  , index_boost     = country_index_boost)
   , pattern         = map(folded_data_for_fitting)
   , error           = "null"
   , format          = "file")
