@@ -5,7 +5,9 @@
 #' @title build_report
 
 #' @param input target that has the figures of interest
-#' @param outpath path to save the figure
+#' @param outpath path to save the figure pieces
+#' @param evalpath path to save the joined figure for tracking model performance
+#'   over time
 #' @param idinfo target that has the date info that can be joined in
 #' @param plotname name of the column that houses the plot of interest
 #' @param overwrite
@@ -13,10 +15,11 @@
 #' @author Morgan Kain
 #' @export
 
-save_fig_pieces <- function(input, outpath, idinfo, plotname, overwrite) {
+save_fig_pieces <- function(input, outpath, evalpath, idinfo, plotname, overwrite) {
 
-  te      <- input |> qread() |> left_join(., idinfo |> dplyr::select(outer_fold_id, assess_range))
+  te      <- input |> qread() |> left_join(idinfo |> dplyr::select(outer_fold_id, assess_range))
   unifold <- unique(te$outer_fold_id)
+  out_list <- vector("list", length(unifold))
 
   if (plotname != "map_split") {
    for (i in seq_along(unifold)) {
@@ -44,10 +47,21 @@ save_fig_pieces <- function(input, outpath, idinfo, plotname, overwrite) {
     try({
         ggsave(out_file, plot = gg.t, width = 8, height = 7)
     }, silent = TRUE)
+    
+    out_list[[i]] <- te.t
 
     }
-
+  
    }
+    
+    out_list <- bind_rows(out_list)
+    gg.t     <- patchwork::wrap_plots(out_list |> pull(get(plotname)), ncol = 2)
+    out_file <- paste(evalpath, "gg_", gsub("[.]", "_", plotname), "_", Sys.Date(), ".svg", sep = "")
+    
+    try({
+      ggsave(out_file, plot = gg.t, width = 8, height = 7)
+    }, silent = TRUE)
+    
     ## Far too many maps to save them all as separate figures, so compile a different
      ## pdf for each level of aggregation with a different page per date
     } else {
@@ -58,17 +72,16 @@ save_fig_pieces <- function(input, outpath, idinfo, plotname, overwrite) {
 
     te.t     <- te |> filter(aggregation == uniag[i])
 
-      for (p in seq_len(nrow(te.t))) {
-
-        out_file <- paste(
-            gsub("figure_pieces/maps_wide/", "", outpath)
-          , "gg_", gsub("[.]", "_", plotname)
-          , "_", gsub("[ ]", "_", te.t$aggregation[1]), ".pdf", sep = "")
+    out_file <- paste(
+      gsub("figure_pieces/maps_wide/", "", outpath)
+      , "gg_", gsub("[.]", "_", plotname)
+      , "_", gsub("[ ]", "_", te.t$aggregation[1]), ".pdf", sep = "")
 
         if (!file.exists(out_file) || overwrite) {
 
           dir.create(dirname(out_file), showWarnings = FALSE)
           cairo_pdf(out_file, width = 8, height = 7)
+          
           for (p in seq_len(nrow(te.t))) {
             print(te.t[p, ]$map_split[[1]])
           }
@@ -78,8 +91,15 @@ save_fig_pieces <- function(input, outpath, idinfo, plotname, overwrite) {
 
     }
 
+    if (uniag[i] == "No aggregation") {
+      gg.t     <- patchwork::wrap_plots(te.t |> pull(get(plotname)), ncol = 1)
+      out_file <- paste(evalpath, "gg_", gsub("[.]", "_", plotname), "_", Sys.Date(), ".svg", sep = "")
+      
+      try({
+        ggsave(out_file, plot = gg.t, width = 8, height = 7)
+      }, silent = TRUE)
     }
-
+    
     ## Also save two example maps of each aggregation for the report
 
     for (i in seq_along(uniag)) {
