@@ -320,6 +320,12 @@ if (purpose == "train") {
     ## Distinct seed so this grid is an independent draw, not a copy of tuning_grid
   , tar_target(hypergrid_seed, 71982634)
 
+    ## Minimum trees*learn_rate ("boosting capacity") a candidate hyperparameter set must have
+     ## to be kept in the search grid. Confirmed empirically that below ~12 on this dataset,
+     ## the ensemble never accumulates enough boosting rounds to escape a constant,
+     ## input-independent prediction regardless of the other hyperparameters
+  , tar_target(min_capacity_for_hypergrid, 20)
+
     ## Build the "global" (first step) hyperparameter tuning grid
   , tar_target(tuning_grid, build_hyperparameter_grid(
       tune_pars            = tune_pars
@@ -327,7 +333,8 @@ if (purpose == "train") {
     , folded_data_training = folded_data_training
     , splitted_data        = splitted_data
     , overwrite            = FALSE
-    , seed                 = hypergrid_seed))
+    , seed                 = hypergrid_seed
+    , min_capacity         = min_capacity_for_hypergrid))
 
     ## Final prep steps for parallel processing for tuning across all inner folds are to
      ## 1) Evaluate which of all of the inner folds across all outer folds actually have
@@ -387,30 +394,53 @@ if (purpose == "train") {
     , error           = "null"
     , format          = "file")
 
-    ## Penalty weight on S_neg_penalty (raw/global, non-hex), used for the final_score component that
-     ## gets folded into final_score_combined via gamma
-  , tar_target(weightval_raw_for_scoring, 500)
+   ## Set up a target to explore how the hyperparameter set changes as a function of the various dials.
+    ## NOTE: see commenting for each individual weighting dial target for details on that parameter
+  , tar_target(dial_hyperspace, sobol::sobol_design(
+      lower = c(weightval_raw_for_scoring = 10, weightval_hex_for_scoring = 1,
+                gamma_for_combined_score = 0, delta_for_index_score = 0)
+    , upper = c(weightval_raw_for_scoring = 5000, weightval_hex_for_scoring = 100,
+                gamma_for_combined_score = 5, delta_for_index_score = 10)
+    , nseq  = 500))
 
-    ## Penalty weight on S_neg_penalty_hex. Within hex weight for hexes that have
-     ## never experienced an outbreak (~92% of hexes have never had an event)
-  , tar_target(weightval_hex_for_scoring, 10)
+    ## Determine the hyperparameter sets that appear across this full weighting parameter space.
+     ## NOTE: used below to determine the dial weights that will be used for the rest of tuning
+     ## AND to be used to explore the implications of different choices on actual predicted results
+  , tar_target(dial_best_sets, calc_dial_best_set(
+      fits            = "outputs/pan_hex_model_tuning_inner_ws" #tuned_results_per_outer_fold
+    , dial_hyperspace = dial_hyperspace
+    , tuning_grid_id  = tuning_grid$grid_id))
 
-    ## Weight on the raw (non-hex) final_score when blending it into final_score_combined =
-     ## final_score_hex + gamma * final_score. This exists so a hyperparameter set that
-     ## gets the within-hex timing right but is systematically miscalibrated overall
-     ## (too high/low everywhere in a given hex) can still be penalized.
-     ## larger gamma puts more weight on the entire raw final_score. That is, a larger gamma pulls
-     ## the blended score towards “global” calibration: both better absolute positive-day
-     ## confidence and better absolute false-alarm control together
-  , tar_target(gamma_for_combined_score, 0.05)
+    ## Figure out the single set of weighting dial values to use based on the objective
+  , tar_target(chosen_weight_set, chose_weight_set(
+      full_set        = dial_best_sets$all_sets
+    , summarized_sets = dial_best_sets$summarized_indices
+    , objective       = "balanced"))
 
-    ## Weight on final_score_index (country-level index-case performance, see
-     ## get_rvf_response/lag_join_aggregate) when blending it into final_score_combined = final_score_hex +
-     ## gamma * final_score + delta * final_score_index. An index case is already counted once as
-     ## an ordinary positive in final_score_hex/final_score; delta > 0 makes it count again, so
-     ## hyperparameter selection rewards catching those cases
-  , tar_target(delta_for_index_score, 1)
-  
+   ## Penalty weight on S_neg_penalty (raw/global, non-hex), used for the final_score component that
+    ## gets folded into final_score_combined via gamma
+  , tar_target(weightval_raw_for_scoring, chosen_weight_set$weightval_raw)
+
+  ## Penalty weight on S_neg_penalty_hex. Within hex weight for hexes that have
+  ## never experienced an outbreak (~92% of hexes have never had an event)
+  , tar_target(weightval_hex_for_scoring, chosen_weight_set$weightval_hex)
+
+  ## Weight on the raw (non-hex) final_score when blending it into final_score_combined =
+  ## final_score_hex + gamma * final_score. This exists so a hyperparameter set that
+  ## gets the within-hex timing right but is systematically miscalibrated overall
+  ## (too high/low everywhere in a given hex) can still be penalized.
+  ## Larger gamma puts more weight on the entire raw final_score. That is, a larger gamma pulls
+  ## the blended score towards “global” calibration: both better absolute positive-day
+  ## confidence and better absolute false-alarm control together
+  , tar_target(gamma_for_combined_score, chosen_weight_set$gamma)
+
+  ## Weight on final_score_index (country-level index-case performance, see
+  ## get_rvf_response/lag_join_aggregate) when blending it into final_score_combined = final_score_hex +
+  ## gamma * final_score + delta * final_score_index. An index case is already counted once as
+  ## an ordinary positive in final_score_hex/final_score; delta > 0 makes it count again, so
+  ## hyperparameter selection rewards catching those cases
+  , tar_target(delta_for_index_score, chosen_weight_set$delta)
+
     ## Build a refined local grid centered on the top-k global results, ranked by final_score_combined
   , tar_target(local_tuning_grid, build_local_hyperparameter_grid(
       inner_fold_paths     = tuned_results_per_outer_fold
@@ -427,7 +457,8 @@ if (purpose == "train") {
     , hyperparam_path      = hyperparam_path
     , folded_data_training = folded_data_training
     , splitted_data        = splitted_data
-    , seed                 = hypergrid_seed))
+    , seed                 = hypergrid_seed
+    , min_capacity         = min_capacity_for_hypergrid))
 
   , tar_target(local_hyperparam_path, paste0(
     "outputs/hyperparameters/best_hyperparameters_combined_"
@@ -548,7 +579,7 @@ model_fitting_targets <- tar_plan(
   , start_p         = start_p
   , id_cols         = id_cols
   , out_dir         = outer_folds_dir3
-  , overwrite       = TRUE
+  , overwrite       = FALSE
   , DEBUG           = FALSE
   , index_boost     = country_index_boost)
   , pattern         = map(folded_data_for_fitting)
@@ -698,12 +729,26 @@ model_evaluation_targets <- tar_plan(
   , outpath = "www"
   ), format = "file")
 
-
   ## For speed and RAM considerations, extract out pieces for individual exploration as
    ## targets, and can the more easily plot / explore from these extracted pieces
+, tar_target(ex_fits.all_probs_raw, {
+
+  filepath <- paste0("outputs/fit_evaluation/ex_fits.all_probs_raw_", Sys.Date(), ".qs")
+  if (file.exists(filepath)) {
+    filepath
+  }
+
+  tf <- purrr::map(examined_fits_within_pan, .f = function(x) {
+    qread(x) |> dplyr::select(outer_fold_id, aggregation, all_preds) |> unnest(all_preds)
+  }) |>
+    bind_rows()
+
+  qsave(tf, filepath)
+  filepath
+}, error   = "null", format  = "file")
 , tar_target(ex_fits.summary_probs_raw, {
 
-  filepath <- "outputs/summarized_fits/ex_fits.summary_probs_raw.qs"
+  filepath <- paste0("outputs/fit_evaluation/ex_fits.summary_probs_raw_", Sys.Date(), ".qs")
   if (file.exists(filepath)) {
     filepath
   }
@@ -718,7 +763,7 @@ model_evaluation_targets <- tar_plan(
   }, error   = "null", format  = "file")
 , tar_target(ex_fits.summary_probs, {
 
-  filepath <- "outputs/summarized_fits/ex_fits.summary_probs.qs"
+  filepath <- paste0("outputs/fit_evaluation/ex_fits.summary_probs_", Sys.Date(), ".qs")
   if (file.exists(filepath)) {
     filepath
   }
@@ -729,7 +774,7 @@ model_evaluation_targets <- tar_plan(
   }, error   = "null", format  = "file")
 , tar_target(ex_fits.plotted_calibration, {
 
-  filepath <- "outputs/summarized_fits/ex_fits.plotted_calibration.qs"
+  filepath <- paste0("outputs/fit_evaluation/ex_fits.plotted_calibration_", Sys.Date(), ".qs")
 
   if (file.exists(filepath)) {
     filepath
@@ -745,7 +790,7 @@ model_evaluation_targets <- tar_plan(
   }, error   = "null", format  = "file")
 , tar_target(ex_fits.prob_dens_plot, {
 
-  filepath <- "outputs/summarized_fits/ex_fits.prob_dens_plot.qs"
+  filepath <- paste0("outputs/fit_evaluation/ex_fits.prob_dens_plot_", Sys.Date(), ".qs")
 
   if (file.exists(filepath)) {
     filepath
@@ -761,7 +806,7 @@ model_evaluation_targets <- tar_plan(
   }, error   = "null", format  = "file")
 , tar_target(ex_fits.map_split, {
 
-  filepath <- "outputs/summarized_fits/ex_fits.map_split.qs"
+  filepath <- paste0("outputs/fit_evaluation/ex_fits.map_split_", Sys.Date(), ".qs")
 
   if (file.exists(filepath)) {
     filepath
@@ -780,24 +825,28 @@ model_evaluation_targets <- tar_plan(
 , tar_target(plotted_calibration.plot_export_opt, save_fig_pieces(
     input     = ex_fits.plotted_calibration
   , outpath   = "reports/figure_pieces/calibration/"
+  , evalpath  = "outputs/fit_evaluation/"
   , idinfo    = model_out_for_eval
   , plotname  = "calplot.opt"
   , overwrite = TRUE))
 , tar_target(plotted_calibration.plot_export_even, save_fig_pieces(
     input     = ex_fits.plotted_calibration
   , outpath   = "reports/figure_pieces/calibration/"
+  , evalpath  = "outputs/fit_evaluation/"
   , idinfo    = model_out_for_eval
   , plotname  = "calplot.even"
   , overwrite = TRUE))
 , tar_target(prob_dens.plot_export, save_fig_pieces(
     input     = ex_fits.prob_dens_plot
   , outpath   = "reports/figure_pieces/dens/"
+  , evalpath  = "outputs/fit_evaluation/"
   , idinfo    = model_out_for_eval
   , plotname  = "prob_dens_plot"
   , overwrite = TRUE))
 , tar_target(map_split.plot_export, save_fig_pieces(
     input     = ex_fits.map_split
   , outpath   = "reports/figure_pieces/map_split/"
+  , evalpath  = "outputs/fit_evaluation/"
   , idinfo    = model_out_for_eval
   , plotname  = "map_split"
   , overwrite = TRUE))
@@ -810,9 +859,59 @@ report_targets <- tar_plan(
   ## Somewhat of a poor, non-dynamic report; need to change path to each and every figure
    ## if code changes which is a bad practice. See figures in report
   tar_quarto(
-    remit_report
+    openrvfcast_report
   , path  = "reports/openRVFcast_report.qmd"
   , quiet = FALSE)
+
+  ## quick bit of summary info about the model change for the given run
+, tar_target(model_note, "Most recent updates: Added index cases, dropped near-term lag sero and
+recent outbreak layers")
+
+  ## Timestamped like the other fit_evaluation outputs so each render becomes part of the
+   ## performance history rather than overwriting the previous run's report; also lets this
+   ## report get swept up by new_performance_files_to_uplaod below (matches on Sys.Date())
+, tar_quarto(
+    openrvfcast_performance_tracking
+  , path        = "outputs/fit_evaluation/openRVFcast_performance_tracking.qmd"
+  , output_file = paste0("openRVFcast_performance_tracking_", Sys.Date(), ".html")
+  , quiet       = FALSE)
+
+, tar_target(new_performance_files_to_uplaod, {
+    outpath   <- "outputs/fit_evaluation"
+    filenames <- list.files(outpath)
+    filenames <- filenames[grep(Sys.Date(), filenames)]
+    paths <- paste0(outpath, "/", filenames)
+    paths
+  })
+
+, tar_target(performance_files_AWS_upload, AWS_put_files(
+    transformed_file_list = new_performance_files_to_uplaod
+  , local_folder          = "outputs/fit_evaluation"
+  , overwrite             = parse_flag("OVERWRITE_EXAMINED_FITS")))
+
+)
+
+## Targets for verifying a full run of the pipeline has completed --------------
+completion_check_targets <- tar_plan(
+
+  ## Top-level target for a run of the pipeline from a bash script
+   ## which targets pipeline_complete depends on is determined by purpose
+   ## forecast runs stop once the new fits/forecasts are uploaded
+   ## training runs require every diagnostic and report and upload of
+   ## the performance-tracking outputs
+  if (purpose == "train") {
+    tar_target(pipeline_complete, {
+      invisible(openrvfcast_report)
+      invisible(openrvfcast_performance_tracking)
+      invisible(performance_files_AWS_upload)
+      TRUE
+    })
+  } else {
+    tar_target(pipeline_complete, {
+      invisible(examined_fits_AWS_upload)
+      TRUE
+    })
+  }
 
 )
 
@@ -824,4 +923,5 @@ list(
 , model_fitting_targets
 , model_evaluation_targets
 , report_targets
+, completion_check_targets
 )
