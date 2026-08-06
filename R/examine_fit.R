@@ -106,8 +106,7 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
       "No aggregation"       = c("date", "shapeName", "forecast_interval")
     , "Spatial aggregation"  = c("date", "region_norm", "forecast_interval")
     , "Temporal aggregation" = c("date", "shapeName")
-    , "Double aggregation"   = c("date", "region_norm")
-  )
+    , "Double aggregation"   = c("date", "region_norm"))
 
  out_list <- purrr::pmap(list(aggregation_list, names(aggregation_list)), .f = function(x, z) {
 
@@ -305,8 +304,7 @@ examine_fits_within <- function(model_out, test_data, regions, larger_districts
               }
             } +
             ggtitle(paste("Prediction Date = ", d))
-
-
+          
     })
 
       tibble(

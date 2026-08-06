@@ -113,7 +113,7 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
       weights = length(which(outbreak == "0")) / max(length(which(outbreak == "1")), 1)
     , weights = ifelse(outbreak == "0", 1, weights)
       ## Extra emphasis for country-level index cases on top of the class-imbalance
-       ## weight above; training itself is untouched by this (see index_boost doc)
+       ## weight above; training itself is untouched by this
     , weights = weights * (1 + index_boost * country_index_outbreak)
     , .after = "index"
     )

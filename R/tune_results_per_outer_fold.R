@@ -404,3 +404,166 @@ get_latest_finalized_hyperparameters <- function(hyperparam_dir) {
   candidates[which.max(file.mtime(candidates))]
 
 }
+
+
+#' Determine the best set across dial_hyperspace
+#'
+#' @title calc_dial_best_set
+
+#' @param fits path to the files from tuning. Set as a path so that this can be
+#'   run without a fully completed tuning pass
+#' @param dial_hyperspace sobol of dial values
+#' @param tuning_grid_id string for this tuning grid
+#' @return List of full and summarized tibbles combining dial_hyperspace and details from best hyperset
+#' @author Morgan Kain
+#' @export
+
+calc_dial_best_set <- function(fits, dial_hyperspace, tuning_grid_id) {
+  
+  ## Read every result file into one long tibble
+  fits <- paste0(fits, "/", list.files(fits))
+  all_results <- purrr::map(fits, .f = function(x) {
+    tload <- try(readRDS(x), silent = TRUE)
+    if (class(tload)[1] != "try-error") {
+      return(tload)
+    } else {
+      return(NULL)
+    }
+  }) |> bind_rows()
+  
+  all_dials <- purrr::map(1:nrow(dial_hyperspace), .f = function(i) {
+    
+    this_set <- dial_hyperspace[i, ]
+    
+    scores <- score_hexrelative_results(
+      all_results   = all_results
+    , weightval_raw = this_set$weightval_raw_for_scoring
+    , weightval_hex = this_set$weightval_hex_for_scoring
+    , gamma         = this_set$gamma_for_combined_score
+    , delta         = this_set$delta_for_index_score)
+    
+  ## Find the single best
+  best <- scores |>
+    arrange(desc(final_score_combined)) |>
+    dplyr::slice(1)
+  
+  ## What a pure hex-relative selection (gamma = 0) and a pure raw selection would each have
+  ## picked from this same pool of fits -- kept alongside so all three strategies are directly
+  ## comparable from one tuning run
+  hex_only_best_index <- scores |> arrange(desc(final_score_hex)) |> dplyr::slice(1) |> pull(index)
+  raw_only_best_index <- scores |> arrange(desc(final_score))     |> dplyr::slice(1) |> pull(index)
+  
+  ## Cleanup/add details for export
+  best <- best |>
+    left_join(
+      all_results |>
+        dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
+        distinct(), by = "index") |>
+    mutate(
+        tuning_grid_id                    = tuning_grid_id
+      , hex_only_would_have_picked_index  = hex_only_best_index
+      , raw_only_would_have_picked_index  = raw_only_best_index
+      , .before = index
+    )
+  
+  ## Find the single best
+  best <- scores |>
+    arrange(desc(final_score_combined)) |>
+    dplyr::slice(1)
+  
+  hex_only_best_index <- scores |> arrange(desc(final_score_hex)) |> dplyr::slice(1) |> pull(index)
+  raw_only_best_index <- scores |> arrange(desc(final_score))     |> dplyr::slice(1) |> pull(index)
+  
+  ## Cleanup/add details for export
+  best <- best |>
+    left_join(
+      all_results |>
+        dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
+        distinct(), by = "index") |>
+    mutate(
+        tuning_grid_id                    = tuning_grid_id
+      , hex_only_would_have_picked_index  = hex_only_best_index
+      , raw_only_would_have_picked_index  = raw_only_best_index
+      , .before = index
+    )
+  
+  best
+  
+  })
+  
+  all_dials.s <- all_dials |>
+    bind_rows() |>
+    group_by(index) |>
+    summarize(
+      n_entry              = n()
+    , final_score_raw      = mean(final_score)
+    , final_score_hex      = mean(final_score_hex)
+    , final_score_combined = mean(final_score_combined)
+    , S_pos                = mean(S_pos)
+    , S_pos_hex            = mean(S_pos_hex)
+    , S_neg_penalty        = mean(S_neg_penalty)
+    , S_neg_penalty_hex    = mean(S_neg_penalty_hex)
+    , weightval_raw        = mean(weightval_raw)
+    , weightval_hex        = mean(weightval_hex)
+    , gamma                = mean(gamma)
+    )
+  
+  list(
+    all_sets           = all_dials |> bind_rows()
+  , summarized_indices = all_dials.s
+  )
+  
+}
+
+
+#' Choose a single set of weighting dials based on a given objective
+#'
+#' @title chose_weight_set
+
+#' @param full_set All calculated scores across dial_hyperspace from calc_dial_best_set
+#' @param summarized_sets Summarized dial values for each winning index from calc_dial_best_set
+#' @param objective one of "balanced"; "minimize false positive"; or "maximize seasonal"
+#' @return Tibble of single set of weighting parameter values for the rest of tuning
+#' @author Morgan Kain
+#' @export
+
+chose_weight_set <- function(full_set, summarized_sets, objective) {
+  
+  if (objective == "balanced") {
+    chosen_set <- summarized_sets |> filter(n_entry == max(n_entry))
+  } else if (objective == "minimize false positive") {
+    chosen_set <- summarized_sets |> filter(S_neg_penalty == min(S_neg_penalty))
+  } else if (objective == "maximize seasonal") {
+    chosen_set <- summarized_sets |> filter(final_score_hex == max(final_score_hex))
+  } else {
+    stop("Choose a supported option for objective")
+  }
+  
+  if ("delta" %in% names(full_set)) {
+    
+  full_set |>
+    filter(index == chosen_set$index) |>
+    summarize(
+      weightval_raw = mean(weightval_raw)
+    , weightval_hex = mean(weightval_hex)
+    , gamma         = mean(gamma)
+    , delta         = mean(delta))
+    
+  } else {
+    
+  full_set |>
+    filter(index == chosen_set$index) |>
+    summarize(
+      weightval_raw = mean(weightval_raw)
+    , weightval_hex = mean(weightval_hex)
+    , gamma         = mean(gamma))
+    
+  }
+  
+}
+
+
+
+
+
+

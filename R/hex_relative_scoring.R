@@ -245,8 +245,9 @@ within_hex_auc_vec <- function(truth, prob1, hex_id) {
 #'   predicted non-index positive
 #' @return Tibble with one row per tuning-grid index: S_pos, S_neg_penalty, final_score (raw),
 #'   S_pos_hex, S_neg_penalty_hex, final_score_hex, S_pos_index, final_score_index,
-#'   final_score_combined, within_hex_auc, n_pos_folds, n_total_folds, total_n_pos,
-#'   total_n_pos_index, weightval_raw, weightval_hex, gamma, delta
+#'   final_score_rank, final_score_hex_rank, final_score_index_rank, final_score_combined,
+#'   within_hex_auc, n_pos_folds, n_total_folds, total_n_pos, total_n_pos_index,
+#'   weightval_raw, weightval_hex, gamma, delta
 #' @author Morgan Kain
 #' @export
 
@@ -254,6 +255,8 @@ score_hexrelative_results <- function(all_results, weightval_raw, weightval_hex,
 
   ## ** NOTE: See commenting in compute_metrics_vec_hexrelative for more details
 
+  if ("logloss_index" %in% names(all_results)) {
+  
   ## Much reused from the final_score calculation without the within-hex component
    ## The rest explained in comments above
   all_results |>
@@ -281,16 +284,85 @@ score_hexrelative_results <- function(all_results, weightval_raw, weightval_hex,
     , .groups           = "drop"
     ) |>
     mutate(
-      final_score          = S_pos - weightval_raw * S_neg_penalty
-    , final_score_hex      = S_pos_hex - weightval_hex * S_neg_penalty_hex
+      final_score             = S_pos - weightval_raw * S_neg_penalty
+    , final_score_hex         = S_pos_hex - weightval_hex * S_neg_penalty_hex
       ## No separate negative-penalty term here: an index case is only ever a positive
        ## row, so there is no natural "false index alarm" to penalize symmetrically
-    , final_score_index    = S_pos_index
-    , final_score_combined = final_score_hex + gamma * final_score + delta * final_score_index
-    , weightval_raw        = weightval_raw
-    , weightval_hex        = weightval_hex
-    , gamma                = gamma
-    , delta                = delta
+    , final_score_index       = S_pos_index
+      ## Percentile-rank each component across this pool of candidate indices before blending,
+       ## so gamma/delta act as genuine relative weights regardless of the raw run-dependent 
+       ## scale of S_pos/S_neg_penalty. Rank-normalizing solves a problem that was arising
+       ## where a few very poor hypersets (e.g., a constant-p which can happen with a small
+       ## number of trees and high learn rate -- fix applied to reduced this as well), can 
+       ## cause gamma to simply strip these outliers out and fail to do anything further
+       ## with the fine-grained differences among the few somewhat similar top sets.
+       ## Rank-normalization strips out how much better certain indices are then others,
+       ## which could impact diagnostics/improvement, so do need to be careful with this, 
+       ## though because our goal is to find the best set, rank-normalization should be fine
+    , final_score_rank        = rank_normalize(final_score)
+    , final_score_hex_rank    = rank_normalize(final_score_hex)
+    , final_score_index_rank  = rank_normalize(final_score_index)
+    , final_score_combined    = final_score_hex_rank + gamma * final_score_rank + delta * final_score_index_rank
+    , weightval_raw           = weightval_raw
+    , weightval_hex           = weightval_hex
+    , gamma                   = gamma
+    , delta                   = delta
     )
+    
+  } else {
+    
+    all_results |>
+      group_by(index) |>
+      summarise(
+          S_pos             = -sum(logloss_pos * n_pos, na.rm = TRUE) /
+            pmax(sum(n_pos[!is.na(logloss_pos)], na.rm = TRUE), 1L)
+        , S_neg_penalty     = sum(logloss_neg * n_all, na.rm = TRUE) / sum(n_all, na.rm = TRUE)
+        , S_pos_hex         = -sum(logloss_pos_hex * n_pos, na.rm = TRUE) /
+          pmax(sum(n_pos[!is.na(logloss_pos_hex)], na.rm = TRUE), 1L)
+        ## Weighted by n_neg_eventful, NOT n_all -- logloss_neg_hex is only computed over negative
+        ## rows in hexes that have an event this call, so it must be weighted by that same count
+        , S_neg_penalty_hex = sum(logloss_neg_hex * n_neg_eventful, na.rm = TRUE) /
+            pmax(sum(n_neg_eventful[!is.na(logloss_neg_hex)], na.rm = TRUE), 1L)
+        , within_hex_auc    = sum(within_hex_auc * within_hex_auc_n_pairs, na.rm = TRUE) /
+            pmax(sum(within_hex_auc_n_pairs[!is.na(within_hex_auc)], na.rm = TRUE), 1L)
+        , n_pos_folds       = sum(n_pos > 0)
+        , n_total_folds     = n()
+        , total_n_pos       = sum(n_pos)
+        , .groups           = "drop"
+      ) |>
+      mutate(
+          final_score          = S_pos - weightval_raw * S_neg_penalty
+        , final_score_hex      = S_pos_hex - weightval_hex * S_neg_penalty_hex
+          ## See notes in the logloss_index branch above for why this is rank-normalized
+           ## before blending rather than combined on the raw score
+        , final_score_rank     = rank_normalize(final_score)
+        , final_score_hex_rank = rank_normalize(final_score_hex)
+        , final_score_combined = final_score_hex_rank + gamma * final_score_rank
+        , weightval_raw        = weightval_raw
+        , weightval_hex        = weightval_hex
+        , gamma                = gamma
+      )
 
+  }
+
+}
+
+
+#' Convert a numeric vector to a percentile rank in [0,1] (0 = worst, 1 = best), so values
+#' from differently-scaled score components can be blended as relative weights instead of raw, 
+#' run-dependent magnitudes. Ties are averaged. A single non-NA value (n=1)
+#' returns 1 for that value, since there is nothing to rank it against.
+#'
+#' @title rank_normalize
+#'
+#' @param x Numeric vector to rank-normalize
+#' @return Numeric vector, same length/order as x, of percentile ranks in [0,1] (NA stays NA)
+#' @author Morgan Kain
+#' @export
+
+rank_normalize <- function(x) {
+  n <- sum(!is.na(x))
+  if (n <= 1) return(ifelse(is.na(x), NA_real_, 1))
+  r <- rank(x, ties.method = "average", na.last = "keep")
+  (r - 1) / (n - 1)
 }
