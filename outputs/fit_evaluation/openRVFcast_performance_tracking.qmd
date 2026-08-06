@@ -1,0 +1,55 @@
+---
+title: "openRVFcast Performance Tracking"
+author: "Morgan Kain"
+format:
+  html:
+    toc: true
+execute: 
+  echo: false
+---
+
+```{r}
+#| label: load
+#| message: false
+
+library(targets)
+library(tidyverse)
+library(qs)
+library(here)
+
+## here::here() anchors to the project root (via open-rvfcast.Rproj) no matter
+ ## what directory quarto actually executes this document from (a plain 
+ ## `quarto render` or inside tar_make() via tar_quarto()
+store <- here::here("model_framework_targets")
+
+## list the figure-exporting targets here explicitly so that there is a
+ ## dependence path 
+targets::tar_load(c(
+    model_note
+  , plotted_calibration.plot_export_opt
+  , plotted_calibration.plot_export_even
+  , prob_dens.plot_export
+  , map_split.plot_export
+), store = store)
+
+map_split_path    <- paste0("gg_map_split_", Sys.Date(), ".svg")
+prob_dens_path    <- paste0("gg_prob_dens_plot_", Sys.Date(), ".svg")
+calplot_even_path <- paste0("gg_calplot_even_", Sys.Date(), ".svg")
+calplot_opt_path  <- paste0("gg_calplot_opt_", Sys.Date(), ".svg")
+
+```
+
+```{r}
+Sys.Date()
+model_note
+```
+
+#### Diagnostics
+
+![Calibration Curve Optimum Breaks](`r calplot_opt_path`)
+
+![Calibration Curve Even Breaks](`r calplot_even_path`)
+
+![Probability Densities](`r prob_dens_path`)
+
+![Predictions, No aggregation](`r map_split_path`)
