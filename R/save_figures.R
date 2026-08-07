@@ -45,7 +45,7 @@ save_fig_pieces <- function(input, outpath, evalpath, idinfo, plotname, overwrit
 
     ## Using svg for quarto html
     try({
-        ggsave(out_file, plot = gg.t, width = 8, height = 7)
+        ggsave(out_file, plot = gg.t, width = 8, height = 8 * length(gg.t), limitsize = FALSE)
     }, silent = TRUE)
     
     out_list[[i]] <- te.t
@@ -55,11 +55,11 @@ save_fig_pieces <- function(input, outpath, evalpath, idinfo, plotname, overwrit
    }
     
     out_list <- bind_rows(out_list)
-    gg.t     <- patchwork::wrap_plots(out_list |> pull(get(plotname)), ncol = 2)
+    gg.t     <- patchwork::wrap_plots(out_list |> pull(get(plotname)), ncol = 1)
     out_file <- paste(evalpath, "gg_", gsub("[.]", "_", plotname), "_", Sys.Date(), ".svg", sep = "")
     
     try({
-      ggsave(out_file, plot = gg.t, width = 8, height = 7)
+      ggsave(out_file, plot = gg.t, width = 8, height = 8 * length(gg.t), limitsize = FALSE)
     }, silent = TRUE)
     
     ## Far too many maps to save them all as separate figures, so compile a different
@@ -80,7 +80,7 @@ save_fig_pieces <- function(input, outpath, evalpath, idinfo, plotname, overwrit
         if (!file.exists(out_file) || overwrite) {
 
           dir.create(dirname(out_file), showWarnings = FALSE)
-          cairo_pdf(out_file, width = 8, height = 7)
+          cairo_pdf(out_file, width = 10, height = 11)
           
           for (p in seq_len(nrow(te.t))) {
             print(te.t[p, ]$map_split[[1]])
@@ -88,18 +88,18 @@ save_fig_pieces <- function(input, outpath, evalpath, idinfo, plotname, overwrit
           dev.off()
 
         }
-
-    }
-
+    
     if (uniag[i] == "No aggregation") {
       gg.t     <- patchwork::wrap_plots(te.t |> pull(get(plotname)), ncol = 1)
       out_file <- paste(evalpath, "gg_", gsub("[.]", "_", plotname), "_", Sys.Date(), ".svg", sep = "")
       
       try({
-        ggsave(out_file, plot = gg.t, width = 8, height = 7)
+        ggsave(out_file, plot = gg.t, width = 8, height = 8 * length(gg.t), limitsize = FALSE)
       }, silent = TRUE)
     }
-    
+
+    }
+
     ## Also save two example maps of each aggregation for the report
 
     for (i in seq_along(uniag)) {
@@ -118,7 +118,7 @@ save_fig_pieces <- function(input, outpath, evalpath, idinfo, plotname, overwrit
 
       if (!file.exists(out_file) || overwrite) {
         try({
-            ggsave(out_file, plot = te.t[p, ]$map_split[[1]], width = 8, height = 7)
+            ggsave(out_file, plot = te.t[p, ]$map_split[[1]], width = 10, height = 11)
         }, silent = TRUE)
       }
 
