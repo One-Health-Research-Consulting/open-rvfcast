@@ -72,7 +72,7 @@ compute_metrics_vec <- function(
 
   n_pos <- length(which(truth == "1"))
   n_all <- length(truth)
-  
+
   ## Constant predictions produce a degenerate two-point PR curve whose trapezoidal
    ## AUC equals (1 + prevalence) / 2 regardless of calibration -- appearing near 0.501
    ## for rare events and scoring far above the true no-skill baseline of prevalence.
@@ -92,24 +92,26 @@ compute_metrics_vec <- function(
        ## Problem is that being a ranking metric it is insensitive to magnitude. If all 1s are
        ## predicted with a prob = 0.002 and all 0s predicted with 0.001 the score is perfect.
     , pr_auc    = if (no_discrimination || n_pos == 0) NA_real_ else pr_auc_vec(truth, prob1, event_level = event_level)
-      ## Calculate Receiver Operating Characteristic - Area Under the Curve. 
-       ## Measures ranking ability averaged over all possible thresholds. Not a great 
-       ## metric for large class imbalance. Problem is that with thousands of negatives 
+      ## Calculate Receiver Operating Characteristic - Area Under the Curve.
+       ## Measures ranking ability averaged over all possible thresholds. Not a great
+       ## metric for large class imbalance. Problem is that with thousands of negatives
        ## some hundreds of false-positives can barely shift the score for the worse
     , roc_auc   = roc_auc_vec(truth, prob1, event_level = event_level)
       ## Measure of sensitivity (see https://yardstick.tidymodels.org/reference/recall.html)
     , recall    = tibble(
         threshold = threshold
       , recall    = apply(class_hat, 2, FUN = function(x) recall_vec(truth, x |> factor(levels = c("1", "0")), event_level = event_level))
-    ) |> list()
+    ) |>
+    list()
       ## See https://yardstick.tidymodels.org/reference/precision.html
     , precision = tibble(
         threshold = threshold
       , precision = apply(class_hat, 2, FUN = function(x) precision_vec(truth, x |> factor(levels = c("1", "0")), event_level = event_level))
-    ) |> list()
+    ) |>
+    list()
       ## A way to measure deviation from baseline by explicitly considering magnitude;
-       ## potentially a better method for measuring differentiation of estimated 
-       ## probabilities for true positives from simply their relative abundance 
+       ## potentially a better method for measuring differentiation of estimated
+       ## probabilities for true positives from simply their relative abundance
        ## (i.e., the starting point for fitting, see argument start_p)
     , logloss     = yardstick::mn_log_loss_vec(truth, prob1)
       ## When true positives are very rare, class *unconditional* log loss can lead to a
@@ -131,22 +133,28 @@ compute_metrics_vec <- function(
         tweights <- as.numeric(caseweights)
         tweights <- ifelse(tweights > 1, x, 1)
         yardstick::mn_log_loss_vec(truth, prob1, case_weights = tweights)})
-      ) |> list()
+      ) |>
+      list()
       ## Performance restricted to country-level index cases specifically (see
        ## get_rvf_response/lag_join_aggregate) -- the cases a real warning system most needs to
        ## catch, as opposed to later, already-known-about cases in the same chain/country
     , logloss_index = if (is.null(index_flag) || sum(index_flag == 1, na.rm = TRUE) == 0) NA_real_ else
                        mean(-log(pmax(prob1[index_flag == 1], 1e-15)))
-    , recall_index   = if (is.null(index_flag) || sum(index_flag == 1, na.rm = TRUE) == 0) NA_real_ else
-                       tibble(
-                         threshold = threshold
-                       , recall    = apply(class_hat[index_flag == 1, , drop = FALSE], 2, FUN = function(x) {
-                           recall_vec(
-                             truth[index_flag == 1] |> factor(levels = c("1", "0"))
-                           , x |> factor(levels = c("1", "0"))
-                           , event_level = event_level)
-                         })
-                       ) |> list()
+      ## Both branches must return a list-column of the same shape (tibble(threshold, recall))
+    , recall_index   = if (is.null(index_flag) || sum(index_flag == 1, na.rm = TRUE) == 0) {
+                         tibble(threshold = threshold, recall = NA_real_) |> list()
+                       } else {
+                         tibble(
+                           threshold = threshold
+                         , recall    = apply(class_hat[index_flag == 1, , drop = FALSE], 2, FUN = function(x) {
+                             recall_vec(
+                               truth[index_flag == 1] |> factor(levels = c("1", "0"))
+                             , x |> factor(levels = c("1", "0"))
+                             , event_level = event_level)
+                           })
+                         ) |>
+                         list()
+                       }
   )
 
   ttib

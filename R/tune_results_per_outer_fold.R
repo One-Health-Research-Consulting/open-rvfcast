@@ -38,20 +38,20 @@ tune_results_per_outer_fold <- function(
   ## Iterate over every (inner_fold_id, tune_grid_index) combination for this outer fold.
   ## Each fit is saved to its own file so partial progress survives a restart or error.
   save_filenames       <- character(nrow(inner_ids_all))
-  
+
   checktime_tibble    <- tibble(user = numeric(0), sys = numeric(0), elapsed = numeric(0))
-  
+
   ## chunk_id is folded into the filename because multiple chunks of the same outer fold now
   ## run concurrently (see cross(outer_fold_prejoined, chunk_id) in model_framework_targets.R);
   ## without it, concurrent branches would overwrite each other's timing log
   checktime_path.full <- paste0(checktime_path, "/outer_fold_", outer_fold_id, "_chunk_", chunk_id, "_hexrel.csv")
-  
+
   for (i in seq_len(nrow(inner_ids_all))) {
-    
+
     inner_ids   <- inner_ids_all[i, ]
     inner_id    <- inner_ids$inner_fold_id
     tuning_grid <- inner_ids |> dplyr::select(-contains("fold_id"))
-    
+
     ## Create a new file saving convention so it doesn't conflict with the other option
     save_filename <- paste(
       out_dir
@@ -68,15 +68,15 @@ tune_results_per_outer_fold <- function(
       , ".Rds"
       , sep = ""
     )
-    
+
     if (!is.null(error_safe_read_file(save_filename)) && !overwrite) {
       message("file already exists and can be loaded, skipping processing")
       save_filenames[i] <- save_filename
       next
     }
-    
+
     checktime <- system.time({
-      
+
       ## Inner training data: exclude one spatial cluster. country_index_outbreak is
        ## dropped here -- never a training predictor (by construction it's 1 only where
        ## outbreak is also 1, so leaving it in would be leakage), same treatment as cases
@@ -108,20 +108,20 @@ tune_results_per_outer_fold <- function(
           , weights = ifelse(outbreak == "0", 1, weights)
           , .after = "index"
         )
-      
+
       if (DEBUG) inner_tbl_train <- inner_tbl_train[1:10000, ]
-      
+
       ## Create scaffold recipe + model + workflow and fit model
       rec <- make_recipe(inner_tbl_train, id_cols = id_cols)
       mod <- make_model(params = tuning_grid, start_p = start_p, spw = spw)
       wf  <- workflow() |> add_model(mod) |> add_recipe(rec)
-      
+
       fit <- fit(wf, data = inner_tbl_train)
-      
+
       ## Free training objects before predictions to reduce peak memory within the loop
       rm(inner_tbl_train, rec, mod, wf)
       gc()
-      
+
       ## Predictions: prob only, plus the hex id needed to compute each hex's own baseline
       prob1     <- predict(fit, inner_tbl_assess, type = "prob")$.pred_1
       truth     <- factor(inner_tbl_assess[["outbreak"]], levels = c("1", "0"))
@@ -133,22 +133,22 @@ tune_results_per_outer_fold <- function(
       )
       all_intervals     <- inner_tbl_assess$forecast_interval
       forecast_interval <- all_intervals |> unique() |> as.character() |> as.numeric() |> sort()
-      
+
       ## Free fitted model before metrics computation
       rm(fit)
       gc()
-      
+
       ## Compute metrics -- hex baseline is computed WITHIN each forecast_interval (rather than
       ## pooling across all five horizons) since predicted probability at a 0-30 day horizon and
       ## a 121-150 day horizon are not expected to share the same typical level for a given hex
       metrics <- purrr:::map(forecast_interval, .f = function(this_int) {
-        
+
         this_rows   <- which(all_intervals == this_int)
         truth.t     <- truth[this_rows]
         prob1.t     <- prob1[this_rows]
         hex_id.t    <- hex_id[this_rows]
         class_hat.t <- class_hat[this_rows, ]
-        
+
         compute_metrics_vec_hexrelative(
           truth       = truth.t
           , threshold   = threshold
@@ -167,31 +167,31 @@ tune_results_per_outer_fold <- function(
             , .before       = 1
           ) |>
           bind_cols(tuning_grid)
-        
+
       }) |>
         bind_rows()
-      
+
       saveRDS(metrics, save_filename)
-      
+
       ## Free assessment data and metrics before the next iteration
       rm(inner_tbl_assess, metrics)
       gc()
-      
+
       save_filenames[i] <- save_filename
-      
+
     })
-    
+
     checktime_tibble <- bind_rows(
       checktime_tibble
       , tibble(user = checktime[1], sys = checktime[2], elapsed = checktime[3])
     )
-    
+
     write.csv(checktime_tibble, checktime_path.full)
-    
+
   }
-  
+
   save_filenames
-  
+
 }
 
 #' Finalize inner folds for all outer folds
@@ -307,13 +307,13 @@ chunk_rows <- function(dat, n_chunks, which) {
 #' @export
 
 finalize_hyperparameters_from_inner <- function(inner_folds, local_tuning_grid, tuning_grid_id, outpath) {
-  
+
   ## First, check if this tuning_grid_id already has a saved best parameter set
   if (file.exists(outpath)) return(outpath)
-  
+
   ## Make the outpath if it doesn't exist yet
   create_data_directory(directory_path = strsplit(outpath, "/best_hyperparameters")[[1]][1])
-  
+
   weightval_raw <- local_tuning_grid$weightval_raw
   weightval_hex <- local_tuning_grid$weightval_hex
   gamma         <- local_tuning_grid$gamma
@@ -326,28 +326,29 @@ finalize_hyperparameters_from_inner <- function(inner_folds, local_tuning_grid, 
 
   ## Read every per-(outer x inner x index) result file into one long tibble
   all_results <- purrr::map(inner_folds, .f = function(x) {
-    tload <- try(readRDS(x), silent = TRUE)
+    tload <- try(readRDS(x) |> dplyr::select(-recall_index), silent = TRUE)
     if (class(tload)[1] != "try-error") {
-      return(tload)
+      tload
     } else {
-      return(NULL)
+      NULL
     }
-  }) |> bind_rows()
+  }) |>
+  bind_rows()
 
   ## Do the scoring. Detaailed info on the scoring inside this function
   scores <- score_hexrelative_results(all_results, weightval_raw, weightval_hex, gamma, delta)
-  
+
   ## Find the single best
   best <- scores |>
     arrange(desc(final_score_combined)) |>
     dplyr::slice(1)
-  
+
   ## What a pure hex-relative selection (gamma = 0) and a pure raw selection would each have
   ## picked from this same pool of fits -- kept alongside so all three strategies are directly
   ## comparable from one tuning run
   hex_only_best_index <- scores |> arrange(desc(final_score_hex)) |> dplyr::slice(1) |> pull(index)
   raw_only_best_index <- scores |> arrange(desc(final_score))     |> dplyr::slice(1) |> pull(index)
-  
+
   ## Cleanup/add details for export
   best <- best |>
     left_join(
@@ -360,7 +361,7 @@ finalize_hyperparameters_from_inner <- function(inner_folds, local_tuning_grid, 
       , raw_only_would_have_picked_index  = raw_only_best_index
       , .before = index
     )
-  
+
   write.csv(best, outpath)
 
   outpath
@@ -419,40 +420,41 @@ get_latest_finalized_hyperparameters <- function(hyperparam_dir) {
 #' @export
 
 calc_dial_best_set <- function(fits, dial_hyperspace, tuning_grid_id) {
-  
+
   ## Read every result file into one long tibble
   fits <- paste0(fits, "/", list.files(fits))
   all_results <- purrr::map(fits, .f = function(x) {
-    tload <- try(readRDS(x), silent = TRUE)
+    tload <- try(readRDS(x) |> dplyr::select(-recall_index), silent = TRUE)
     if (class(tload)[1] != "try-error") {
-      return(tload)
+      tload
     } else {
-      return(NULL)
+      NULL
     }
-  }) |> bind_rows()
-  
-  all_dials <- purrr::map(1:nrow(dial_hyperspace), .f = function(i) {
-    
+  }) |>
+  bind_rows()
+
+  all_dials <- purrr::map(seq_len(nrow(dial_hyperspace)), .f = function(i) {
+
     this_set <- dial_hyperspace[i, ]
-    
+
     scores <- score_hexrelative_results(
       all_results   = all_results
     , weightval_raw = this_set$weightval_raw_for_scoring
     , weightval_hex = this_set$weightval_hex_for_scoring
     , gamma         = this_set$gamma_for_combined_score
     , delta         = this_set$delta_for_index_score)
-    
+
   ## Find the single best
   best <- scores |>
     arrange(desc(final_score_combined)) |>
     dplyr::slice(1)
-  
+
   ## What a pure hex-relative selection (gamma = 0) and a pure raw selection would each have
   ## picked from this same pool of fits -- kept alongside so all three strategies are directly
   ## comparable from one tuning run
   hex_only_best_index <- scores |> arrange(desc(final_score_hex)) |> dplyr::slice(1) |> pull(index)
   raw_only_best_index <- scores |> arrange(desc(final_score))     |> dplyr::slice(1) |> pull(index)
-  
+
   ## Cleanup/add details for export
   best <- best |>
     left_join(
@@ -465,15 +467,15 @@ calc_dial_best_set <- function(fits, dial_hyperspace, tuning_grid_id) {
       , raw_only_would_have_picked_index  = raw_only_best_index
       , .before = index
     )
-  
+
   ## Find the single best
   best <- scores |>
     arrange(desc(final_score_combined)) |>
     dplyr::slice(1)
-  
+
   hex_only_best_index <- scores |> arrange(desc(final_score_hex)) |> dplyr::slice(1) |> pull(index)
   raw_only_best_index <- scores |> arrange(desc(final_score))     |> dplyr::slice(1) |> pull(index)
-  
+
   ## Cleanup/add details for export
   best <- best |>
     left_join(
@@ -486,11 +488,11 @@ calc_dial_best_set <- function(fits, dial_hyperspace, tuning_grid_id) {
       , raw_only_would_have_picked_index  = raw_only_best_index
       , .before = index
     )
-  
+
   best
-  
+
   })
-  
+
   all_dials.s <- all_dials |>
     bind_rows() |>
     group_by(index) |>
@@ -507,12 +509,12 @@ calc_dial_best_set <- function(fits, dial_hyperspace, tuning_grid_id) {
     , weightval_hex        = mean(weightval_hex)
     , gamma                = mean(gamma)
     )
-  
+
   list(
     all_sets           = all_dials |> bind_rows()
   , summarized_indices = all_dials.s
   )
-  
+
 }
 
 
@@ -528,7 +530,7 @@ calc_dial_best_set <- function(fits, dial_hyperspace, tuning_grid_id) {
 #' @export
 
 chose_weight_set <- function(full_set, summarized_sets, objective) {
-  
+
   if (objective == "balanced") {
     chosen_set <- summarized_sets |> filter(n_entry == max(n_entry))
   } else if (objective == "minimize false positive") {
@@ -538,9 +540,9 @@ chose_weight_set <- function(full_set, summarized_sets, objective) {
   } else {
     stop("Choose a supported option for objective")
   }
-  
+
   if ("delta" %in% names(full_set)) {
-    
+
   full_set |>
     filter(index == chosen_set$index) |>
     summarize(
@@ -548,22 +550,16 @@ chose_weight_set <- function(full_set, summarized_sets, objective) {
     , weightval_hex = mean(weightval_hex)
     , gamma         = mean(gamma)
     , delta         = mean(delta))
-    
+
   } else {
-    
+
   full_set |>
     filter(index == chosen_set$index) |>
     summarize(
       weightval_raw = mean(weightval_raw)
     , weightval_hex = mean(weightval_hex)
     , gamma         = mean(gamma))
-    
+
   }
-  
+
 }
-
-
-
-
-
-

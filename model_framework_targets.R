@@ -407,7 +407,7 @@ if (purpose == "train") {
      ## NOTE: used below to determine the dial weights that will be used for the rest of tuning
      ## AND to be used to explore the implications of different choices on actual predicted results
   , tar_target(dial_best_sets, calc_dial_best_set(
-      fits            = "outputs/pan_hex_model_tuning_inner_ws" #tuned_results_per_outer_fold
+      fits             = tuned_results_per_outer_fold
     , dial_hyperspace = dial_hyperspace
     , tuning_grid_id  = tuning_grid$grid_id))
 
@@ -712,9 +712,7 @@ model_evaluation_targets <- tar_plan(
     all_files <- paste(app_file_path, list.files("outputs/for_app"), sep = "/")
     just_hex_files <- all_files[grepl("FALSE", all_files)]
     just_hex_files
-    }
-    , format = "file"
-  )
+    }, format = "file")
 
   ## Build the data file for the app
 , tar_target(built_app_components_predictions, build_app_components_predictions(
@@ -851,6 +849,20 @@ model_evaluation_targets <- tar_plan(
   , plotname  = "map_split"
   , overwrite = TRUE))
 
+  ## target to ensure dependency for the new batch of fit evaluation files for upload
+, tar_target(completed_fit_evaluation, {
+   invisible(ex_fits.all_probs_raw)
+   invisible(ex_fits.summary_probs_raw)
+   invisible(ex_fits.summary_probs)
+   invisible(ex_fits.plotted_calibration)
+   invisible(ex_fits.prob_dens_plot)
+   invisible(ex_fits.map_split)
+   invisible(plotted_calibration.plot_export_opt)
+   invisible(plotted_calibration.plot_export_even)
+   invisible(prob_dens.plot_export)
+   invisible(map_split.plot_export)
+  })
+
 )
 
 ## Reports ---------------------------------------------------------------------
@@ -877,6 +889,8 @@ recent outbreak layers")
   , quiet       = FALSE)
 
 , tar_target(new_performance_files_to_uplaod, {
+    invisible(completed_fit_evaluation)
+    invisible(openrvfcast_performance_tracking)
     outpath   <- "outputs/fit_evaluation"
     filenames <- list.files(outpath)
     filenames <- filenames[grep(Sys.Date(), filenames)]
@@ -901,6 +915,9 @@ completion_check_targets <- tar_plan(
    ## the performance-tracking outputs
   if (purpose == "train") {
     tar_target(pipeline_complete, {
+      invisible(ex_fits.all_probs_raw)
+      invisible(ex_fits.summary_probs_raw)
+      invisible(ex_fits.summary_probs)
       invisible(openrvfcast_report)
       invisible(openrvfcast_performance_tracking)
       invisible(performance_files_AWS_upload)
@@ -923,5 +940,4 @@ list(
 , model_fitting_targets
 , model_evaluation_targets
 , report_targets
-, completion_check_targets
-)
+, completion_check_targets)

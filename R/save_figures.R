@@ -17,6 +17,11 @@
 
 save_fig_pieces <- function(input, outpath, evalpath, idinfo, plotname, overwrite) {
 
+  outfilename <- paste(evalpath, "gg_", gsub("[.]", "_", plotname), "_", Sys.Date(), ".svg", sep = "")
+  if (file.exists(outfilename) & !overwrite) {
+    return(outfilename)
+  }
+  
   te      <- input |> qread() |> left_join(idinfo |> dplyr::select(outer_fold_id, assess_range))
   unifold <- unique(te$outer_fold_id)
   out_list <- vector("list", length(unifold))
@@ -54,13 +59,27 @@ save_fig_pieces <- function(input, outpath, evalpath, idinfo, plotname, overwrit
   
    }
     
-    out_list <- bind_rows(out_list)
+    out_list <- bind_rows(out_list) |> mutate(success = 0)
+    
+    for (j in 1:nrow(out_list)) {
+      ttemp <- try(print(out_list[j, ] |> pull(get(plotname)), silent = T))
+      if (class(ttemp)[1] != "try-error") {
+        out_list[j, ]$success <- 1
+      }
+    }
+    
+    out_list <- out_list |> dplyr::filter(success == 1)
+    
     gg.t     <- patchwork::wrap_plots(out_list |> pull(get(plotname)), ncol = 1)
     out_file <- paste(evalpath, "gg_", gsub("[.]", "_", plotname), "_", Sys.Date(), ".svg", sep = "")
     
+    if (!file.exists(out_file) || overwrite) {
+    
     try({
-      ggsave(out_file, plot = gg.t, width = 8, height = 8 * length(gg.t), limitsize = FALSE)
+      ggsave(out_file, plot = gg.t, width = 8, height = 4 * length(gg.t), limitsize = FALSE)
     }, silent = TRUE)
+      
+    }
     
     ## Far too many maps to save them all as separate figures, so compile a different
      ## pdf for each level of aggregation with a different page per date
@@ -93,9 +112,14 @@ save_fig_pieces <- function(input, outpath, evalpath, idinfo, plotname, overwrit
       gg.t     <- patchwork::wrap_plots(te.t |> pull(get(plotname)), ncol = 1)
       out_file <- paste(evalpath, "gg_", gsub("[.]", "_", plotname), "_", Sys.Date(), ".svg", sep = "")
       
+      if (!file.exists(out_file) || overwrite) {
+      
       try({
         ggsave(out_file, plot = gg.t, width = 8, height = 8 * length(gg.t), limitsize = FALSE)
       }, silent = TRUE)
+        
+      }
+        
     }
 
     }

@@ -130,7 +130,7 @@ build_local_hyperparameter_grid <- function(
   create_data_directory(directory_path = grid_path)
 
   all_results <- purrr::map(inner_fold_paths, .f = function(x) {
-    tload <- try(readRDS(x), silent = TRUE)
+    tload <- try(readRDS(x) |> dplyr::select(-recall_index), silent = TRUE)
     if (class(tload)[1] != "try-error") {
       return(tload)
     } else {
@@ -140,19 +140,19 @@ build_local_hyperparameter_grid <- function(
 
   ## Do the scoring. Detailed info on the scoring inside this function
   scores <- score_hexrelative_results(all_results, weightval_raw, weightval_hex, gamma, delta)
-  
+
   ## Extract out the top few indices
   top_indices <- scores |>
     arrange(desc(final_score_combined)) |>
     dplyr::slice(seq_len(top_k)) |>
     pull(index)
-  
+
   ## Extract out the top few parameter sets
   top_params <- all_results |>
     dplyr::filter(index %in% top_indices) |>
     dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
     distinct()
-  
+
   ## Compute local bounds for each hyperparameter, hard-capped at the ORIGINAL global
   ## tune_pars bounds -- the local grid is a refinement and should never be allowed to
   ## search outside where the global grid already looked.
@@ -164,7 +164,7 @@ build_local_hyperparameter_grid <- function(
   lossred_range <- expand_range(log10(top_params$loss_reduction + .Machine$double.eps), lo_hard = tune_pars$loss_red_min, hi_hard = tune_pars$loss_red_max, expansion = expansion, min_half_width = 0.5)
   ## Keep mtry anchored within reach of the top-k observed values, but never below the global floor
   mtry_range_lo <- max(tune_pars$mtry_min, min(top_params$mtry) - 3L)
-  
+
   ## Hash every parameter that determines this grid's content into its id, so a change in any of
   ## them produces a new file (forcing a rebuild) instead of silently reusing a stale one -- see
   ## the note above the function.
@@ -202,11 +202,11 @@ build_local_hyperparameter_grid <- function(
     saveRDS(par_grid, save_path)
 
   }
-  
+
   ## Save the intermediate best set as a tracking method to indicate the global
   ## tuning is finished
   write.csv(top_params, hyperparam_path)
-  
+
   tibble(
     par_grid      = par_grid |> list()
   , grid_id       = hyper_id
