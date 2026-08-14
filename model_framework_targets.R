@@ -407,7 +407,7 @@ if (purpose == "train") {
      ## NOTE: used below to determine the dial weights that will be used for the rest of tuning
      ## AND to be used to explore the implications of different choices on actual predicted results
   , tar_target(dial_best_sets, calc_dial_best_set(
-      fits             = tuned_results_per_outer_fold
+      fits            = tuned_results_per_outer_fold
     , dial_hyperspace = dial_hyperspace
     , tuning_grid_id  = tuning_grid$grid_id))
 
@@ -460,9 +460,14 @@ if (purpose == "train") {
     , seed                 = hypergrid_seed
     , min_capacity         = min_capacity_for_hypergrid))
 
+    ## Folds in a digest of chosen_weight_set_final (not just the two grid_ids) so that a rerun
+     ## landing on a different FINAL weighting -- even with identical global/local grids -- gets
+     ## its own output file instead of the "already exists, skip" check in
+     ## finalize_hyperparameters_from_inner silently reusing a stale result
   , tar_target(local_hyperparam_path, paste0(
     "outputs/hyperparameters/best_hyperparameters_combined_"
-    , tuning_grid$grid_id, "--", local_tuning_grid$grid_id, ".csv"))
+    , tuning_grid$grid_id, "--", local_tuning_grid$grid_id
+    , "--", digest::digest(chosen_weight_set_final), ".csv"))
 
     ## (outer x inner x local-index) combinations, shuffled for load balancing.
      ## Mirrors inner_fold_id_finalized but cross-joined with the local grid.
@@ -528,13 +533,21 @@ if (purpose == "train") {
      , error           = "null"
      , format          = "file")
 
-    ## weightval_raw/weightval_hex/gamma/delta are NOT passed here separately -- they are read directly
-     ## off local_tuning_grid inside finalize_hyperparameters_from_inner, so
-     ## this stage can never silently drift out of sync with whatever scoring parameters actually
-     ## built that grid (see the note on build_local_hyperparameter_grid)
+    ## Re-derive the weighting dials a second time, now over the combined global (1-75) + local
+     ## (76-150) candidate pool
+  , tar_target(dial_best_sets_final, calc_dial_best_set(
+      fits            = c(tuned_results_per_outer_fold, local_tuned_results)
+    , dial_hyperspace = dial_hyperspace
+    , tuning_grid_id  = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")))
+
+  , tar_target(chosen_weight_set_final, chose_weight_set(
+      full_set        = dial_best_sets_final$all_sets
+    , summarized_sets = dial_best_sets_final$summarized_indices
+    , objective       = "balanced"))
+
   , tar_target(finalized_hyperparameters, finalize_hyperparameters_from_inner(
       inner_folds       = c(tuned_results_per_outer_fold, local_tuned_results)
-    , local_tuning_grid = local_tuning_grid
+    , weight_set        = chosen_weight_set_final
     , tuning_grid_id    = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")
     , outpath           = local_hyperparam_path))
 

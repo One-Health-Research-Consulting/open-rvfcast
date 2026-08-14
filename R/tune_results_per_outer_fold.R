@@ -296,8 +296,8 @@ chunk_rows <- function(dat, n_chunks, which) {
 
 #' @param inner_folds Character vector of all file paths returned by the
 #'   tuned_results_per_outer_fold target (one path per outer x inner x index branch)
-#' @param local_tuning_grid Single-row tibble returned by build_local_hyperparameter_grid;
-#'   must carry weightval_raw, weightval_hex, gamma, delta columns
+#' @param weight_set Single-row tibble from chose_weight_set carrying weightval_raw,
+#'   weightval_hex, gamma, delta
 #' @param tuning_grid_id string for this tuning grid
 #' @param outpath where to save the best hyperparameter set
 #' @return Single-row tibble containing final_score_combined, final_score_hex, S_pos_hex,
@@ -306,7 +306,7 @@ chunk_rows <- function(dat, n_chunks, which) {
 #' @author Morgan Kain
 #' @export
 
-finalize_hyperparameters_from_inner <- function(inner_folds, local_tuning_grid, tuning_grid_id, outpath) {
+finalize_hyperparameters_from_inner <- function(inner_folds, weight_set, tuning_grid_id, outpath) {
 
   ## First, check if this tuning_grid_id already has a saved best parameter set
   if (file.exists(outpath)) return(outpath)
@@ -314,10 +314,10 @@ finalize_hyperparameters_from_inner <- function(inner_folds, local_tuning_grid, 
   ## Make the outpath if it doesn't exist yet
   create_data_directory(directory_path = strsplit(outpath, "/best_hyperparameters")[[1]][1])
 
-  weightval_raw <- local_tuning_grid$weightval_raw
-  weightval_hex <- local_tuning_grid$weightval_hex
-  gamma         <- local_tuning_grid$gamma
-  delta         <- local_tuning_grid$delta
+  weightval_raw <- weight_set$weightval_raw
+  weightval_hex <- weight_set$weightval_hex
+  gamma         <- weight_set$gamma
+  delta         <- weight_set$delta
 
   stopifnot(is.numeric(weightval_raw), length(weightval_raw) == 1, weightval_raw >= 0)
   stopifnot(is.numeric(weightval_hex), length(weightval_hex) == 1, weightval_hex >= 0)
@@ -411,8 +411,10 @@ get_latest_finalized_hyperparameters <- function(hyperparam_dir) {
 #'
 #' @title calc_dial_best_set
 
-#' @param fits path to the files from tuning. Set as a path so that this can be
-#'   run without a fully completed tuning pass
+#' @param fits Character vector of individual result-file paths to score (e.g. the
+#'   tuned_results_per_outer_fold target, or c(tuned_results_per_outer_fold, local_tuned_results)
+#'   for a second pass over the combined global+local pool) -- NOT a directory to list; matches
+#'   the convention already used by finalize_hyperparameters_from_inner
 #' @param dial_hyperspace sobol of dial values
 #' @param tuning_grid_id string for this tuning grid
 #' @return List of full and summarized tibbles combining dial_hyperspace and details from best hyperset
@@ -422,7 +424,6 @@ get_latest_finalized_hyperparameters <- function(hyperparam_dir) {
 calc_dial_best_set <- function(fits, dial_hyperspace, tuning_grid_id) {
 
   ## Read every result file into one long tibble
-  fits <- paste0(fits, "/", list.files(fits))
   all_results <- purrr::map(fits, .f = function(x) {
     tload <- try(readRDS(x) |> dplyr::select(-recall_index), silent = TRUE)
     if (class(tload)[1] != "try-error") {
@@ -444,57 +445,34 @@ calc_dial_best_set <- function(fits, dial_hyperspace, tuning_grid_id) {
     , gamma         = this_set$gamma_for_combined_score
     , delta         = this_set$delta_for_index_score)
 
-  ## Find the single best
-  best <- scores |>
-    arrange(desc(final_score_combined)) |>
-    dplyr::slice(1)
+    ## Find the single best
+    best <- scores |>
+      arrange(desc(final_score_combined)) |>
+      dplyr::slice(1)
 
-  ## What a pure hex-relative selection (gamma = 0) and a pure raw selection would each have
-  ## picked from this same pool of fits -- kept alongside so all three strategies are directly
-  ## comparable from one tuning run
-  hex_only_best_index <- scores |> arrange(desc(final_score_hex)) |> dplyr::slice(1) |> pull(index)
-  raw_only_best_index <- scores |> arrange(desc(final_score))     |> dplyr::slice(1) |> pull(index)
+    ## What a pure hex-relative selection (gamma = 0) and a pure raw selection would each have
+    ## picked from this same pool of fits -- kept alongside so all three strategies are directly
+    ## comparable from one tuning run
+    hex_only_best_index <- scores |> arrange(desc(final_score_hex)) |> dplyr::slice(1) |> pull(index)
+    raw_only_best_index <- scores |> arrange(desc(final_score))     |> dplyr::slice(1) |> pull(index)
 
-  ## Cleanup/add details for export
-  best <- best |>
-    left_join(
-      all_results |>
-        dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
-        distinct(), by = "index") |>
-    mutate(
-        tuning_grid_id                    = tuning_grid_id
-      , hex_only_would_have_picked_index  = hex_only_best_index
-      , raw_only_would_have_picked_index  = raw_only_best_index
-      , .before = index
-    )
+    ## Cleanup/add details for export
+    best |>
+      left_join(
+        all_results |>
+          dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
+          distinct(), by = "index") |>
+      mutate(
+          tuning_grid_id                    = tuning_grid_id
+        , hex_only_would_have_picked_index  = hex_only_best_index
+        , raw_only_would_have_picked_index  = raw_only_best_index
+        , .before = index
+      )
 
-  ## Find the single best
-  best <- scores |>
-    arrange(desc(final_score_combined)) |>
-    dplyr::slice(1)
-
-  hex_only_best_index <- scores |> arrange(desc(final_score_hex)) |> dplyr::slice(1) |> pull(index)
-  raw_only_best_index <- scores |> arrange(desc(final_score))     |> dplyr::slice(1) |> pull(index)
-
-  ## Cleanup/add details for export
-  best <- best |>
-    left_join(
-      all_results |>
-        dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
-        distinct(), by = "index") |>
-    mutate(
-        tuning_grid_id                    = tuning_grid_id
-      , hex_only_would_have_picked_index  = hex_only_best_index
-      , raw_only_would_have_picked_index  = raw_only_best_index
-      , .before = index
-    )
-
-  best
-
-  })
+  }) |>
+  bind_rows()
 
   all_dials.s <- all_dials |>
-    bind_rows() |>
     group_by(index) |>
     summarize(
       n_entry              = n()
@@ -511,7 +489,7 @@ calc_dial_best_set <- function(fits, dial_hyperspace, tuning_grid_id) {
     )
 
   list(
-    all_sets           = all_dials |> bind_rows()
+    all_sets           = all_dials
   , summarized_indices = all_dials.s
   )
 
@@ -541,25 +519,45 @@ chose_weight_set <- function(full_set, summarized_sets, objective) {
     stop("Choose a supported option for objective")
   }
 
-  if ("delta" %in% names(full_set)) {
-
-  full_set |>
-    filter(index == chosen_set$index) |>
-    summarize(
-      weightval_raw = mean(weightval_raw)
-    , weightval_hex = mean(weightval_hex)
-    , gamma         = mean(gamma)
-    , delta         = mean(delta))
-
+  dial_cols <- if ("delta" %in% names(full_set)) {
+    c("weightval_raw", "weightval_hex", "gamma", "delta")
   } else {
-
-  full_set |>
-    filter(index == chosen_set$index) |>
-    summarize(
-      weightval_raw = mean(weightval_raw)
-    , weightval_hex = mean(weightval_hex)
-    , gamma         = mean(gamma))
-
+    c("weightval_raw", "weightval_hex", "gamma")
   }
+
+  ## Pick the evaluated draw closest to this winning index's own centroid
+  full_set |>
+    dplyr::filter(index == chosen_set$index) |>
+    select_centroid_draw(full_set = full_set, cols = dial_cols)
+
+}
+
+
+#' Pick the evaluated draw closest to the centroid of a subset of dial-hyperspace draws,
+#' in range-normalized distance. Used instead of averaging so the returned weighting values are
+#' from a real, previously-evaluated point 
+#'
+#' @title select_centroid_draw
+#'
+#' @param draws Tibble of candidate draws to choose among (already filtered to one winning index)
+#' @param full_set Tibble used only to establish each dial's explored range for normalization --
+#'   the full, unfiltered pool of draws, not just `draws`, so the normalization scale reflects
+#'   the whole search space rather than shrinking to whatever this particular subset spans
+#' @param cols Character vector of dial column names to match on
+#' @return One-row tibble, `draws` subset to `cols`, for the single closest-to-centroid row
+#' @author Morgan Kain
+#' @export
+
+select_centroid_draw <- function(draws, full_set, cols) {
+
+  ranges   <- purrr::map_dbl(cols, ~ diff(range(full_set[[.x]], na.rm = TRUE)))
+  centroid <- purrr::map_dbl(cols, ~ mean(draws[[.x]], na.rm = TRUE))
+
+  dist_sq <- purrr::map(seq_along(cols), function(i) {
+    ((draws[[cols[i]]] - centroid[i]) / ranges[i])^2
+  }) |>
+    purrr::reduce(`+`)
+
+  draws[which.min(dist_sq), cols]
 
 }
