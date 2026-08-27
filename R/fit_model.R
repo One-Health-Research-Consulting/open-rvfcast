@@ -15,20 +15,24 @@
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
 #' @param DEBUG If TRUE reduce to a small dataset for code testing
 #' @param index_boost Multiplier applied on top of the class-imbalance weight for
-#'   country-level index cases (see identify_index_outbreaks/get_rvf_response), i.e. an
-#'   index case counts as (1 + index_boost) times an ordinary positive case in reporting
-#'   metrics. Default 1 (double weight). Training itself is unaffected either way -- class
-#'   imbalance there is handled via scale_pos_weight at the engine level, not per-row
-#'   weights, to avoid corrupting min_child_weight semantics
+#'   country-level index cases, i.e. an index case counts as (1 + index_boost) times an 
+#'   ordinary positive case in reporting metrics. 
+#' @param k_correction Optional path to a CSV with column `k` which contributes to 
+#'   a post-hoc recalibration applied to .pred_1, correcting residual overconfidence 
+#'   left over from scale_pos_weight. NULL does no recalibration. 
 #' @return Tibble of model fit output
 #' @author Morgan Kain
 #' @export
 
-fit_model <- function(final_hyper_set, full_data, train_data, test_data, threshold, weightings, start_p, id_cols, out_dir, overwrite, DEBUG, index_boost = 1) {
+fit_model <- function(final_hyper_set, full_data, train_data, test_data, threshold, weightings, start_p, id_cols, out_dir, overwrite, DEBUG, index_boost = 1, k_correction = NULL) {
 
   ## load the csv of the finalized hyperparameter set
   final_hyper_set <- read.csv(final_hyper_set)
-  
+
+  ## load the csv of the fitted k-correction, if one was supplied as a path (same
+   ## convention as final_hyper_set above); NULL is passed through unchanged
+  if (!is.null(k_correction)) k_correction <- read.csv(k_correction)
+
   ## Set filenames
   save_filename <- paste(
       out_dir
@@ -126,11 +130,6 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
   rm(train_data, test_data)
   gc()
   
-  #outer_tbl_train  <- outer_tbl_train |> dplyr::select(-pred_sero)
-  #outer_tbl_assess <- outer_tbl_assess |> dplyr::select(-pred_sero)
-  #outer_tbl_train  <- outer_tbl_train |> dplyr::select(-Country)
-  #outer_tbl_assess <- outer_tbl_assess |> dplyr::select(-Country)
-  
   ## Set up and fit the final model for this outer fold
   rec       <- make_recipe(outer_tbl_train, id_cols = id_cols)
   mod       <- make_model(params = final_hyper_set, start_p = start_p, spw = spw)
@@ -144,7 +143,16 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
         select(outbreak)
     ) |>
     mutate(outbreak = factor(outbreak, levels = c("1", "0")))
-  
+
+  ## Apply the post-hoc scale_pos_weight damping-fraction correction, when supplied
+  if (!is.null(k_correction)) {
+    preds <- preds |>
+      mutate(
+        .pred_1 = apply_k_correction(.pred_1, spw_used = spw * resolve_spw_multiplier(final_hyper_set), k = k_correction$k)
+      , .pred_0 = 1 - .pred_1
+      )
+  }
+
   ## Compare distributions of predicted probabilities for 1s vs 0s
   preds_hist <- ggplot(preds, aes(x = .pred_1)) + 
     geom_density(aes(fill = outbreak), colour = NA, alpha = 0.3) +

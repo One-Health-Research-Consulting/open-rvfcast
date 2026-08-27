@@ -375,24 +375,24 @@ if (purpose == "train") {
   , tar_target(hyperparam_path, paste0("outputs/hyperparameters/best_hyperparameters", tuning_grid$grid_id, ".csv"))
 
   , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
-      prejoined_data  = outer_fold_prejoined
-    , inner_ids_all   = inner_fold_id_finalized |>
+      prejoined_data = outer_fold_prejoined
+    , inner_ids_all  = inner_fold_id_finalized |>
                           dplyr::filter(outer_fold_id == outer_fold_prejoined$outer_fold_id) |>
                           chunk_rows(n_chunks = n_tune_chunks, which = chunk_id)
-    , threshold       = positive_threshold
-    , weightings      = weightings_on_ones
-    , start_p         = start_p
-    , id_cols         = id_cols
-    , out_dir         = outer_folds_dir
-    , tuning_grid_id  = tuning_grid$grid_id
-    , overwrite       = FALSE
-    , DEBUG           = FALSE
-    , chunk_id        = chunk_id
-    , checktime_path  = "outputs/timing"
-    , hex_id_col      = district_id_col)
-    , pattern         = cross(outer_fold_prejoined, chunk_id)
-    , error           = "null"
-    , format          = "file")
+    , threshold      = positive_threshold
+    , weightings     = weightings_on_ones
+    , start_p        = start_p
+    , id_cols        = id_cols
+    , out_dir        = outer_folds_dir
+    , tuning_grid_id = tuning_grid$grid_id
+    , overwrite      = FALSE
+    , DEBUG          = FALSE
+    , chunk_id       = chunk_id
+    , checktime_path = "outputs/timing"
+    , hex_id_col     = district_id_col)
+    , pattern        = cross(outer_fold_prejoined, chunk_id)
+    , error          = "null"
+    , format         = "file")
 
    ## Set up a target to explore how the hyperparameter set changes as a function of the various dials.
     ## NOTE: see commenting for each individual weighting dial target for details on that parameter
@@ -447,7 +447,7 @@ if (purpose == "train") {
     , global_grid          = tuning_grid
     , tune_pars            = tune_pars
     , top_k                = 8
-    , size                 = 75
+    , size                 = 100
     , weightval_raw        = weightval_raw_for_scoring
     , weightval_hex        = weightval_hex_for_scoring
     , gamma                = gamma_for_combined_score
@@ -458,7 +458,8 @@ if (purpose == "train") {
     , folded_data_training = folded_data_training
     , splitted_data        = splitted_data
     , seed                 = hypergrid_seed
-    , min_capacity         = min_capacity_for_hypergrid))
+    , min_capacity         = min_capacity_for_hypergrid
+    , spw_mult_range       = c(0.3, 1.0)))
 
     ## Folds in a digest of chosen_weight_set_final (not just the two grid_ids) so that a rerun
      ## landing on a different FINAL weighting -- even with identical global/local grids -- gets
@@ -514,27 +515,26 @@ if (purpose == "train") {
      ## See the matching comment on tuned_results_per_outer_fold above for why the filter/chunk
      ## is done inline rather than via local_inner_fold_ids_per_outer_chunked.
   , tar_target(local_tuned_results, tune_results_per_outer_fold(
-       prejoined_data  = outer_fold_prejoined
-     , inner_ids_all   = local_inner_fold_id_finalized |>
+       prejoined_data = outer_fold_prejoined
+     , inner_ids_all  = local_inner_fold_id_finalized |>
                             dplyr::filter(outer_fold_id == outer_fold_prejoined$outer_fold_id) |>
                             chunk_rows(n_chunks = n_tune_chunks, which = chunk_id)
-     , threshold       = positive_threshold
-     , weightings      = weightings_on_ones
-     , start_p         = start_p
-     , id_cols         = id_cols
-     , out_dir         = outer_folds_dir
-     , tuning_grid_id  = local_tuning_grid$grid_id
-     , overwrite       = FALSE
-     , DEBUG           = FALSE
-     , chunk_id        = chunk_id
-     , checktime_path  = "outputs/timing"
-     , hex_id_col      = district_id_col)
-     , pattern         = cross(outer_fold_prejoined, chunk_id)
-     , error           = "null"
-     , format          = "file")
+     , threshold      = positive_threshold
+     , weightings     = weightings_on_ones
+     , start_p        = start_p
+     , id_cols        = id_cols
+     , out_dir        = outer_folds_dir
+     , tuning_grid_id = local_tuning_grid$grid_id
+     , overwrite      = FALSE
+     , DEBUG          = FALSE
+     , chunk_id       = chunk_id
+     , checktime_path = "outputs/timing"
+     , hex_id_col     = district_id_col)
+     , pattern        = cross(outer_fold_prejoined, chunk_id)
+     , error          = "null"
+     , format         = "file")
 
-    ## Re-derive the weighting dials a second time, now over the combined global (1-75) + local
-     ## (76-150) candidate pool
+    ## Re-derive the weighting dials a second time, now over the combined global + local candidate pool
   , tar_target(dial_best_sets_final, calc_dial_best_set(
       fits            = c(tuned_results_per_outer_fold, local_tuned_results)
     , dial_hyperspace = dial_hyperspace
@@ -546,10 +546,40 @@ if (purpose == "train") {
     , objective       = "balanced"))
 
   , tar_target(finalized_hyperparameters, finalize_hyperparameters_from_inner(
-      inner_folds       = c(tuned_results_per_outer_fold, local_tuned_results)
-    , weight_set        = chosen_weight_set_final
-    , tuning_grid_id    = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")
-    , outpath           = local_hyperparam_path))
+      inner_folds    = c(tuned_results_per_outer_fold, local_tuned_results)
+    , weight_set     = chosen_weight_set_final
+    , tuning_grid_id = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")
+    , outpath        = local_hyperparam_path))
+
+    ## Use the inner-fold held-out predictions for the already-chosen winning
+     ## hyperparameter set to fit a post-hoc calibration correction
+  , tar_target(k_correction_raw_predictions, harvest_k_correction_predictions(
+      winning_hyperparam_path       = finalized_hyperparameters
+    , prejoined_data                = outer_fold_prejoined
+    , inner_fold_id_finalized       = inner_fold_id_finalized
+    , local_inner_fold_id_finalized = local_inner_fold_id_finalized
+    , threshold                     = positive_threshold
+    , weightings                    = weightings_on_ones
+    , start_p                       = start_p
+    , id_cols                       = id_cols
+    , out_dir                       = "outputs/k_correction_harvest"
+    , checktime_path                = "outputs/timing/k_correction_harvest"
+    , hex_id_col                    = district_id_col)
+    , pattern                       = map(outer_fold_prejoined)
+    , error                         = "null"
+    , format                        = "file")
+
+    ## Pool the harvested predictions across outer folds and fit the single, shared damping-fraction k.
+     ## save_path uses derive_k_correction_path() (pure naming, no existence check) rather than
+     ## get_latest_k_correction() -- the latter REQUIRES the file to already exist (it's for
+     ## PURPOSE = forecast's lookup below), which would make this target error every time, since
+     ## the whole point of this target is to write a file that doesn't exist yet.
+  , tar_target(k_correction_fit, fit_k_correction_from_paths(
+      raw_prediction_paths = k_correction_raw_predictions
+    , save_path            = derive_k_correction_path(local_hyperparam_path)
+    , prior_mean           = 0.47
+    , prior_lambda         = 5)
+    , format               = "file")
 
   )
 
@@ -559,8 +589,10 @@ if (purpose == "train") {
    ## whatever hyperparameter set was most recently finalized by a PURPOSE = train run
   model_tuning_targets_purpose <- tar_plan(
 
-    tar_target(finalized_hyperparameters, get_latest_finalized_hyperparameters(
-      hyperparam_dir = "outputs/hyperparameters"))
+    tar_target(finalized_hyperparameters, get_latest_finalized_hyperparameters(hyperparam_dir = "outputs/hyperparameters"))
+
+    ## Reuse the k-correction paired with whatever hyperparameter set was just located above 
+  , tar_target(k_correction_fit, get_latest_k_correction(finalized_hyperparameters))
 
   )
 
@@ -594,7 +626,8 @@ model_fitting_targets <- tar_plan(
   , out_dir         = outer_folds_dir3
   , overwrite       = FALSE
   , DEBUG           = FALSE
-  , index_boost     = country_index_boost)
+  , index_boost     = country_index_boost
+  , k_correction    = k_correction_fit)
   , pattern         = map(folded_data_for_fitting)
   , error           = "null"
   , format          = "file")

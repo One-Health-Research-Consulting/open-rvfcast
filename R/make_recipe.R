@@ -31,10 +31,16 @@ make_recipe <- function(train_data, id_cols) {
 #' @param spw scale_pos_weight passed to xgboost engine (n_neg / n_pos); handles class imbalance
 #'   at the gradient level without corrupting min_child_weight semantics via case weights.
 #'   max_delta_step = 1 caps per-tree leaf output to prevent margin accumulation to 0/1 extremes.
+#'   Damped by params$spw_multiplier when present (see build_local_hyperparameter_grid) --
+#'   scale_pos_weight set to the raw imbalance ratio is a known source of overconfident
+#'   predicted probabilities; a tunable multiplier lets the local hyperparameter search
+#'   trade off some of that against calibration.
 #' @author Morgan Kain
 #' @export
 
 make_model <- function(params, start_p, spw) {
+
+  spw_mult <- resolve_spw_multiplier(params)
 
   boost_tree(
     trees          = params$trees
@@ -49,12 +55,34 @@ make_model <- function(params, start_p, spw) {
       "xgboost"
     , objective        = "binary:logistic"
     , base_score       = start_p
-    , scale_pos_weight = spw
+    , scale_pos_weight = spw * spw_mult
     , max_delta_step   = 1
     , nthread          = 1
     , verbosity        = 0
     )
 
+}
+
+#' Resolve a hyperparameter row's spw_multiplier, defaulting to 1 (no damping)
+#'
+#' params$spw_multiplier is only present on rows that came from the local
+#' refinement grid; absent (NULL) on global-grid rows, and can also come through 
+#' as NA elsewhere in the tuning pipeline. Shared by make_model() and 
+#' tune_results_per_outer_fold()'s save_raw_predictions logic so both compute 
+#' the same effective scale_pos_weight.
+#'
+#' @title resolve_spw_multiplier
+#'
+#' @param params Set of hyperparameters for this fit (may or may not have an
+#'   spw_multiplier column)
+#' @return Single numeric: params$spw_multiplier if present and non-NA, else 1
+#' @author Morgan Kain
+#' @export
+
+resolve_spw_multiplier <- function(params) {
+  spw_mult <- suppressWarnings(params$spw_multiplier)
+  if (is.null(spw_mult) || length(spw_mult) == 0 || is.na(spw_mult)) spw_mult <- 1
+  spw_mult
 }
 
 ##### Some helpers ----------------------------------------------------------------

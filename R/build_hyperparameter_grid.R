@@ -73,12 +73,12 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
 }
 
 
-#' Build a local refinement hyperparameter grid centred on the top-k sets from global tuning
+#' Build a local refinement hyperparameter grid centered on the top-k sets from global tuning
 #'
 #' Reads the saved per-(outer x inner x index) tuning result files produced by
 #' tune_results_per_outer_fold, scores them with the same S_pos / S_neg_penalty
 #' formula used in finalize_hyperparameters_from_inner, then builds a new
-#' space-filling grid confined to the neighbourhood of the top-k parameter sets.
+#' space-filling grid confined to the neighborhood of the top-k parameter sets.
 #' Indices in the new grid start above max(global_grid$par_grid[[1]]$index) so
 #' that local and global indices never collide when pooled in
 #' finalize_hyperparameters_from_inner.
@@ -103,6 +103,7 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
 #' @param seed Random seed for reproducibility
 #' @param min_capacity Minimum trees*learn_rate ("boosting capacity") a grid point must have
 #'   to be kept; see sample_capacity_filtered_grid for why this is needed
+#' @param spw_mult_range range on the scaling on the ratio for the class imbalance weighting
 #' @return Single-row tibble with columns par_grid (list), grid_id (character, prefixed "localhex_"),
 #'   weightval_raw, weightval_hex, gamma, delta
 #' @author Morgan Kain
@@ -124,7 +125,8 @@ build_local_hyperparameter_grid <- function(
     , folded_data_training
     , splitted_data
     , seed
-    , min_capacity = 20
+    , min_capacity   = 20
+    , spw_mult_range = c(0.3, 1.0)
 ) {
 
   create_data_directory(directory_path = grid_path)
@@ -166,9 +168,9 @@ build_local_hyperparameter_grid <- function(
   mtry_range_lo <- max(tune_pars$mtry_min, min(top_params$mtry) - 3L)
 
   ## Hash every parameter that determines this grid's content into its id, so a change in any of
-  ## them produces a new file (forcing a rebuild) instead of silently reusing a stale one -- see
-  ## the note above the function.
-  param_sig <- digest::digest(list(weightval_raw, weightval_hex, gamma, delta, top_k, expansion, size, seed, min_capacity))
+   ## them produces a new file (forcing a rebuild) instead of silently reusing a stale one -- see
+   ## the note above the function.
+  param_sig <- digest::digest(list(weightval_raw, weightval_hex, gamma, delta, top_k, expansion, size, seed, min_capacity, spw_mult_range))
   hyper_id  <- paste0("localhex_", param_sig)
   save_path <- paste0(grid_path, "/hypergrid_", hyper_id, ".Rds")
 
@@ -196,6 +198,8 @@ build_local_hyperparameter_grid <- function(
       , size          = size
       , min_capacity  = min_capacity
       , seed          = seed
+        ## Pulled in as a new parameter -- not part of the global grid
+      , spw_mult_range = spw_mult_range
       ) |>
       mutate(index = idx_offset + seq_len(n()), .before = 1)
 
@@ -249,11 +253,22 @@ expand_range <- function(vals, lo_hard, hi_hard, expansion, min_half_width = 0) 
 sample_capacity_filtered_grid <- function(
     trees_range, depth_range, lr_range, minn_range, lossred_range
   , mtry_range_lo, finalize_data, size, min_capacity, seed, max_attempts = 6
+  , spw_mult_range = NULL
 ) {
 
   oversample_mult <- 2
   attempt         <- 0
   kept            <- NULL
+
+  ## Only the local refinement grid passes spw_mult_range (see
+   ## build_local_hyperparameter_grid) -- the global grid's call site never does,
+   ## so this extra dimension is fully optional/backward compatible
+  spw_param <- if (!is.null(spw_mult_range)) {
+    list(dials::new_quant_param(
+      type = "double", range = spw_mult_range, inclusive = c(TRUE, TRUE)
+    , label = c(spw_multiplier = "spw multiplier")
+    ))
+  } else list()
 
   repeat {
 
@@ -263,15 +278,18 @@ sample_capacity_filtered_grid <- function(
     ## Vary the seed by attempt so a retry actually draws a fresh design rather than
     ## regenerating the same (still-insufficient) set of points
     set.seed(seed + attempt)
-    candidate <- grid_space_filling(
-        trees(range          = as.integer(trees_range))
-      , tree_depth(range     = as.integer(depth_range))
-      , learn_rate(range     = lr_range)
-      , min_n(range          = as.integer(minn_range))
-      , loss_reduction(range = lossred_range)
-      , finalize(mtry(range  = c(mtry_range_lo, unknown())), finalize_data)
-      , size = request_size
-      )
+    candidate <- do.call(grid_space_filling, c(
+        list(
+          trees(range          = as.integer(trees_range))
+        , tree_depth(range     = as.integer(depth_range))
+        , learn_rate(range     = lr_range)
+        , min_n(range          = as.integer(minn_range))
+        , loss_reduction(range = lossred_range)
+        , finalize(mtry(range  = c(mtry_range_lo, unknown())), finalize_data)
+        )
+      , spw_param
+      , list(size = request_size)
+      ))
 
     kept <- candidate |> dplyr::filter(trees * learn_rate >= min_capacity)
 

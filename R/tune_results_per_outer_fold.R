@@ -16,6 +16,13 @@
 #' @param chunk_id Index of the (inner_fold x tune_grid) chunk this branch is responsible for.
 #' @param checktime_path path to save csv tracking computation time
 #' @param hex_id_col Column identifying the spatial hex
+#' @param save_raw_predictions If TRUE, additionally persist per-row raw predictions
+#'   (prob1, truth, hex_id, forecast_interval, inner_fold_id, spw_used) alongside the
+#'   usual summarized metrics, for whichever (inner_fold_id, tune_grid_index) rows this
+#'   call processes. Normally FALSE (raw predictions are computed but discarded --
+#'   saving them for the full grid search would be a large, unnecessary storage cost);
+#'   set TRUE only for a small, targeted rerun restricted to an already-chosen winning
+#'   index, to harvest data for fit_k_correction() (see model_framework_targets.R).
 #' @return Character vector of file paths, one per (inner_fold_id, tune_grid_index) combination
 #' @author Morgan Kain
 #' @export
@@ -25,6 +32,7 @@ tune_results_per_outer_fold <- function(
   , weightings, start_p, id_cols, out_dir
   , tuning_grid_id, overwrite, DEBUG
   , chunk_id, checktime_path, hex_id_col = "shapeName"
+  , save_raw_predictions = FALSE
 ) {
 
   ## Extract the outer fold ID and the pre-joined covariate data for this branch.
@@ -133,6 +141,29 @@ tune_results_per_outer_fold <- function(
       )
       all_intervals     <- inner_tbl_assess$forecast_interval
       forecast_interval <- all_intervals |> unique() |> as.character() |> as.numeric() |> sort()
+
+      ## Persist raw per-row predictions before they're discarded below, when requested
+       ## (see save_raw_predictions doc above -- normally FALSE). spw_used is the actual
+       ## effective scale_pos_weight this fit used (spw damped by spw_multiplier, if any),
+       ## needed by fit_k_correction() since it varies per inner fold.
+      if (save_raw_predictions) {
+        raw_save_filename <- paste(
+          out_dir, "/", "inner_raw_", "outer_fold_", paste(outer_fold_id, collapse = "_")
+        , "_inner_fold_", inner_id, "_tune_grid_", tuning_grid_id, "_tune_index_", tuning_grid$index
+        , ".Rds", sep = ""
+        )
+        saveRDS(
+          tibble(
+            prob1             = prob1
+          , truth             = as.numeric(as.character(truth))
+          , hex_id            = hex_id
+          , forecast_interval = all_intervals
+          , inner_fold_id     = inner_id
+          , spw_used          = spw * resolve_spw_multiplier(tuning_grid)
+          )
+        , raw_save_filename
+        )
+      }
 
       ## Free fitted model before metrics computation
       rm(fit)
@@ -349,11 +380,13 @@ finalize_hyperparameters_from_inner <- function(inner_folds, weight_set, tuning_
   hex_only_best_index <- scores |> arrange(desc(final_score_hex)) |> dplyr::slice(1) |> pull(index)
   raw_only_best_index <- scores |> arrange(desc(final_score))     |> dplyr::slice(1) |> pull(index)
 
-  ## Cleanup/add details for export
+  ## Cleanup/add details for export. any_of() rather than a bare column list: fits
+   ## from the global grid never carry spw_multiplier (see calc_dial_best_set above
+   ## for the same reasoning)
   best <- best |>
     left_join(
       all_results |>
-        dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
+        dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry, dplyr::any_of("spw_multiplier")) |>
         distinct(), by = "index") |>
     mutate(
       tuning_grid_id                    = tuning_grid_id
@@ -457,10 +490,14 @@ calc_dial_best_set <- function(fits, dial_hyperspace, tuning_grid_id) {
     raw_only_best_index <- scores |> arrange(desc(final_score))     |> dplyr::slice(1) |> pull(index)
 
     ## Cleanup/add details for export
+    ## any_of() rather than a bare column list: fits from the global grid never carry
+     ## spw_multiplier (that dimension only exists in the local refinement grid, see
+     ## build_local_hyperparameter_grid), and a bare select() on a column that isn't
+     ## present in every source would error
     best |>
       left_join(
         all_results |>
-          dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
+          dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry, dplyr::any_of("spw_multiplier")) |>
           distinct(), by = "index") |>
       mutate(
           tuning_grid_id                    = tuning_grid_id
