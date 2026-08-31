@@ -103,7 +103,11 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
 #' @param seed Random seed for reproducibility
 #' @param min_capacity Minimum trees*learn_rate ("boosting capacity") a grid point must have
 #'   to be kept; see sample_capacity_filtered_grid for why this is needed
-#' @param spw_mult_range range on the scaling on the ratio for the class imbalance weighting
+#' @param spw_mult_range Range on the scaling of the class-imbalance weighting ratio; NULL
+#'   (default) omits spw_multiplier from this grid entirely. In testing, spw_multiplier's effect 
+#'   (which is purely on absolute prediction confidence) is resolved quite poorly at this stage,
+#'   so NULL is the current plan (and optimizing as part of post-correction calibration). 
+#'   Leaving it here for now though. 
 #' @return Single-row tibble with columns par_grid (list), grid_id (character, prefixed "localhex_"),
 #'   weightval_raw, weightval_hex, gamma, delta
 #' @author Morgan Kain
@@ -126,7 +130,7 @@ build_local_hyperparameter_grid <- function(
     , splitted_data
     , seed
     , min_capacity   = 20
-    , spw_mult_range = c(0.3, 1.0)
+    , spw_mult_range = NULL
 ) {
 
   create_data_directory(directory_path = grid_path)
@@ -237,9 +241,9 @@ expand_range <- function(vals, lo_hard, hi_hard, expansion, min_half_width = 0) 
 ## hyperparameter sets below this capacity never escape a constant, input-independent
 ## prediction -- the ensemble never accumulates enough boosting rounds to move off its
 ## initial base-score guess, regardless of the other hyperparameters. The degenerate zone
-## is bounded by the hyperbola trees*learn_rate = min_capacity, not a rectangle, so a plain
-## trees_min/learn_rate_min floor can't exclude it without also cutting off perfectly good
-## "many trees, slow learn_rate" combinations elsewhere on that same hyperbola.
+## is bounded by the hyperbola trees*learn_rate = min_capacity, so a plain
+## trees_min/learn_rate_min floor can't exclude it without also cutting off 
+## "many trees, slow learn_rate" combinations.
 ##
 ## @param trees_range,depth_range,lr_range,minn_range,lossred_range Ranges passed straight
 ##   through to the matching dials::* range args (lr_range/lossred_range on log10 scale)

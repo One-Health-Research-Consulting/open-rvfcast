@@ -447,19 +447,18 @@ if (purpose == "train") {
     , global_grid          = tuning_grid
     , tune_pars            = tune_pars
     , top_k                = 8
-    , size                 = 100
+    , size                 = 75
     , weightval_raw        = weightval_raw_for_scoring
     , weightval_hex        = weightval_hex_for_scoring
     , gamma                = gamma_for_combined_score
     , delta                = delta_for_index_score
-    , expansion            = 0.2
+    , expansion            = 0.15
     , grid_path            = "data/hypergrid"
     , hyperparam_path      = hyperparam_path
     , folded_data_training = folded_data_training
     , splitted_data        = splitted_data
     , seed                 = hypergrid_seed
-    , min_capacity         = min_capacity_for_hypergrid
-    , spw_mult_range       = c(0.3, 1.0)))
+    , min_capacity         = min_capacity_for_hypergrid))
 
     ## Folds in a digest of chosen_weight_set_final (not just the two grid_ids) so that a rerun
      ## landing on a different FINAL weighting -- even with identical global/local grids -- gets
@@ -467,6 +466,14 @@ if (purpose == "train") {
      ## finalize_hyperparameters_from_inner silently reusing a stale result
   , tar_target(local_hyperparam_path, paste0(
     "outputs/hyperparameters/best_hyperparameters_combined_"
+    , tuning_grid$grid_id, "--", local_tuning_grid$grid_id
+    , "--", digest::digest(chosen_weight_set_final), ".csv"))
+
+    ## Structural (pre spw-calibration) hyperparameter path -- distinct naming from
+     ## local_hyperparam_path so get_latest_finalized_hyperparameters() wont 
+     ## pick up this intermediate file 
+  , tar_target(structural_hyperparam_path, paste0(
+    "outputs/hyperparameters/best_hyperparameters_structural_"
     , tuning_grid$grid_id, "--", local_tuning_grid$grid_id
     , "--", digest::digest(chosen_weight_set_final), ".csv"))
 
@@ -545,41 +552,38 @@ if (purpose == "train") {
     , summarized_sets = dial_best_sets_final$summarized_indices
     , objective       = "balanced"))
 
-  , tar_target(finalized_hyperparameters, finalize_hyperparameters_from_inner(
+  , tar_target(finalized_hyperparameters_structural, finalize_hyperparameters_from_inner(
       inner_folds    = c(tuned_results_per_outer_fold, local_tuned_results)
     , weight_set     = chosen_weight_set_final
     , tuning_grid_id = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")
-    , outpath        = local_hyperparam_path))
+    , outpath        = structural_hyperparam_path))
 
-    ## Use the inner-fold held-out predictions for the already-chosen winning
-     ## hyperparameter set to fit a post-hoc calibration correction
-  , tar_target(k_correction_raw_predictions, harvest_k_correction_predictions(
-      winning_hyperparam_path       = finalized_hyperparameters
-    , prejoined_data                = outer_fold_prejoined
-    , inner_fold_id_finalized       = inner_fold_id_finalized
-    , local_inner_fold_id_finalized = local_inner_fold_id_finalized
-    , threshold                     = positive_threshold
-    , weightings                    = weightings_on_ones
-    , start_p                       = start_p
-    , id_cols                       = id_cols
-    , out_dir                       = "outputs/k_correction_harvest"
-    , checktime_path                = "outputs/timing/k_correction_harvest"
-    , hex_id_col                    = district_id_col)
-    , pattern                       = map(outer_fold_prejoined)
-    , error                         = "null"
-    , format                        = "file")
+    ## Candidate spw_multiplier values 
+  , tar_target(spw_mult_grid, seq(0.3, 1.0, by = 0.05))
 
-    ## Pool the harvested predictions across outer folds and fit the single, shared damping-fraction k.
-     ## save_path uses derive_k_correction_path() (pure naming, no existence check) rather than
-     ## get_latest_k_correction() -- the latter REQUIRES the file to already exist (it's for
-     ## PURPOSE = forecast's lookup below), which would make this target error every time, since
-     ## the whole point of this target is to write a file that doesn't exist yet.
-  , tar_target(k_correction_fit, fit_k_correction_from_paths(
-      raw_prediction_paths = k_correction_raw_predictions
-    , save_path            = derive_k_correction_path(local_hyperparam_path)
-    , prior_mean           = 0.47
-    , prior_lambda         = 5)
-    , format               = "file")
+    ## Choose spw_multiplier by post-correction calibration; for each candidate fit once per
+     ## outer fold on that fold's full training window, pool predictions, fit k, and score the 
+     ## corrected result (branches collated in write_calibrated_hyperparameters below)
+  , tar_target(spw_multiplier_calibration, evaluate_spw_multiplier_candidate(
+      spw_mult                = spw_mult_grid
+    , winning_hyperparam_path = finalized_hyperparameters_structural
+    , folded_data_training    = folded_data_training
+    , full_data               = train_data
+    , start_p                 = start_p
+    , id_cols                 = id_cols
+    , hex_id_col              = district_id_col
+    , prior_mean              = 0.47
+    , prior_lambda            = 5
+    , out_dir                 = "outputs/spw_calibration_harvest"
+    , overwrite               = FALSE)
+    , pattern                 = map(spw_mult_grid))
+
+    ## Final, spw- and k-calibrated hyperparameter set
+  , tar_target(finalized_hyperparameters, write_calibrated_hyperparameters(
+      calibration_results        = spw_multiplier_calibration
+    , structural_hyperparam_path = finalized_hyperparameters_structural
+    , outpath                    = local_hyperparam_path)
+    , format                     = "file")
 
   )
 
@@ -587,12 +591,10 @@ if (purpose == "train") {
 
   ## PURPOSE == "forecast": skip tuning entirely and point finalized_hyperparameters at
    ## whatever hyperparameter set was most recently finalized by a PURPOSE = train run
+   ## (k lives as a column on that same file, so nothing further to look up)
   model_tuning_targets_purpose <- tar_plan(
 
     tar_target(finalized_hyperparameters, get_latest_finalized_hyperparameters(hyperparam_dir = "outputs/hyperparameters"))
-
-    ## Reuse the k-correction paired with whatever hyperparameter set was just located above 
-  , tar_target(k_correction_fit, get_latest_k_correction(finalized_hyperparameters))
 
   )
 
@@ -626,8 +628,7 @@ model_fitting_targets <- tar_plan(
   , out_dir         = outer_folds_dir3
   , overwrite       = FALSE
   , DEBUG           = FALSE
-  , index_boost     = country_index_boost
-  , k_correction    = k_correction_fit)
+  , index_boost     = country_index_boost)
   , pattern         = map(folded_data_for_fitting)
   , error           = "null"
   , format          = "file")

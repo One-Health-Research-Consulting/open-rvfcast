@@ -34,7 +34,7 @@ tune_results_per_outer_fold <- function(
   , chunk_id, checktime_path, hex_id_col = "shapeName"
   , save_raw_predictions = FALSE
 ) {
-
+  
   ## Extract the outer fold ID and the pre-joined covariate data for this branch.
   ## joined_data already contains inner fold indices left-joined with train_data covariates,
   ## so no join is needed inside the loop -- only cluster-based filtering per iteration.
@@ -390,9 +390,9 @@ finalize_hyperparameters_from_inner <- function(inner_folds, weight_set, tuning_
         distinct(), by = "index") |>
     mutate(
       tuning_grid_id                    = tuning_grid_id
-      , hex_only_would_have_picked_index  = hex_only_best_index
-      , raw_only_would_have_picked_index  = raw_only_best_index
-      , .before = index
+    , hex_only_would_have_picked_index  = hex_only_best_index
+    , raw_only_would_have_picked_index  = raw_only_best_index
+    , .before = index
     )
 
   write.csv(best, outpath)

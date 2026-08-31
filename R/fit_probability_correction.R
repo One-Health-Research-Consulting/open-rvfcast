@@ -1,138 +1,180 @@
-#' Rerun tuning-phase fits for the already-chosen winning hyperparameter index only, 
-#' this time saving raw per-row predictions
+#' Fit a given hyperparameter set on one outer fold's full training window and predict on that 
+#' same outer fold's own genuinely held-out assess window. Used to determine post-fit
+#' probability calibration. Determined using the full outer folds instead of each inner 
+#' fold per outer fold as the tuning search does (tune_results_per_outer_fold) as this
+#' calibration needs more consistant positives -- too little info for this calibration
+#' in each inner fold
 #'
-#' harvest_k_correction_predictions used to build the predictions for fit_k_correction_from_paths()
-#' extra function used here to avoid having to save raw predictions for the full 
-#' hyperparameter search which would be more expensive than just doing this one refit
-#' per fold with the optimal set. 
+#' @title fit_and_predict_outer_fold
 #'
-#' @title harvest_k_correction_predictions
-#'
-#' @param winning_hyperparam_path Path to the finalized hyperparameter CSV
-#'   (finalize_hyperparameters_from_inner's output) -- read to find the winning index
-#' @param prejoined_data One outer fold's pre-joined data (one row of outer_fold_prejoined)
-#' @param inner_fold_id_finalized Global-grid inner-fold-id tibble
-#' @param local_inner_fold_id_finalized Local-grid inner-fold-id tibble
-#' @param threshold,weightings,start_p,id_cols,checktime_path,hex_id_col Passed
-#'   straight through to tune_results_per_outer_fold()
-#' @param out_dir Directory for this harvest's output -- MUST differ from the
-#'   original tuning sweep's out_dir (see header note)
-#' @return Character vector of raw-prediction file paths for this outer fold
+#' @param params Hyperparameter set to fit with (trees, tree_depth, learn_rate, min_n,
+#'   loss_reduction, mtry, and optionally spw_multiplier -- see resolve_spw_multiplier)
+#' @param outer_fold_row One row of folded_data_training (has outer_fold_id, and the train_data /
+#'   assess_data row-index lists fold_data() built for that outer fold)
+#' @param full_data The full (unfolded) training data that outer_fold_row's train_data/assess_data
+#'   row indices refer into (the train_data target)
+#' @param start_p,id_cols,hex_id_col Passed straight through to make_recipe/make_model, same
+#'   meaning as in tune_results_per_outer_fold
+#' @return Tibble of raw per-row predictions: prob1, truth, hex_id, forecast_interval,
+#'   outer_fold_id, spw_used (the effective scale_pos_weight this fit actually used)
 #' @author Morgan Kain
 #' @export
 
-harvest_k_correction_predictions <- function(
-    winning_hyperparam_path, prejoined_data, inner_fold_id_finalized, local_inner_fold_id_finalized
-  , threshold, weightings, start_p, id_cols, out_dir, checktime_path, hex_id_col = "shapeName"
-) {
+fit_and_predict_outer_fold <- function(params, outer_fold_row, full_data, start_p, id_cols, hex_id_col = "shapeName") {
 
-  winning_index      <- read.csv(winning_hyperparam_path)$index
-  this_outer_fold_id <- prejoined_data$outer_fold_id
+  outer_fold_id <- outer_fold_row$outer_fold_id
 
-  winning_ids <- dplyr::bind_rows(
-    inner_fold_id_finalized       |> dplyr::filter(outer_fold_id == this_outer_fold_id, index == winning_index)
-  , local_inner_fold_id_finalized |> dplyr::filter(outer_fold_id == this_outer_fold_id, index == winning_index)
+  ## This outer fold's full training window (no inner-cluster exclusion) and its own genuinely
+   ## held-out assess window, from the row-index lists fold_data() already computed. Same column
+   ## exclusions as inner_tbl_train/inner_tbl_assess in tune_results_per_outer_fold: cases and
+   ## country_index_outbreak are never training predictors (by construction they are only
+   ## non-zero where outbreak is also 1, so leaving them in would be leakage)
+  outer_tbl_train <- full_data |>
+    dplyr::filter(index %in% outer_fold_row$train_data[[1]]) |>
+    dplyr::select(-dplyr::any_of(c("cases", "country_index_outbreak"))) |>
+    dplyr::mutate(outbreak = as.factor(outbreak), forecast_interval = as.factor(forecast_interval))
+
+  outer_tbl_assess <- full_data |>
+    dplyr::filter(index %in% outer_fold_row$assess_data[[1]]) |>
+    dplyr::select(-dplyr::any_of(c("cases", "country_index_outbreak"))) |>
+    dplyr::mutate(outbreak = as.factor(outbreak), forecast_interval = as.factor(forecast_interval))
+
+  spw <- calc_spw(outer_tbl_train)
+
+  rec <- make_recipe(outer_tbl_train, id_cols = id_cols)
+  mod <- make_model(params = params, start_p = start_p, spw = spw)
+  wf  <- workflow() |> add_model(mod) |> add_recipe(rec)
+
+  fit <- fit(wf, data = outer_tbl_train)
+
+  prob1 <- predict(fit, outer_tbl_assess, type = "prob")$.pred_1
+
+  tibble::tibble(
+    prob1             = prob1
+  , truth             = as.numeric(as.character(outer_tbl_assess[["outbreak"]]))
+  , hex_id            = outer_tbl_assess[[hex_id_col]]
+  , forecast_interval = outer_tbl_assess$forecast_interval
+  , outer_fold_id     = outer_fold_id
+    ## effective scale_pos_weight this fit actually used (spw damped by spw_multiplier, if
+     ## present) -- needed by fit_k_correction() since it varies per outer fold
+  , spw_used          = spw * resolve_spw_multiplier(params)
   )
 
-  metrics_paths <- tune_results_per_outer_fold(
-    prejoined_data       = prejoined_data
-  , inner_ids_all        = winning_ids
-  , threshold            = threshold
-  , weightings           = weightings
-  , start_p              = start_p
-  , id_cols              = id_cols
-  , out_dir              = out_dir
-    ## identify the step
-  , tuning_grid_id       = "k_correction_harvest"
-  , overwrite            = TRUE
-  , DEBUG                = FALSE
-  , chunk_id             = 1
-  , checktime_path       = checktime_path
-  , hex_id_col           = hex_id_col
-  , save_raw_predictions = TRUE)
+}
 
-  ## tune_results_per_outer_fold()'s return value is the METRICS file paths; the
-   ## raw-prediction files it also written (save_raw_predictions=TRUE) following the
-   ## naming convention with "inner_raw_" in place of "inner_tuning_"
-  stringr::str_replace(metrics_paths, "inner_tuning_", "inner_raw_")
+
+#' Choose spw_multiplier by post-correction calibration quality
+#'
+#' spw_multiplier's effect is on absolute prediction confidence, not on model
+#' discrimination (i.e. AUC). This function holds every hyperparameter fixed at the 
+#' already-chosen winning set, and for each candidate spw_multiplier fits once per 
+#' outer fold on that fold's full training window, pools the held-out predictions, fits
+#' k on that pool via the existing fit_k_correction(), and scores the resulting 
+#' k corrected predictions with the final_score formula.
+#'
+#' @title evaluate_spw_multiplier_candidate
+#'
+#' @param spw_mult The single candidate spw_multiplier value to evaluate
+#' @param winning_hyperparam_path Path to the finalized (structural) hyperparameter CSV --
+#'   read for every hyperparameter value except spw_multiplier, which this function overrides,
+#'   and for weightval_raw, used to score this candidate the same way the rest of this
+#'   pipeline does
+#' @param folded_data_training All outer folds (fold_data()'s output; one fit per row)
+#' @param full_data The full (unfolded) training data (the train_data target)
+#' @param start_p,id_cols,hex_id_col Passed straight through to fit_and_predict_outer_fold
+#' @param prior_mean,prior_lambda Passed through to fit_k_correction()
+#' @param out_dir Directory for this candidate's harvested per-outer-fold predictions
+#' @param overwrite Boolean to recalculate and save over previously saved harvest files or not
+#' @return One-row tibble: spw_multiplier, k, converged, n, n_pos, S_pos, S_neg_penalty,
+#'   final_score (all computed on the k-corrected pooled predictions)
+#' @author Morgan Kain
+#' @export
+
+evaluate_spw_multiplier_candidate <- function(
+    spw_mult, winning_hyperparam_path, folded_data_training, full_data
+  , start_p, id_cols, hex_id_col = "shapeName"
+  , prior_mean = 0.47, prior_lambda = 5
+  , out_dir, overwrite = FALSE
+) {
+
+  base_params   <- read.csv(winning_hyperparam_path)
+  weightval_raw <- base_params$weightval_raw
+  eps           <- 1e-15
+
+  these_params <- base_params
+  these_params$spw_multiplier <- spw_mult
+
+  cand_dir <- file.path(out_dir, paste0("spw_", spw_mult))
+  create_data_directory(directory_path = cand_dir)
+
+  pooled <- purrr::map_dfr(seq_len(nrow(folded_data_training)), function(i) {
+
+    outer_fold_row <- folded_data_training[i, ]
+    save_filename  <- file.path(cand_dir, paste0("outer_raw_outer_fold_", outer_fold_row$outer_fold_id, ".Rds"))
+
+    error_safe_read_file <- possibly(readRDS, NULL)
+    existing <- error_safe_read_file(save_filename)
+    if (!is.null(existing) && !overwrite) return(existing)
+
+    out <- fit_and_predict_outer_fold(these_params, outer_fold_row, full_data, start_p, id_cols, hex_id_col)
+    saveRDS(out, save_filename)
+    out
+
+  })
+
+  k_fit     <- fit_k_correction(pooled$prob1, pooled$truth, pooled$spw_used, prior_mean, prior_lambda)
+  corrected <- apply_k_correction(pooled$prob1, pooled$spw_used, k_fit$k)
+
+  S_pos         <- -mean(-log(pmax(corrected[pooled$truth == 1], eps)))
+  S_neg_penalty <- mean(-log(pmax(1 - corrected[pooled$truth == 0], eps)))
+
+  tibble::tibble(
+    spw_multiplier = spw_mult
+  , k              = k_fit$k
+  , converged      = k_fit$converged
+  , n              = k_fit$n
+  , n_pos          = k_fit$n_pos
+  , S_pos          = S_pos
+  , S_neg_penalty  = S_neg_penalty
+  , final_score    = S_pos - weightval_raw * S_neg_penalty
+  )
 
 }
 
 
-#' Pool per-outer-fold raw predictions from the winning hyperparameter set and fit
-#' the scale_pos_weight damping-fraction correction
+#' Pick the best-scoring spw_multiplier from evaluate_spw_multiplier_candidate()'s per-candidate
+#' rows and write the finalized hyperparameter set (structural hyperparameter values unchanged),
+#' spw_multiplier and k added as columns 
 #'
-#' @title fit_k_correction_from_paths
+#' @title write_calibrated_hyperparameters
 #'
-#' @param raw_prediction_paths Character vector of file paths from
-#'   harvest_k_correction_predictions()
-#' @param save_path Where to save the fitted correction (k, converged, n, n_pos)
-#' @param prior_mean,prior_lambda Passed through to fit_k_correction(); prior_lambda
-#'   should be chosen via scr_r/scr_validate_k_correction.R, not guessed
-#' @return save_path
+#' @param calibration_results Row-bound output of evaluate_spw_multiplier_candidate() across every
+#'   spw_mult_grid candidate (model_framework_targets.R runs it as pattern = map(spw_mult_grid),
+#'   so this arrives as one combined tibble, one row per candidate)
+#' @param structural_hyperparam_path Path to the structural-only hyperparameter CSV
+#'   (finalize_hyperparameters_from_inner's output, before spw_multiplier/k are layered on)
+#' @param outpath Where to save the finalized (spw- and k-calibrated) hyperparameter CSV
+#' @return outpath
 #' @author Morgan Kain
 #' @export
 
-fit_k_correction_from_paths <- function(raw_prediction_paths, save_path, prior_mean = 0.47, prior_lambda) {
+write_calibrated_hyperparameters <- function(calibration_results, structural_hyperparam_path, outpath) {
 
-  pooled <- purrr::map(raw_prediction_paths, .f = function(x) {
-    tload <- try(readRDS(x), silent = TRUE)
-    if (class(tload)[1] != "try-error") tload else NULL
-  }) |> dplyr::bind_rows()
+  if (file.exists(outpath)) return(outpath)
 
-  ## Call function to fit the damping parameter k used for post-fit recalibration
-  fit <- fit_k_correction(
-    raw_prob     = pooled$prob1
-  , true_out     = pooled$truth
-  , spw_used     = pooled$spw_used
-  , prior_mean   = prior_mean
-  , prior_lambda = prior_lambda)
+  best   <- calibration_results |> dplyr::arrange(dplyr::desc(final_score)) |> dplyr::slice(1)
+  params <- read.csv(structural_hyperparam_path)
+  params$spw_multiplier <- best$spw_multiplier
+  params$k              <- best$k
+  params$k_converged    <- best$converged
+  params$k_n            <- best$n
+  params$k_n_pos        <- best$n_pos
 
-  create_data_directory(directory_path = dirname(save_path))
-  write.csv(tibble::as_tibble(fit[c("k", "converged", "n", "n_pos")]), save_path, row.names = FALSE)
+  create_data_directory(directory_path = dirname(outpath))
+  write.csv(params, outpath, row.names = FALSE)
 
-  save_path
+  outpath
 
-}
-
-
-#' Derive the k-correction path paired with a given finalized hyperparameter set
-#'
-#' @title derive_k_correction_path
-#'
-#' @param finalized_hyperparameters_path Path in the same family as
-#'   finalize_hyperparameters_from_inner()'s output (e.g. local_hyperparam_path)
-#' @return The paired k-correction path (may or may not exist yet)
-#' @author Morgan Kain
-#' @export
-
-derive_k_correction_path <- function(finalized_hyperparameters_path) {
-  sub("best_hyperparameters_combined_", "k_correction_", finalized_hyperparameters_path)
-}
-
-
-#' Locate the k-correction fit paired with a given finalized hyperparameter set
-#' to be used for PURPOSE = forecast (grabs the k-correction from the
-#' finalized_hyperparameters path from the most recent model tuning)
-#'
-#' @title get_latest_k_correction
-#'
-#' @param finalized_hyperparameters_path Path returned by
-#'   finalize_hyperparameters_from_inner() / get_latest_finalized_hyperparameters()
-#' @return Path to the paired k-correction CSV
-#' @author Morgan Kain
-#' @export
-
-get_latest_k_correction <- function(finalized_hyperparameters_path) {
-  k_path <- derive_k_correction_path(finalized_hyperparameters_path)
-  if (!file.exists(k_path)) {
-    stop(
-      "PURPOSE = forecast needs a k-correction paired with the finalized hyperparameters at '"
-    , finalized_hyperparameters_path, "', but none was found at the expected path '", k_path
-    , "'. Run PURPOSE = train at least once (with this pipeline version) first."
-    )
-  }
-  k_path
 }
 
 

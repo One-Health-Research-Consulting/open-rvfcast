@@ -15,23 +15,18 @@
 #' @param overwrite Boolean to recalculate and save over a previously saved file or not
 #' @param DEBUG If TRUE reduce to a small dataset for code testing
 #' @param index_boost Multiplier applied on top of the class-imbalance weight for
-#'   country-level index cases, i.e. an index case counts as (1 + index_boost) times an 
-#'   ordinary positive case in reporting metrics. 
-#' @param k_correction Optional path to a CSV with column `k` which contributes to 
-#'   a post-hoc recalibration applied to .pred_1, correcting residual overconfidence 
-#'   left over from scale_pos_weight. NULL does no recalibration. 
+#'   country-level index cases, i.e. an index case counts as (1 + index_boost) times an
+#'   ordinary positive case in reporting metrics.
 #' @return Tibble of model fit output
 #' @author Morgan Kain
 #' @export
 
-fit_model <- function(final_hyper_set, full_data, train_data, test_data, threshold, weightings, start_p, id_cols, out_dir, overwrite, DEBUG, index_boost = 1, k_correction = NULL) {
+fit_model <- function(final_hyper_set, full_data, train_data, test_data, threshold, weightings, start_p, id_cols, out_dir, overwrite, DEBUG, index_boost = 1) {
 
-  ## load the csv of the finalized hyperparameter set
+  ## load the csv of the finalized hyperparameter set. k (the post-hoc scale_pos_weight
+   ## damping-fraction correction) is a column on this same file -- see
+   ## write_calibrated_hyperparameters -- rather than a separately-supplied path
   final_hyper_set <- read.csv(final_hyper_set)
-
-  ## load the csv of the fitted k-correction, if one was supplied as a path (same
-   ## convention as final_hyper_set above); NULL is passed through unchanged
-  if (!is.null(k_correction)) k_correction <- read.csv(k_correction)
 
   ## Set filenames
   save_filename <- paste(
@@ -144,11 +139,12 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
     ) |>
     mutate(outbreak = factor(outbreak, levels = c("1", "0")))
 
-  ## Apply the post-hoc scale_pos_weight damping-fraction correction, when supplied
-  if (!is.null(k_correction)) {
+  ## Apply the post-hoc scale_pos_weight damping-fraction correction, when present -- absent/NA
+  ## (e.g. a hyperparameter CSV predating write_calibrated_hyperparameters) does no recalibration
+  if (!is.null(final_hyper_set$k) && !is.na(final_hyper_set$k)) {
     preds <- preds |>
       mutate(
-        .pred_1 = apply_k_correction(.pred_1, spw_used = spw * resolve_spw_multiplier(final_hyper_set), k = k_correction$k)
+        .pred_1 = apply_k_correction(.pred_1, spw_used = spw * resolve_spw_multiplier(final_hyper_set), k = final_hyper_set$k)
       , .pred_0 = 1 - .pred_1
       )
   }
