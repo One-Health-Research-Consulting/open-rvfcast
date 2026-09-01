@@ -292,13 +292,12 @@ score_hexrelative_results <- function(all_results, weightval_raw, weightval_hex,
       ## Percentile-rank each component across this pool of candidate indices before blending,
        ## so gamma/delta act as genuine relative weights regardless of the raw run-dependent 
        ## scale of S_pos/S_neg_penalty. Rank-normalizing solves a problem that was arising
-       ## where a few very poor hypersets (e.g., a constant-p which can happen with a small
-       ## number of trees and high learn rate -- fix applied to reduced this as well), can 
-       ## cause gamma to simply strip these outliers out and fail to do anything further
-       ## with the fine-grained differences among the few somewhat similar top sets.
-       ## Rank-normalization strips out how much better certain indices are then others,
-       ## which could impact diagnostics/improvement, so do need to be careful with this, 
-       ## though because our goal is to find the best set, rank-normalization should be fine
+       ## where a few very poor hypersets can cause gamma to simply strip these outliers out 
+       ## and fail to do anything further with the fine-grained differences among the few 
+       ## somewhat similar top sets. Rank-normalization strips out how much better certain 
+       ## indices are then others, which could impact diagnostics/improvement, so do need to 
+       ## be careful with this, though because our goal is to find the best set, 
+       ## rank-normalization should be fine
     , final_score_rank        = rank_normalize(final_score)
     , final_score_hex_rank    = rank_normalize(final_score_hex)
     , final_score_index_rank  = rank_normalize(final_score_index)

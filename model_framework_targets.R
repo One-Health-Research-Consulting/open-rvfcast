@@ -282,22 +282,19 @@ model_tuning_targets_common <- tar_plan(
    ## 1 means an index case counts double an ordinary positive case
 , tar_target(country_index_boost, 1)
 
-  ## get the baseline occurance of outbreaks (in the full data)
+  ## get the baseline occurrence of outbreaks (in the full data)
 , tar_target(start_p, mean(splitted_data_fitting$train_data[[1]]$outbreak == 1))
 
 , tar_target(outer_folds_dir3, create_data_directory(
-  directory_path = paste("outputs/", region_name, "_final_model_fits_ws", sep = "")))
+    directory_path = paste("outputs/", region_name, "_final_model_fits_ws", sep = "")))
 
 )
 
 ## PURPOSE == "train" runs the full two-stage tuning pipeline (global grid search across all
- ## outer/inner folds, then a refined local grid centred on the top global results) and ends by
- ## writing out finalized_hyperparameters. PURPOSE == "forecast" needs none of that -- the branch
- ## below is plain R evaluated once while the plan is being built, so when PURPOSE == "forecast"
- ## none of tuning_grid / tuned_results_per_outer_fold / local_tuning_grid / local_tuned_results
- ## are ever added to the targets graph at all (not merely skipped at run time). Only the target
- ## name finalized_hyperparameters is shared across both branches, since that's the only piece
- ## model_fitting_targets depends on
+ ## outer/inner folds, then a refined local grid centered on the top global results) and ends by
+ ## writing out finalized_hyperparameters. 
+## PURPOSE == "forecast" skips all of this, pulling the optimized hyperparameter set from 
+ ## the most recent training run to predict cases into the future.
 if (purpose == "train") {
 
   model_tuning_targets_purpose <- tar_plan(
@@ -323,10 +320,11 @@ if (purpose == "train") {
     ## Minimum trees*learn_rate ("boosting capacity") a candidate hyperparameter set must have
      ## to be kept in the search grid. Confirmed empirically that below ~12 on this dataset,
      ## the ensemble never accumulates enough boosting rounds to escape a constant,
-     ## input-independent prediction regardless of the other hyperparameters
+     ## input-independent prediction regardless of the other hyperparameters. Choosing 20
+     ## to escape the potential edge (not exactly sure where it resides)
   , tar_target(min_capacity_for_hypergrid, 20)
 
-    ## Build the "global" (first step) hyperparameter tuning grid
+    ## Build the "global" hyperparameter tuning grid (first tuning phase)
   , tar_target(tuning_grid, build_hyperparameter_grid(
       tune_pars            = tune_pars
     , grid_path            = "data/hypergrid"
@@ -336,7 +334,7 @@ if (purpose == "train") {
     , seed                 = hypergrid_seed
     , min_capacity         = min_capacity_for_hypergrid))
 
-    ## Final prep steps for parallel processing for tuning across all inner folds are to
+    ## Final prep steps for parallel processing for tuning across all inner folds are to:
      ## 1) Evaluate which of all of the inner folds across all outer folds actually have
      ## ones (outbreaks) in the assessment set
   , tar_target(inner_fold_id, prep_fold_ids(
@@ -358,22 +356,15 @@ if (purpose == "train") {
       , inner_ids   = inner_fold_id)
     tfolds[sample(nrow(tfolds)), ]})
 
+    ## Path to save all of the individual tuning fits
   , tar_target(outer_folds_dir, create_data_directory(
       directory_path = paste("outputs/", region_name, "_model_tuning_inner_ws", sep = "")))
 
-    ## DIAGNOSTIC ONLY -- nothing downstream depends on this target. It exists purely so the
-     ## (outer_fold_id x chunk_id) partition of inner_fold_id_finalized can be sanity-checked
-     ## cheaply. See how pattern = cross(outer_fold_prejoined, chunk_id) in tuned_results_per_outer_fold
-     ## below
-  , tar_target(inner_fold_ids_per_outer_chunked
-    , inner_fold_id_finalized |>
-       dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id) |>
-       chunk_rows(n_chunks = n_tune_chunks, which = chunk_id) |>
-       dplyr::mutate(chunk_id = chunk_id, .after = "outer_fold_id")
-     , pattern = cross(folded_data_training, chunk_id))
-
+    ## Path to save the hyperparameter set
   , tar_target(hyperparam_path, paste0("outputs/hyperparameters/best_hyperparameters", tuning_grid$grid_id, ".csv"))
 
+    ## Do the fitting across all inner -by- outer folds across the "global" 
+     ## hyperparameter grid
   , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
       prejoined_data = outer_fold_prejoined
     , inner_ids_all  = inner_fold_id_finalized |>
@@ -394,8 +385,7 @@ if (purpose == "train") {
     , error          = "null"
     , format         = "file")
 
-   ## Set up a target to explore how the hyperparameter set changes as a function of the various dials.
-    ## NOTE: see commenting for each individual weighting dial target for details on that parameter
+    ## Create a grid of weighting values (each of which is described a bit further down)
   , tar_target(dial_hyperspace, sobol::sobol_design(
       lower = c(weightval_raw_for_scoring = 10, weightval_hex_for_scoring = 1,
                 gamma_for_combined_score = 0, delta_for_index_score = 0)
@@ -403,8 +393,8 @@ if (purpose == "train") {
                 gamma_for_combined_score = 5, delta_for_index_score = 10)
     , nseq  = 500))
 
-    ## Determine the hyperparameter sets that appear across this full weighting parameter space.
-     ## NOTE: used below to determine the dial weights that will be used for the rest of tuning
+    ## Determine which hyperparameter sets appear across this full weighting parameter space.
+     ## NOTE: used below to determine the weights that will be used for the rest of tuning
      ## AND to be used to explore the implications of different choices on actual predicted results
   , tar_target(dial_best_sets, calc_dial_best_set(
       fits            = tuned_results_per_outer_fold
@@ -460,18 +450,14 @@ if (purpose == "train") {
     , seed                 = hypergrid_seed
     , min_capacity         = min_capacity_for_hypergrid))
 
-    ## Folds in a digest of chosen_weight_set_final (not just the two grid_ids) so that a rerun
-     ## landing on a different FINAL weighting -- even with identical global/local grids -- gets
-     ## its own output file instead of the "already exists, skip" check in
-     ## finalize_hyperparameters_from_inner silently reusing a stale result
+    ## Folds in a digest of chosen_weight_set_final so that each set also saves the
+     ## information about all weightings
   , tar_target(local_hyperparam_path, paste0(
     "outputs/hyperparameters/best_hyperparameters_combined_"
     , tuning_grid$grid_id, "--", local_tuning_grid$grid_id
     , "--", digest::digest(chosen_weight_set_final), ".csv"))
 
-    ## Structural (pre spw-calibration) hyperparameter path -- distinct naming from
-     ## local_hyperparam_path so get_latest_finalized_hyperparameters() wont 
-     ## pick up this intermediate file 
+    ## Structural (pre spw/k-calibration) hyperparameter path 
   , tar_target(structural_hyperparam_path, paste0(
     "outputs/hyperparameters/best_hyperparameters_structural_"
     , tuning_grid$grid_id, "--", local_tuning_grid$grid_id
@@ -508,15 +494,6 @@ if (purpose == "train") {
     ## Chunk index branching dimension, crossed against outer_fold_prejoined below
   , tar_target(chunk_id, seq_len(n_tune_chunks))
 
-    ## DIAGNOSTIC ONLY, mirroring inner_fold_ids_per_outer_chunked above -- nothing downstream
-     ## depends on this; it's just a cheap way to sanity-check the local grid's partition.
-  , tar_target(local_inner_fold_ids_per_outer_chunked
-     , local_inner_fold_id_finalized |>
-        dplyr::filter(outer_fold_id == folded_data_training$outer_fold_id) |>
-        chunk_rows(n_chunks = n_tune_chunks, which = chunk_id) |>
-        dplyr::mutate(chunk_id = chunk_id, .after = "outer_fold_id")
-     , pattern = cross(folded_data_training, chunk_id))
-
     ## Reuse the already-computed outer_fold_prejoined branches; only the per-fold
      ## ID slice changes (pointing to local grid indices instead of global ones).
      ## See the matching comment on tuned_results_per_outer_fold above for why the filter/chunk
@@ -542,48 +519,60 @@ if (purpose == "train") {
      , format         = "file")
 
     ## Re-derive the weighting dials a second time, now over the combined global + local candidate pool
+     ## for model fitting
   , tar_target(dial_best_sets_final, calc_dial_best_set(
       fits            = c(tuned_results_per_outer_fold, local_tuned_results)
     , dial_hyperspace = dial_hyperspace
     , tuning_grid_id  = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")))
 
+    ## Identify the set of weighting dial values to use based on "objective",
+     ## with the default being "balanced"
   , tar_target(chosen_weight_set_final, chose_weight_set(
       full_set        = dial_best_sets_final$all_sets
     , summarized_sets = dial_best_sets_final$summarized_indices
     , objective       = "balanced"))
 
+    ## Get the finalized hyperparameter set prior to any re-calibration (that may
+     ## or may not occur)
   , tar_target(finalized_hyperparameters_structural, finalize_hyperparameters_from_inner(
       inner_folds    = c(tuned_results_per_outer_fold, local_tuned_results)
     , weight_set     = chosen_weight_set_final
     , tuning_grid_id = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")
     , outpath        = structural_hyperparam_path))
 
-    ## Candidate spw_multiplier values 
-  , tar_target(spw_mult_grid, seq(0.3, 1.0, by = 0.05))
-
-    ## Choose spw_multiplier by post-correction calibration; for each candidate fit once per
-     ## outer fold on that fold's full training window, pool predictions, fit k, and score the 
-     ## corrected result (branches collated in write_calibrated_hyperparameters below)
-  , tar_target(spw_multiplier_calibration, evaluate_spw_multiplier_candidate(
-      spw_mult                = spw_mult_grid
-    , winning_hyperparam_path = finalized_hyperparameters_structural
+    ## Fit k 
+     ## After much consideration/tinkering/testing/fitting, spw_multiplier, which impacts 
+     ## scale_positive_weight has proved to be very difficult to nail down, hence, 
+     ## I have decided to just keep it at 1 and adjust k for any potential recalibration.
+     ## Fit once per outer fold on that fold's full training window, pool predictions, 
+     ## and fit k against false positives in the upper (highest-confidence)
+     ## prediction bin specifically. Requires another parameter weightval_upper which
+     ## controls how we weight an increase in false negative rate vs improvement in
+     ## true positive rate (higher p for 1s). Seems to balance to about a k of 0
+     ## (no manipulation) at a weight of about 1000. So can adjust this up or down
+     ## (up leading to positive k and thus down weight of all p or down to a negative k)
+     ## depending on purpose/desire
+  , tar_target(k_correction_result, fit_k_correction_on_outer_folds(
+      winning_hyperparam_path = finalized_hyperparameters_structural
     , folded_data_training    = folded_data_training
     , full_data               = train_data
     , start_p                 = start_p
     , id_cols                 = id_cols
     , hex_id_col              = district_id_col
-    , prior_mean              = 0.47
-    , prior_lambda            = 5
+    , top_n_multiplier        = 5
+    , weightval_upper         = 1000
+    , prior_mean              = 0.5
+    , prior_lambda            = 0.01
     , out_dir                 = "outputs/spw_calibration_harvest"
-    , overwrite               = FALSE)
-    , pattern                 = map(spw_mult_grid))
+    , overwrite               = FALSE))
 
-    ## Final, spw- and k-calibrated hyperparameter set
+    ## Final, spw- and k-calibrated hyperparameter set (add k to the
+     ## hyperparameter set)
   , tar_target(finalized_hyperparameters, write_calibrated_hyperparameters(
-      calibration_results        = spw_multiplier_calibration
-    , structural_hyperparam_path = finalized_hyperparameters_structural
-    , outpath                    = local_hyperparam_path)
-    , format                     = "file")
+      k_correction_result         = k_correction_result
+    , structural_hyperparam_path  = finalized_hyperparameters_structural
+    , outpath                     = local_hyperparam_path)
+    , format                      = "file")
 
   )
 

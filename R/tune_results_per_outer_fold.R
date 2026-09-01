@@ -19,9 +19,9 @@
 #' @param save_raw_predictions If TRUE, additionally persist per-row raw predictions
 #'   (prob1, truth, hex_id, forecast_interval, inner_fold_id, spw_used) alongside the
 #'   usual summarized metrics, for whichever (inner_fold_id, tune_grid_index) rows this
-#'   call processes. Normally FALSE (raw predictions are computed but discarded --
-#'   saving them for the full grid search would be a large, unnecessary storage cost);
-#'   set TRUE only for a small, targeted rerun restricted to an already-chosen winning
+#'   call processes. Normally FALSE (raw predictions are computed but discarded;
+#'   saving them for the full grid search would be a large, unnecessary storage cost).
+#'   Set to TRUE only for a small, targeted rerun restricted to an already-chosen winning
 #'   index, to harvest data for fit_k_correction() (see model_framework_targets.R).
 #' @return Character vector of file paths, one per (inner_fold_id, tune_grid_index) combination
 #' @author Morgan Kain
@@ -404,9 +404,7 @@ finalize_hyperparameters_from_inner <- function(inner_folds, weight_set, tuning_
 #' Locate the finalized hyperparameter set from the most recent PURPOSE = train run
 #'
 #' Used when PURPOSE = forecast so that finalized_hyperparameters can be populated without
-#' rebuilding (or even defining) any of the tuning targets (tuning_grid, tuned_results_per_outer_fold,
-#' local_tuning_grid, local_tuned_results, etc.) -- those targets only exist in the targets
-#' graph when PURPOSE = train (see model_framework_targets.R), so forecasting just needs to
+#' rebuilding (or even defining) any of the tuning targets; forecasting just needs to
 #' find whatever finalized hyperparameter file that train run already wrote out.
 #'
 #' @title get_latest_finalized_hyperparameters

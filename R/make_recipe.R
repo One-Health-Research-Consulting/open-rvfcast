@@ -149,7 +149,7 @@ compute_metrics_vec <- function(
        ## Different weighting for ones and zeros to help the class imbalance scoring formula problem.
        ## See finalize_hyperparameters_from_inner for how this is used. Basically allows
        ## positive deviations in probability for true 1s to be rewarded (with the magintude
-       ## explicity as compared to roc_auc and to a greater degree than pr_auc)
+       ## explicitly as compared to roc_auc and to a greater degree than pr_auc)
     , logloss_pos = if (n_pos == 0) NA_real_ else
                     mean(-log(pmax(prob1[truth == "1"], 1e-15)))
     , logloss_neg = mean(-log(pmax(1 - prob1[truth == "0"], 1e-15)))
