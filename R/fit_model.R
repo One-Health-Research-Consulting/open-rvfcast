@@ -17,16 +17,23 @@
 #' @param index_boost Multiplier applied on top of the class-imbalance weight for
 #'   country-level index cases, i.e. an index case counts as (1 + index_boost) times an
 #'   ordinary positive case in reporting metrics.
+#' @param interaction_constraints Output of define_interaction_constraints() (the
+#'   interaction_constraints target), or NULL for none
 #' @return Tibble of model fit output
 #' @author Morgan Kain
 #' @export
 
-fit_model <- function(final_hyper_set, full_data, train_data, test_data, threshold, weightings, start_p, id_cols, out_dir, overwrite, DEBUG, index_boost = 1) {
+fit_model <- function(final_hyper_set, full_data, train_data, test_data, threshold, weightings, start_p, id_cols, out_dir, overwrite, DEBUG, index_boost = 1, interaction_constraints = NULL) {
 
-  ## load the csv of the finalized hyperparameter set. k (the post-hoc scale_pos_weight
-   ## damping-fraction correction) is a column on this same file -- see
+  ## load the csv of the finalized hyperparameter set. The probability calibration
+   ## coefficients (calib_*) are columns on this same file -- see
    ## write_calibrated_hyperparameters -- rather than a separately-supplied path
   final_hyper_set <- read.csv(final_hyper_set)
+  calibration     <- read_calibration_coefficients(final_hyper_set)
+
+  ## Tag file names with the constraints and calibration so a changed model never reuses
+   ## saved fits from an older one (the tag goes last so downstream prefix matching still works)
+  fit_tag <- substr(digest::digest(list(interaction_constraints$tag, calibration)), 1, 8)
 
   ## Set filenames
   save_filename <- paste(
@@ -40,6 +47,8 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
     , final_hyper_set$tuning_grid_id
     , "_tune_index_"
     , final_hyper_set$index
+    , "_"
+    , fit_tag
     , ".Rds"
     , sep = "")
 
@@ -55,6 +64,8 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
     , final_hyper_set$tuning_grid_id
     , "_tune_index_"
     , final_hyper_set$index
+    , "_"
+    , fit_tag
     , ".Rds"
     , sep = "")
 
@@ -69,6 +80,8 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
     , final_hyper_set$tuning_grid_id
     , "_tune_index_"
     , final_hyper_set$index
+    , "_"
+    , fit_tag
     , ".Rds"
     , sep = "")
 
@@ -127,9 +140,13 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
   
   ## Set up and fit the final model for this outer fold
   rec       <- make_recipe(outer_tbl_train, id_cols = id_cols)
-  mod       <- make_model(params = final_hyper_set, start_p = start_p, spw = spw)
-  wf        <- workflow() |> add_model(mod) |> add_recipe(rec)
-  model_fit <- fit(wf, data = outer_tbl_train)
+  model_fit <- fit_constrained_workflow(
+    rec                     = rec
+  , training                = outer_tbl_train
+  , params                  = final_hyper_set
+  , start_p                 = start_p
+  , spw                     = spw
+  , interaction_constraints = interaction_constraints)
 
   ## Predict probabilities on outer assessment
   preds <- predict(model_fit, outer_tbl_assess, type = "prob") |>
@@ -139,14 +156,22 @@ fit_model <- function(final_hyper_set, full_data, train_data, test_data, thresho
     ) |>
     mutate(outbreak = factor(outbreak, levels = c("1", "0")))
 
-  ## Apply the post-hoc scale_pos_weight damping-fraction correction, when present -- absent/NA
-  ## (e.g. a hyperparameter CSV predating write_calibrated_hyperparameters) does no recalibration
-  if (!is.null(final_hyper_set$k) && !is.na(final_hyper_set$k)) {
+  ## Keep the uncalibrated prediction and the scale_pos_weight used, so calibration can be
+   ## re-checked later. Names start with "." so they never collide with test_data columns
+   ## in downstream joins (see examine_fits_within)
+  spw_used <- spw * resolve_spw_multiplier(final_hyper_set)
+  preds    <- preds |> mutate(.pred_1_raw = .pred_1, .spw_used = spw_used)
+
+  ## Apply the probability calibration (one intercept per forecast window, shared slope)
+  if (!is.null(calibration)) {
     preds <- preds |>
       mutate(
-        .pred_1 = apply_k_correction(.pred_1, spw_used = spw * resolve_spw_multiplier(final_hyper_set), k = final_hyper_set$k)
+        .pred_1 = apply_probability_calibration(.pred_1_raw, spw_used, outer_tbl_assess$forecast_interval, calibration)
       , .pred_0 = 1 - .pred_1
       )
+  } else {
+    warning("No calib_* columns in the hyperparameter set, so predictions are uncalibrated",
+            if (!is.null(final_hyper_set$k)) " (a legacy k column was found and ignored)", ".")
   }
 
   ## Compare distributions of predicted probabilities for 1s vs 0s

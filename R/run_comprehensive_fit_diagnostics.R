@@ -64,11 +64,9 @@ run_comprehensive_fit_diagnostics <- function(
     , pdp_grid_res       = 25
     , min_events_for_auc = 5
     , enso_data_dir      = here::here("data/ENSO")
-    , correlation_method = "spearman"
 ) {
   
   dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
-  
   
   #### 1) Load core data ------------------------------------------------------------------
   
@@ -80,8 +78,8 @@ run_comprehensive_fit_diagnostics <- function(
   x_names     <- parsnip_fit$preproc$x_names
   
   ## region_hexes/performance_hexes are passed in as the raw targets 
-  hex_fine   <- region_hexes[[1]]        ## shapeName-resolution hexes
-  hex_coarse <- performance_hexes[[1]]   ## region_norm-resolution hexes
+  hex_fine    <- region_hexes[[1]]        ## shapeName-resolution hexes
+  hex_coarse  <- performance_hexes[[1]]   ## region_norm-resolution hexes
   
   ## Guarantee one row per shapeName (take the modal Country per shapeName
   ## the same way region_to_country does), otherwise downstream joins go
@@ -363,6 +361,86 @@ run_comprehensive_fit_diagnostics <- function(
     scale_fill_viridis_c(name = "average_p", direction = -1, na.value = "grey90") +
     theme_void() +
     labs(title = "Average predicted P on true-negative rows, by country")
+  
+  
+  #### Check covariate stack in periods in Mauritania that have cases vs those periods
+   ## that do not have cases
+  all_preds |> filter(Country == "MRT") %>% 
+    group_by(date) %>% summarize(mp = mean(prob_pred)) %>% 
+    mutate(month = month(date)) %>% 
+    arrange(desc(mp))
+    ## months 5, 6, 7, 8
+  MRT_shapes <- all_preds |> filter(Country == "MRT") %>%
+    mutate(month = month(date)) %>% 
+    filter(month %in% c(5, 6, 7, 8)) %>%
+    group_by(shapeName) %>%
+    summarize(mm = mean(prob_pred)) %>% 
+    arrange(desc(mm)) %>%
+    dplyr::slice(1:20) %>%
+    pull(shapeName)
+  
+  MRT_data <- all_preds %>%
+    mutate(month = month(date)) %>% 
+    filter(
+      month %in% c(5, 6, 7, 8)
+    , shapeName %in% MRT_shapes
+    ) %>% left_join(test_data)
+  
+  MRT_data %>% dplyr::select(
+    outbreak, contains("anomaly_forecast")
+  ) %>% mutate(outbreak = as.factor(outbreak)) %>% {
+    ggpairs(., aes(colour = outbreak)) +
+      scale_colour_brewer(palette = "Dark2") +
+      theme(
+        strip.text.x = element_text(size = 10)
+      , axis.text.x  = element_text(size = 8))
+  }
+  
+  MRT_data %>% dplyr::select(
+    outbreak, contains("anomaly_scaled")
+  ) %>% mutate(outbreak = as.factor(outbreak)) %>% {
+    ggpairs(., aes(colour = outbreak)) +
+      scale_colour_brewer(palette = "Dark2") +
+      theme(
+        strip.text.x = element_text(size = 10)
+      , axis.text.x  = element_text(size = 8))
+  }
+  
+  ZAF_shapes <- all_preds |> filter(Country == "ZAF") %>%
+    mutate(month = month(date)) %>% 
+    filter(month %in% c(10, 11, 12, 1, 2)) %>%
+    group_by(shapeName) %>%
+    summarize(mm = mean(prob_pred)) %>% 
+    arrange(desc(mm)) %>%
+    dplyr::slice(1:20) %>%
+    pull(shapeName)
+  
+  ZAF_data <- all_preds %>%
+    mutate(month = month(date)) %>% 
+    filter(
+      month %in% c(10, 11, 12, 1, 2)
+      , shapeName %in% ZAF_shapes
+    ) %>% left_join(test_data)
+  
+  ZAF_data %>% dplyr::select(
+    outbreak, contains("anomaly_forecast")
+  ) %>% mutate(outbreak = as.factor(outbreak)) %>% {
+    ggpairs(., aes(colour = outbreak)) +
+      scale_colour_brewer(palette = "Dark2") +
+      theme(
+        strip.text.x = element_text(size = 10)
+      , axis.text.x  = element_text(size = 8))
+  }
+  
+  ZAF_data %>% dplyr::select(
+    outbreak, contains("anomaly_scaled")
+  ) %>% mutate(outbreak = as.factor(outbreak)) %>% {
+    ggpairs(., aes(colour = outbreak)) +
+      scale_colour_brewer(palette = "Dark2") +
+      theme(
+        strip.text.x = element_text(size = 10)
+      , axis.text.x  = element_text(size = 8))
+  }
   
   
   #### 4) ENSO / climate-phase coupling -----------------------------------------

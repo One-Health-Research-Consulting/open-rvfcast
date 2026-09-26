@@ -22,7 +22,9 @@
 #'   call processes. Normally FALSE (raw predictions are computed but discarded;
 #'   saving them for the full grid search would be a large, unnecessary storage cost).
 #'   Set to TRUE only for a small, targeted rerun restricted to an already-chosen winning
-#'   index, to harvest data for fit_k_correction() (see model_framework_targets.R).
+#'   index, to harvest raw predictions for inspection.
+#' @param interaction_constraints Output of define_interaction_constraints() (the
+#'   interaction_constraints target), or NULL for none
 #' @return Character vector of file paths, one per (inner_fold_id, tune_grid_index) combination
 #' @author Morgan Kain
 #' @export
@@ -33,19 +35,38 @@ tune_results_per_outer_fold <- function(
   , tuning_grid_id, overwrite, DEBUG
   , chunk_id, checktime_path, hex_id_col = "shapeName"
   , save_raw_predictions = FALSE
+  , interaction_constraints = NULL
 ) {
-  
+
   ## Extract the outer fold ID and the pre-joined covariate data for this branch.
   ## joined_data already contains inner fold indices left-joined with train_data covariates,
   ## so no join is needed inside the loop -- only cluster-based filtering per iteration.
   outer_fold_id <- prejoined_data$outer_fold_id
   joined_data   <- prejoined_data$data[[1]]
 
+  ## Tag cached result files with the constraints so results fitted under different
+   ## constraints are never reused for each other (no tag when there are no constraints,
+   ## so existing unconstrained results keep their names)
+  constraint_tag <- if (is.null(interaction_constraints)) "" else paste0("_ic_", interaction_constraints$tag)
+
+  ## Resolve predictor names once per call (a full recipe prep takes ~20s on this data);
+   ## fit_constrained_workflow() checks every fit against them and refits if they differ
+  predictor_names <- NULL
+  if (!is.null(interaction_constraints)) {
+    template <- joined_data |>
+      dplyr::select(-c(cluster, cases, country_index_outbreak)) |>
+      mutate(outbreak = factor(outbreak, levels = c(1, 0))) |>
+      mutate(forecast_interval = as.factor(forecast_interval))
+    predictor_names <- get_predictor_names(make_recipe(template, id_cols = id_cols), template)
+    rm(template)
+    gc()
+  }
+
   error_safe_read_file <- possibly(readRDS, NULL)
 
   ## Iterate over every (inner_fold_id, tune_grid_index) combination for this outer fold.
   ## Each fit is saved to its own file so partial progress survives a restart or error.
-  save_filenames       <- character(nrow(inner_ids_all))
+  save_filenames      <- character(nrow(inner_ids_all))
 
   checktime_tibble    <- tibble(user = numeric(0), sys = numeric(0), elapsed = numeric(0))
 
@@ -73,6 +94,7 @@ tune_results_per_outer_fold <- function(
       , tuning_grid_id
       , "_tune_index_"
       , tuning_grid$index
+      , constraint_tag
       , ".Rds"
       , sep = ""
     )
@@ -92,7 +114,7 @@ tune_results_per_outer_fold <- function(
         dplyr::filter(cluster != inner_id) |>
         relocate(cluster, .after = "date") |>
         dplyr::select(-c(cluster, cases, country_index_outbreak)) |>
-        mutate(outbreak = as.factor(outbreak)) |>
+        mutate(outbreak = factor(outbreak, levels = c(1, 0))) |>
         mutate(forecast_interval = as.factor(forecast_interval))
 
       ## Class imbalance handled via scale_pos_weight in engine, not case weights
@@ -109,25 +131,29 @@ tune_results_per_outer_fold <- function(
         dplyr::filter(cluster == inner_id) |>
         relocate(cluster, .after = "date") |>
         dplyr::select(-c(cluster, cases)) |>
-        mutate(outbreak = as.factor(outbreak)) |>
+        mutate(outbreak = factor(outbreak, levels = c(1, 0))) |>
         mutate(forecast_interval = as.factor(forecast_interval)) |>
         mutate(
           weights = length(which(outbreak == "0")) / max(length(which(outbreak == "1")), 1)
-          , weights = ifelse(outbreak == "0", 1, weights)
-          , .after = "index"
+        , weights = ifelse(outbreak == "0", 1, weights)
+        , .after = "index"
         )
 
       if (DEBUG) inner_tbl_train <- inner_tbl_train[1:10000, ]
 
       ## Create scaffold recipe + model + workflow and fit model
       rec <- make_recipe(inner_tbl_train, id_cols = id_cols)
-      mod <- make_model(params = tuning_grid, start_p = start_p, spw = spw)
-      wf  <- workflow() |> add_model(mod) |> add_recipe(rec)
-
-      fit <- fit(wf, data = inner_tbl_train)
+      fit <- fit_constrained_workflow(
+        rec                     = rec
+      , training                = inner_tbl_train
+      , params                  = tuning_grid
+      , start_p                 = start_p
+      , spw                     = spw
+      , interaction_constraints = interaction_constraints
+      , predictor_names         = predictor_names)
 
       ## Free training objects before predictions to reduce peak memory within the loop
-      rm(inner_tbl_train, rec, mod, wf)
+      rm(inner_tbl_train, rec)
       gc()
 
       ## Predictions: prob only, plus the hex id needed to compute each hex's own baseline
@@ -145,11 +171,11 @@ tune_results_per_outer_fold <- function(
       ## Persist raw per-row predictions before they're discarded below, when requested
        ## (see save_raw_predictions doc above -- normally FALSE). spw_used is the actual
        ## effective scale_pos_weight this fit used (spw damped by spw_multiplier, if any),
-       ## needed by fit_k_correction() since it varies per inner fold.
+       ## needed to undo its log-odds shift when calibrating, since it varies per inner fold.
       if (save_raw_predictions) {
         raw_save_filename <- paste(
           out_dir, "/", "inner_raw_", "outer_fold_", paste(outer_fold_id, collapse = "_")
-        , "_inner_fold_", inner_id, "_tune_grid_", tuning_grid_id, "_tune_index_", tuning_grid$index
+        , "_inner_fold_", inner_id, "_tune_grid_", tuning_grid_id, "_tune_index_", tuning_grid$index, constraint_tag
         , ".Rds", sep = ""
         )
         saveRDS(

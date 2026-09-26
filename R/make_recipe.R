@@ -35,10 +35,12 @@ make_recipe <- function(train_data, id_cols) {
 #'   scale_pos_weight set to the raw imbalance ratio is a known source of overconfident
 #'   predicted probabilities; a tunable multiplier lets the local hyperparameter search
 #'   trade off some of that against calibration.
+#' @param int_con Interaction constraints as xgboost's list of 0-based column positions, or
+#'   NULL for none. Build it with fit_constrained_workflow() rather than by hand
 #' @author Morgan Kain
 #' @export
 
-make_model <- function(params, start_p, spw) {
+make_model <- function(params, start_p, spw, int_con = NULL) {
 
   spw_mult <- resolve_spw_multiplier(params)
 
@@ -59,6 +61,7 @@ make_model <- function(params, start_p, spw) {
     , max_delta_step   = 1
     , nthread          = 1
     , verbosity        = 0
+    , interaction_constraints = int_con
     )
 
 }

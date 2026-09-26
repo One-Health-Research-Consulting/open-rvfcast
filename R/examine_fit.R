@@ -23,7 +23,7 @@
 examine_fits_within <- function(model_out, test_data, regions, larger_districts
                                 , africa_sf, region_to_sum, p_thresh, using_hexes
                                 , outpath, outpath_for_for, outpath_for_app
-                                , overwrite, ...) {
+                                , purpose, overwrite, ...) {
 
   print(model_out$outer_fold_id)
   

@@ -269,7 +269,7 @@ cross_validation_targets <- tar_plan(
 model_tuning_targets_common <- tar_plan(
 
   ## Set up list of a id columns for grouping, summarizing, etc. that are usde in a few spots
-  tar_target(id_cols, c("shapeName", "Proportion_Country", "ADM2", "Proportion_ADM2", "date", "index"))
+  tar_target(id_cols, c("shapeName", "Country", "Proportion_Country", "ADM2", "Proportion_ADM2", "date", "index"))
 
   ## probability value for which an outbreak is considered "likely"
 , tar_target(positive_threshold, seq(0.05, 0.95, by = 0.05))
@@ -284,6 +284,12 @@ model_tuning_targets_common <- tar_plan(
 
   ## get the baseline occurrence of outbreaks (in the full data)
 , tar_target(start_p, mean(splitted_data_fitting$train_data[[1]]$outbreak == 1))
+
+  ## Interaction constraints used each time a model is fit.
+   ## "isolated" is xgboost's default behavior (no feature can interact with any other)
+, tar_target(interaction_constraints, define_interaction_constraints(
+    groups            = list("lat", "lon", "anomaly_not_sero_360", "anomaly_not_sero_720")
+  , unlisted_features = "isolated"))
 
 , tar_target(outer_folds_dir3, create_data_directory(
     directory_path = paste("outputs/", region_name, "_final_model_fits_ws", sep = "")))
@@ -301,28 +307,25 @@ if (purpose == "train") {
 
     ## Model tuning parameters
     tar_target(tune_pars, data.frame(
-      tree_min       = 100
+      tree_min       = 100      ## natural scale
     , tree_max       = 1500
-    , tree_dep_min   = 4
+    , tree_dep_min   = 4        ## natural scale
     , tree_dep_max   = 9
-    , learn_rate_min = -2
+    , learn_rate_min = -2       ## log10 scale: 0.01 to 0.30
     , learn_rate_max = -0.52
-    , minn_min       = 1
-    , minn_max       = 10
-    , loss_red_min   = -5
-    , loss_red_max   = -0.3
-    , mtry_min       = 8
+    , minn_min       = 1        ## natural scale here, but sampled evenly on log10 scale
+    , minn_max       = 100
+    , loss_red_min   = -1       ## log10 scale: 0.1 to 1000
+    , loss_red_max   = 3
+    , mtry_min       = 8        ## natural scale; the maximum is every predictor the model sees
     , size           = 75))
 
     ## Distinct seed so this grid is an independent draw, not a copy of tuning_grid
-  , tar_target(hypergrid_seed, 71982634)
+  , tar_target(hypergrid_seed, 93822634)
 
     ## Minimum trees*learn_rate ("boosting capacity") a candidate hyperparameter set must have
-     ## to be kept in the search grid. Confirmed empirically that below ~12 on this dataset,
-     ## the ensemble never accumulates enough boosting rounds to escape a constant,
-     ## input-independent prediction regardless of the other hyperparameters. Choosing 20
-     ## to escape the potential edge (not exactly sure where it resides)
-  , tar_target(min_capacity_for_hypergrid, 20)
+     ## to be kept in the search grid. 
+  , tar_target(min_capacity_for_hypergrid, 2)
 
     ## Build the "global" hyperparameter tuning grid (first tuning phase)
   , tar_target(tuning_grid, build_hyperparameter_grid(
@@ -332,7 +335,8 @@ if (purpose == "train") {
     , splitted_data        = splitted_data
     , overwrite            = FALSE
     , seed                 = hypergrid_seed
-    , min_capacity         = min_capacity_for_hypergrid))
+    , min_capacity         = min_capacity_for_hypergrid
+    , id_cols              = id_cols))
 
     ## Final prep steps for parallel processing for tuning across all inner folds are to:
      ## 1) Evaluate which of all of the inner folds across all outer folds actually have
@@ -380,7 +384,8 @@ if (purpose == "train") {
     , DEBUG          = FALSE
     , chunk_id       = chunk_id
     , checktime_path = "outputs/timing"
-    , hex_id_col     = district_id_col)
+    , hex_id_col     = district_id_col
+    , interaction_constraints = interaction_constraints)
     , pattern        = cross(outer_fold_prejoined, chunk_id)
     , error          = "null"
     , format         = "file")
@@ -448,7 +453,8 @@ if (purpose == "train") {
     , folded_data_training = folded_data_training
     , splitted_data        = splitted_data
     , seed                 = hypergrid_seed
-    , min_capacity         = min_capacity_for_hypergrid))
+    , min_capacity         = min_capacity_for_hypergrid
+    , id_cols              = id_cols))
 
     ## Folds in a digest of chosen_weight_set_final so that each set also saves the
      ## information about all weightings
@@ -513,7 +519,8 @@ if (purpose == "train") {
      , DEBUG          = FALSE
      , chunk_id       = chunk_id
      , checktime_path = "outputs/timing"
-     , hex_id_col     = district_id_col)
+     , hex_id_col     = district_id_col
+     , interaction_constraints = interaction_constraints)
      , pattern        = cross(outer_fold_prejoined, chunk_id)
      , error          = "null"
      , format         = "file")
@@ -540,39 +547,37 @@ if (purpose == "train") {
     , tuning_grid_id = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")
     , outpath        = structural_hyperparam_path))
 
-    ## Fit k 
-     ## After much consideration/tinkering/testing/fitting, spw_multiplier, which impacts 
-     ## scale_positive_weight has proved to be very difficult to nail down, hence, 
-     ## I have decided to just keep it at 1 and adjust k for any potential recalibration.
-     ## Fit once per outer fold on that fold's full training window, pool predictions, 
-     ## and fit k against false positives in the upper (highest-confidence)
-     ## prediction bin specifically. Requires another parameter weightval_upper which
-     ## controls how we weight an increase in false negative rate vs improvement in
-     ## true positive rate (higher p for 1s). Seems to balance to about a k of 0
-     ## (no manipulation) at a weight of about 1000. So can adjust this up or down
-     ## (up leading to positive k and thus down weight of all p or down to a negative k)
-     ## depending on purpose/desire
-  , tar_target(k_correction_result, fit_k_correction_on_outer_folds(
+    ## Probability calibration
+     ## Step 1: refit the winning set once per outer fold on that fold's full training
+     ## window (same interaction constraints as every other fit) and harvest its held-out
+     ## predictions. One branch per outer fold so the fits run in parallel
+  , tar_target(calibration_harvest, harvest_outer_fold_predictions(
       winning_hyperparam_path = finalized_hyperparameters_structural
-    , folded_data_training    = folded_data_training
+    , outer_fold_row          = folded_data_training
     , full_data               = train_data
     , start_p                 = start_p
     , id_cols                 = id_cols
+    , interaction_constraints = interaction_constraints
     , hex_id_col              = district_id_col
-    , top_n_multiplier        = 5
-    , weightval_upper         = 1000
-    , prior_mean              = 0.5
-    , prior_lambda            = 0.01
-    , out_dir                 = "outputs/spw_calibration_harvest"
-    , overwrite               = FALSE))
+    , out_dir                 = "outputs/calibration_harvest"
+    , overwrite               = FALSE)
+    , pattern                 = map(folded_data_training)
+    , format                  = "file")
 
-    ## Final, spw- and k-calibrated hyperparameter set (add k to the
-     ## hyperparameter set)
+    ## Step 2: fit the calibration on the pooled harvest by maximum likelihood (one intercept
+     ## per forecast window, one shared slope on the log-odds. 
+     ## Also cross-fit across outer folds and save diagnostics (observed vs expected by window, 
+     ## fold and year) to out_dir
+  , tar_target(probability_calibration_result, fit_probability_calibration_on_outer_folds(
+      harvest_files = calibration_harvest
+    , out_dir       = "outputs/calibration_harvest"))
+
+    ## Step 3: Build the final calibrated hyperparameter set (calibration coefficients added as calib_* columns)
   , tar_target(finalized_hyperparameters, write_calibrated_hyperparameters(
-      k_correction_result         = k_correction_result
-    , structural_hyperparam_path  = finalized_hyperparameters_structural
-    , outpath                     = local_hyperparam_path)
-    , format                      = "file")
+      probability_calibration_result = probability_calibration_result
+    , structural_hyperparam_path     = finalized_hyperparameters_structural
+    , outpath                        = local_hyperparam_path)
+    , format                         = "file")
 
   )
 
@@ -580,7 +585,7 @@ if (purpose == "train") {
 
   ## PURPOSE == "forecast": skip tuning entirely and point finalized_hyperparameters at
    ## whatever hyperparameter set was most recently finalized by a PURPOSE = train run
-   ## (k lives as a column on that same file, so nothing further to look up)
+   ## (the calib_* calibration coefficients live as columns on that same file, so nothing further to look up)
   model_tuning_targets_purpose <- tar_plan(
 
     tar_target(finalized_hyperparameters, get_latest_finalized_hyperparameters(hyperparam_dir = "outputs/hyperparameters"))
@@ -617,7 +622,8 @@ model_fitting_targets <- tar_plan(
   , out_dir         = outer_folds_dir3
   , overwrite       = FALSE
   , DEBUG           = FALSE
-  , index_boost     = country_index_boost)
+  , index_boost     = country_index_boost
+  , interaction_constraints = interaction_constraints)
   , pattern         = map(folded_data_for_fitting)
   , error           = "null"
   , format          = "file")

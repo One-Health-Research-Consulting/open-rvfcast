@@ -11,12 +11,14 @@
 #' @param seed
 #' @param min_capacity Minimum trees*learn_rate ("boosting capacity") a grid point must have
 #'   to be kept; see sample_capacity_filtered_grid for why this is needed
+#' @param id_cols Columns that define a unique data point (removed by the recipe); used to
+#'   count the predictors the model actually sees, which sets mtry's upper bound
 #' @return Tibble of search grid and other needs for model tuning
 #' @author Morgan Kain
 #' @export
 
 build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training, splitted_data
-                                      , overwrite, seed, min_capacity = 20) {
+                                      , overwrite, seed, min_capacity = 20, id_cols) {
 
   ## Make the grid path
   create_data_directory(directory_path = grid_path)
@@ -24,7 +26,9 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
   #### Hyperparameter search and tuning grid --------------------------------------
 
   set.seed(seed)
-  hyper_id  <- stringi::stri_rand_strings(1, length = 15, pattern = "[A-Za-z0-9]")
+  ## Grid id from everything that shapes the grid, so changing a range, the capacity floor
+   ## or the ID columns builds a new grid instead of silently reusing a saved one
+  hyper_id  <- substr(digest::digest(list(tune_pars, min_capacity, seed, id_cols)), 1, 15)
   grid_path <- paste(grid_path, "/hypergrid_", hyper_id, ".Rds", sep = "")
 
   ## load previously saved if available for consistency
@@ -48,11 +52,8 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
            , minn_range    = c(minn_min, minn_max)
            , lossred_range = c(loss_red_min, loss_red_max)
            , mtry_range_lo = mtry_min
-           ## Arbitrary choice here in which train_inner, doesn't matter which
-           , finalize_data = folded_data_training$inner_folds[[10]] |>
-                               left_join(
-                                 splitted_data$train_data[[1]], by = "index") |>
-                               filter(cluster != 1)
+           ## Every predictor the model sees after the recipe (dummy columns included)
+           , mtry_range_hi = count_model_predictors(folded_data_training, splitted_data, id_cols)
            ## Total number of combinations of hyperparameters
            , size          = size
            , min_capacity  = min_capacity
@@ -108,6 +109,8 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
 #'   (which is purely on absolute prediction confidence) is resolved quite poorly at this stage,
 #'   so NULL is the current plan (and optimizing as part of post-correction calibration). 
 #'   Leaving it here for now though. 
+#' @param id_cols Columns that define a unique data point (removed by the recipe); used to
+#'   count the predictors the model actually sees, which sets mtry's upper bound
 #' @return Single-row tibble with columns par_grid (list), grid_id (character, prefixed "localhex_"),
 #'   weightval_raw, weightval_hex, gamma, delta
 #' @author Morgan Kain
@@ -131,6 +134,7 @@ build_local_hyperparameter_grid <- function(
     , seed
     , min_capacity   = 20
     , spw_mult_range = NULL
+    , id_cols
 ) {
 
   create_data_directory(directory_path = grid_path)
@@ -166,7 +170,9 @@ build_local_hyperparameter_grid <- function(
   trees_range   <- expand_range(top_params$trees, lo_hard = tune_pars$tree_min, hi_hard = tune_pars$tree_max, expansion = expansion, min_half_width = 50)
   depth_range   <- expand_range(top_params$tree_depth, lo_hard = tune_pars$tree_dep_min, hi_hard = tune_pars$tree_dep_max, expansion = expansion, min_half_width = 1)
   lr_range      <- expand_range(log10(top_params$learn_rate), lo_hard = tune_pars$learn_rate_min, hi_hard = tune_pars$learn_rate_max, expansion = expansion, min_half_width = 0.2)
-  minn_range    <- expand_range(top_params$min_n, lo_hard = tune_pars$minn_min, hi_hard = tune_pars$minn_max, expansion = expansion, min_half_width = 5)
+  ## min_n is searched on log10 scale (see sample_capacity_filtered_grid), so widen it there
+   ## too and convert back; min_half_width 0.3 is roughly a factor of 2 either way
+  minn_range    <- 10^expand_range(log10(top_params$min_n), lo_hard = log10(tune_pars$minn_min), hi_hard = log10(tune_pars$minn_max), expansion = expansion, min_half_width = 0.3)
   lossred_range <- expand_range(log10(top_params$loss_reduction + .Machine$double.eps), lo_hard = tune_pars$loss_red_min, hi_hard = tune_pars$loss_red_max, expansion = expansion, min_half_width = 0.5)
   ## Keep mtry anchored within reach of the top-k observed values, but never below the global floor
   mtry_range_lo <- max(tune_pars$mtry_min, min(top_params$mtry) - 3L)
@@ -174,7 +180,10 @@ build_local_hyperparameter_grid <- function(
   ## Hash every parameter that determines this grid's content into its id, so a change in any of
    ## them produces a new file (forcing a rebuild) instead of silently reusing a stale one -- see
    ## the note above the function.
-  param_sig <- digest::digest(list(weightval_raw, weightval_hex, gamma, delta, top_k, expansion, size, seed, min_capacity, spw_mult_range))
+  param_sig <- digest::digest(list(weightval_raw, weightval_hex, gamma, delta, top_k, expansion, size, seed, min_capacity, spw_mult_range,
+                                   ## The sets the grid is centred on, the global bounds and grid, and
+                                    ## the ID columns (which set mtry's upper bound) also shape it
+                                   top_params, tune_pars, global_grid$grid_id, id_cols))
   hyper_id  <- paste0("localhex_", param_sig)
   save_path <- paste0(grid_path, "/hypergrid_", hyper_id, ".Rds")
 
@@ -196,9 +205,8 @@ build_local_hyperparameter_grid <- function(
       , minn_range    = minn_range
       , lossred_range = lossred_range
       , mtry_range_lo = mtry_range_lo
-      , finalize_data = folded_data_training$inner_folds[[10]] |>
-                          left_join(splitted_data$train_data[[1]], by = "index") |>
-                          filter(cluster != 1)
+      ## Every predictor the model sees after the recipe (dummy columns included)
+      , mtry_range_hi = count_model_predictors(folded_data_training, splitted_data, id_cols)
       , size          = size
       , min_capacity  = min_capacity
       , seed          = seed
@@ -244,10 +252,15 @@ expand_range <- function(vals, lo_hard, hi_hard, expansion, min_half_width = 0) 
 ## is bounded by the hyperbola trees*learn_rate = min_capacity, so a plain
 ## trees_min/learn_rate_min floor can't exclude it without also cutting off 
 ## "many trees, slow learn_rate" combinations.
+## Update (Sep 2026): that collapse was caused by the outcome factor levels being ordered 0,1
+## during tuning (so scale_pos_weight and base_score applied to the wrong class). With the
+## levels fixed, a capacity of 2 still gives a varied, well-ranked prediction, so the
+## pipeline now passes a much lower min_capacity.
 ##
 ## @param trees_range,depth_range,lr_range,minn_range,lossred_range Ranges passed straight
-##   through to the matching dials::* range args (lr_range/lossred_range on log10 scale)
-## @param mtry_range_lo,finalize_data Lower bound and data used to finalise mtry's upper bound
+##   through to the matching dials::* range args (lr_range/lossred_range on log10 scale;
+##   minn_range on the natural scale, sampled on a log10 scale here)
+## @param mtry_range_lo,mtry_range_hi Lower and upper bounds on mtry (a count of predictors)
 ## @param size Desired number of grid points after capacity filtering
 ## @param min_capacity Minimum trees*learn_rate required to keep a candidate point
 ## @param seed Random seed
@@ -256,7 +269,7 @@ expand_range <- function(vals, lo_hard, hi_hard, expansion, min_half_width = 0) 
 ##   unreachable within max_attempts), with no `index` column assigned yet
 sample_capacity_filtered_grid <- function(
     trees_range, depth_range, lr_range, minn_range, lossred_range
-  , mtry_range_lo, finalize_data, size, min_capacity, seed, max_attempts = 6
+  , mtry_range_lo, mtry_range_hi, size, min_capacity, seed, max_attempts = 6
   , spw_mult_range = NULL
 ) {
 
@@ -287,13 +300,23 @@ sample_capacity_filtered_grid <- function(
           trees(range          = as.integer(trees_range))
         , tree_depth(range     = as.integer(depth_range))
         , learn_rate(range     = lr_range)
-        , min_n(range          = as.integer(minn_range))
+        ## min_n is drawn as a continuous log10 value so small values (1, 2, 5) get as much of
+         ## the search as large ones; dials' integer min_n with a log transform does not spread
+         ## evenly on the log scale in a multi-parameter design. Converted back below
+        , dials::new_quant_param(
+            type = "double", range = log10(minn_range), inclusive = c(TRUE, TRUE)
+          , label = c(min_n_log10 = "log10 minimal node size"))
         , loss_reduction(range = lossred_range)
-        , finalize(mtry(range  = c(mtry_range_lo, unknown())), finalize_data)
+        , mtry(range           = as.integer(c(mtry_range_lo, mtry_range_hi)))
         )
       , spw_param
       , list(size = request_size)
       ))
+
+    ## Back to whole-number min_n, in the column position the rest of the pipeline expects
+    candidate <- candidate |>
+      mutate(min_n = as.integer(round(10^min_n_log10)), .before = min_n_log10) |>
+      dplyr::select(-min_n_log10)
 
     kept <- candidate |> dplyr::filter(trees * learn_rate >= min_capacity)
 
@@ -313,6 +336,26 @@ sample_capacity_filtered_grid <- function(
     return(kept)
   }
 
-  kept |> dplyr::slice_head(n = size)
+  ## Random subset rather than the first rows: grid_space_filling returns its draws sorted by
+   ## trees, so keeping the first rows would drop the upper half of the trees range
+  kept |> dplyr::slice_sample(n = size)
+
+}
+
+## Helper: number of predictors the model sees after the recipe (ID columns removed, dummy
+## columns added), used as mtry's upper bound. parsnip converts mtry to a share of these
+## predictors for xgboost, so the bound must count them rather than raw data columns.
+## Uses the same inner-fold training slice the grid has always used to size mtry.
+count_model_predictors <- function(folded_data_training, splitted_data, id_cols) {
+
+  ## Same column handling as the training tables in tune_results_per_outer_fold
+  template <- folded_data_training$inner_folds[[10]] |>
+    left_join(splitted_data$train_data[[1]], by = "index") |>
+    filter(cluster != 1) |>
+    dplyr::select(-dplyr::any_of(c("cluster", "cases", "country_index_outbreak"))) |>
+    mutate(outbreak = factor(outbreak, levels = c(1, 0))) |>
+    mutate(forecast_interval = as.factor(forecast_interval))
+
+  length(get_predictor_names(make_recipe(template, id_cols = id_cols), template))
 
 }
