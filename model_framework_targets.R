@@ -298,8 +298,8 @@ model_tuning_targets_common <- tar_plan(
 
 ## PURPOSE == "train" runs the full two-stage tuning pipeline (global grid search across all
  ## outer/inner folds, then a refined local grid centered on the top global results) and ends by
- ## writing out finalized_hyperparameters. 
-## PURPOSE == "forecast" skips all of this, pulling the optimized hyperparameter set from 
+ ## writing out finalized_hyperparameters.
+## PURPOSE == "forecast" skips all of this, pulling the optimized hyperparameter set from
  ## the most recent training run to predict cases into the future.
 if (purpose == "train") {
 
@@ -314,7 +314,7 @@ if (purpose == "train") {
     , learn_rate_min = -2       ## log10 scale: 0.01 to 0.30
     , learn_rate_max = -0.52
     , minn_min       = 1        ## natural scale here, but sampled evenly on log10 scale
-    , minn_max       = 100
+    , minn_max       = 1000
     , loss_red_min   = -1       ## log10 scale: 0.1 to 1000
     , loss_red_max   = 3
     , mtry_min       = 8        ## natural scale; the maximum is every predictor the model sees
@@ -324,7 +324,7 @@ if (purpose == "train") {
   , tar_target(hypergrid_seed, 93822634)
 
     ## Minimum trees*learn_rate ("boosting capacity") a candidate hyperparameter set must have
-     ## to be kept in the search grid. 
+     ## to be kept in the search grid.
   , tar_target(min_capacity_for_hypergrid, 2)
 
     ## Build the "global" hyperparameter tuning grid (first tuning phase)
@@ -367,7 +367,7 @@ if (purpose == "train") {
     ## Path to save the hyperparameter set
   , tar_target(hyperparam_path, paste0("outputs/hyperparameters/best_hyperparameters", tuning_grid$grid_id, ".csv"))
 
-    ## Do the fitting across all inner -by- outer folds across the "global" 
+    ## Do the fitting across all inner -by- outer folds across the "global"
      ## hyperparameter grid
   , tar_target(tuned_results_per_outer_fold, tune_results_per_outer_fold(
       prejoined_data = outer_fold_prejoined
@@ -392,11 +392,13 @@ if (purpose == "train") {
 
     ## Create a grid of weighting values (each of which is described a bit further down)
   , tar_target(dial_hyperspace, sobol::sobol_design(
-      lower = c(weightval_raw_for_scoring = 10, weightval_hex_for_scoring = 1,
+      lower = c(weightval_raw_for_scoring = -1, weightval_hex_for_scoring = 1,
                 gamma_for_combined_score = 0, delta_for_index_score = 0)
-    , upper = c(weightval_raw_for_scoring = 5000, weightval_hex_for_scoring = 100,
+    , upper = c(weightval_raw_for_scoring = 2, weightval_hex_for_scoring = 100,
                 gamma_for_combined_score = 5, delta_for_index_score = 10)
-    , nseq  = 500))
+    , nseq  = 500) |>
+      ## weightval_raw is sampled on log10 scale: 0.1 to 100
+      dplyr::mutate(weightval_raw_for_scoring = 10^weightval_raw_for_scoring))
 
     ## Determine which hyperparameter sets appear across this full weighting parameter space.
      ## NOTE: used below to determine the weights that will be used for the rest of tuning
@@ -463,7 +465,7 @@ if (purpose == "train") {
     , tuning_grid$grid_id, "--", local_tuning_grid$grid_id
     , "--", digest::digest(chosen_weight_set_final), ".csv"))
 
-    ## Structural (pre spw/k-calibration) hyperparameter path 
+    ## Structural (pre spw/k-calibration) hyperparameter path
   , tar_target(structural_hyperparam_path, paste0(
     "outputs/hyperparameters/best_hyperparameters_structural_"
     , tuning_grid$grid_id, "--", local_tuning_grid$grid_id
@@ -565,8 +567,8 @@ if (purpose == "train") {
     , format                  = "file")
 
     ## Step 2: fit the calibration on the pooled harvest by maximum likelihood (one intercept
-     ## per forecast window, one shared slope on the log-odds. 
-     ## Also cross-fit across outer folds and save diagnostics (observed vs expected by window, 
+     ## per forecast window, one shared slope on the log-odds.
+     ## Also cross-fit across outer folds and save diagnostics (observed vs expected by window,
      ## fold and year) to out_dir
   , tar_target(probability_calibration_result, fit_probability_calibration_on_outer_folds(
       harvest_files = calibration_harvest
@@ -891,8 +893,8 @@ model_evaluation_targets <- tar_plan(
   , plotname  = "map_split"
   , overwrite = TRUE))
 
-  ## Further / tidied prediction diagnostics into a single output. 
-   ## Includes scoring, calibration, spatial, ENSO coupling, temporal dynamics, 
+  ## Further / tidied prediction diagnostics into a single output.
+   ## Includes scoring, calibration, spatial, ENSO coupling, temporal dynamics,
    ## variable importance/SHAP, tree structure.
 , tar_target(comprehensive_diagnostics_out_dir
              , paste0("outputs/fit_evaluation/comprehensive_diagnostics_", Sys.Date()))
