@@ -289,7 +289,7 @@ model_tuning_targets_common <- tar_plan(
    ## "isolated" is xgboost's default behavior (no feature can interact with any other)
 , tar_target(interaction_constraints, define_interaction_constraints(
     groups            = list("lat", "lon", "anomaly_not_sero_360", "anomaly_not_sero_720")
-  , unlisted_features = "isolated"))
+  , unlisted_features = "free"))
 
 , tar_target(outer_folds_dir3, create_data_directory(
     directory_path = paste("outputs/", region_name, "_final_model_fits_ws", sep = "")))
