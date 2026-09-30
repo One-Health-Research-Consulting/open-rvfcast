@@ -25,6 +25,8 @@
 #'   index, to harvest raw predictions for inspection.
 #' @param interaction_constraints Output of define_interaction_constraints() (the
 #'   interaction_constraints target), or NULL for none
+#' @param metrics_version Tag added to result file names. Bump it whenever the saved metrics
+#'   change, so a rerun writes new files instead of reusing ones that lack the new columns
 #' @return Character vector of file paths, one per (inner_fold_id, tune_grid_index) combination
 #' @author Morgan Kain
 #' @export
@@ -36,6 +38,7 @@ tune_results_per_outer_fold <- function(
   , chunk_id, checktime_path, hex_id_col = "shapeName"
   , save_raw_predictions = FALSE
   , interaction_constraints = NULL
+  , metrics_version = "m2"
 ) {
 
   ## Extract the outer fold ID and the pre-joined covariate data for this branch.
@@ -48,6 +51,9 @@ tune_results_per_outer_fold <- function(
    ## constraints are never reused for each other (no tag when there are no constraints,
    ## so existing unconstrained results keep their names)
   constraint_tag <- if (is.null(interaction_constraints)) "" else paste0("_ic_", interaction_constraints$tag)
+  ## Metrics version in file names: results saved before partial AUC and top-of-ranking
+   ## recall were recorded ("m2") must not be picked up as if they had them
+  constraint_tag <- paste0(constraint_tag, "_", metrics_version)
 
   ## Resolve predictor names once per call (a full recipe prep takes ~20s on this data);
    ## fit_constrained_workflow() checks every fit against them and refits if they differ
@@ -123,8 +129,8 @@ tune_results_per_outer_fold <- function(
       ## Inner assessment data: extract the held-out spatial cluster. country_index_outbreak
        ## is kept here (unlike inner_tbl_train above) -- a native column on joined_data (see
        ## get_rvf_response/lag_join_aggregate), used below as index_flag for
-       ## compute_metrics_vec_hexrelative so hyperparameter selection can weight
-       ## country-level index-case performance via score_hexrelative_results' delta
+       ## compute_metrics_vec_hexrelative so country-level index-case performance is recorded
+       ## (reported as a diagnostic; not currently used for hyperparameter selection)
       ## weights stored as plain numeric (not hardhat_importance_weights) so that
       ## predict() on a workflow without add_case_weights() does not raise a type error
       inner_tbl_assess <- joined_data |>
@@ -353,33 +359,30 @@ chunk_rows <- function(dat, n_chunks, which) {
 
 #' @param inner_folds Character vector of all file paths returned by the
 #'   tuned_results_per_outer_fold target (one path per outer x inner x index branch)
-#' @param weight_set Single-row tibble from chose_weight_set carrying weightval_raw,
-#'   weightval_hex, gamma, delta
+#' @param selection_weights Named weights (pauc, within_hex, quiet); see score_rank_based
+#' @param quiet_cap Lower cap on quiet-cluster elevation; see score_rank_based
+#' @param near_tie_share Bootstrap share of ranking first for a set to count as a near-tie;
+#'   see choose_near_tie_set (1 always takes the top-ranked set)
+#' @param n_boot Outer-fold bootstrap resamples; see score_rank_based
+#' @param seed Random seed for the bootstrap
 #' @param tuning_grid_id string for this tuning grid
-#' @param outpath where to save the best hyperparameter set
-#' @return Single-row tibble containing final_score_combined, final_score_hex, S_pos_hex,
-#'   S_neg_penalty_hex, within_hex_auc, the raw (non-hex) final_score/S_pos/S_neg_penalty,
-#'   hex_only_would_have_picked_index, raw_only_would_have_picked_index, and all hyperparameter values
+#' @param outpath where to save the best hyperparameter set. The full ranking of every set is
+#'   saved beside it with "_selection_table" added to the file name
+#' @return outpath. The CSV holds the chosen set's hyperparameters, its ranks, pooled AUCs and
+#'   bootstrap share, the old log-loss terms as diagnostics, the top-ranked index and the
+#'   selection rule that was applied
 #' @author Morgan Kain
 #' @export
 
-finalize_hyperparameters_from_inner <- function(inner_folds, weight_set, tuning_grid_id, outpath) {
+finalize_hyperparameters_from_inner <- function(inner_folds, selection_weights = c(pauc = 0.4, within_hex = 0.4, quiet = 0.2)
+                                                , quiet_cap = -1, near_tie_share = 0.1
+                                                , n_boot = 200, seed = 1, tuning_grid_id, outpath) {
 
   ## First, check if this tuning_grid_id already has a saved best parameter set
   if (file.exists(outpath)) return(outpath)
 
   ## Make the outpath if it doesn't exist yet
   create_data_directory(directory_path = strsplit(outpath, "/best_hyperparameters")[[1]][1])
-
-  weightval_raw <- weight_set$weightval_raw
-  weightval_hex <- weight_set$weightval_hex
-  gamma         <- weight_set$gamma
-  delta         <- weight_set$delta
-
-  stopifnot(is.numeric(weightval_raw), length(weightval_raw) == 1, weightval_raw >= 0)
-  stopifnot(is.numeric(weightval_hex), length(weightval_hex) == 1, weightval_hex >= 0)
-  stopifnot(is.numeric(gamma), length(gamma) == 1, gamma >= 0)
-  stopifnot(is.numeric(delta), length(delta) == 1, delta >= 0)
 
   ## Read every per-(outer x inner x index) result file into one long tibble
   all_results <- purrr::map(inner_folds, .f = function(x) {
@@ -392,33 +395,23 @@ finalize_hyperparameters_from_inner <- function(inner_folds, weight_set, tuning_
   }) |>
   bind_rows()
 
-  ## Do the scoring. Detaailed info on the scoring inside this function
-  scores <- score_hexrelative_results(all_results, weightval_raw, weightval_hex, gamma, delta)
+  ## Fold-aware ranks of partial AUC, within-hex AUC and the quiet-cluster penalty, with
+   ## outer-fold bootstrap (see score_rank_based for why this replaced the dial-weighted score)
+  scores <- score_rank_based(all_results, weights = selection_weights, quiet_cap = quiet_cap, n_boot = n_boot, seed = seed)
 
-  ## Find the single best
-  best <- scores |>
-    arrange(desc(final_score_combined)) |>
-    dplyr::slice(1)
+  ## The full ranking, for transparency about how close the runners-up were
+  write.csv(scores, sub("\\.csv$", "_selection_table.csv", outpath), row.names = FALSE)
 
-  ## What a pure hex-relative selection (gamma = 0) and a pure raw selection would each have
-  ## picked from this same pool of fits -- kept alongside so all three strategies are directly
-  ## comparable from one tuning run
-  hex_only_best_index <- scores |> arrange(desc(final_score_hex)) |> dplyr::slice(1) |> pull(index)
-  raw_only_best_index <- scores |> arrange(desc(final_score))     |> dplyr::slice(1) |> pull(index)
-
-  ## Cleanup/add details for export. any_of() rather than a bare column list: fits
-   ## from the global grid never carry spw_multiplier (see calc_dial_best_set above
-   ## for the same reasoning)
-  best <- best |>
-    left_join(
-      all_results |>
-        dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry, dplyr::any_of("spw_multiplier")) |>
-        distinct(), by = "index") |>
+  ## Top-ranked set, or the most regularized of the near-ties
+  best <- choose_near_tie_set(scores, near_tie_share = near_tie_share) |>
     mutate(
-      tuning_grid_id                    = tuning_grid_id
-    , hex_only_would_have_picked_index  = hex_only_best_index
-    , raw_only_would_have_picked_index  = raw_only_best_index
-    , .before = index
+      tuning_grid_id    = tuning_grid_id
+    , weight_pauc       = selection_weights[["pauc"]]
+    , weight_within_hex = selection_weights[["within_hex"]]
+    , weight_quiet      = selection_weights[["quiet"]]
+    , quiet_cap         = quiet_cap
+    , near_tie_share    = near_tie_share
+    , .before = 1
     )
 
   write.csv(best, outpath)
@@ -460,165 +453,5 @@ get_latest_finalized_hyperparameters <- function(hyperparam_dir) {
 
   ## Most recently modified file == most recently completed training run
   candidates[which.max(file.mtime(candidates))]
-
-}
-
-
-#' Determine the best set across dial_hyperspace
-#'
-#' @title calc_dial_best_set
-
-#' @param fits Character vector of individual result-file paths to score (e.g. the
-#'   tuned_results_per_outer_fold target, or c(tuned_results_per_outer_fold, local_tuned_results)
-#'   for a second pass over the combined global+local pool) -- NOT a directory to list; matches
-#'   the convention already used by finalize_hyperparameters_from_inner
-#' @param dial_hyperspace sobol of dial values
-#' @param tuning_grid_id string for this tuning grid
-#' @return List of full and summarized tibbles combining dial_hyperspace and details from best hyperset
-#' @author Morgan Kain
-#' @export
-
-calc_dial_best_set <- function(fits, dial_hyperspace, tuning_grid_id) {
-
-  ## Read every result file into one long tibble
-  all_results <- purrr::map(fits, .f = function(x) {
-    tload <- try(readRDS(x) |> dplyr::select(-recall_index), silent = TRUE)
-    if (class(tload)[1] != "try-error") {
-      tload
-    } else {
-      NULL
-    }
-  }) |>
-  bind_rows()
-
-  all_dials <- purrr::map(seq_len(nrow(dial_hyperspace)), .f = function(i) {
-
-    this_set <- dial_hyperspace[i, ]
-
-    scores <- score_hexrelative_results(
-      all_results   = all_results
-    , weightval_raw = this_set$weightval_raw_for_scoring
-    , weightval_hex = this_set$weightval_hex_for_scoring
-    , gamma         = this_set$gamma_for_combined_score
-    , delta         = this_set$delta_for_index_score)
-
-    ## Find the single best
-    best <- scores |>
-      arrange(desc(final_score_combined)) |>
-      dplyr::slice(1)
-
-    ## What a pure hex-relative selection (gamma = 0) and a pure raw selection would each have
-    ## picked from this same pool of fits -- kept alongside so all three strategies are directly
-    ## comparable from one tuning run
-    hex_only_best_index <- scores |> arrange(desc(final_score_hex)) |> dplyr::slice(1) |> pull(index)
-    raw_only_best_index <- scores |> arrange(desc(final_score))     |> dplyr::slice(1) |> pull(index)
-
-    ## Cleanup/add details for export
-    ## any_of() rather than a bare column list: fits from the global grid never carry
-     ## spw_multiplier (that dimension only exists in the local refinement grid, see
-     ## build_local_hyperparameter_grid), and a bare select() on a column that isn't
-     ## present in every source would error
-    best |>
-      left_join(
-        all_results |>
-          dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry, dplyr::any_of("spw_multiplier")) |>
-          distinct(), by = "index") |>
-      mutate(
-          tuning_grid_id                    = tuning_grid_id
-        , hex_only_would_have_picked_index  = hex_only_best_index
-        , raw_only_would_have_picked_index  = raw_only_best_index
-        , .before = index
-      )
-
-  }) |>
-  bind_rows()
-
-  all_dials.s <- all_dials |>
-    group_by(index) |>
-    summarize(
-      n_entry              = n()
-    , final_score_raw      = mean(final_score)
-    , final_score_hex      = mean(final_score_hex)
-    , final_score_combined = mean(final_score_combined)
-    , S_pos                = mean(S_pos)
-    , S_pos_hex            = mean(S_pos_hex)
-    , S_neg_penalty        = mean(S_neg_penalty)
-    , S_neg_penalty_hex    = mean(S_neg_penalty_hex)
-    , weightval_raw        = mean(weightval_raw)
-    , weightval_hex        = mean(weightval_hex)
-    , gamma                = mean(gamma)
-    )
-
-  list(
-    all_sets           = all_dials
-  , summarized_indices = all_dials.s
-  )
-
-}
-
-
-#' Choose a single set of weighting dials based on a given objective
-#'
-#' @title chose_weight_set
-
-#' @param full_set All calculated scores across dial_hyperspace from calc_dial_best_set
-#' @param summarized_sets Summarized dial values for each winning index from calc_dial_best_set
-#' @param objective one of "balanced"; "minimize false positive"; or "maximize seasonal"
-#' @return Tibble of single set of weighting parameter values for the rest of tuning
-#' @author Morgan Kain
-#' @export
-
-chose_weight_set <- function(full_set, summarized_sets, objective) {
-
-  if (objective == "balanced") {
-    chosen_set <- summarized_sets |> filter(n_entry == max(n_entry))
-  } else if (objective == "minimize false positive") {
-    chosen_set <- summarized_sets |> filter(S_neg_penalty == min(S_neg_penalty))
-  } else if (objective == "maximize seasonal") {
-    chosen_set <- summarized_sets |> filter(final_score_hex == max(final_score_hex))
-  } else {
-    stop("Choose a supported option for objective")
-  }
-
-  dial_cols <- if ("delta" %in% names(full_set)) {
-    c("weightval_raw", "weightval_hex", "gamma", "delta")
-  } else {
-    c("weightval_raw", "weightval_hex", "gamma")
-  }
-
-  ## Pick the evaluated draw closest to this winning index's own centroid
-  full_set |>
-    dplyr::filter(index == chosen_set$index) |>
-    select_centroid_draw(full_set = full_set, cols = dial_cols)
-
-}
-
-
-#' Pick the evaluated draw closest to the centroid of a subset of dial-hyperspace draws,
-#' in range-normalized distance. Used instead of averaging so the returned weighting values are
-#' from a real, previously-evaluated point 
-#'
-#' @title select_centroid_draw
-#'
-#' @param draws Tibble of candidate draws to choose among (already filtered to one winning index)
-#' @param full_set Tibble used only to establish each dial's explored range for normalization --
-#'   the full, unfiltered pool of draws, not just `draws`, so the normalization scale reflects
-#'   the whole search space rather than shrinking to whatever this particular subset spans
-#' @param cols Character vector of dial column names to match on
-#' @return One-row tibble, `draws` subset to `cols`, for the single closest-to-centroid row
-#' @author Morgan Kain
-#' @export
-
-select_centroid_draw <- function(draws, full_set, cols) {
-
-  ranges   <- purrr::map_dbl(cols, ~ diff(range(full_set[[.x]], na.rm = TRUE)))
-  centroid <- purrr::map_dbl(cols, ~ mean(draws[[.x]], na.rm = TRUE))
-
-  dist_sq <- purrr::map(seq_along(cols), function(i) {
-    ((draws[[cols[i]]] - centroid[i]) / ranges[i])^2
-  }) |>
-    purrr::reduce(`+`)
-
-  draws[which.min(dist_sq), cols]
 
 }

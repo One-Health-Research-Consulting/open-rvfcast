@@ -115,7 +115,7 @@ compute_metrics_vec <- function(
     , n_all     = n_all
       ## Count of country-level index-case rows in this call, needed to correctly weight
        ## logloss_index when it's pooled (by n_pos_index) across many such calls in
-       ## score_hexrelative_results, exactly as n_pos already does for logloss_pos
+       ## tuning diagnostics, exactly as n_pos already does for logloss_pos
     , n_pos_index = if (is.null(index_flag)) NA_integer_ else sum(index_flag == 1, na.rm = TRUE)
       ## Ranking metrics
       ## Calculate Area Under the Precision-Recall Curve (good for cases where getting
@@ -128,6 +128,15 @@ compute_metrics_vec <- function(
        ## metric for large class imbalance. Problem is that with thousands of negatives
        ## some hundreds of false-positives can barely shift the score for the worse
     , roc_auc   = roc_auc_vec(truth, prob1, event_level = event_level)
+      ## Standardized partial ROC AUC over false-alarm rates 0 to 5% (McClish 1989): ranking
+       ## quality in the region where alarms are actually raised. 0.5 = random, 1 = perfect.
+       ## Used for hyperparameter selection (see score_rank_based)
+    , pauc_std    = if (n_pos == 0 || n_pos == n_all) NA_real_ else
+                      standardized_partial_auc(prob1, truth == "1", max_fpr = 0.05)
+      ## Share of outbreaks among the top 1% / 5% of rows by predicted probability (tied rows
+       ## shared in expectation); diagnostics matching the final rare-event verification report
+    , recall_top1 = if (n_pos == 0) NA_real_ else recall_at_top(prob1, truth == "1", frac = 0.01)
+    , recall_top5 = if (n_pos == 0) NA_real_ else recall_at_top(prob1, truth == "1", frac = 0.05)
       ## Measure of sensitivity (see https://yardstick.tidymodels.org/reference/recall.html)
     , recall    = tibble(
         threshold = threshold
@@ -189,6 +198,53 @@ compute_metrics_vec <- function(
   )
 
   ttib
+
+}
+
+## Standardized partial ROC AUC for false-alarm rates in [0, max_fpr] (McClish 1989), so
+## 0.5 = random ranking and 1 = perfect. The ROC curve has one point per distinct score, so
+## tied rows move together as a straight segment (the tie-correct treatment); the curve is
+## interpolated linearly at max_fpr.
+standardized_partial_auc <- function(score, is_event, max_fpr = 0.05) {
+
+  o <- order(score, decreasing = TRUE)
+  s <- score[o]
+  y <- is_event[o]
+  n1 <- sum(y)
+  n0 <- length(y) - n1
+
+  ## Cumulative true- and false-positive rates at the end of each tied group
+  last <- c(s[-1] != s[-length(s)], TRUE)
+  tpr  <- c(0, cumsum(y)[last] / n1)
+  fpr  <- c(0, cumsum(!y)[last] / n0)
+
+  ## Keep the curve up to max_fpr, adding an interpolated end point when it is crossed
+  keep <- fpr <= max_fpr
+  x <- fpr[keep]
+  t <- tpr[keep]
+  if (max(x) < max_fpr) {
+    j <- which(fpr > max_fpr)[1]
+    t <- c(t, tpr[j - 1] + (tpr[j] - tpr[j - 1]) * (max_fpr - fpr[j - 1]) / (fpr[j] - fpr[j - 1]))
+    x <- c(x, max_fpr)
+  }
+
+  pauc     <- sum(diff(x) * (head(t, -1) + tail(t, -1)) / 2)
+  min_area <- max_fpr^2 / 2
+  0.5 * (1 + (pauc - min_area) / (max_fpr - min_area))
+
+}
+
+## Share of events among the top `frac` of rows by score. Rows tied at the cut-off are shared
+## in expectation (the recall a random ordering of the tied rows would give on average)
+recall_at_top <- function(score, is_event, frac) {
+
+  k     <- ceiling(frac * length(score))
+  cut   <- sort(score, decreasing = TRUE)[k]
+  above <- score > cut
+  tied  <- score == cut
+
+  hits <- sum(is_event[above]) + (k - sum(above)) / sum(tied) * sum(is_event[tied])
+  hits / sum(is_event)
 
 }
 

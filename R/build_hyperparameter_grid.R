@@ -77,8 +77,8 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
 #' Build a local refinement hyperparameter grid centered on the top-k sets from global tuning
 #'
 #' Reads the saved per-(outer x inner x index) tuning result files produced by
-#' tune_results_per_outer_fold, scores them with the same S_pos / S_neg_penalty
-#' formula used in finalize_hyperparameters_from_inner, then builds a new
+#' tune_results_per_outer_fold, ranks the sets with the same fold-aware AUC ranking used in
+#' finalize_hyperparameters_from_inner (score_rank_based), then builds a new
 #' space-filling grid confined to the neighborhood of the top-k parameter sets.
 #' Indices in the new grid start above max(global_grid$par_grid[[1]]$index) so
 #' that local and global indices never collide when pooled in
@@ -92,11 +92,9 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
 #'   used to cap the local grid so it never searches outside where the global grid already looked
 #' @param top_k Number of top global parameter sets whose ranges define the local neighbourhood
 #' @param size Number of local grid points to generate (space-filling)
-#' @param weightval_raw Numeric penalty weight on S_neg_penalty (raw, non-hex); see score_hexrelative_results
-#' @param weightval_hex Numeric penalty weight on S_neg_penalty_hex; see score_hexrelative_results
-#' @param gamma Numeric weight on the raw (non-hex) final_score in the blend; see score_hexrelative_results
-#' @param delta Numeric weight on final_score_index (country-level index-case performance) in the
-#'   blend; see score_hexrelative_results. 0 reduces to the pre-existing hex + gamma*raw blend
+#' @param selection_weights Named weights (pauc, within_hex, quiet) used to rank sets when
+#'   choosing the top-k; see score_rank_based
+#' @param quiet_cap Lower cap on quiet-cluster elevation; see score_rank_based
 #' @param expansion Fraction of the top-k range to extend on each side (e.g. 0.5 = +/-50%)
 #' @param grid_path Directory in which to save the local grid Rds
 #' @param folded_data_training Folded training data (needed to finalise mtry upper bound)
@@ -112,7 +110,7 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
 #' @param id_cols Columns that define a unique data point (removed by the recipe); used to
 #'   count the predictors the model actually sees, which sets mtry's upper bound
 #' @return Single-row tibble with columns par_grid (list), grid_id (character, prefixed "localhex_"),
-#'   weightval_raw, weightval_hex, gamma, delta
+#'   selection_weights (list), quiet_cap
 #' @author Morgan Kain
 #' @export
 
@@ -122,10 +120,8 @@ build_local_hyperparameter_grid <- function(
     , tune_pars
     , top_k
     , size
-    , weightval_raw
-    , weightval_hex
-    , gamma
-    , delta
+    , selection_weights = c(pauc = 0.4, within_hex = 0.4, quiet = 0.2)
+    , quiet_cap         = -1
     , expansion
     , grid_path
     , hyperparam_path
@@ -148,14 +144,11 @@ build_local_hyperparameter_grid <- function(
     }
   }) |> bind_rows()
 
-  ## Do the scoring. Detailed info on the scoring inside this function
-  scores <- score_hexrelative_results(all_results, weightval_raw, weightval_hex, gamma, delta)
+  ## Fold-aware AUC ranking (best first); no bootstrap needed just to pick the top-k
+  scores <- score_rank_based(all_results, weights = selection_weights, quiet_cap = quiet_cap, n_boot = 0)
 
   ## Extract out the top few indices
-  top_indices <- scores |>
-    arrange(desc(final_score_combined)) |>
-    dplyr::slice(seq_len(top_k)) |>
-    pull(index)
+  top_indices <- head(scores$index, top_k)
 
   ## Extract out the top few parameter sets
   top_params <- all_results |>
@@ -180,7 +173,7 @@ build_local_hyperparameter_grid <- function(
   ## Hash every parameter that determines this grid's content into its id, so a change in any of
    ## them produces a new file (forcing a rebuild) instead of silently reusing a stale one -- see
    ## the note above the function.
-  param_sig <- digest::digest(list(weightval_raw, weightval_hex, gamma, delta, top_k, expansion, size, seed, min_capacity, spw_mult_range,
+  param_sig <- digest::digest(list(selection_weights, quiet_cap, top_k, expansion, size, seed, min_capacity, spw_mult_range,
                                    ## The sets the grid is centred on, the global bounds and grid, and
                                     ## the ID columns (which set mtry's upper bound) also shape it
                                    top_params, tune_pars, global_grid$grid_id, id_cols))
@@ -196,7 +189,7 @@ build_local_hyperparameter_grid <- function(
     idx_offset <- max(global_grid$par_grid[[1]]$index)
 
     ## Same capacity-floor rejection/resampling as build_hyperparameter_grid -- the top-k sets
-     ## this local grid is centred on are already known-good, but the +/- expansion can still
+     ## this local grid is centered on are already known-good, but the +/- expansion can still
      ## push some candidates back into the degenerate trees*learn_rate zone, so guard here too.
     par_grid <- sample_capacity_filtered_grid(
         trees_range   = trees_range
@@ -225,11 +218,9 @@ build_local_hyperparameter_grid <- function(
 
   tibble(
     par_grid      = par_grid |> list()
-  , grid_id       = hyper_id
-  , weightval_raw = weightval_raw
-  , weightval_hex = weightval_hex
-  , gamma         = gamma
-  , delta         = delta
+  , grid_id           = hyper_id
+  , selection_weights = list(selection_weights)
+  , quiet_cap         = quiet_cap
   )
 
 }
@@ -245,7 +236,7 @@ expand_range <- function(vals, lo_hard, hi_hard, expansion, min_half_width = 0) 
 
 ## Helper: build a space-filling grid, rejecting and resampling any point whose
 ## trees*learn_rate ("boosting capacity") falls below min_capacity. Confirmed empirically
-## (see notes above score_hexrelative_results) that on this severely imbalanced dataset,
+## that on this severely imbalanced dataset,
 ## hyperparameter sets below this capacity never escape a constant, input-independent
 ## prediction -- the ensemble never accumulates enough boosting rounds to move off its
 ## initial base-score guess, regardless of the other hyperparameters. The degenerate zone

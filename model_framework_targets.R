@@ -390,65 +390,35 @@ if (purpose == "train") {
     , error          = "null"
     , format         = "file")
 
-    ## Create a grid of weighting values (each of which is described a bit further down)
-  , tar_target(dial_hyperspace, sobol::sobol_design(
-      lower = c(weightval_raw_for_scoring = -1, weightval_hex_for_scoring = 1,
-                gamma_for_combined_score = 0, delta_for_index_score = 0)
-    , upper = c(weightval_raw_for_scoring = 2, weightval_hex_for_scoring = 100,
-                gamma_for_combined_score = 5, delta_for_index_score = 10)
-    , nseq  = 500) |>
-      ## weightval_raw is sampled on log10 scale: 0.1 to 100
-      dplyr::mutate(weightval_raw_for_scoring = 10^weightval_raw_for_scoring))
+    ## Hyperparameter selection
+     ## Sets are ranked against each other within comparable cells on three components
+     ##   pauc: partial ROC AUC over 0-5%; percent of outbreaks in top probability ranks
+     ##   within_hex: within-hex AUC, i.e. timing within a hex; a model that only knows which
+     ##     hexes are risky scores 0.5
+     ##   quiet: penalty for false alarms in held-out clusters with no outbreaks, relative to the
+     ##     non-outbreak background of outbreak clusters
+  , tar_target(selection_weights, c(pauc = 0.4, within_hex = 0.4, quiet = 0.2))
 
-    ## Determine which hyperparameter sets appear across this full weighting parameter space.
-     ## NOTE: used below to determine the weights that will be used for the rest of tuning
-     ## AND to be used to explore the implications of different choices on actual predicted results
-  , tar_target(dial_best_sets, calc_dial_best_set(
-      fits            = tuned_results_per_outer_fold
-    , dial_hyperspace = dial_hyperspace
-    , tuning_grid_id  = tuning_grid$grid_id))
+    ## Lower cap on probability for penalizing elevated probabilities in all 0 inner folds
+     ## (natural-log ratio of mean predicted probability in
+      ## quiet clusters to the non-outbreak background of outbreak clusters).
+  , tar_target(selection_quiet_cap, -1)
 
-    ## Figure out the single set of weighting dial values to use based on the objective
-  , tar_target(chosen_weight_set, chose_weight_set(
-      full_set        = dial_best_sets$all_sets
-    , summarized_sets = dial_best_sets$summarized_indices
-    , objective       = "balanced"))
+    ## Two parameters to separate ties; that is, ranked sets that cant really be differentiated.
+     ## See internal code, but in the end, when sets are about equal the set that overfits the least
+     ## is chosen as the best set
+  , tar_target(selection_near_tie_share, 0.1)
+  , tar_target(selection_n_boot, 200)
 
-   ## Penalty weight on S_neg_penalty (raw/global, non-hex), used for the final_score component that
-    ## gets folded into final_score_combined via gamma
-  , tar_target(weightval_raw_for_scoring, chosen_weight_set$weightval_raw)
-
-  ## Penalty weight on S_neg_penalty_hex. Within hex weight for hexes that have
-  ## never experienced an outbreak (~92% of hexes have never had an event)
-  , tar_target(weightval_hex_for_scoring, chosen_weight_set$weightval_hex)
-
-  ## Weight on the raw (non-hex) final_score when blending it into final_score_combined =
-  ## final_score_hex + gamma * final_score. This exists so a hyperparameter set that
-  ## gets the within-hex timing right but is systematically miscalibrated overall
-  ## (too high/low everywhere in a given hex) can still be penalized.
-  ## Larger gamma puts more weight on the entire raw final_score. That is, a larger gamma pulls
-  ## the blended score towards “global” calibration: both better absolute positive-day
-  ## confidence and better absolute false-alarm control together
-  , tar_target(gamma_for_combined_score, chosen_weight_set$gamma)
-
-  ## Weight on final_score_index (country-level index-case performance, see
-  ## get_rvf_response/lag_join_aggregate) when blending it into final_score_combined = final_score_hex +
-  ## gamma * final_score + delta * final_score_index. An index case is already counted once as
-  ## an ordinary positive in final_score_hex/final_score; delta > 0 makes it count again, so
-  ## hyperparameter selection rewards catching those cases
-  , tar_target(delta_for_index_score, chosen_weight_set$delta)
-
-    ## Build a refined local grid centered on the top-k global results, ranked by final_score_combined
+    ## Build a refined local grid centered on the top-k global results, ranked as above
   , tar_target(local_tuning_grid, build_local_hyperparameter_grid(
       inner_fold_paths     = tuned_results_per_outer_fold
     , global_grid          = tuning_grid
     , tune_pars            = tune_pars
     , top_k                = 8
     , size                 = 75
-    , weightval_raw        = weightval_raw_for_scoring
-    , weightval_hex        = weightval_hex_for_scoring
-    , gamma                = gamma_for_combined_score
-    , delta                = delta_for_index_score
+    , selection_weights    = selection_weights
+    , quiet_cap            = selection_quiet_cap
     , expansion            = 0.15
     , grid_path            = "data/hypergrid"
     , hyperparam_path      = hyperparam_path
@@ -458,18 +428,17 @@ if (purpose == "train") {
     , min_capacity         = min_capacity_for_hypergrid
     , id_cols              = id_cols))
 
-    ## Folds in a digest of chosen_weight_set_final so that each set also saves the
-     ## information about all weightings
+    ## Folds in a digest of the selection settings so each saved set records how it was chosen
   , tar_target(local_hyperparam_path, paste0(
     "outputs/hyperparameters/best_hyperparameters_combined_"
     , tuning_grid$grid_id, "--", local_tuning_grid$grid_id
-    , "--", digest::digest(chosen_weight_set_final), ".csv"))
+    , "--", digest::digest(list(selection_weights, selection_quiet_cap, selection_near_tie_share, selection_n_boot)), ".csv"))
 
-    ## Structural (pre spw/k-calibration) hyperparameter path
+    ## Structural (pre-calibration) hyperparameter path
   , tar_target(structural_hyperparam_path, paste0(
     "outputs/hyperparameters/best_hyperparameters_structural_"
     , tuning_grid$grid_id, "--", local_tuning_grid$grid_id
-    , "--", digest::digest(chosen_weight_set_final), ".csv"))
+    , "--", digest::digest(list(selection_weights, selection_quiet_cap, selection_near_tie_share, selection_n_boot)), ".csv"))
 
     ## (outer x inner x local-index) combinations, shuffled for load balancing.
      ## Mirrors inner_fold_id_finalized but cross-joined with the local grid.
@@ -527,27 +496,17 @@ if (purpose == "train") {
      , error          = "null"
      , format         = "file")
 
-    ## Re-derive the weighting dials a second time, now over the combined global + local candidate pool
-     ## for model fitting
-  , tar_target(dial_best_sets_final, calc_dial_best_set(
-      fits            = c(tuned_results_per_outer_fold, local_tuned_results)
-    , dial_hyperspace = dial_hyperspace
-    , tuning_grid_id  = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")))
-
-    ## Identify the set of weighting dial values to use based on "objective",
-     ## with the default being "balanced"
-  , tar_target(chosen_weight_set_final, chose_weight_set(
-      full_set        = dial_best_sets_final$all_sets
-    , summarized_sets = dial_best_sets_final$summarized_indices
-    , objective       = "balanced"))
-
-    ## Get the finalized hyperparameter set prior to any re-calibration (that may
-     ## or may not occur)
+    ## Get the finalized hyperparameter set prior to any re-calibration, ranking the pooled
+     ## global + local candidates (the full ranking is saved beside it as *_selection_table.csv)
   , tar_target(finalized_hyperparameters_structural, finalize_hyperparameters_from_inner(
-      inner_folds    = c(tuned_results_per_outer_fold, local_tuned_results)
-    , weight_set     = chosen_weight_set_final
-    , tuning_grid_id = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")
-    , outpath        = structural_hyperparam_path))
+      inner_folds       = c(tuned_results_per_outer_fold, local_tuned_results)
+    , selection_weights = selection_weights
+    , quiet_cap         = selection_quiet_cap
+    , near_tie_share    = selection_near_tie_share
+    , n_boot            = selection_n_boot
+    , seed              = hypergrid_seed
+    , tuning_grid_id    = paste(tuning_grid$grid_id, local_tuning_grid$grid_id, sep = "--")
+    , outpath           = structural_hyperparam_path))
 
     ## Probability calibration
      ## Step 1: refit the winning set once per outer fold on that fold's full training
