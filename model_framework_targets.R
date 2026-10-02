@@ -415,11 +415,17 @@ if (purpose == "train") {
       inner_fold_paths     = tuned_results_per_outer_fold
     , global_grid          = tuning_grid
     , tune_pars            = tune_pars
-    , top_k                = 8
-    , size                 = 75
+      ## Separate neighborhoods around the top 2 global sets
+    , top_k                = 2
+    , size                 = 30
     , selection_weights    = selection_weights
     , quiet_cap            = selection_quiet_cap
-    , expansion            = 0.15
+      ## Half-widths around each center: trees and mtry as a fraction of the center value,
+       ## depth in levels, rest on the log10 scale
+    , neighbourhood        = list(
+        trees = 0.25, tree_depth = 1, learn_rate_log10 = 0.2
+      , min_n_log10 = 0.3, loss_reduction_log10 = 0.5, mtry = 0.25
+      )
     , grid_path            = "data/hypergrid"
     , hyperparam_path      = hyperparam_path
     , folded_data_training = folded_data_training

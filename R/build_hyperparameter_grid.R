@@ -77,9 +77,13 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
 #' Build a local refinement hyperparameter grid centered on the top-k sets from global tuning
 #'
 #' Reads the saved per-(outer x inner x index) tuning result files produced by
-#' tune_results_per_outer_fold, ranks the sets with the same fold-aware AUC ranking used in
-#' finalize_hyperparameters_from_inner (score_rank_based), then builds a new
-#' space-filling grid confined to the neighborhood of the top-k parameter sets.
+#' tune_results_per_outer_fold, ranks the sets with the same fold-aware ranking used in
+#' finalize_hyperparameters_from_inner (score_rank_based), then draws a separate
+#' space-filling neighbourhood around EACH of the top-k sets (an equal share of `size` per
+#' centre). Separate neighbourhoods matter when the leading sets are structurally different
+#' (e.g. deep/slow/small-mtry vs shallower/faster/larger-mtry): one box spanning them all
+#' would mostly sample the space between them rather than refine either. Every range,
+#' mtry included, is set relative to its centre and clipped to the global tune_pars bounds.
 #' Indices in the new grid start above max(global_grid$par_grid[[1]]$index) so
 #' that local and global indices never collide when pooled in
 #' finalize_hyperparameters_from_inner.
@@ -90,12 +94,15 @@ build_hyperparameter_grid <- function(tune_pars, grid_path, folded_data_training
 #' @param global_grid Single-row tibble returned by build_hyperparameter_grid (par_grid + grid_id)
 #' @param tune_pars Data frame of global search bounds (same object passed to build_hyperparameter_grid);
 #'   used to cap the local grid so it never searches outside where the global grid already looked
-#' @param top_k Number of top global parameter sets whose ranges define the local neighbourhood
-#' @param size Number of local grid points to generate (space-filling)
+#' @param top_k Number of top global parameter sets to centre neighbourhoods on
+#' @param size Total number of local grid points, split equally across the top_k centres
 #' @param selection_weights Named weights (pauc, within_hex, quiet) used to rank sets when
 #'   choosing the top-k; see score_rank_based
 #' @param quiet_cap Lower cap on quiet-cluster elevation; see score_rank_based
-#' @param expansion Fraction of the top-k range to extend on each side (e.g. 0.5 = +/-50%)
+#' @param neighbourhood Named list of half-widths around each centre: trees and mtry as a
+#'   fraction of the centre value (at least 50 trees and 3 mtry either way), tree_depth in
+#'   levels, and learn_rate_log10, min_n_log10 and loss_reduction_log10 on the log10 scale
+#'   (0.2 is a factor of about 1.6, 0.3 about 2, 0.5 about 3)
 #' @param grid_path Directory in which to save the local grid Rds
 #' @param folded_data_training Folded training data (needed to finalise mtry upper bound)
 #' @param splitted_data Split data object (needed to finalise mtry upper bound)
@@ -122,7 +129,10 @@ build_local_hyperparameter_grid <- function(
     , size
     , selection_weights = c(pauc = 0.4, within_hex = 0.4, quiet = 0.2)
     , quiet_cap         = -1
-    , expansion
+    , neighbourhood     = list(
+        trees = 0.25, tree_depth = 1, learn_rate_log10 = 0.2
+      , min_n_log10 = 0.3, loss_reduction_log10 = 0.5, mtry = 0.25
+      )
     , grid_path
     , hyperparam_path
     , folded_data_training
@@ -150,33 +160,25 @@ build_local_hyperparameter_grid <- function(
   ## Extract out the top few indices
   top_indices <- head(scores$index, top_k)
 
-  ## Extract out the top few parameter sets
+  ## Extract out the top few parameter sets, in rank order
   top_params <- all_results |>
     dplyr::filter(index %in% top_indices) |>
     dplyr::select(index, trees, tree_depth, learn_rate, min_n, loss_reduction, mtry) |>
-    distinct()
-
-  ## Compute local bounds for each hyperparameter, hard-capped at the ORIGINAL global
-  ## tune_pars bounds -- the local grid is a refinement and should never be allowed to
-  ## search outside where the global grid already looked.
-  ## learn_rate and loss_reduction are sampled on log10 scale by dials, so convert.
-  trees_range   <- expand_range(top_params$trees, lo_hard = tune_pars$tree_min, hi_hard = tune_pars$tree_max, expansion = expansion, min_half_width = 50)
-  depth_range   <- expand_range(top_params$tree_depth, lo_hard = tune_pars$tree_dep_min, hi_hard = tune_pars$tree_dep_max, expansion = expansion, min_half_width = 1)
-  lr_range      <- expand_range(log10(top_params$learn_rate), lo_hard = tune_pars$learn_rate_min, hi_hard = tune_pars$learn_rate_max, expansion = expansion, min_half_width = 0.2)
-  ## min_n is searched on log10 scale (see sample_capacity_filtered_grid), so widen it there
-   ## too and convert back; min_half_width 0.3 is roughly a factor of 2 either way
-  minn_range    <- 10^expand_range(log10(top_params$min_n), lo_hard = log10(tune_pars$minn_min), hi_hard = log10(tune_pars$minn_max), expansion = expansion, min_half_width = 0.3)
-  lossred_range <- expand_range(log10(top_params$loss_reduction + .Machine$double.eps), lo_hard = tune_pars$loss_red_min, hi_hard = tune_pars$loss_red_max, expansion = expansion, min_half_width = 0.5)
-  ## Keep mtry anchored within reach of the top-k observed values, but never below the global floor
-  mtry_range_lo <- max(tune_pars$mtry_min, min(top_params$mtry) - 3L)
+    distinct() |>
+    dplyr::arrange(match(index, top_indices))
 
   ## Hash every parameter that determines this grid's content into its id, so a change in any of
    ## them produces a new file (forcing a rebuild) instead of silently reusing a stale one -- see
    ## the note above the function.
-  param_sig <- digest::digest(list(selection_weights, quiet_cap, top_k, expansion, size, seed, min_capacity, spw_mult_range,
-                                   ## The sets the grid is centred on, the global bounds and grid, and
-                                    ## the ID columns (which set mtry's upper bound) also shape it
-                                   top_params, tune_pars, global_grid$grid_id, id_cols))
+  param_sig <- digest::digest(
+    list(
+    ## The sets the grid is centered on, the global bounds and grid, and
+     ## the ID columns (which set mtry's upper bound) also shape it
+    selection_weights, quiet_cap, top_k, neighbourhood, size, seed, min_capacity
+  , spw_mult_range, top_params, tune_pars, global_grid$grid_id, id_cols
+    )
+  )
+                                  
   hyper_id  <- paste0("localhex_", param_sig)
   save_path <- paste0(grid_path, "/hypergrid_", hyper_id, ".Rds")
 
@@ -186,26 +188,30 @@ build_local_hyperparameter_grid <- function(
 
   } else {
 
-    idx_offset <- max(global_grid$par_grid[[1]]$index)
+    idx_offset   <- max(global_grid$par_grid[[1]]$index)
+    ## Every predictor the model sees after the recipe (dummy columns included): mtry's hard cap
+    n_predictors <- count_model_predictors(folded_data_training, splitted_data, id_cols)
+    per_centre   <- ceiling(size / nrow(top_params))
 
-    ## Same capacity-floor rejection/resampling as build_hyperparameter_grid -- the top-k sets
-     ## this local grid is centered on are already known-good, but the +/- expansion can still
-     ## push some candidates back into the degenerate trees*learn_rate zone, so guard here too.
-    par_grid <- sample_capacity_filtered_grid(
-        trees_range   = trees_range
-      , depth_range   = depth_range
-      , lr_range      = lr_range
-      , minn_range    = minn_range
-      , lossred_range = lossred_range
-      , mtry_range_lo = mtry_range_lo
-      ## Every predictor the model sees after the recipe (dummy columns included)
-      , mtry_range_hi = count_model_predictors(folded_data_training, splitted_data, id_cols)
-      , size          = size
-      , min_capacity  = min_capacity
-      , seed          = seed
-        ## Pulled in as a new parameter -- not part of the global grid
-      , spw_mult_range = spw_mult_range
-      ) |>
+    ## One space-filling neighbourhood per center. 
+    par_grid <- purrr::map_dfr(seq_len(nrow(top_params)), function(i) {
+      r <- centre_neighbourhood(top_params[i, ], tune_pars, neighbourhood, n_predictors)
+      sample_capacity_filtered_grid(
+          trees_range   = r$trees
+        , depth_range   = r$tree_depth
+        , lr_range      = r$learn_rate_log10
+        , minn_range    = r$min_n
+        , lossred_range = r$loss_reduction_log10
+        , mtry_range_lo = r$mtry[1]
+        , mtry_range_hi = r$mtry[2]
+        , size          = per_centre
+        , min_capacity  = min_capacity
+          ## Distinct seed per center so neighbourhoods are independent draws
+        , seed          = seed + i
+          ## Pulled in as a new parameter -- not part of the global grid
+        , spw_mult_range = spw_mult_range
+        )
+    }) |>
       mutate(index = idx_offset + seq_len(n()), .before = 1)
 
     saveRDS(par_grid, save_path)
@@ -225,29 +231,47 @@ build_local_hyperparameter_grid <- function(
 
 }
 
-## Helper: extend the observed range by expansion on each side, clamped to hard limits.
-## min_half_width prevents collapse when all top-k sets share the same value.
-expand_range <- function(vals, lo_hard, hi_hard, expansion, min_half_width = 0) {
-  lo_k <- min(vals, na.rm = TRUE)
-  hi_k <- max(vals, na.rm = TRUE)
-  pad  <- max((hi_k - lo_k) * expansion, min_half_width)
-  c(max(lo_hard, lo_k - pad), min(hi_hard, hi_k + pad))
+## Helper: search ranges for one center's neighborhood, each clipped to the global tune_pars
+## bounds and to the number of predictors for mtry. Returned on the scales 
+## sample_capacity_filtered_grid takes: trees, tree_depth and mtry natural; learn_rate 
+## and loss_reduction log10; min_n natural (sampled on log10)
+centre_neighbourhood <- function(centre, tune_pars, neighbourhood, n_predictors) {
+
+  ## Clip a range to hard limits, keeping it non-degenerate
+  clip <- function(lo, hi, lo_hard, hi_hard) {
+    r <- c(max(lo_hard, lo), min(hi_hard, hi))
+    if (r[1] >= r[2]) r <- c(max(lo_hard, r[2] - 1), min(hi_hard, r[1] + 1))
+    r
+  }
+
+  tree_pad <- max(round(centre$trees * neighbourhood$trees), 50)
+  mtry_pad <- max(round(centre$mtry * neighbourhood$mtry), 3)
+  lr_c     <- log10(centre$learn_rate)
+  minn_c   <- log10(centre$min_n)
+  lossr_c  <- log10(centre$loss_reduction)
+
+  list(
+    trees                = clip(centre$trees - tree_pad, centre$trees + tree_pad, tune_pars$tree_min, tune_pars$tree_max)
+  , tree_depth           = clip(centre$tree_depth - neighbourhood$tree_depth, centre$tree_depth + neighbourhood$tree_depth,
+                                tune_pars$tree_dep_min, tune_pars$tree_dep_max)
+  , learn_rate_log10     = clip(lr_c - neighbourhood$learn_rate_log10, lr_c + neighbourhood$learn_rate_log10,
+                                tune_pars$learn_rate_min, tune_pars$learn_rate_max)
+  , min_n                = 10^clip(minn_c - neighbourhood$min_n_log10, minn_c + neighbourhood$min_n_log10,
+                                   log10(tune_pars$minn_min), log10(tune_pars$minn_max))
+  , loss_reduction_log10 = clip(lossr_c - neighbourhood$loss_reduction_log10, lossr_c + neighbourhood$loss_reduction_log10,
+                                tune_pars$loss_red_min, tune_pars$loss_red_max)
+    ## Bounded on BOTH sides by the centre; previously only the lower bound followed the top
+     ## sets and the upper bound was always every predictor
+  , mtry                 = clip(centre$mtry - mtry_pad, centre$mtry + mtry_pad, tune_pars$mtry_min, n_predictors)
+  )
+
 }
 
 ## Helper: build a space-filling grid, rejecting and resampling any point whose
-## trees*learn_rate ("boosting capacity") falls below min_capacity. Confirmed empirically
-## that on this severely imbalanced dataset,
-## hyperparameter sets below this capacity never escape a constant, input-independent
-## prediction -- the ensemble never accumulates enough boosting rounds to move off its
-## initial base-score guess, regardless of the other hyperparameters. The degenerate zone
-## is bounded by the hyperbola trees*learn_rate = min_capacity, so a plain
+## trees*learn_rate ("boosting capacity") falls below min_capacity. 
+## The degenerate zone is bounded by the hyperbola trees*learn_rate = min_capacity, so a plain
 ## trees_min/learn_rate_min floor can't exclude it without also cutting off 
 ## "many trees, slow learn_rate" combinations.
-## Update (Sep 2026): that collapse was caused by the outcome factor levels being ordered 0,1
-## during tuning (so scale_pos_weight and base_score applied to the wrong class). With the
-## levels fixed, a capacity of 2 still gives a varied, well-ranked prediction, so the
-## pipeline now passes a much lower min_capacity.
-##
 ## @param trees_range,depth_range,lr_range,minn_range,lossred_range Ranges passed straight
 ##   through to the matching dials::* range args (lr_range/lossred_range on log10 scale;
 ##   minn_range on the natural scale, sampled on a log10 scale here)
@@ -334,9 +358,7 @@ sample_capacity_filtered_grid <- function(
 }
 
 ## Helper: number of predictors the model sees after the recipe (ID columns removed, dummy
-## columns added), used as mtry's upper bound. parsnip converts mtry to a share of these
-## predictors for xgboost, so the bound must count them rather than raw data columns.
-## Uses the same inner-fold training slice the grid has always used to size mtry.
+## columns added), used as mtry's upper bound. 
 count_model_predictors <- function(folded_data_training, splitted_data, id_cols) {
 
   ## Same column handling as the training tables in tune_results_per_outer_fold
