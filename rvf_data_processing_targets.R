@@ -511,6 +511,16 @@ rvf_processing_targets <- tar_plan(
   , overwrite             = parse_flag("OVERWRITE_FINAL_REGION_DATA"))
   , error                 = "null")
 
+  ## Save outbreaks with the hex each is labelled in (placed exactly as the response labels
+   ## are built), for linking predictions to outbreaks in the model pipeline
+   ## (see link_predictions_to_outbreaks and run_comprehensive_performance)
+, tar_target(hexed_outbreaks, export_hexed_outbreaks(
+    wahis_outbreaks_indexed = rvf_outbreaks_indexed
+  , wahis_raster_template   = wahis_raster_template
+  , cell_hex_lookup         = tail(region_data, 1)
+  , save_filename           = "data/rvf_outbreaks_hexed.Rds")
+  , format                  = "file")
+
 )
 
 list(

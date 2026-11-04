@@ -640,3 +640,11 @@ enforce_exact_K <- function(seeds, K, cx, cy, n, taken = NULL) {
   }
   seeds
 }
+
+
+## Make geometries valid and keep only their polygon parts
+vfix <- function(x) {
+  x <- sf::st_make_valid(x)
+  x <- sf::st_collection_extract(x, "POLYGON")
+  x
+}
