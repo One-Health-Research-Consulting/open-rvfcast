@@ -202,8 +202,7 @@ plot_one_masked_window <- function(map_sf, window_counts, size_max, n_top, hatch
     ggplot2::geom_sf(data = window_counts, ggplot2::aes(size = n_outbreaks), shape = 21, fill = "red", colour = "white", stroke = 0.3) +
     ## Shared colour limits so maps of different dates and windows are comparable; zero probabilities
      ## (log10 = -Inf, e.g. rounded forecasts) are squished to the lowest colour rather than drawn as missing
-    ggplot2::scale_fill_viridis_c(trans = "log10", name = "P(outbreak)", na.value = "grey90", limits = fill_limits
-                                  , oob = function(x, range) scales::squish(x, range, only.finite = FALSE)) +
+    probability_fill_scale(fill_limits) +
     ggplot2::scale_colour_manual(values = rlang::set_names("red", top_label), name = NULL) +
     ggplot2::scale_size_area(name = "Outbreaks in\nthe window", max_size = 6, limits = c(0, size_max)
                              , breaks = function(l) { b <- unique(round(pretty(c(1, l[2]), 4))); b[b >= 1] }) +
@@ -215,19 +214,15 @@ plot_one_masked_window <- function(map_sf, window_counts, size_max, n_top, hatch
     ## Legend order: probability, the two quality keys together, then outbreak history. Quality keys
      ## take the marks' own colours, on grey so the light stipple dots are visible
     ggplot2::guides(
-      fill      = ggplot2::guide_colourbar(order = 1)
+      fill      = ggplot2::guide_colourbar(order = 1, nbin = 300, barheight = ggplot2::unit(10, "lines"))
     , size      = if (has_counts) ggplot2::guide_legend(order = 2) else "none"
     , linetype  = if (has_lines) ggplot2::guide_legend(order = 3, override.aes = list(colour = mark_colours(hatching$lines), linewidth = 0.6)) else "none"
     , shape     = if (has_dots) ggplot2::guide_legend(order = 4, override.aes = list(colour = mark_colours(hatching$dots), size = 1.5)
                                                        , theme = ggplot2::theme(legend.key = ggplot2::element_rect(fill = "grey45", colour = NA))) else "none"
     , linewidth = ggplot2::guide_legend(order = 5)) +
     ggplot2::coord_sf(datum = NA) +
-#    ggplot2::labs(title = title
-#                  , subtitle = paste0("Forecast quality: diagonal hatching = low forecast skill, stippling = no outbreaks in evaluation period, no marks = demonstrated skill\n"
-#                                      , "Outline width = prior outbreaks; ", dot_note)) +
     ggplot2::labs(title = title) +
     ggplot2::theme_void() +
-    ## Explicit white background (theme_void leaves it transparent)
     ggplot2::theme(plot.background = ggplot2::element_rect(fill = "white", colour = NA))
 
 }
