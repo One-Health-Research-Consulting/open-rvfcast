@@ -2,7 +2,10 @@ transform_ndvi <- function(ndvi_transformed_sources,
                            ndvi_transformed_directory,
                            basename_template = "ndvi_transformed_{.y}_{.m}.parquet",
                            overwrite = FALSE,
-                           ...) {
+                           ...,
+                           ## c(intercept, slope) mapping Sentinel NDVI onto the MODIS scale before
+                            ## blending; after ... so a positional targets dependency never lands here
+                           sentinel_calibration = NULL) {
 
   # Extract month and file lists from the single-row tibble
   stopifnot(nrow(ndvi_transformed_sources) == 1)
@@ -25,7 +28,13 @@ transform_ndvi <- function(ndvi_transformed_sources,
   if(!is.null(existing_dataset) & !overwrite) {
     # Check if file has data - if zero rows, overwrite anyway
     row_count <- existing_dataset |> count() |> collect() |> pull(n)
-    if(row_count > 0) {
+    # Days of the month actually present; a month built from incomplete sources
+    # (e.g., missing Sentinel 10-day products) must be rebuilt rather than skipped forever
+    n_dates_present <- existing_dataset |> distinct(date) |> collect() |> nrow()
+    n_days_in_month <- lubridate::days_in_month(as.Date(sprintf("%d-%02d-01", .y, .m)))
+    if(row_count > 0 && n_dates_present < n_days_in_month) {
+      message(glue::glue("{basename(save_filename)} covers only {n_dates_present} of {n_days_in_month} days, rebuilding"))
+    } else if(row_count > 0) {
       message(glue::glue("{basename(save_filename)} already exists, has rows, and overwrite is not TRUE, skipping"))
       return(save_filename)
     } else {
@@ -70,38 +79,22 @@ transform_ndvi <- function(ndvi_transformed_sources,
   # "data/sentinel_ndvi_transformed/transformed_sentinel_NDVI_2018-10-22_to_2018-11-01.parquet"
   # Has 2018-10-22 in both files.
 
-  # Open dataset for this month
-  ndvi_transformed_dataset <- arrow::open_dataset(all_ndvi_files)
+  ## Read each source file for this month on its own and put it on the -1 to 1 scale.
+   ## Scale is decided per file, not per month: a month can mix files stored on the raw
+   ## digital-number scale with files that are already scaled (e.g. July 2026 drew on a raw
+   ## MODIS composite starting in June plus already-scaled July composites), and a single
+   ## month-wide check then divides the already-scaled files a second time
+  ndvi_transformed_data <- purrr::map(all_ndvi_files, read_scaled_ndvi_file, .y = .y, .m = .m) |>
+    dplyr::bind_rows()
 
-  # Process single month instead of all months
-  ndvi_transformed_data <- ndvi_transformed_dataset |>
-    dplyr::filter(year == .y,
-           month == .m) |>
-           collect()
+  ## Put Sentinel on the MODIS scale so the blend does not step when Sentinel enters (2019) and
+   ## the long MODIS-only baseline years stay comparable with the blended years
+  if (!is.null(sentinel_calibration)) {
+    ndvi_transformed_data <- ndvi_transformed_data |>
+      dplyr::mutate(ndvi = ifelse(source == "modis", ndvi, sentinel_calibration[1] + sentinel_calibration[2] * ndvi))
+  }
 
   message(paste("Processing", nrow(ndvi_transformed_data), "rows"))
-
-  ## It appears that sentinel NDVI after about Feb 2025 comes already scaled??
-   ## Dividing an already-scaled value by 200 again silently corrupts it,
-   ## so detect which format this month's Sentinel data is in before deciding whether to rescale.
-  sentinel_vals <- ndvi_transformed_data$ndvi[ndvi_transformed_data$source != "modis"]
-  sentinel_already_scaled <- length(sentinel_vals) > 0 && max(abs(sentinel_vals), na.rm = TRUE) <= 1.5
-
-  ## Same issue observed for MODIS -- some months arrive already scaled to the standard
-   ## -1 to 1 range rather than needing the /10000 correction, so check this source too.
-  modis_vals <- ndvi_transformed_data$ndvi[ndvi_transformed_data$source == "modis"]
-  modis_already_scaled <- length(modis_vals) > 0 && max(abs(modis_vals), na.rm = TRUE) <= 1.5
-
-  ## Scale raw data appropriately.
-  ndvi_transformed_data <- ndvi_transformed_data |>
-    mutate(
-      ndvi = case_when(
-        modis_already_scaled & source == "modis" ~ ndvi, ## MODIS, already scaled upstream
-        source == "modis" ~ ndvi / 10000,                ## MODIS, raw digital-number scale
-        sentinel_already_scaled ~ ndvi,                  ## Sentinel, already scaled upstream
-        TRUE ~ ndvi / 200                                ## Sentinel, raw digital-number scale
-      )
-    )
 
   ndvi_transformed_data <- ndvi_transformed_data |>
     select(-source) |>
@@ -115,5 +108,43 @@ transform_ndvi <- function(ndvi_transformed_sources,
   arrow::write_parquet(ndvi_transformed_data, save_filename, compression = "gzip", compression_level = 5)
 
   return(save_filename)
+
+}
+
+#' Read One NDVI Source File for a Month and Put It on the -1 to 1 Scale
+#'
+#' MODIS and Sentinel parquets are stored either on their raw digital-number scale
+#' (MODIS x10000, Sentinel x200) or already scaled, depending on when they were built.
+#' The scale is detected from this file's own values so files of both kinds can be
+#' blended in one month.
+#'
+#' @param file Character. Path to a MODIS or Sentinel transformed NDVI parquet.
+#' @param .y,.m Integer. Year and month to keep.
+#'
+#' @return Tibble with this file's rows for the month, ndvi on the -1 to 1 scale.
+read_scaled_ndvi_file <- function(file, .y, .m) {
+
+  # Rows of this file that fall in the requested month
+  file_data <- arrow::open_dataset(file) |>
+    dplyr::filter(year == .y, month == .m) |>
+    dplyr::collect()
+
+  if (nrow(file_data) == 0) return(file_data)
+
+  # Values within +/-1.5 can only be already scaled; raw digital numbers run into the thousands
+  already_scaled <- max(abs(file_data$ndvi), na.rm = TRUE) <= 1.5
+
+  ## Sentinel parquets are written as true NDVI by read_sentinel_ndvi_nc and the older ones were
+   ## corrected in place (2026-11-19). A raw-scale Sentinel file cannot be decoded safely here:
+   ## older files used two different raw scales (DN and NDVI x 200) that overlap in range
+  if (!already_scaled && any(file_data$source != "modis")) {
+    stop(glue::glue("{basename(file)} holds raw-scale Sentinel NDVI; re-transform it with transform_sentinel_ndvi"))
+  }
+
+  # Divisor for raw values depends on the sensor
+  raw_divisor <- ifelse(file_data$source == "modis", 10000, 200)
+
+  file_data |>
+    dplyr::mutate(ndvi = if (already_scaled) ndvi else ndvi / raw_divisor)
 
 }
