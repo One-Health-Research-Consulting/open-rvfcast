@@ -32,7 +32,7 @@ source("_targets_settings.R")
 using_hexes <- TRUE
 
 ## If true, rebuilds all dates regardless of whether or not they exist
-rebuild <- TRUE
+rebuild <- FALSE
 
 ## reduce outbreaks by looking at resolution of nearby start dates?
  ## NOTE: not supported yet, because no decision has been made on how to reduce
@@ -81,7 +81,7 @@ data_import_targets <- tar_plan(
    ## Load the already-processed response parquet to determine what dates have been built
  , tar_target(region_data_dates, {
      ## Path to the master parquet that records which dates have already been processed
-     final_parquet <- paste0(region_joined_data_directory, "/pan_hex_joined_response_data_final.parquet")
+     final_parquet <- model_data_file_name
      ## Pull it from S3 if it is not already local so incremental updating is preserved on a
       ## fresh checkout / cleaned data folder; wrapped in try() so a genuine first-ever run (no
       ## AWS creds or no object in the bucket) still falls through to the build-everything path
@@ -128,6 +128,21 @@ data_import_targets <- tar_plan(
 
    if (rebuild) all.d <- all.d |> mutate(processed = 0)
 
+   ## Re-label a rolling window: dates within 150 days (the longest forecast window) of the newest
+    ## processed date had windows running past the outbreak data available when they were built,
+    ## so their 0 labels partly mean "not yet reported". Marking them unprocessed rebuilds them
+    ## each run with the current WAHIS data; combine_lja_and_append replaces their old rows
+   if (!rebuild && any(all.d$processed == 1)) {
+     last_processed <- max(all.d$dates[all.d$processed == 1])
+     all.d <- all.d |> mutate(processed = ifelse(processed == 1 & dates > last_processed - 150, 0, processed))
+
+     ## Dates earlier than the first date in the joined file are not part of the modeling data
+      ## (currently 2005-04 to 2006-03); treat them as processed so they are not downloaded and
+      ## rebuilt every run. A full rebuild still processes everything
+     first_in_file   <- min(region_data_dates$all_dates)
+     all.d <- all.d |> mutate(processed = ifelse(dates < first_in_file, 1, processed))
+   }
+
    all.d
 
   })
@@ -171,7 +186,17 @@ data_import_targets <- tar_plan(
 
   ## Make sure AT LEAST these few files are downloaded for a few of the steps below,
    ## then recheck for the full suite for all needed calculations further down
-, tar_target(minimal_date_needs, AWS_get_files(new_predictor_paths))
+, tar_target(minimal_date_needs, {
+    ## Region-level file each predictor file is turned into (same naming as mask_and_cluster_from_template)
+    region_files <- file.path(region_data_directory, paste0(basename(region_data_directory), "_", sub(".*data_", "", new_predictor_paths)))
+    ## Only download predictor files (~300 MB each) whose region file is missing, so re-labeled
+     ## dates reuse their existing region files; the first is always fetched because
+     ## region_data_template and sero_template read it
+    needs_download <- !file.exists(region_files) | seq_along(new_predictor_paths) == 1
+    AWS_get_files(new_predictor_paths[needs_download])
+    ## Return every path; mask_and_cluster_from_template skips dates whose region file exists
+    new_predictor_paths
+  })
 
   ## Polygon of Africa
 , tar_target(continent_polygon, create_africa_polygon())
@@ -205,7 +230,8 @@ data_import_targets <- tar_plan(
 
   ## Clean raw outbreak data into form needed for analysis (Step 1)
 , tar_target(rvf_outbreaks, clean_rvf_outbreaks(
-    output_path = wahis_file_path
+    ## The scrape target (not the plain path string) so newly scraped reports rerun everything downstream
+    output_path = wahis_rvf_tables
   , map_dat     = region_map
   , reduced     = reduce_outbreaks_by_end_date))
 
@@ -472,7 +498,9 @@ rvf_processing_targets <- tar_plan(
   , neighbor_outbreaks = neighbor_outbreak_history
   , out_dir            = region_cleaned_data_directory
   , all_dates          = joined_dates
-  , overwrite          = FALSE)
+    ## Overwrite so re-labeled dates get fresh outbreak labels (new dates have no file anyway);
+     ## a full rebuild keeps reusing existing cleaned files as before
+  , overwrite          = !rebuild)
   , pattern            = map(file_path_per_date)
   , error              = "null"
   , format             = "file")
@@ -523,8 +551,28 @@ rvf_processing_targets <- tar_plan(
 
 )
 
+## Make sure everything relevant ran, important step for automation ------------
+pipeline_check_targets <- tar_plan(
+
+  ## Check to make sure the appropriate uploads to S3 have happened
+  tar_target(all_files_uploaded, {
+    invisible(list(
+      cleaned_region_data_AWS_upload
+    , final_region_data_AWS_upload
+    ))
+    TRUE
+  })
+  
+, tar_target(pipeline_complete, {
+    invisible(all_files_uploaded)
+    TRUE
+  })
+  
+)
+
 list(
   data_import_targets
 , modeling_targets
 , rvf_processing_targets
+, pipeline_check_targets
 )

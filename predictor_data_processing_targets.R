@@ -345,9 +345,11 @@ dynamic_targets <- tar_plan(
     
     ## Somewhat crude fix to avoid too recent of a date given lags with era5t
      ## weather that can cause some issues
-    narrow_dates <= Sys.Date() - 7
+    narrow_dates[which(narrow_dates <= Sys.Date() - 7)]
 
-  })
+    ## The S3 listing is invisible to targets, so rerun every time; otherwise files deleted from S3
+     ## since the last run (to force a rebuild) are never picked up
+  }, cue = tar_cue("always"))
 
 , tar_target(months_to_process_all, dates_to_process_all |> format("%Y-%m") |> unique())
 , tar_target(months_to_process, dates_to_process |> format("%Y-%m") |> unique())
@@ -448,7 +450,7 @@ dynamic_targets <- tar_plan(
   , pattern                          = map(modis_task_end_dates))
 
   ## Set up modis_ndvi data requests. This can be really slow (in my experience sometimes
-   ## upwards of 30 minutes, so part of this re-factoring of the pipeline was to be able
+   ## upwards of 60 minutes, so part of this re-factoring of the pipeline was to be able
    ## to skip requests like these if the data already exists in the S3 bucket, that is:
    ## UPDATE July 2026: there is overall more linkages between targets to create more
    ## interconnected dependencies to be able to skip more targets if data is already
@@ -549,7 +551,10 @@ dynamic_targets <- tar_plan(
 , tar_target(ndvi_transformed_sources, create_ndvi_transformed_sources(
     modis_ndvi_transformed
   , sentinel_ndvi_transformed
-  , months_to_process) |>
+  , months_to_process
+    ## Directories let the lookup see every parquet on disk, not just this run's branches
+  , modis_ndvi_transformed_directory
+  , sentinel_ndvi_transformed_directory) |>
     group_by(month) |>
     tar_group()
   , iteration = "group")
@@ -562,7 +567,11 @@ dynamic_targets <- tar_plan(
   , basename_template = "ndvi_transformed_{.y}_{.m}.parquet"
   , overwrite  = parse_flag(c("OVERWRITE_MODIS_NDVI", "OVERWRITE_SENTINEL_NDVI", "OVERWRITE_NDVI_TRANSFORMED"))
     ## Enforce dependency so S3 files are synced locally before the file-exists check
-  , ndvi_transformed_AWS)
+  , ndvi_transformed_AWS
+    ## MODIS = 0.0461 + 1.0799 * Sentinel: OLS on 3.46M paired pixels, 173 MODIS composite dates
+     ## 2019-02 to 2026-10 (fit 2026-11-19, R2 0.90). Relationship drifts (slope ~1.4 in 2019-20,
+     ## ~1.0 from 2022), so year-level biases of about +/-0.03 remain
+  , sentinel_calibration = c(0.04611083, 1.07991320))
   , pattern    = map(ndvi_transformed_sources)
   , format     = "file"
   , error      = "null"
@@ -597,8 +606,31 @@ dynamic_targets <- tar_plan(
 
   ## Fetch ERA5T daily weather from CDS and transform to continental parquets.
   ## Branches over months_to_process_era5t
-  ## For forecasting, don't need many months
-, tar_target(era5t_weather_transformed, fetch_and_transform_era5t_weather(
+  ## For forecasting, don't need many months.
+  ## NOTE: Cue wait time can be quite long, upwards of an hour in my experience
+   ## AND is very fragile to too many jobs
+, tar_target(era5t_weather_transformed_old, fetch_and_transform_era5t_weather(
+    months_to_process         = months_to_process
+  , continent_raster_template = continent_raster_template
+  , local_folder              = era5t_weather_transformed_directory
+  , basename_template         = "era5t_weather_transformed_{months_to_process}.parquet"
+  , overwrite                 = parse_flag("OVERWRITE_ERA5T_WEATHER")
+  , era5t_weather_transformed_AWS
+    ## Depends on the ARCO target so it always runs after it, finds those parquets up to
+     ## date and returns without sending anything to the CDS queue
+  , era5t_weather_transformed)
+  , pattern                   = map(months_to_process)
+  , error                     = "null"
+  , format                    = "file"
+    ## Run branches one at a time on the main process: CDS rejects new jobs once
+    ## too many requests for this dataset are queued, so parallel workers each
+    ## submitting jobs fail
+  , deployment                = "main")
+
+  ## Same ERA5T parquets built from the hourly ARCO-ERA5 Zarr store on Google Cloud instead of
+   ## the CDS daily-statistics product (multi-hour queue per request since late 2026). Values
+   ## match the CDS product to float precision. No queue, so branches can run on workers
+, tar_target(era5t_weather_transformed, fetch_and_transform_era5t_weather_arco(
     months_to_process         = months_to_process
   , continent_raster_template = continent_raster_template
   , local_folder              = era5t_weather_transformed_directory
@@ -761,7 +793,13 @@ derived_data_targets <- tar_plan(
   , weather_anomalies_directory
   , basename_template = "weather_anomaly_{date}.parquet"
   , overwrite         = parse_flag("OVERWRITE_WEATHER_ANOMALIES")
-  , weather_anomalies_AWS)
+  , weather_anomalies_AWS
+    ## Caps = min/max of each scaled anomaly across all local weather_anomaly files before
+     ## 2026-07-01 (checked 2026-11-19). Revisit after the historical means are rebuilt
+  , scaled_caps       = list(
+      temperature       = c(-4.173833, 4.116167)
+    , precipitation     = c(-3.479927, 4.477215)
+    , relative_humidity = c(-4.302992, 4.314274)))
   , pattern           = map(era5t_weather_transformed)
   , error             = "null"
   , format            = "file"
