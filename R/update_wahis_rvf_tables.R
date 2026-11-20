@@ -25,6 +25,8 @@ update_wahis_rvf_tables <- function(
   , host_con        = 8L
   , delay           = 0.5
   , retry           = 2L
+    ## ANDO disease lookup used by transform_outbreak_reports()
+  , disease_lookup_path = "data/WAHIS/disease_lookup.xlsx"
 ) {
   
     base_url  <- "https://wahis.woah.org/api/v1/pi/review/report/"
@@ -101,7 +103,10 @@ update_wahis_rvf_tables <- function(
 
     new_gi_resps <- bfs_general_info(
       seed_ids  = needs_update$report_info_id
-    , known_ids = existing_report_ids)
+    , known_ids = existing_report_ids
+      ## The helpers live at top level, so the endpoint and curl settings are passed in explicitly
+    , base_url  = base_url
+    , curl_args = curl_args)
     
     message("Collected general-info for ", length(new_gi_resps), " new report(s)")
 
@@ -118,7 +123,7 @@ update_wahis_rvf_tables <- function(
 
     new_ids          <- unique(new_report_list$report_info_id)
     message("Fetching outbreak details for ", length(new_ids), " new report(s)")
-    new_detail_resps <- fetch_outbreak_details(new_ids)
+    new_detail_resps <- fetch_outbreak_details(new_ids, base_url = base_url, curl_args = curl_args)
 
     
 #### Transform new batch ------------------------------------------------------------
@@ -127,11 +132,14 @@ update_wahis_rvf_tables <- function(
     new_tables <- transform_outbreak_reports(
       general_info_resps     = new_gi_resps
     , outbreak_details_resps = new_detail_resps
-    , report_list            = new_report_list)
+    , report_list            = new_report_list
+      ## Lookup copied into the project from the wahis clone (see R/wahis_scrape_helpers.R)
+    , disease_lookup_path    = disease_lookup_path)
 
     if (is.null(new_tables)) {
       message("Transform produced no output — nothing to merge")
-      return(invisible(existing))
+      ## Return the path, not the data: the calling target uses format = "file"
+      return(output_path)
     }
 
     
@@ -222,17 +230,17 @@ scrape_report_list <- function(post_url) {
   
 }
 
-fetch_batch <- function(urls, ingest_fn) {
+fetch_batch <- function(urls, ingest_fn, curl_args) {
   if (!length(urls)) return(list())
   split(urls, (seq_along(urls) - 1L) %/% 100L) |>
     map(function(batch) {
-      do.call(map_curl, c(list(urls = batch, .f = ingest_fn), curl_args))
+      do.call(scrapetools::map_curl, c(list(urls = batch, .f = ingest_fn), curl_args))
     }) |>
     reduce(c)
 }
 
 ## BFS over previousReportId chain; terminates when it hits known_ids
-bfs_general_info <- function(seed_ids, known_ids = integer(0)) {
+bfs_general_info <- function(seed_ids, known_ids = integer(0), base_url, curl_args) {
   all_resps <- list()
   fetched   <- as.integer(known_ids)
   pending   <- setdiff(as.integer(seed_ids), fetched)
@@ -241,13 +249,14 @@ bfs_general_info <- function(seed_ids, known_ids = integer(0)) {
     message("  BFS wave: fetching general-info for ", length(pending), " report(s)")
     resps     <- fetch_batch(
       paste0(base_url, pending, "/general-information")
-    , safe_ingest_general_info)
+    , safe_ingest_general_info
+    , curl_args)
     all_resps <- c(all_resps, resps)
     fetched   <- c(fetched, pending)
     pending   <- resps |>
-      discard(~ !is.null(.$ingest_status)) |>
+      purrr::discard(~ !is.null(.$ingest_status)) |>
       map(~ .$report$previousReportId) |>
-      compact() |>
+      purrr::compact() |>
       as.integer() |>
       setdiff(fetched)
   }
@@ -257,7 +266,7 @@ bfs_general_info <- function(seed_ids, known_ids = integer(0)) {
 ## Build expanded report list from a set of general-info responses
 build_report_list <- function(gi_resps) {
   gi_resps |>
-    discard(~ !is.null(.$ingest_status)) |>
+    purrr::discard(~ !is.null(.$ingest_status)) |>
     map_dfr(function(x) {
       tibble(
         report_info_id           = as.integer(x$report_info_id)
@@ -272,15 +281,16 @@ build_report_list <- function(gi_resps) {
 }
 
 ## Fetch per-outbreak all-information for all outbreaks in a set of reports
-fetch_outbreak_details <- function(report_ids) {
+fetch_outbreak_details <- function(report_ids, base_url, curl_args) {
   if (!length(report_ids)) return(list())
   
   ob_resps <- fetch_batch(
     paste0(base_url, report_ids, "/outbreaks")
-  , safe_ingest_outbreaks)
+  , safe_ingest_outbreaks
+  , curl_args)
   
   pairs <- ob_resps |>
-    discard(~ !is.null(.$ingest_status)) |>
+    purrr::discard(~ !is.null(.$ingest_status)) |>
     map_dfr(function(x) {
       if (!length(x$outbreaks)) return(NULL)
       rid <- as.integer(x$report_info_id)
@@ -300,6 +310,7 @@ fetch_outbreak_details <- function(report_ids) {
   fetch_batch(
     paste0(base_url, pairs$report_id, "/outbreak/", pairs$outbreak_id, "/all-information")
   , safe_ingest_outbreak_detail
+  , curl_args
   )
   
 }
