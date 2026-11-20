@@ -430,7 +430,9 @@ combine_lja_and_append <- function(new_files, save_filename, rebuild, out_dir, o
   base_data <- safe_read(save_filename)
 
   all_data <- if (!is.null(base_data) && !is.null(new_data) && !rebuild) {
-    bind_rows(base_data, new_data)
+    ## Replace, not append, any date already in the file (re-labeled dates, or a date processed
+     ## twice) so no date can end up duplicated
+    bind_rows(base_data |> filter(!(date %in% unique(new_data$date))), new_data)
   } else if (!is.null(base_data) && !rebuild) {
     base_data
   } else {
