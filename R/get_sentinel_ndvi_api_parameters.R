@@ -63,12 +63,19 @@ get_sentinel_ndvi_api_parameters <- function(sentinel_ndvi_transformed_directory
     end_date   = end_dates
   )
 
+  ## Drop the commissioning-phase products (2018-09-22 to 2019-01-19). They are packed as signed
+   ## bytes whose metadata does not match their contents (decoded NDVI regresses on MODIS with a
+   ## slope near 2.8 rather than ~1), so NDVI for those dates comes from MODIS alone
+  out <- out |> dplyr::filter(start_date >= as.Date("2019-01-20"))
+
   # When dates_to_process is provided, restrict to products whose time span
   # covers at least one of those dates. This avoids submitting API requests for
   # all historical products (hundreds since 2018) when only a few new dates
   # need processing.
   if (!is.null(dates_to_process) && length(dates_to_process) > 0) {
-    dates_dt <- as.Date(dates_to_process)
+    ## Expand to whole months: ndvi_transformed is built per month, so every 10-day
+     ## product overlapping a processed month is needed, not only those containing a sampled date
+    dates_dt <- expand_dates_to_months(dates_to_process)
     out <- out |>
       dplyr::filter(purrr::map2_lgl(start_date, end_date, function(s, e) {
         any(dates_dt >= s & dates_dt <= e)
