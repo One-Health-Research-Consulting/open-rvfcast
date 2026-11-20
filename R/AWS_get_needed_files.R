@@ -105,6 +105,8 @@ get_needed_s3_filenames <- function(s3_files, dates, data_type) {
     #### sentinel_ndvi ------------------------------------------------------------
     ## 10-day windows: transformed_sentinel_NDVI_{start}_to_{end}.parquet
     sentinel_ndvi = {
+      ## Whole months are needed because ndvi_transformed is built per month
+      dates <- expand_dates_to_months(dates)
       Filter(function(f) {
         m          <- regmatches(f, regexpr("(\\d{4}-\\d{2}-\\d{2})_to_(\\d{4}-\\d{2}-\\d{2})", f))
         if (length(m) == 0) return(FALSE)
@@ -120,6 +122,8 @@ get_needed_s3_filenames <- function(s3_files, dates, data_type) {
     #### modis_ndvi ---------------------------------------------------------------
     ## 16-day composites: transformed_modis_NDVI_{start_date}.parquet
   , modis_ndvi = {
+      ## Whole months are needed because ndvi_transformed is built per month
+      dates <- expand_dates_to_months(dates)
       Filter(function(f) {
         m          <- regmatches(f, regexpr("NDVI_(\\d{4}-\\d{2}-\\d{2})", f))
         if (length(m) == 0) return(FALSE)
@@ -324,4 +328,21 @@ cleanup_local_intermediate_files <- function(
   message(glue::glue("Local cleanup: removed {n_deleted} intermediate parquet files"))
   n_deleted
   
+}
+
+#' Expand dates to every day of the calendar months they fall in
+#'
+#' NDVI is combined into monthly files (ndvi_transformed_{year}_{month}.parquet)
+#' that are skipped once complete, so the Sentinel and MODIS inputs must cover the
+#' whole month of each date being processed, not just the sampled dates themselves.
+#'
+#' @param dates Date vector
+#' @return Date vector of all days in the months spanned by `dates`
+#' @noRd
+expand_dates_to_months <- function(dates) {
+  dates        <- as.Date(dates)
+  # First day of each distinct month among the dates
+  month_starts <- unique(lubridate::floor_date(dates, "month"))
+  # Every day from each month start through that month's last day
+  do.call(c, lapply(month_starts, function(m) seq.Date(m, lubridate::ceiling_date(m, "month") - 1, by = "day")))
 }
