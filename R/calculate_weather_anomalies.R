@@ -32,7 +32,10 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
                                         weather_anomalies_directory,
                                         basename_template = "weather_anomaly_{date}.parquet",
                                         overwrite = FALSE,
-                                        ...) {
+                                        ...,
+                                        ## Named list of c(min, max) per variable; after ... so a
+                                         ## positional targets dependency is never matched to it
+                                        scaled_caps = NULL) {
   # Check if input file exists
   if (length(nasa_weather_transformed) == 0 || is.na(nasa_weather_transformed)) {
     stop("nasa_weather_transformed is empty or NA - no weather file available for this month")
@@ -122,6 +125,17 @@ calculate_weather_anomalies <- function(nasa_weather_transformed,
         anomaly_relative_humidity = relative_humidity - relative_humidity_historical,
         anomaly_scaled_relative_humidity = anomaly_relative_humidity / relative_humidity_sd
       )
+
+    ## Clamp scaled anomalies to the range seen in the historical data. Dates inside the
+     ## historical-means window can never exceed about (n_years - 1) / sqrt(n_years) SDs because
+     ## they are part of their own baseline; newer dates are not, and in cells where it has
+     ## (almost) never rained the SD is near zero, so a little rain gives values in the thousands
+    if (!is.null(scaled_caps)) {
+      for (v in names(scaled_caps)) {
+        col <- paste0("anomaly_scaled_", v)
+        weather_transformed_dataset[[col]] <- pmin(pmax(weather_transformed_dataset[[col]], scaled_caps[[v]][1]), scaled_caps[[v]][2])
+      }
+    }
 
     # Remove intermediate columns
     weather_transformed_dataset <- weather_transformed_dataset |>
