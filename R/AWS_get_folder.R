@@ -170,6 +170,14 @@ AWS_get_files <- function(s3_paths, ...) {
     s3_path    <- s3_paths[i]
     local_path <- s3_path  # S3 keys mirror local paths in this project
 
+    ## A local copy whose size differs from the S3 object is a truncated download; remove it so it is
+     ## fetched again (a file absent from S3 has NA size and is left alone)
+    remote_size <- get_remote_size(s3_path, bucket = Sys.getenv("AWS_BUCKET_ID"), region = aws_region)
+    if (file.exists(local_path) && !is.na(remote_size) && file.size(local_path) != remote_size) {
+      cat("Local copy of", basename(local_path), "is", file.size(local_path), "bytes but S3 has", remote_size, "; re-downloading\n")
+      unlink(local_path)
+    }
+
     if (!file.exists(local_path)) {
       dir.create(dirname(local_path), showWarnings = FALSE, recursive = TRUE)
       tryCatch(
@@ -184,6 +192,12 @@ AWS_get_files <- function(s3_paths, ...) {
           invisible(NULL)
         }
       )
+      ## The error handler above lets a partially written file through, so confirm the full object
+       ## arrived and fail loudly otherwise
+      if (!is.na(remote_size) && file.size(local_path) != remote_size) {
+        unlink(local_path)
+        stop(glue::glue("Download of {s3_path} incomplete; removed the partial file, rerun to retry"))
+      }
       cat("Downloaded:", basename(local_path), "\n")
     } else {
       cat("Already local:", basename(local_path), "\n")
@@ -484,4 +498,30 @@ verify_remote_upload <- function(file, bucket, region) {
   local_size  <- file.size(file)
 
   isTRUE(!is.na(remote_size) && remote_size == local_size)
+}
+
+
+#' Size of an Object in AWS S3
+#'
+#' HEADs the object and returns its Content-Length, so a local copy can be
+#' checked for truncation without downloading anything.
+#'
+#' @param file String giving the S3 key.
+#' @param bucket String giving the S3 bucket name.
+#' @param region String giving the AWS region (may be \code{""}).
+#'
+#' @return Numeric size in bytes, or \code{NA} if the object is missing or the
+#'   request fails.
+get_remote_size <- function(file, bucket, region) {
+
+  # Any error or a 404 counts as unknown size; the 404 message from aws.s3 is suppressed
+  head_result <- suppressMessages(tryCatch(
+    aws.s3::head_object(object = file, bucket = bucket, region = region),
+    error = function(e) FALSE
+  ))
+
+  if (!isTRUE(head_result)) return(NA_real_)
+
+  # Content-Length comes back as a character attribute
+  suppressWarnings(as.numeric(attr(head_result, "content-length")))
 }
