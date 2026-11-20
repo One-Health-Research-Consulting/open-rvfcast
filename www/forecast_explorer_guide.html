@@ -1,0 +1,97 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Forecast explorer guide</title>
+<style>body{font-family:sans-serif;max-width:900px;margin:2em auto;padding:0 1em;line-height:1.5;color:#1f2937}table{border-collapse:collapse;font-size:14px;margin:0.6em 0}th,td{border:1px solid #ccc;padding:4px 8px;text-align:left;vertical-align:top}th{background:#f3f3f3}code{font-size:90%}</style>
+</head><body>
+<h1>OpenRVFcast Forecast Explorer — User Guide</h1>
+<h2>What this app shows</h2>
+<p>The map shows the model's latest <strong>forward forecasts</strong> of Rift Valley fever outbreaks across Africa. Colour is the predicted probability that at least one outbreak (with cases) starts in the place during the chosen forecast window. Clicking a place shows three things: its forecast for every window, <strong>how well the model's forecasts have scored there</strong>, and its <strong>outbreak history</strong>.</p>
+<p>There are two versions of the app:</p>
+<table>
+<thead>
+<tr>
+<th>App</th>
+<th>Places</th>
+<th>Probability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hexes</td>
+<td>H3 hexes of about 12,500 km², the model's native units</td>
+<td>The model's probability for the hex</td>
+</tr>
+<tr>
+<td>Regions</td>
+<td>Aggregated ADM2 regions of about 60,000 km² (districts merged within a country)</td>
+<td>The probability of at least one outbreak anywhere in the region, combined from its hexes with a fitted Gaussian copula</td>
+</tr>
+</tbody>
+</table>
+<p>Regional probabilities are not averages of the hex probabilities. A region's chance of at least one outbreak is higher than any one of its hexes', but lower than if its hexes had outbreaks independently, because outbreaks in neighbouring hexes go together. The <strong>Dependence bounds (max hex – independence)</strong> column gives those two bounds: the largest single hex's probability (as if the region's hexes always had outbreaks together) and the probability if its hexes had outbreaks independently. It is not an uncertainty interval; a wide range means the regional probability depends a lot on how strongly the region's hexes move together.</p>
+<hr />
+<h2>Controls</h2>
+<ul>
+<li><strong>Forecast base date</strong>: the date the forecasts were made from. The most recent is shown first.</li>
+<li><strong>Forecast window</strong>: forecasts are made for five consecutive windows after the base date: days 1–29, 30–59, 60–89, 90–119 and 120–149.</li>
+<li><strong>Show forecast-quality mask</strong>:
+<ul>
+<li><em>faded</em> places: the model's skill there cannot be judged (no outbreaks in the back-test period);</li>
+<li><em>dashed white outline</em>: low forecast skill (see below).</li>
+</ul>
+</li>
+</ul>
+<p>The colour scale is logarithmic: each step is a multiplication, so differences between 0.01% and 0.1% are as visible as between 1% and 10%. Most places have very small probabilities; outbreaks are rare. The colour limits are the same as in the evaluation report's maps, so a colour means the same probability in every month.</p>
+<hr />
+<h2>Forecast panel</h2>
+<ul>
+<li><strong>P(outbreak)</strong> for each window, for the chosen base date.</li>
+<li><strong>Rank</strong>: where the place sits among all hexes (or regions) for that window. &quot;Top 5%&quot; means only 5% of places have a higher probability.</li>
+<li><strong>Dependence bounds (regions only)</strong>: the lower and upper bounds described above (hover over the column title for a reminder).</li>
+<li>The plot shows the forecast across windows; the yellow ring is the window on the map. In the hex app the dashed line is the hex's typical (median) probability in the test period, to show whether the current forecast is unusually high for this place.</li>
+</ul>
+<hr />
+<h2>Forecast-quality panel</h2>
+<p>Forecast quality comes from back-tests: forecasts the model made for past dates, compared with what happened. Each place is scored on its <strong>log-loss gain over a flat forecast</strong>: how much better the model's probabilities scored than a constant forecast equal to the overall outbreak rate. Positive is better than flat.</p>
+<p>The back-tests used are the <strong>outer folds</strong> (models refitted on earlier data and used to forecast 2008–2020, before the test period) wherever the place has them, otherwise the <strong>test period</strong> (from 2021). Outer folds come first because they are evidence available <em>before</em> the period being forecast.</p>
+<table>
+<thead>
+<tr>
+<th>Forecast quality</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Demonstrated skill</strong></td>
+<td>The back-tests included outbreaks here, and the model beat a flat forecast.</td>
+</tr>
+<tr>
+<td><strong>Low Forecast Skill</strong></td>
+<td>The back-tests included outbreaks here, but the model did not beat a flat forecast. Treat forecasts here with caution.</td>
+</tr>
+<tr>
+<td><strong>No outbreaks in evaluation period</strong></td>
+<td>No outbreaks happened here in the back-tests, so whether the model catches outbreaks here cannot be judged. This is most places, especially for hexes.</td>
+</tr>
+</tbody>
+</table>
+<p>The table adds:</p>
+<ul>
+<li><strong>Predictions scored</strong> and <strong>of which had an outbreak</strong>: how much evidence the class rests on. A class built on two outbreak rows is weak evidence.</li>
+<li><strong>Skill rank</strong>: 1 = the largest gain of all places.</li>
+<li><strong>Test-period gain</strong>: the same score on the test period, for comparison.</li>
+<li>Hexes only:
+<ul>
+<li><strong>Timing skill (within-hex AUC)</strong>: compares the hex's outbreak dates with its other dates in the test period. 0.5 means the model knew <em>where</em> outbreaks happen but not <em>when</em>.</li>
+<li><strong>Gain over its own history</strong>: whether the model beat the hex's own historical outbreak rate for that time of year.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2>Outbreak-history panel</h2>
+<p>All labelled outbreaks (WAHIS reports with cases &gt; 0) recorded in the place, by year. <strong># of times cases recorded</strong> counts the distinct outbreak reports that year. Hexes count the outbreaks the model's labels place in the hex; regions count outbreaks by their reported coordinates.</p>
+<p>The note under the summary says how many outbreaks started before the test period. Only those count as the &quot;outbreak history&quot; used in the forecast-quality context and in the evaluation report's maps.</p>
+<hr />
+<h2>Where the data come from</h2>
+<p>The forecasts are the json forecasts of the most recent forecast run. Forecast quality and outbreak history come from the most recent training run's evaluation (the date is in the header). Regional forecasts use the copula fitted in that training run. The data files are built by <code>build_forecast_app_data()</code> (R/build_app_components.R).</p>
+
+</body></html>
