@@ -340,9 +340,14 @@ cleanup_local_intermediate_files <- function(
 #' @return Date vector of all days in the months spanned by `dates`
 #' @noRd
 expand_dates_to_months <- function(dates) {
+  
   dates        <- as.Date(dates)
-  # First day of each distinct month among the dates
+  ## First day of each distinct month among the dates
+  
   month_starts <- unique(lubridate::floor_date(dates, "month"))
-  # Every day from each month start through that month's last day
+  ## Every day from each month start through that month's last day
+  
   do.call(c, lapply(month_starts, function(m) seq.Date(m, lubridate::ceiling_date(m, "month") - 1, by = "day")))
+
 }
+
