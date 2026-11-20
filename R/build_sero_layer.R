@@ -33,7 +33,20 @@ prep_all_pairs <- function(sero_cases_dat, cov_dat, map_dat, outpath, overwrite)
     
     ## Check if there are new dates in the old file
     needed_date <- unique(cov_dat$date)[which(unique(cov_dat$date) > last_date)]
-    
+
+    ## Nothing past the saved file's last date: return it as is. Without this the empty date set
+     ## below reaches the joins with zero columns and errors (happens whenever an upstream input such
+     ## as the WAHIS cases changes without new model dates being added)
+    if (length(needed_date) == 0 && !overwrite) {
+      message("prepped_pairs.Rds already covers every date through ", last_date, "; returning it")
+      return(all_dates.prepped.old)
+    }
+
+  } else {
+
+    ## No saved file to append to, so every date is needed
+    needed_date <- unique(cov_dat$date)
+
   }
   
   ## grab the stan data to get the correct indices for the H3 hex names
