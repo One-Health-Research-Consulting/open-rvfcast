@@ -73,7 +73,7 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_api_parameters,
   message(paste0("Transforming ", raw_filename))
 
   # Re-project to raster to template
-  transformed_raster <- transform_raster(raw_raster = terra::rast(sentinel_ndvi_downloaded),
+  transformed_raster <- transform_raster(raw_raster = read_sentinel_ndvi_nc(sentinel_ndvi_downloaded),
                                          template = terra::rast(continent_raster_template))
 
   # Convert raster to dataframe
@@ -99,4 +99,41 @@ transform_sentinel_ndvi <- function(sentinel_ndvi_api_parameters,
   unlink(sentinel_ndvi_downloaded)
 
   return(sentinel_ndvi_filename)
+}
+
+#' Read a Sentinel-3 SY_2_V10 NDVI.nc as True NDVI
+#'
+#' NDVI is stored as packed bytes (NDVI = DN * scale_factor + add_offset; 2019 onward
+#' 0.004 and -0.08). Whether terra/GDAL applies that packing on read has changed between
+#' versions, which left the stored parquets on three different scales (raw DN 2019-2025,
+#' NDVI x 200 for 2025-09 to 2026-07, true NDVI after). Reading the raw integers and
+#' applying the file's own attributes gives true NDVI regardless of version.
+#'
+#' @param nc_file Character. Path to the product's NDVI.nc.
+#'
+#' @return SpatRaster of NDVI on the -1 to 1 scale, fill values as NA.
+read_sentinel_ndvi_nc <- function(nc_file) {
+
+  # Stored integers with the fill value already set to NA and no packing applied
+  raw <- terra::rast(nc_file, raw = TRUE)
+
+  # Packing attributes straight from the NetCDF metadata
+  meta   <- terra::describe(nc_file)
+  scale  <- as.numeric(sub(".*=", "", grep("NDVI#scale_factor=", meta, value = TRUE)))
+  offset <- as.numeric(sub(".*=", "", grep("NDVI#add_offset=", meta, value = TRUE)))
+  if (length(scale) != 1 || length(offset) != 1) {
+    stop(glue::glue("Could not read NDVI scale_factor/add_offset from {basename(nc_file)}"))
+  }
+
+  ndvi <- raw * scale + offset
+  names(ndvi) <- "NDVI"
+
+  # Guard against a future change in packing silently producing values off the NDVI scale
+  rng <- unlist(terra::global(ndvi, c("min", "max"), na.rm = TRUE))
+  if (rng[1] < -1.05 || rng[2] > 1.05) {
+    stop(glue::glue("Decoded NDVI in {basename(nc_file)} spans {round(rng[1], 3)} to {round(rng[2], 3)}, outside -1 to 1"))
+  }
+
+  ndvi
+
 }
