@@ -59,7 +59,7 @@ submit_modis_ndvi_bundle_request <- function(modis_ndvi_token,
     elapsed_minutes <- difftime(Sys.time(), start_time, units = "mins")[[1]] |> round(2)
     cat(glue::glue("  Fetching MODIS NDVI task details for year {modis_ndvi_task_id_continent$year}. Task {task_id} is '{task_status}' with {elapsed_minutes} minutes elapsed.        \r"))
     
-    if(i > 1000) stop(glue::glue("MODIS NDVI task {task_id} timed out."))
+    if(i > 2) stop(glue::glue("MODIS NDVI task {task_id} timed out."))
     
     Sys.sleep(retry_time)
     i <- i + 1
