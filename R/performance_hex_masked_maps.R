@@ -91,7 +91,7 @@ plot_hex_masked_forecasts <- function(
         map_sf             = map_sf[map_sf$forecast_interval == forecast_interval, ]
       , hatch_lines        = hatch_lines
       , title              = paste0("Hex outbreak probability from base date ", d
-                                    , ", days ", window_lower, "-", forecast_interval - 1)
+                                    , ", days ", window_lower, "-", forecast_interval)
       , fill_limits        = fill_limits
       , history_levels     = levels(hex_context$history_class)
       , history_linewidths = history_linewidths
@@ -130,8 +130,7 @@ plot_one_hex_masked_window <- function(map_sf, hatch_lines, title, fill_limits, 
                                          , linetype = "dashed", linewidth = 0.5, key_glyph = "path")) +
     ## Shared colour limits so maps of different dates and windows are comparable; zero probabilities
      ## (log10 = -Inf, e.g. rounded forecasts) are squished to the lowest colour rather than drawn as missing
-    ggplot2::scale_fill_viridis_c(trans = "log10", name = "P(outbreak)", na.value = "grey90", limits = fill_limits
-                                  , oob = function(x, range) scales::squish(x, range, only.finite = FALSE)) +
+    probability_fill_scale(fill_limits) +
     ggplot2::scale_alpha_manual(values = rlang::set_names(c(faded_alpha, 1), c(faded_class, "Other")), breaks = faded_class, name = NULL) +
     ggplot2::scale_colour_manual(values = rlang::set_names("red", outbreak_label), name = NULL) +
     ggplot2::scale_linetype_manual(values = rlang::set_names("solid", hatch_class), name = "Forecast quality") +
@@ -140,7 +139,7 @@ plot_one_hex_masked_window <- function(map_sf, hatch_lines, title, fill_limits, 
     ## Legend order: probability, outbreak outline, the two quality keys together, then outbreak history.
      ## The faded key uses a mid-scale fill so its transparency is visible
     ggplot2::guides(
-      fill      = ggplot2::guide_colourbar(order = 1)
+      fill      = ggplot2::guide_colourbar(order = 1, nbin = 300, barheight = ggplot2::unit(10, "lines"))
     , colour    = if (has_outbreaks) ggplot2::guide_legend(order = 2) else "none"
     , linetype  = if (has_hatching) ggplot2::guide_legend(order = 3, override.aes = list(colour = hatch_colour, linewidth = 0.6)) else "none"
     , alpha     = ggplot2::guide_legend(order = 4, override.aes = list(fill = viridisLite::viridis(1, begin = 0.6), colour = NA))
@@ -150,5 +149,40 @@ plot_one_hex_masked_window <- function(map_sf, hatch_lines, title, fill_limits, 
     ggplot2::theme_void() +
     ## Explicit white background (theme_void leaves it transparent)
     ggplot2::theme(plot.background = ggplot2::element_rect(fill = "white", colour = NA))
+
+}
+
+
+## Fill scale for outbreak probabilities shared by the hex and regional masked maps. Log10 like before,
+ ## but (1) everything below `floor` takes the lowest colour, since differences among near-zero
+ ## probabilities are not worth a gradient, and (2) colours are packed toward the top of the range:
+ ## a colour at fraction c of the palette sits at fraction c^(1/stretch) of the log range, so with
+ ## stretch = 1.5 the upper half of the log range spans about the upper two thirds of the palette
+probability_fill_scale <- function(fill_limits, floor = 0.001, stretch = 1.5, n_colours = 64) {
+
+  # Raise the lower limit to the floor (kept below the upper limit for very low-probability maps)
+  limits <- c(max(fill_limits[1], min(floor, fill_limits[2] / 10)), fill_limits[2])
+
+  # Palette positions in rescaled (0-1, log) data space, denser toward the top
+  palette_at <- seq(0, 1, length.out = n_colours)^(1 / stretch)
+
+  # Labelled ticks at 1-3-10 steps inside the limits; the bottom tick also covers everything squished under it
+  ticks  <- c(1e-4, 3e-4, 1e-3, 3e-3, 0.01, 0.03, 0.1, 0.3, 1)
+  # The bottom tick sits a hair inside the limit so floating-point error on the log scale cannot drop it
+  breaks <- unique(c(limits[1] * 1.001, ticks[ticks > limits[1] * 1.2 & ticks <= limits[2]]))
+  labels <- scales::label_percent(accuracy = 0.1, drop0trailing = TRUE)(breaks)
+  labels[1] <- paste0("≤", labels[1])
+
+  ggplot2::scale_fill_gradientn(
+    colours  = viridisLite::viridis(n_colours)
+  , values   = palette_at
+  , trans    = "log10"
+  , limits   = limits
+  , breaks   = breaks
+  , labels   = labels
+  , name     = "P(outbreak)"
+  , na.value = "grey90"
+    # Zero probabilities (log10 = -Inf) and everything under the floor take the lowest colour
+  , oob      = function(x, range) scales::squish(x, range, only.finite = FALSE))
 
 }
