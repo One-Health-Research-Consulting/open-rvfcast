@@ -393,7 +393,7 @@ run_comprehensive_performance <- function(
 ## Consecutive forecast windows from their upper bounds (days): the first starts at day 1, each
 ## later one at the previous upper bound
 make_forecast_windows <- function(forecast_horizon) {
-  tibble::tibble(forecast_interval = forecast_horizon, window_lower = c(1, utils::head(forecast_horizon, -1)))
+  tibble::tibble(forecast_interval = forecast_horizon, window_lower = c(1, utils::head(forecast_horizon, -1)) + 1)
 }
 
 ## Read the calibration-harvest predictions and calibrate each fold with coefficients fit
