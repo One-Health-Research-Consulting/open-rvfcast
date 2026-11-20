@@ -120,5 +120,3 @@ delete_all_current_tasks <- function(modis_ndvi_token) {
   
   map(current_tasks, ~delete_appears_task(modis_ndvi_token, .x))
 }
-
-
