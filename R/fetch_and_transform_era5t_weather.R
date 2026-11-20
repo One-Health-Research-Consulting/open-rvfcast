@@ -108,7 +108,21 @@ fetch_and_transform_era5t_weather <- function(
   # Remove nc files left from a previous failed run. download_era5t_nc skips existing files,
   # so stale nc files (covering fewer days than now available) would otherwise be silently
   # reused. Clearing them here forces a fresh CDS download for each processing attempt.
-  purrr::walk(c(nc_t2m_file, nc_d2m_file, nc_precip_file), ~if (file.exists(.x)) file.remove(.x))
+  ## Exception: an nc file that already holds every requested day is kept, so a run that was
+   ## stopped part-way through a month resumes with only the variables still missing instead of
+   ## waiting in the CDS queue again for downloads that already finished
+  nc_candidates <- list(
+    c("t2m", "VAR_2T", "2m_temperature")
+  , c("d2m", "VAR_2D", "2m_dewpoint_temperature")
+  , c("tp",  "VAR_TP", "total_precipitation"))
+  purrr::walk2(c(nc_t2m_file, nc_d2m_file, nc_precip_file), nc_candidates, function(nc_file, candidates) {
+    if (!file.exists(nc_file)) return(invisible(NULL))
+    if (!overwrite && era5t_nc_is_complete(nc_file, candidates, n_days = length(days))) {
+      message(glue::glue("{basename(nc_file)} from a previous run covers all {length(days)} days, reusing it"))
+    } else {
+      file.remove(nc_file)
+    }
+  })
 
   download_era5t_nc(
     variable     = "2m_temperature"
@@ -281,15 +295,76 @@ download_era5t_nc <- function(variable, statistic, year, month, days,
   , download_format    = "unarchived"
   , target             = basename(filename))
 
-  ecmwfr::wf_request(
-    request  = request
-  , user     = Sys.getenv("ECMWF_USERID")
-  , path     = local_folder
-    ## Setting a shorter time out to test if there are individual file issues
-     ## or if timeout is due to throttle from too many requests. Timeout
-     ## printout uninformative
-  , time_out = 300
-  , verbose  = TRUE)
+  ## Previously wf_request was allowed to wait only 300 s; CDS daily-statistics jobs often
+   ## sit in the queue longer, in which case wf_request returned without downloading, the
+   ## branch failed, and the job was left orphaned in the CDS queue (where it counts toward
+   ## the per-dataset queue limit and causes later requests to be rejected). Now each job is
+   ## submitted without waiting (transfer = FALSE) and polled here until it downloads.
+   ## Timeout, poll interval and wait-after-rejection can be tuned via .env.
+  time_out      <- as.numeric(Sys.getenv("ERA5T_CDS_TIMEOUT", "43200"))
+  poll_interval <- as.numeric(Sys.getenv("ERA5T_CDS_POLL_INTERVAL", "30"))
+  queue_wait    <- as.numeric(Sys.getenv("ERA5T_CDS_QUEUE_WAIT", "120"))
+  deadline      <- Sys.time() + time_out
+
+  ## Holds the current CDS job so it can be cancelled if this function exits early
+  cds_job <- NULL
+  on.exit({
+    ## On error, timeout or user interrupt, remove the job from the CDS queue so it does
+     ## not block future requests; a successful job is already deleted below
+    if (!is.null(cds_job) && !isTRUE(cds_job$is_success())) try(cds_job$delete(), silent = TRUE)
+  }, add = TRUE)
+
+  repeat {
+
+    ## Submit the job; transient gateway errors (e.g. 502) are retried
+    cds_job <- retry_transient_cds_error(function() {
+      ecmwfr::wf_request(
+        request  = request
+      , user     = Sys.getenv("ECMWF_USERID")
+      , path     = local_folder
+      , transfer = FALSE
+      , verbose  = TRUE)
+    }, label = glue::glue("submitting {basename(filename)}"))
+
+    ## Poll the same job until it downloads, ends in a terminal state, or the timeout passes.
+     ## download() refreshes the status and fetches the file once it is ready; a "failed"
+     ## job raises an error inside it, but a "rejected" job does not, so check explicitly.
+    while (!cds_job$is_success() && !cds_job$get_status() %in% c("rejected", "dismissed", "deleted")) {
+      if (Sys.time() > deadline) {
+        stop(glue::glue(
+          "ERA5T CDS request for {basename(filename)} not complete after {round(time_out / 60)} minutes ",
+          "(status: {cds_job$get_status()}); job cancelled. ",
+          "Increase ERA5T_CDS_TIMEOUT in .env or rerun later."
+        ))
+      }
+      Sys.sleep(poll_interval)
+      retry_transient_cds_error(function() cds_job$download(), label = glue::glue("polling {basename(filename)}"))
+    }
+
+    ## Downloaded: done
+    if (cds_job$is_success()) break
+
+    ## Ended without data; find out why
+    reason <- get_cds_job_reason(cds_job)
+    try(cds_job$delete(), silent = TRUE)
+
+    ## Too many queued requests for this dataset is temporary: wait for the queue to drain
+     ## and resubmit, as long as there is time left
+    if (grepl("Maximum number queued requests", reason, ignore.case = TRUE) &&
+        Sys.time() + queue_wait < deadline) {
+      message(glue::glue(
+        "CDS rejected {basename(filename)} because the dataset queue limit is reached; ",
+        "resubmitting in {queue_wait} s"))
+      Sys.sleep(queue_wait)
+      next
+    }
+
+    stop(glue::glue(
+      "ERA5T CDS request for {basename(filename)} ended with status '{cds_job$get_status()}': {reason}"))
+  }
+
+  ## Remove the finished job from the CDS queue; failure to delete is harmless
+  try(cds_job$delete(), silent = TRUE)
 
   if (!file.exists(filename)) {
     stop(glue::glue("ERA5T CDS download failed: {basename(filename)} not found after request"))
@@ -322,4 +397,90 @@ detect_era5t_nc_variable <- function(nc_file, candidates) {
   }
 
   match[1]
+}
+
+#' Retry a CDS API Call on Transient Server Errors
+#'
+#' The CDS API intermittently returns gateway errors (HTTP 502/503/504) or drops
+#' connections. These are not problems with the request itself, so the call is retried
+#' after a pause instead of failing the whole targets branch. Any other error is
+#' re-thrown immediately.
+#'
+#' @param f Function with no arguments that performs the CDS call.
+#' @param label Character. Description of the call, used in messages.
+#' @param max_attempts Integer. Maximum number of attempts.
+#' @param wait Numeric. Seconds to wait before the first retry; doubles each retry.
+#' @return The value returned by f().
+retry_transient_cds_error <- function(f, label = "CDS request", max_attempts = 5, wait = 30) {
+
+  # Error message fragments that indicate a temporary server or network problem
+  transient_pattern <- paste(
+    c("502", "503", "504", "Bad Gateway", "Service Unavailable", "Gateway Time-?out",
+      "Timeout was reached", "Connection reset", "Could not resolve host", "Recv failure"),
+    collapse = "|")
+
+  for (attempt in seq_len(max_attempts)) {
+    result <- tryCatch(f(), error = function(e) e)
+
+    # Success: return the value straight away
+    if (!inherits(result, "error")) return(result)
+
+    msg <- conditionMessage(result)
+
+    # Non-transient errors, or out of attempts: fail with a short, readable message
+    if (!grepl(transient_pattern, msg, ignore.case = TRUE) || attempt == max_attempts) {
+      # Gateway error pages arrive as full HTML; strip tags so the targets error field is legible
+      stop(glue::glue("{label} failed after {attempt} attempt(s): ",
+                      "{substr(trimws(gsub('<[^>]+>|\\\\s+', ' ', msg)), 1, 300)}"), call. = FALSE)
+    }
+
+    message(glue::glue("Transient CDS error while {label} (attempt {attempt}/{max_attempts}); ",
+                       "retrying in {wait} s"))
+    Sys.sleep(wait)
+    wait <- wait * 2
+  }
+}
+
+#' Get the Reason a CDS Job Ended Without Data
+#'
+#' ecmwfr does not surface why a CDS job was rejected or dismissed. The CDS jobs API
+#' returns the reason (e.g. "Maximum number queued requests for this dataset has been
+#' reached") in the body of the job's /results endpoint.
+#'
+#' @param cds_job An ecmwfr ds_service request object.
+#' @return Character scalar describing the reason, or a placeholder if none is available.
+get_cds_job_reason <- function(cds_job) {
+
+  # The results endpoint for a rejected job returns a JSON error body holding the reason
+  response <- tryCatch(
+    httr::GET(paste0(cds_job$get_url(), "/results"),
+              httr::add_headers(`PRIVATE-TOKEN` = Sys.getenv("ECMWF_TOKEN"))),
+    error = function(e) NULL)
+
+  if (is.null(response)) return("no reason available (could not reach CDS)")
+
+  body <- tryCatch(httr::content(response, as = "parsed", encoding = "UTF-8"), error = function(e) NULL)
+
+  # Prefer the most specific field CDS provides
+  reason <- body$traceback %||% body$detail %||% body$title
+  if (is.null(reason)) "no reason given by CDS" else as.character(reason)
+}
+
+#' Check Whether a Leftover ERA5T NetCDF File Covers Every Requested Day
+#'
+#' Used to decide if an nc file left by an interrupted run can be reused rather than
+#' re-requested from CDS. A file is complete when it opens, contains one of the expected
+#' variables, and has one layer per requested day. Unreadable or partial files count as
+#' incomplete.
+#'
+#' @param nc_file Character. Path to the NetCDF file.
+#' @param candidates Character vector. Variable names passed to detect_era5t_nc_variable().
+#' @param n_days Integer. Number of days requested for the month.
+#' @return Logical scalar.
+era5t_nc_is_complete <- function(nc_file, candidates, n_days) {
+  tryCatch({
+    # Open just the variable of interest; each layer is one day
+    nc_var <- detect_era5t_nc_variable(nc_file, candidates)
+    terra::nlyr(terra::rast(nc_file, subds = nc_var)) == n_days
+  }, error = function(e) FALSE)
 }
