@@ -71,6 +71,8 @@ GitHub repository which is organized with the following structure:
   are .gitignored and are available with access to S3-compatible cloud
   storage or the raw data can be downloaded and processed.
 - `R/` contains functions used in this analysis.
+- `secondary_analysis/` extra supplemental analysis run outside of the
+  targets pipeline.
 - `documentation/` contains documentation:
   - `openRVFcast_Walkthrough.docx` - comprehensive details on the full
     modeling pipeline

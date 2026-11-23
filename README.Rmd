@@ -43,6 +43,7 @@ Project code is available on the [open-rvfcast](https://github.com/One-Health-Re
 
 -   `data/` contains downloaded and transformed data sources. These data are .gitignored and are available with access to S3-compatible cloud storage or the raw data can be downloaded and processed.
 -   `R/` contains functions used in this analysis.
+-   `secondary_analysis/` extra supplemental analysis run outside of the targets pipeline.
 -   `documentation/` contains documentation:
     -   `openRVFcast_Walkthrough.docx` - comprehensive details on the full modeling pipeline
     -   `dynamic_branching_guide.md` - comprehensive guide to the dynamic branching implementation
