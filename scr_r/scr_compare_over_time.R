@@ -59,8 +59,8 @@ compare_fits_over_time <- function(eval_path) {
 plot_fits_over_time <- function(all_metrics) {
 
   plot_dat <- all_metrics |>
-    dplyr::select(run_date, aggregation, forecast_interval, roc_auc, pr_auc, logloss, brier) |>
-    pivot_longer(cols = c(roc_auc, pr_auc, logloss, brier), names_to = "metric", values_to = "value")
+    dplyr::select(run_date, aggregation, forecast_interval, roc_auc, pr_auc, logloss, brier, brier_skill, reliability, resolution) |>
+    pivot_longer(cols = c(roc_auc, pr_auc, logloss, brier, brier_skill, reliability, resolution), names_to = "metric", values_to = "value")
 
   ggplot(plot_dat, aes(x = run_date, y = value, colour = factor(forecast_interval))) +
     geom_line() +
@@ -80,34 +80,67 @@ plot_fits_over_time <- function(all_metrics) {
 
 #### Helper: score a single dated fit file -----------------------------------------
 
-## Computes ranking (ROC-AUC, PR-AUC), probabilistic (log loss, Brier score),
- ## and prevalence summaries per aggregation type / forecast interval,
+## Computes ranking (ROC-AUC, PR-AUC), probabilistic (log loss, Brier score,
+ ## Brier Skill Score relative to base-rate climatology), and its Murphy (1973)
+ ## reliability/resolution decomposition, per aggregation type / forecast interval,
  ## matching the metric choices used elsewhere in the pipeline (see
- ## R/make_recipe.R, event_level = "first" for the positive class)
+ ## R/make_recipe.R, event_level = "first" for the positive class).
+ ## brier_skill alone can look damning under extreme rarity even when the model
+ ## has real discriminative value -- reliability (miscalibration, want LOW) and
+ ## resolution (discrimination, want HIGH) pull those two failure modes apart;
+ ## see reliability_decomposition() below.
 score_one_run <- function(path, run_date) {
 
   dat <- qread(path) |> mutate(true_out_fct = factor(true_out, levels = c("1", "0")))
 
   dat |>
     group_by(aggregation, forecast_interval) |>
-    summarize(
-        n          = n()
-      , n_pos      = sum(true_out == 1)
-      , prevalence = n_pos / n
-      , roc_auc    = tryCatch(
-          yardstick::roc_auc_vec(true_out_fct, prob_pred, event_level = "first")
-        , error = function(e) NA_real_)
-      , pr_auc     = tryCatch(
-          yardstick::pr_auc_vec(true_out_fct, prob_pred, event_level = "first")
-        , error = function(e) NA_real_)
-      , logloss    = tryCatch(
-          yardstick::mn_log_loss_vec(true_out_fct, prob_pred, event_level = "first")
-        , error = function(e) NA_real_)
-      , brier      = mean((prob_pred - true_out)^2)
-    , .groups = "drop"
-    ) |>
+    group_modify(~ {
+      clim_p   <- mean(.x$true_out)
+      bs_model <- mean((.x$prob_pred - .x$true_out)^2)
+      bs_clim  <- mean((clim_p - .x$true_out)^2)
+      decomp   <- reliability_decomposition(.x$prob_pred, .x$true_out)
+      tibble(
+          n            = nrow(.x)
+        , n_pos        = sum(.x$true_out == 1)
+        , prevalence   = clim_p
+        , roc_auc      = tryCatch(
+            yardstick::roc_auc_vec(factor(.x$true_out, levels = c("1", "0")), .x$prob_pred, event_level = "first")
+          , error = function(e) NA_real_)
+        , pr_auc       = tryCatch(
+            yardstick::pr_auc_vec(factor(.x$true_out, levels = c("1", "0")), .x$prob_pred, event_level = "first")
+          , error = function(e) NA_real_)
+        , logloss      = tryCatch(
+            yardstick::mn_log_loss_vec(factor(.x$true_out, levels = c("1", "0")), .x$prob_pred, event_level = "first")
+          , error = function(e) NA_real_)
+        , brier        = bs_model
+        , brier_skill  = if (bs_clim > 0) 1 - (bs_model / bs_clim) else NA_real_
+        , reliability  = decomp$reliability
+        , resolution   = decomp$resolution
+      )
+    }) |>
+    ungroup() |>
     mutate(run_date = run_date, .before = 1)
 
+}
+
+## Murphy (1973) three-term Brier decomposition (brier = reliability - resolution +
+ ## uncertainty) using fixed, hand-chosen probability bins sized for this problem's
+ ## extreme rarity (finer near 0, where almost all the mass sits, coarser above 0.1).
+ ## Bins this coarse necessarily lose some resolution/reliability signal relative to
+ ## an unbinned estimator, but exact per-value binning is not identifiable from a
+ ## finite sample anyway -- this is the standard practical tradeoff for this
+ ## decomposition, not a shortcut specific to this script
+reliability_decomposition <- function(prob_pred, true_out, breaks = c(0, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 1)) {
+  clim_p <- mean(true_out)
+  bin    <- cut(prob_pred, breaks, include.lowest = TRUE)
+  tab    <- tibble(prob_pred, true_out, bin) |>
+    group_by(bin) |>
+    summarize(n = n(), pbar = mean(prob_pred), ybar = mean(true_out), .groups = "drop")
+  list(
+    reliability = sum(tab$n * (tab$pbar - tab$ybar)^2) / length(true_out)
+  , resolution  = sum(tab$n * (tab$ybar - clim_p)^2) / length(true_out)
+  )
 }
 
 #### Run ---------------------------------------------------------------------------
