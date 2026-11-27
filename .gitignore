@@ -28,6 +28,8 @@ data/fao_rvf_rasters/hex_summaries/
 data/fao_rvf_rasters/VAXCRM-MEA/
 data/upscaling_regions/*.Rds
 data/hypergrid/*.Rds
+data/sero_kernel_icar_base_model_samples.Rds
+data/sero_layer_prep/prepped_pairs.Rds 
 notes/*
 *.token
 **/*.SEN3
@@ -38,3 +40,4 @@ scr_r/*
 *.RDataTmp
 Rplots.pdf
 my_plots.gif
+logs/
