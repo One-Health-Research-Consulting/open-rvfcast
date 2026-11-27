@@ -43,6 +43,8 @@
 #' @param forecast_horizon Upper bounds (days) of the consecutive forecast windows (the
 #'   forecast_horizon target); the first window starts at day 1
 #' @param regions_path Regions to up-scale to, e.g.data/upscaling_regions/reduced_pan_regions_target60000km2.Rds
+#' @param country_regions_path Country polygons (build_country_regions()) for the country-level copula
+#'   fit saved with the forecast context; NULL skips it
 #' @param harvest_dir Folder of calibration-harvest files (outer-fold predictions); NULL to skip
 #' @param fitted_model The fitted_model target (file paths), for the model-structure section
 #' @param variable_importance The variable_importance target, for the variable-importance section
@@ -75,29 +77,30 @@ run_comprehensive_performance <- function(
   , train_data
   , test_data
   , region_hexes
-  , forecast_horizon   = c(30, 60, 90, 120, 150)
-  , regions_path       = "data/upscaling_regions/reduced_pan_regions_target60000km2.Rds"
-  , harvest_dir        = "outputs/calibration_harvest"
-  , fitted_model       = NULL
-  , variable_importance = NULL
-  , out_root           = "outputs/comprehensive_performance"
-  , run_date           = Sys.Date()
-  , sections           = c("hex", "rare_event", "outbreak", "regional", "cumulative", "spatial", "enso", "temporal", "model_structure", "variable_importance")
-  , alert_fractions    = c(0.01, 0.05, 0.10)
-  , p_thresh           = c(0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5)
-  , min_events_for_auc = 5
-  , n_boot             = 200
-  , n_boot_corp        = 50
-  , n_boot_episodes    = 1000
-  , copula_args        = list()
-  , n_map_dates        = 4
-  , enso_data_dir      = here::here("data/ENSO")
-  , correlation_method = "spearman"
-  , chosen_outer_fold  = 1
-  , chosen_purpose_tag = "for_test_data"
-  , shap_sample_n      = 3000
-  , pdp_grid_res       = 25
-  , context_dir        = "outputs/forecast_context"
+  , forecast_horizon     = c(30, 60, 90, 120, 150)
+  , regions_path         = "data/upscaling_regions/reduced_pan_regions_target60000km2.Rds"
+  , country_regions_path = NULL
+  , harvest_dir          = "outputs/calibration_harvest"
+  , fitted_model         = NULL
+  , variable_importance  = NULL
+  , out_root             = "outputs/comprehensive_performance"
+  , run_date             = Sys.Date()
+  , sections             = c("hex", "rare_event", "outbreak", "regional", "country", "cumulative", "spatial", "enso", "temporal", "model_structure", "variable_importance")
+  , alert_fractions      = c(0.01, 0.05, 0.10)
+  , p_thresh             = c(0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5)
+  , min_events_for_auc   = 5
+  , n_boot               = 200
+  , n_boot_corp          = 50
+  , n_boot_episodes      = 1000
+  , copula_args          = list()
+  , n_map_dates          = 4
+  , enso_data_dir        = here::here("data/ENSO")
+  , correlation_method   = "spearman"
+  , chosen_outer_fold    = 1
+  , chosen_purpose_tag   = "for_test_data"
+  , shap_sample_n        = 3000
+  , pdp_grid_res         = 25
+  , context_dir          = "outputs/forecast_context"
 ) {
 
   ##########################################################################################
@@ -335,6 +338,29 @@ run_comprehensive_performance <- function(
 
   
   ##########################################################################################
+  #### 5a) Country-level up-scaling with the copula (saved with the forecast context) ------
+  ##########################################################################################
+
+  ## Same copula as the regional section with countries as the regions; used for the monthly
+   ## memo's country table (fit_country_copula() in R/country_copula.R)
+  country_out <- if (!is.null(country_regions_path)) run_section("country", {
+    country_fit <- fit_country_copula(
+      hex_preds            = hex_preds
+    , hexed_outbreaks      = hexed_outbreaks
+    , region_hexes         = region_hexes
+    , country_regions_path = country_regions_path
+    , forecast_windows     = forecast_windows
+    , history_end          = min(test_preds$date) - 1
+    , copula_args          = copula_args)
+    list(
+      tables = country_fit[c("params_full", "params_by_fold", "scores", "scores_by_size", "rare_event_scores", "region_context")]
+    , plots  = list()
+      ## Full fit passed on to the forecast context (not saved as a table)
+    , data   = country_fit)
+  })
+
+
+  ##########################################################################################
   #### 5b) Any outbreak within the whole forecast horizon ----------------------------------
   ##########################################################################################
 
@@ -378,7 +404,10 @@ run_comprehensive_performance <- function(
 
   ## Mask context and copula fit kept for masking the forward-forecast maps of later forecast runs
   if (!is.null(context_dir)) {
-    save_forecast_context(results, test_preds, regional_out$data$oof, context_dir, run_date, regions_path, copula_args)
+    save_forecast_context(results, test_preds, regional_out$data$oof, context_dir, run_date, regions_path, copula_args
+                          , model_id = model_id_from_fit_paths(fitted_model)
+                            ## Country-level copula fit for the memo country table (NULL when skipped)
+                          , country_fit = country_out$data)
   }
 
   out_dir
