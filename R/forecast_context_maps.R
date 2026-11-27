@@ -21,6 +21,8 @@
 #' @param out_root Maps go to out_root/<forecast date>
 #' @param forecast_horizon Upper bounds (days) of the consecutive forecast windows (the
 #'   forecast_horizon target)
+#' @param fitted_model The fitted_model target (file paths); its hyperparameter set must match
+#'   the one the saved context was built from. NULL skips the check
 #' @return Path of the output folder (figures, the regional forecast rows and the context used)
 #' @author Morgan Kain
 #' @export
@@ -31,6 +33,7 @@ run_forecast_context_maps <- function(
   , context_dir      = "outputs/forecast_context"
   , out_root         = "outputs/forecasts/context_maps"
   , forecast_horizon = c(30, 60, 90, 120, 150)
+  , fitted_model     = NULL
 ) {
 
   forecast_windows <- make_forecast_windows(forecast_horizon)
@@ -38,6 +41,12 @@ run_forecast_context_maps <- function(
   ## Context saved by the most recent training run
   context_path <- get_latest_forecast_context(context_dir)
   context      <- qs::qread(context_path)
+
+  ## Stop if the forecast model and the context (skill mask, copula fit, colour limits) come
+   ## from different training runs, since the forecasts would be on a different 
+   ## probability scale (as calibration happens for each run so using a mismatched
+   ## calibration will produce the wrong probabilities)
+  check_context_model_match(context, fitted_model, context_path)
 
   ## Forward forecasts of this run, in the hex_preds layout used by the map functions
   hex_preds <- read_forecast_hex_predictions(forecast_files)
@@ -86,7 +95,7 @@ run_forecast_context_maps <- function(
 
 ## Save the context needed to mask forecast maps (called from run_comprehensive_performance()
  ## in PURPOSE = train runs); returns the saved path, or NULL when the hex context is missing
-save_forecast_context <- function(results, test_preds, regional_oof, context_dir, run_date, regions_path, copula_args) {
+save_forecast_context <- function(results, test_preds, regional_oof, context_dir, run_date, regions_path, copula_args, model_id = NULL, country_fit = NULL) {
 
   hex_context <- results$tables$context$hex_context
   if (is.null(hex_context)) {
@@ -97,7 +106,7 @@ save_forecast_context <- function(results, test_preds, regional_oof, context_dir
   ## Copula settings the regional fit used (evaluate_regional_copula() defaults unless overridden)
   copula_settings <- utils::modifyList(
     as.list(formals(evaluate_regional_copula)[c("latent_step", "min_coverage")])
-  , copula_args[intersect(names(copula_args), c("latent_step", "min_coverage"))])
+  , copula_args[base::intersect(names(copula_args), c("latent_step", "min_coverage"))])
 
   ## Test-period colour limits, so forecast maps share the test-period colour scale
   hex_probs   <- test_preds$prob_pred[test_preds$prob_pred > 0]
@@ -113,12 +122,54 @@ save_forecast_context <- function(results, test_preds, regional_oof, context_dir
   , params_full      = results$tables$regional$params_full
   , copula_settings  = copula_settings
   , regions_path     = regions_path
-  , fill_limits      = list(hex = range(hex_probs, na.rm = TRUE), regional = region_lims))
+  , fill_limits      = list(hex = range(hex_probs, na.rm = TRUE), regional = region_lims)
+    ## Hyperparameter set (tuning grid id + index) of the fits behind this context, checked by forecast runs
+  , model_id         = model_id
+    ## Country-level copula fit (fit_country_copula()), used for the memo country table
+  , country          = country_fit)
 
   dir.create(context_dir, showWarnings = FALSE, recursive = TRUE)
   path <- file.path(context_dir, paste0("forecast_context_", run_date, ".qs"))
   qs::qsave(context, path)
   path
+
+}
+
+## Stop when the forecast model's hyperparameter set differs from the one the saved context was
+ ## built from; contexts saved before model_id was recorded only get a message
+check_context_model_match <- function(context, fitted_model, context_path) {
+
+  ## Nothing to compare without fit paths
+  if (is.null(fitted_model)) return(invisible(NULL))
+
+  forecast_id <- model_id_from_fit_paths(fitted_model)
+
+  ## Older contexts did not record the model they came from
+  if (is.null(context$model_id)) {
+    message("Forecast context ", basename(context_path), " has no model_id; cannot confirm it matches the forecast model (", forecast_id, ")")
+    return(invisible(NULL))
+  }
+
+  ## Any difference means the forecast and the context are on different probability scales
+  if (!identical(sort(forecast_id), sort(context$model_id))) {
+    stop("Forecast model (", paste(forecast_id, collapse = ", "), ") does not match the model behind forecast context "
+       , basename(context_path), " (", paste(context$model_id, collapse = ", "), "). Re-run PURPOSE = train"
+       , " (comprehensive_performance) for this hyperparameter set, or check finalized_hyperparameters.")
+  }
+
+  invisible(NULL)
+
+}
+
+## Hyperparameter set id(s) ("<tuning_grid_id>_<index>") from fitted_model file paths
+ ## (e.g., parsnip_fit_1_for_forecasting_tune_grid_<grid id>_tune_index_<index>_<fit tag>.Rds)
+model_id_from_fit_paths <- function(fit_paths) {
+
+  ## Only the parsnip fits are needed (model_fit / recipe files carry the same id)
+  fits <- basename(grep("parsnip_fit_", unlist(fit_paths), value = TRUE))
+  if (!length(fits)) return(NULL)
+
+  unique(sub(".*_tune_grid_(.+)_tune_index_([0-9]+).*", "\\1_\\2", fits))
 
 }
 
