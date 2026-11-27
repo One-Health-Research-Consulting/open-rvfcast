@@ -1,0 +1,96 @@
+---
+title: "Rift Valley Fever Forecast Memo: {{PERIOD_LABEL}}"
+subtitle: "Forecast made {{FORECAST_DATE_LONG}}"
+author: "Morgan P. Kain (morganpkain@gmail.com)
+Noam Ross (noam@ropensci.org)
+Melinda K. Rostal (rostal@onehealthresearch.net)"
+date: "{{TODAY_LONG}}"
+date-format: "D MMMM YYYY"
+format:
+  typst:
+    papersize: us-letter
+    margin:
+      x: 1in
+      y: 0.9in
+    fontsize: 10.5pt
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+## Everything this memo needs was saved by the memo_draft target (data/memo_inputs.rds);
+## only base R and knitr are used so the memo renders outside the project's renv
+m <- readRDS("data/memo_inputs.rds")
+
+## Percent with one decimal ("0.3%"), and "<0.1%" for tiny values
+pct <- function(x, digits = 1) ifelse(x < 10^-(digits + 2), paste0("<", 10^-digits, "%"), paste0(formatC(100 * x, format = "f", digits = digits), "%"))
+
+## "A, B and C"
+and_list <- function(x) if (length(x) <= 1) x else paste(paste(head(x, -1), collapse = ", "), "and", tail(x, 1))
+```
+
+## Executive summary
+
+- **`r m$headers$overall`.** The highest risk of Rift Valley fever outbreaks in `r m$meta$period_label` is concentrated in `r and_list(m$risk$top_countries_text)`. [CONTEXT]
+- **`r m$headers$relative`.** `r m$relative$n_never` of the `r m$relative$n_compared` medium- and high-risk locations are forecast to be at their highest risk since `r m$relative$history_start_text`, mostly in `r and_list(m$relative$top_never_countries)`. [CONTEXT]
+- **`r m$headers$countries`.** The chance that at least one outbreak is recorded is highest in `r and_list(m$countries$top3_text)`. [CONTEXT]
+- **`r m$headers$expected`.** [CONTEXT]
+- **`r m$headers$unexpected`.** [CONTEXT]
+
+## Introduction
+
+Each month we forecast the chance of Rift Valley fever outbreaks being recorded across Africa, using a machine-learning model of weather and weather forecasts, vegetation, livestock, land cover and estimated herd immunity, trained on outbreaks reported to WOAH (WAHIS) since 2007. This memo covers `r m$meta$period_label` and uses data available on `r m$meta$forecast_date_text`.^[The forecast is for outbreaks starting `r m$meta$window_days_text` after `r m$meta$forecast_date_text` (`r m$meta$window_dates_text`). Outbreak records used run to `r m$meta$outbreak_data_end_text`. Model: `r m$meta$model_id`, trained `r m$meta$training_run_text`.]
+
+## `r m$headers$overall`
+
+[DESCRIPTION OF FIGURE 1.] This month, `r m$risk$n_high` locations are rated high risk and `r m$risk$n_medium` medium risk.^[Risk levels compare this forecast with our model's predictions across the model test period (`r m$risk$test_period_text`). A "High" risk marks locations in the top `r m$risk$high_top_pct` of all predicted probabilities over this test period. Across the test period, "High" risk hexes (as defined here) had outbreaks at `r m$risk$high_lift` times the average rate and accounted for `r pct(m$risk$high_share, 0)` of recorded outbreaks. "Medium" risk marks the top `r m$risk$medium_top_pct`, which captured `r pct(m$risk$medium_share, 0)` of recorded outbreaks.]
+
+![Forecast risk of a Rift Valley fever outbreak in `r m$meta$period_label`. Thick outlines: locations where the model has anticipated past outbreaks. Thin outlines: locations where it has had mixed results. No outline: too few past outbreaks to judge.](figures/risk_map.png){width=88%}
+
+## `r m$headers$relative`
+
+[DESCRIPTION OF FIGURE 2.]^[Compared with the model's forecasts for the same two-month-ahead window made between `r m$relative$history_start_text` and `r m$relative$history_end_text`, and in earlier monthly memos. Only medium- and high-risk locations are compared. `r m$relative$gap_note`]
+
+![For each medium- or high-risk location, how long ago the model last forecast risk this high.](figures/relative_map.png){width=88%}
+
+## `r m$headers$countries`
+
+[DESCRIPTION OF TABLE 1.]^[Country chances combine the location forecasts, allowing for outbreaks in nearby locations tending to happen together (a Gaussian copula fitted to past outbreaks). Across all countries they add up to `r formatC(m$countries$expected_countries, format = "f", digits = 2)`, the expected number of countries with a recorded outbreak in the period. Chances for very small countries are less reliable. "High-risk locations" counts high-risk hexagons, with those where the model has a good track record in brackets. "Track record" is how well the model forecast past outbreaks in that country.]
+
+```{r}
+#| label: tbl-countries
+#| tbl-cap: "Countries with the highest chance that at least one Rift Valley fever outbreak is recorded in the forecast period."
+knitr::kable(m$countries$table, align = c("r", "l", rep("r", ncol(m$countries$table) - 3), "l"))
+```
+
+## `r m$headers$expected`
+
+[CONTEXT]
+
+![Why forecast risk in each focus region differs from the same time of year in earlier years. Bars show how much each group of factors multiplies the odds of an outbreak; together they give the overall change shown for each region.](figures/drivers_change.png){width=95%}
+
+::: {.callout-note}
+## Auto-generated DRAFT notes to be edited 
+
+```{r}
+#| results: asis
+cat(paste0("- ", m$drivers$notes), sep = "\n")
+```
+:::
+
+## `r m$headers$unexpected`
+
+[CONTEXT]
+
+![The data behind the largest changes in each focus region over the past six years. Grey bands: the same time of year as this forecast. Red point: this forecast. Red ticks: recorded outbreaks.](figures/drivers_raw.png){width=100%}
+
+{{< pagebreak >}}
+
+## Appendix (optional)
+
+![What the model relies on across Africa this month.](figures/drivers_importance.png){width=75%}
+
+![Why risk in each focus region differs from the average African location this month.](figures/drivers_vs_africa.png){width=95%}
