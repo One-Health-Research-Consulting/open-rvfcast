@@ -564,7 +564,12 @@ model_tuning_targets_purpose <- tar_plan(
    ## whatever hyperparameter set was most recently finalized by a PURPOSE = train run
    ## (the calib_* calibration coefficients live as columns on that same file, so nothing further to look up)
 model_tuning_targets_purpose <- tar_plan(
-  tar_target(finalized_hyperparameters, get_latest_finalized_hyperparameters(hyperparam_dir = "outputs/hyperparameters"))
+  tar_target(finalized_hyperparameters, get_latest_finalized_hyperparameters(hyperparam_dir = "outputs/hyperparameters")
+    ## Re-check the folder on every run: targets cannot see new files appear on disk, so without
+     ## this a cached path from an older training run would be reused indefinitely. As a file target
+     ## downstream fits rerun only when the chosen file (path or contents) changes
+  , format = "file"
+  , cue    = tar_cue("always"))
 )
 
 }
@@ -682,6 +687,12 @@ model_evaluation_targets_common <- tar_plan(
    ## hexed_outbreaks target); links predictions to the outbreaks behind them
 , tar_target(hexed_outbreaks_path, "data/rvf_outbreaks_hexed.Rds", format = "file")
 
+  ## Country polygons (rnaturalearth, ISO3-coded, equal-area) for up-scaling hex forecasts to
+   ## whole countries: fitted in PURPOSE = train runs and used by the memo country table
+, tar_target(country_regions_path, build_country_regions(
+    out_path = "data/upscaling_regions/countries_rnaturalearth.Rds")
+  , format   = "file")
+
 )
 
 if (purpose == "train") {
@@ -718,6 +729,8 @@ model_evaluation_targets_purpose <- tar_plan(
   , region_hexes         = region_hexes
   , forecast_horizon     = forecast_horizon
   , regions_path         = performance_regions_path
+    ## Countries for the country-level copula saved with the forecast context
+  , country_regions_path = country_regions_path
   , harvest_dir          = "outputs/calibration_harvest"
   , fitted_model         = fitted_model
   , variable_importance  = variable_importance
@@ -731,7 +744,10 @@ model_evaluation_targets_purpose <- tar_plan(
 , tar_target(comprehensive_performance_AWS_upload, AWS_put_files(
     transformed_file_list = c(
       list.files(comprehensive_performance, recursive = TRUE, full.names = TRUE)
-    , list.files("outputs/forecast_context", full.names = TRUE))
+    , list.files("outputs/forecast_context", full.names = TRUE)
+      ## Outer-fold harvest behind this run's calibration and copula fit, so it can be
+       ## recovered on another machine (only the .Rds files the pipeline reads, not .gitkeep)
+    , list.files("outputs/calibration_harvest", pattern = "\\.Rds$", full.names = TRUE))
   , local_folder          = comprehensive_performance
   , overwrite             = parse_flag("OVERWRITE_PERFORMANCE"))
   , error                 = "null")
@@ -751,7 +767,9 @@ model_evaluation_targets_purpose <- tar_plan(
   , hexed_outbreaks_path = hexed_outbreaks_path
   , forecast_horizon     = forecast_horizon
   , context_dir          = "outputs/forecast_context"
-  , out_root             = "outputs/forecasts/context_maps")
+  , out_root             = "outputs/forecasts/context_maps"
+    ## Fitted forecast model, checked against the model the saved context was built from
+  , fitted_model         = fitted_model)
   , error                = "null")
 
   ## Data for the forecast explorer apps (www/forecast_explorer_hex.R and _regions.R)
@@ -780,6 +798,122 @@ model_evaluation_targets_purpose <- tar_plan(
   , local_folder          = forecasts_path
   , overwrite             = parse_flag("OVERWRITE_FORECASTS"))
   , error                 = "null")
+ 
+  ####
+  ## Targets to build pieces for a monthly memo, part automated to construct a template
+  ## that can be adjusted + needed tables and figures 
+  ####
+
+  ## The single forecast window shared in the memo (90 = days 61-90 from the forecast date)
+   ## NOTE: fine for development / for now, but will want to combine temporally to say something
+   ## about risk in the next, say, 90 days. Will need to think on how to do this
+, tar_target(memo_window, 90)
+
+  ## Test-period quantiles of the hex probabilities (memo_window) where "medium" and "high" risk
+   ## begin. Defaults are to use the top 2.5%, which captures about 40% of outbreaks over
+   ## the test period and 10% which captures about 80%. Not a specific justification otherwise
+   ## for these; these arbitrary decisions seem about as good as any others
+, tar_target(memo_risk_quantiles, c(medium = 0.90, high = 0.975))
+
+  ## Make a simplified low / medium / high hex-based risk map where hexes are outlined 
+   ## with different weights based on forecast-skill over the test period
+, tar_target(memo_risk_map, build_memo_risk_map(
+    forecast_files   = examined_fits
+  , region_hexes     = region_hexes
+  , context_dir      = "outputs/forecast_context"
+  , perf_root        = "outputs/comprehensive_performance"
+  , memo_window      = memo_window
+  , risk_quantiles   = memo_risk_quantiles
+  , forecast_horizon = forecast_horizon
+  , out_root         = "reports/memos"))
+
+  ## Months since each Medium / High hex (see above target) was last forecast to 
+   ## have this high of a risk (test period plus previously forecasted months
+   ## beyond the test period if multiple forecasts run since the last time the 
+   ## full training run and thus full model performance metrics were calculated.
+   ## This function also archives this run's hex forecasts for later 
+   ## forecasts/memos to compare against
+, tar_target(memo_relative_map, build_memo_relative_map(
+    memo_risk_map = memo_risk_map
+  , region_hexes  = region_hexes
+  , context_dir   = "outputs/forecast_context"
+  , perf_root     = "outputs/comprehensive_performance"
+  , memo_root     = "reports/memos"))
+
+  ## Country-level copula fit in the saved forecast context (see the 
+   ## run_comprehensive_performance function for more detail on up-scaling of
+   ## predictions using copulas). The copulas are fitted using predictions for
+   ## all out-of-sample periods produced as part of harvest_outer_fold_predictions
+   ## for model calibration. 
+   ## NOTE: these are currently from an old fit, so these are not correct and need
+   ## to be updated by downloading the correct files from Sycorax. Not sure how
+   ## much will change, but the current files were created before some of the
+   ## now-present calibration steps so come from predictions that are higher
+   ## than the correct ones (but may not matter much if the spatial variation is
+   ## similar and just the intercept different) 
+, tar_target(memo_country_context, ensure_country_copula_context(
+    context_dir          = "outputs/forecast_context"
+  , perf_root            = "outputs/comprehensive_performance"
+  , country_regions_path = country_regions_path
+  , hexed_outbreaks_path = hexed_outbreaks_path
+  , region_hexes         = region_hexes
+  , forecast_horizon     = forecast_horizon)
+  , format               = "file")
+
+  ## Builds a table of the top countries by probability of a recorded outbreak 
+   ## in the memo window
+, tar_target(memo_country_table, build_memo_country_table(
+    memo_risk_map        = memo_risk_map
+  , forecast_files       = examined_fits
+  , region_hexes         = region_hexes
+  , country_context_path = memo_country_context
+  , hexed_outbreaks_path = hexed_outbreaks_path
+  , memo_root            = "reports/memos"
+  , n_top                = 10))
+
+  ## Focus regions for examining the predictions for specific regions in more
+   ## detail. Uses ISO3 codes; create lists as desired to explore broader regions
+, tar_target(memo_focus_regions, list(
+    "East Africa (Kenya, Tanzania)" = c("KEN", "TZA")
+  , "Senegal & Mauritania"          = c("SEN", "MRT")
+  , "South Africa"                  = "ZAF"
+  , "Malawi"                        = "MWI"))
+
+  ## SHAP drivers of the forecast for the interval as desired for the current
+   ## months memo. Builds continent-wide importance by covariate family,
+   ## drivers in each focus region, change from the same season in earlier
+   ## years, and does some exploration of raw data
+, tar_target(memo_drivers, build_memo_drivers(
+    memo_risk_map             = memo_risk_map
+  , fitted_model              = fitted_model
+  , finalized_hyperparameters = finalized_hyperparameters
+  , region_data               = region_data
+  , focus_regions             = memo_focus_regions
+  , hexed_outbreaks_path      = hexed_outbreaks_path
+  , memo_root                 = "reports/memos"))
+
+  ## Quarto template for the memo (tracked so edits to the template causes 
+   ## targets to rerun memo_draft)
+, tar_target(memo_template, "reports/templates/rvf_monthly_memo.qmd", format = "file")
+
+  ## Put together a draft memo for manual editing afterwards. Pulls in the various
+   ## figure and table creations as built above and outputs a qmd and a rendered
+   ## pdf, though the pieces are most likely to be extracted individually to put
+   ## together a word or google doc for sharing. 
+    ## NOTE: slightly different topic, but it will probably be sensible to build a
+    ## user-friendly online archive of memo's so that a user can look at the
+    ## full history of created memos
+, tar_target(memo_draft, build_memo_draft(
+    memo_risk_map        = memo_risk_map
+  , memo_relative_map    = memo_relative_map
+  , memo_country_table   = memo_country_table
+  , memo_drivers         = memo_drivers
+  , template_path        = memo_template
+  , context_dir          = "outputs/forecast_context"
+  , hexed_outbreaks_path = hexed_outbreaks_path
+  , forecast_horizon     = forecast_horizon
+  , memo_root            = "reports/memos"
+  , render               = TRUE))
 
   )
 
