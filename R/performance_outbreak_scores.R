@@ -107,7 +107,7 @@ plot_outbreak_skill <- function(outbreak_skill) {
   lead_plot <- function(d, by_type) {
     g <- d |>
       ggplot2::ggplot(ggplot2::aes(lead_bin_mid, median_rank_pct)) +
-      ggplot2::geom_hline(yintercept = 0.5, linetype = "dashed") +
+#      ggplot2::geom_hline(yintercept = 0.5, linetype = "dashed") +
       ggplot2::geom_pointrange(ggplot2::aes(ymin = q25_rank_pct, ymax = q75_rank_pct)) +
       ggplot2::scale_x_reverse() +
       ggplot2::labs(x = "Days before outbreak start", y = "Percentile among all hexes (1 = highest risk)"
