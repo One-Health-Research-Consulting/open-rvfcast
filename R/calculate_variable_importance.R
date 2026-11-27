@@ -46,7 +46,7 @@ for (i in seq_along(vartt)) {
     object          = parsnip::extract_fit_engine(parsnip_fit)
   , pred.var        = vartt[i]
   , pred.fun        = function(object, newdata) {
-      predict(object, as.matrix(newdata))
+      predict(object, xgb_model_matrix(newdata, parsnip_fit$preproc$x_names))
     }
   , grid.resolution = 30
   , ice             = FALSE

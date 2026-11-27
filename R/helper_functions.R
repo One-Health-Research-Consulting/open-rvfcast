@@ -35,3 +35,12 @@ suppressWarnings(
     , panel.border = element_rect(colour = "black", fill = NA, size = 1)
     , strip.text.x = element_text(size = 16, colour = "black", face = "bold"))
 )
+
+## xgboost input built exactly as parsnip builds it for prediction (parsnip:::maybe_matrix):
+ ## a sparse matrix when the baked data has sparse (e.g., one-hot dummy) columns.
+ ## Used in place of as.matrix() when xgboost booster fitted through parsnip is 
+ ## called directly (SHAP, partial dependence) so that the fit and evaluation are identical
+xgb_model_matrix <- function(baked, x_names = NULL) {
+  if (!is.null(x_names)) baked <- baked[, x_names, drop = FALSE]
+  xgboost::xgb.DMatrix(utils::getFromNamespace("maybe_matrix", "parsnip")(baked), missing = NA)
+}

@@ -36,9 +36,9 @@ calculate_shap_by_forecast_interval <- function(model_dat, final_hyper_set, fitt
   xgb_model <- parsnip::extract_fit_engine(parsnip_fit)
 
   ## Do the predictions to get shap (predcontrib = TRUE)
-  shap_mat  <- predict(xgb_model, as.matrix(baked_x), predcontrib = TRUE)
+  shap_mat  <- predict(xgb_model, xgb_model_matrix(baked_x, parsnip_fit$preproc$x_names), predcontrib = TRUE)
 
-  ## Bias estiamte -- not needed for our purposes
+  ## Bias estimate -- not needed for our purposes
   shap_df                   <- as.data.frame(shap_mat[, -ncol(shap_mat)])
 
   ## Add back forecast interval for summarizing shap by interval

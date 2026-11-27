@@ -900,7 +900,7 @@ decompose_series <- function(monthly_tbl, value_col, start_year, start_month) {
 ## Long-format SHAP contributions for a sample of rows, using xgboosts predcontrib 
 compute_shap_long <- function(booster, baked_x) {
   
-  shap_mat <- predict(booster, as.matrix(baked_x), predcontrib = TRUE)
+  shap_mat <- predict(booster, xgb_model_matrix(baked_x), predcontrib = TRUE)
   shap_df  <- as_tibble(shap_mat) |> mutate(.row = row_number())
   feat_df  <- baked_x |> mutate(.row = row_number())
   
